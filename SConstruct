@@ -108,7 +108,10 @@ def UpdateSettings(path):
    boost_inc, boost_lib = GetDirsWithDefault("boost", incdir_default=deps_inc, libdir_default=deps_lib)
    AddDirectories(boost_inc, boost_lib)
    
-   boost_python_libname = GetArgument("boost-python-libname", default=boost_python_libname)
+   boost_pyinc, boost_pylib = GetDirsWithDefault("boost-python", incdir_default=deps_inc, libdir_default=deps_lib)
+   AddDirectories(boost_pyinc, boost_pylib)
+   
+   boost_python_libname = GetArgument("with-boost-python-libname", default=boost_python_libname)
    
    ilmbase_inc, ilmbase_lib = GetDirsWithDefault("ilmbase", incdir_default=deps_inc, libdir_default=deps_lib)
    AddDirectories(ilmbase_inc+"/OpenEXR", ilmbase_lib)
@@ -121,19 +124,21 @@ def UpdateSettings(path):
    
    pyspec = GetArgument("with-python", default=None)
    
-   nogl = GetArgument("nogl", default=False, func=lambda x: int(x) != 0)
+   nogl = GetArgument("no-gl", default=False, func=lambda x: int(x) != 0)
    glut_inc, glut_lib = None, None
    if not nogl:
       glut_inc, glut_lib = GetDirsWithDefault("glut", incdir_default=deps_inc, libdir_default=deps_lib)
       AddDirectories(glut_inc, glut_lib)
    
+   print("===--- Write build settings to %s ---===" % os.path.abspath(path))
    c = open(excons_cache, "w")
    c.write("%s\n" % sys.platform)
    c.write("nogl=%d\n" % (1 if nogl else 0))
    if pyspec is not None:
       c.write("python=%s\n" % pyspec)
    c.write("zlib=%s,%s\n" % (zlib_inc, zlib_lib))
-   c.write("boost=%s,%s,%s\n" % (boost_inc, boost_lib, boost_python_libname))
+   c.write("boost=%s,%s\n" % (boost_inc, boost_lib))
+   c.write("boost-python=%s,%s,%s\n" % (boost_pyinc, boost_pylib, boost_python_libname))
    c.write("ilmbase=%s/OpenEXR,%s\n" % (ilmbase_inc, ilmbase_lib))
    c.write("pyilmbase=%s/OpenEXR,%s\n" % (pyilmbase_inc, pyilmbase_lib))
    c.write("hdf5=%s,%s\n" % (hdf5_inc, hdf5_lib))
@@ -143,6 +148,7 @@ def UpdateSettings(path):
    c.close()
 
 def ReadSettings(path):
+   print("===--- Read build settings from %s (use no-cache=1 to ignore) ---===" % os.path.abspath(path))
    global boost_python_libname, nogl
    
    c = open(path, "r")
@@ -150,7 +156,7 @@ def ReadSettings(path):
       l = l.strip()
       try:
          key, val = l.split("=")
-         if key == "boost":
+         if key == "boost-python":
             inc, lib, boost_python_libname = val.split(",")
             AddDirectories(inc, lib)
          elif key == "python":
@@ -160,13 +166,19 @@ def ReadSettings(path):
          else:
             inc, lib = val.split(",")
             AddDirectories(inc, lib)
+            if key in ["glut", "boost"]:
+               if inc:
+                  SetArgument("with-%s-inc" % key, inc)
+               if lib:
+                  SetArgument("with-%s-lib" % key, lib)
       except Exception, e:
          if verbose and len(l) > 0:
             print("Ignore line: \"%s\" (%s)" % (l, e))
 
 
+
 excons_cache = os.path.abspath("excons.cache")
-nocache = GetArgument("nocache", False, lambda x: int(x) != 0)
+nocache = GetArgument("no-cache", False, lambda x: int(x) != 0)
 
 if nocache or not os.path.isfile(excons_cache):
    UpdateSettings(excons_cache)
