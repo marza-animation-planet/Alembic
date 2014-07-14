@@ -1,0 +1,6 @@
+*.pyc
+.build
+release
+debug
+*.dblite
+excons.cache
