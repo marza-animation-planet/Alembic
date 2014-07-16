@@ -95,7 +95,7 @@ def SafeRemove(lst, item):
    return lst
 
 def UpdateSettings(path):
-   global boost_python_libname, nogl
+   global boost_python_libname, nogl, maya, arnold
    
    try:
       deps_inc, deps_lib = excons.GetDirs("deps", noexc=False)
@@ -122,6 +122,15 @@ def UpdateSettings(path):
    hdf5_inc, hdf5_lib = GetDirsWithDefault("hdf5", incdir_default=deps_inc, libdir_default=deps_lib)
    AddDirectories(hdf5_inc, hdf5_lib)
    
+   arnold_inc, arnold_lib = excons.GetDirs("arnold", libdirname=("bin" if sys.platform != "win32" else "lib"))
+   if arnold_inc and arnold_lib:
+      arnold = True
+   
+   maya_inc, maya_lib = excons.GetDirs("maya", noexc=True)
+   maya_ver = GetArgument("maya-ver", None)
+   if (maya_inc and maya_lib) or maya_ver:
+      maya = True
+   
    pyspec = GetArgument("with-python", default=None)
    
    nogl = GetArgument("no-gl", default=False, func=lambda x: int(x) != 0)
@@ -136,6 +145,12 @@ def UpdateSettings(path):
    c.write("nogl=%d\n" % (1 if nogl else 0))
    if pyspec is not None:
       c.write("python=%s\n" % pyspec)
+   if maya_inc and maya_lib:
+      c.write("maya=%s,%s\n" % (maya_inc, maya_lib))
+   elif maya_ver:
+      c.write("maya-ver=%s\n" % maya_ver)
+   if arnold_inc and arnold_lib:
+      c.write("arnold=%s,%s\n" % (arnold_inc, arnold_lib))
    c.write("zlib=%s,%s\n" % (zlib_inc, zlib_lib))
    c.write("boost=%s,%s\n" % (boost_inc, boost_lib))
    c.write("boost-python=%s,%s,%s\n" % (boost_pyinc, boost_pylib, boost_python_libname))
@@ -149,7 +164,7 @@ def UpdateSettings(path):
 
 def ReadSettings(path):
    print("===--- Read build settings from %s (use no-cache=1 to ignore) ---===" % os.path.abspath(path))
-   global boost_python_libname, nogl
+   global boost_python_libname, nogl, maya, arnold
    
    c = open(path, "r")
    for l in c.readlines():
@@ -163,14 +178,21 @@ def ReadSettings(path):
             SetArgument("with-python", val)
          elif key == "nogl":
             nogl = (int(val) != 0)
+         elif key == "maya-ver":
+            SetArgument(key, val)
+            maya = True
          else:
             inc, lib = val.split(",")
             AddDirectories(inc, lib)
-            if key in ["glut", "boost"]:
+            if key in ["glut", "boost", "maya", "arnold"]:
                if inc:
                   SetArgument("with-%s-inc" % key, inc)
                if lib:
                   SetArgument("with-%s-lib" % key, lib)
+            if key == "maya":
+               maya = True
+            if key == "arnold":
+               arnold = True
       except Exception, e:
          if verbose and len(l) > 0:
             print("Ignore line: \"%s\" (%s)" % (l, e))
@@ -363,13 +385,40 @@ if not nogl:
                 }])
 
 if arnold:
-   # TODO
-   pass
-
+   prjs.append({"name": "AlembicArnoldProcedural",
+                "type": "dynamicmodule",
+                "ext": arnoldbuilder.PluginExt(),
+                "prefix": "arnold",
+                "defs": defs,
+                "incdirs": incdirs + ["arnold/Procedural"],
+                "libdirs": libdirs,
+                "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
+                "srcs": glob.glob("arnold/Procedural/*.cpp"),
+                "custom": [arnoldbuilder.Require]})
 
 if maya:
-   # TODO
-   pass
+   prjs.extend([{"name": "AbcImport",
+                 "type": "dynamicmodule",
+                 "ext": mayabuilder.PluginExt(),
+                 "prefix": "maya/plug-ins",
+                 "defs": defs,
+                 "incdirs": incdirs + ["maya/AbcImport"],
+                 "libdirs": libdirs,
+                 "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
+                 "srcs": glob.glob("maya/AbcImport/*.cpp"),
+                 "custom": [mayabuilder.Require]
+                },
+                {"name": "AbcExport",
+                 "type": "dynamicmodule",
+                 "ext": mayabuilder.PluginExt(),
+                 "prefix": "maya/plug-ins",
+                 "defs": defs,
+                 "incdirs": incdirs + ["maya/AbcExport"],
+                 "libdirs": libdirs,
+                 "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
+                 "srcs": glob.glob("maya/AbcExport/*.cpp"),
+                 "custom": [mayabuilder.Require, mayabuilder.Plugin]
+                }])
 
 
 if houdini:
