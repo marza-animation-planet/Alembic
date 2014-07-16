@@ -101,6 +101,7 @@ public:
 
     CreateSceneVisitor(double iFrame = 0,
         bool iUnmarkedFaceVaryingColors = false,
+        bool iUnmarkedFaceVaryingUVs = false,
         const MObject & iParent = MObject::kNullObj,
         Action iAction = CREATE, MString iRootNodes = MString(),
         MString iFilterString = MString(),
@@ -161,6 +162,7 @@ private:
     // without the appropriate metadata hint should be treated as a color
     // set (if true) or as an attribute on the node (if false)
     bool mUnmarkedFaceVaryingColors;
+    bool mUnmarkedFaceVaryingUVs;
 
     MDagPath mConnectDagNode;
 

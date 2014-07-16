@@ -58,25 +58,61 @@
 
 namespace
 {
-
+    bool createUVSet(MFnMesh & meshIO, MString & iSetName)
+    {
+        MStatus status = MS::kSuccess;
+        MString tmp;
+        
+        tmp = meshIO.createUVSetDataMeshWithName(iSetName, &status);
+        
+        if (status != MS::kSuccess)
+        {
+            tmp = meshIO.createUVSetWithName(iSetName, NULL, &status);
+            
+            if (status != MS::kSuccess)
+            {
+                return false;
+            }
+            else
+            {
+                iSetName = tmp;
+                return true;
+            }
+        }
+        else
+        {
+            iSetName = tmp;
+            return true;
+        }
+    }
+    
     MStatus setMeshUVs(MFnMesh & ioMesh,
         const MFloatArray & uArray, const MFloatArray & vArray,
-        const MIntArray & uvCounts, const MIntArray & uvIds)
+        const MIntArray & uvCounts, const MIntArray & uvIds,
+        MString * uvSetName)
     {
         MStatus status = MS::kSuccess;
 
         // Create uv set on ioMesh object
-        MString uvSetName("uvset1");
-        status = ioMesh.getCurrentUVSetName(uvSetName);
-        if ( status != MS::kSuccess )
+        MString tmp;
+        if ( ioMesh.getCurrentUVSetName(tmp) != MS::kSuccess )
         {
-            uvSetName = MString("uvset1");
-            status = ioMesh.createUVSet(uvSetName);
-            status = ioMesh.setCurrentUVSetName(uvSetName);
+            // No uv set yet on mesh, create one and set it current
+            tmp = (uvSetName ? *uvSetName : "");
+            if (!createUVSet(ioMesh, tmp))
+            {
+                printError(ioMesh.fullPathName() + " Assign UVs failed");
+                return MS::kFailure;
+            }
+            status = ioMesh.setCurrentUVSetName(tmp);
+            if (uvSetName)
+            {
+                *uvSetName = tmp;
+            }
         }
-        status = ioMesh.clearUVs();
-        status = ioMesh.setUVs(uArray, vArray, &uvSetName);
-        status = ioMesh.assignUVs(uvCounts, uvIds);
+        status = ioMesh.clearUVs(uvSetName);
+        status = ioMesh.setUVs(uArray, vArray, uvSetName);
+        status = ioMesh.assignUVs(uvCounts, uvIds, uvSetName);
 
         if (status != MS::kSuccess)
             printError(ioMesh.fullPathName() + " Assign UVs failed");
@@ -86,7 +122,7 @@ namespace
 
 
     void setUVs(double iFrame, MFnMesh & ioMesh,
-        Alembic::AbcGeom::IV2fGeomParam iUVs)
+        Alembic::AbcGeom::IV2fGeomParam iUVs, MString *iSetName = 0)
     {
 
         if (!iUVs.valid())
@@ -178,7 +214,17 @@ namespace
             }
         }
 
-        setMeshUVs(ioMesh, uArray, vArray, uvCounts, uvIds);
+        MString _uvSetName;
+        if (!iSetName)
+        {
+            _uvSetName = Alembic::AbcGeom::GetSourceName(iUVs.getMetaData()).c_str();
+            if (_uvSetName.length() > 0)
+            {
+                iSetName = &_uvSetName;
+            }
+        }
+
+        setMeshUVs(ioMesh, uArray, vArray, uvCounts, uvIds, iSetName);
     }  // setUVs
 
     // utility to clear pt when doing a swap otherwise
@@ -418,7 +464,7 @@ namespace
         }
 
     }
-
+    
     void setColor(MFnMesh & ioMesh, MColorArray & iColorList,
         Alembic::Abc::UInt32ArraySamplePtr & iSampIndices,
         MString & iColorSet,
@@ -664,6 +710,37 @@ namespace
         }
     }
 
+    void setExtraUVs(double iFrame, MFnMesh & ioMesh,
+        std::vector< Alembic::AbcGeom::IV2fGeomParam > iV2s,
+        bool iSetStatic)
+    {
+        if (iV2s.empty())
+        {
+            return;
+        }
+        
+        std::vector< Alembic::AbcGeom::IV2fGeomParam >::iterator v2s;
+        std::vector< Alembic::AbcGeom::IV2fGeomParam >::iterator v2sEnd = iV2s.end();
+        
+        MStringArray allSetNames;
+        ioMesh.getUVSetNames(allSetNames);
+        
+        for (v2s = iV2s.begin(); v2s != v2sEnd; ++v2s)
+        {
+            if (v2s->getNumSamples() > 0 && (iSetStatic || !v2s->isConstant()))
+            {
+                MString setName(v2s->getName().c_str());
+                if (!inStrArray(allSetNames, setName))
+                {
+                    createUVSet(ioMesh, setName);
+                    allSetNames.append(setName);
+                }
+
+                setUVs(iFrame, ioMesh, *v2s, &setName);
+            }
+        }
+    }
+
     void fillCreases(MFnMesh & ioMesh, SubDAndColors & iNode,
                      Alembic::Abc::FloatArraySamplePtr creases,
                      Alembic::Abc::Int32ArraySamplePtr indices,
@@ -827,7 +904,6 @@ void readPoly(double iFrame, MFnMesh & ioMesh, MObject & iParent,
 
         fillPoints(pointArray, points, ceilPoints, alpha);
         ioMesh.setPoints(pointArray, MSpace::kObject);
-        setColors(iFrame, ioMesh, iNode.mC3s, iNode.mC4s, !iInitialized);
 
         if (schema.getNormalsParam().getNumSamples() > 1)
         {
@@ -838,6 +914,9 @@ void readPoly(double iFrame, MFnMesh & ioMesh, MObject & iParent,
         {
             setUVs(iFrame, ioMesh, schema.getUVsParam());
         }
+
+        setColors(iFrame, ioMesh, iNode.mC3s, iNode.mC4s, !iInitialized);
+        setExtraUVs(iFrame, ioMesh, iNode.mV2s, !iInitialized);
 
         return;
     }
@@ -860,6 +939,7 @@ void readPoly(double iFrame, MFnMesh & ioMesh, MObject & iParent,
     setPolyNormals(iFrame, ioMesh, schema.getNormalsParam());
     setUVs(iFrame, ioMesh, schema.getUVsParam());
     setColors(iFrame, ioMesh, iNode.mC3s, iNode.mC4s, !iInitialized);
+    setExtraUVs(iFrame, ioMesh, iNode.mV2s, !iInitialized);
 }
 
 void readSubD(double iFrame, MFnMesh & ioMesh, MObject & iParent,
@@ -897,6 +977,7 @@ void readSubD(double iFrame, MFnMesh & ioMesh, MObject & iParent,
         }
 
         setColors(iFrame, ioMesh, iNode.mC3s, iNode.mC4s, !iInitialized);
+        setExtraUVs(iFrame, ioMesh, iNode.mV2s, !iInitialized);
 
         return;
     }
@@ -918,6 +999,7 @@ void readSubD(double iFrame, MFnMesh & ioMesh, MObject & iParent,
 
     setUVs(iFrame, ioMesh, schema.getUVsParam());
     setColors(iFrame, ioMesh, iNode.mC3s, iNode.mC4s, !iInitialized);
+    setExtraUVs(iFrame, ioMesh, iNode.mV2s, !iInitialized);
     fillCreasesCornersAndHoles(ioMesh, iNode, samp);
 }
 
@@ -993,7 +1075,7 @@ MObject createPoly(double iFrame, PolyMeshAndColors & iNode,
     setInitialShadingGroup(pathName);
 
     setColors(iFrame, fnMesh, iNode.mC3s, iNode.mC4s, true);
-
+    setExtraUVs(iFrame, fnMesh, iNode.mV2s, true);
 
     if ( !schema.getNormalsParam().valid() )
     {
@@ -1040,6 +1122,7 @@ MObject createSubD(double iFrame, SubDAndColors & iNode,
     setUVs(iFrame, fnMesh, schema.getUVsParam());
 
     setColors(iFrame, fnMesh, iNode.mC3s, iNode.mC4s, true);
+    setExtraUVs(iFrame, fnMesh, iNode.mV2s, true);
 
     // add the mFn-specific attributes to fnMesh node
     MFnNumericAttribute numAttr;

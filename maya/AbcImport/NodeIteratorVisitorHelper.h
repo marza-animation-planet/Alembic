@@ -69,7 +69,7 @@ struct Prop
 };
 
 void addProps(Alembic::Abc::ICompoundProperty & iParent, MObject & iObject,
-              bool iUnmarkedFaceVaryingColors);
+              bool iUnmarkedFaceVaryingColors, bool iUnmarkedFaceVaryingUVs);
 
 bool addArrayProp(Alembic::Abc::IArrayProperty & iProp, MObject & iParent);
 bool addScalarProp(Alembic::Abc::IScalarProperty & iProp, MObject & iParent);
@@ -137,7 +137,7 @@ void readProp(double iFrame,
               MDataHandle & iHandle);
 
 void getAnimatedProps(Alembic::Abc::ICompoundProperty & iParent,
-    std::vector<Prop> & oPropList, bool iUnmarkedFaceVaryingColors);
+    std::vector<Prop> & oPropList, bool iUnmarkedFaceVaryingColors, bool iUnmarkedFaceVaryingUVs);
 
 void getAnimatedArrayProp(Alembic::Abc::IArrayProperty prop,
                           std::vector<Prop> & oPropList);
@@ -185,6 +185,7 @@ public:
     Alembic::AbcGeom::IPolyMesh mMesh;
     std::vector< Alembic::AbcGeom::IC3fGeomParam > mC3s;
     std::vector< Alembic::AbcGeom::IC4fGeomParam > mC4s;
+    std::vector< Alembic::AbcGeom::IV2fGeomParam > mV2s;
 };
 
 class SubDAndColors
@@ -193,6 +194,7 @@ public:
     Alembic::AbcGeom::ISubD mMesh;
     std::vector< Alembic::AbcGeom::IC3fGeomParam > mC3s;
     std::vector< Alembic::AbcGeom::IC4fGeomParam > mC4s;
+    std::vector< Alembic::AbcGeom::IV2fGeomParam > mV2s;
 };
 
 // A data class for cleaner code when copying a group of info between functions
@@ -248,6 +250,7 @@ public:
         bool    iCreateIfNotFound = false,
         bool    iRemoveIfNoUpdate = false,
         bool    iRecreateColorSets = false,
+        bool    iRecreateUVSets = false,
         MString iIncludeFilterString = MString(""),
         MString iExcludeFilterString = MString(""));
     ArgData(const ArgData & rhs);
@@ -261,6 +264,7 @@ public:
     MObject     mReparentObj;
 
     bool        mRecreateColorSets;
+    bool        mRecreateUVSets;
 
     // optional information for the "connect" flag
     bool        mConnect;
@@ -286,5 +290,9 @@ bool getColorAttrs( Alembic::Abc::ICompoundProperty & iParent,
     std::vector< Alembic::AbcGeom::IC3fGeomParam > & ioC3s,
     std::vector< Alembic::AbcGeom::IC4fGeomParam > & ioC4s,
     bool iUnmarkedFaceVaryingColors);
+
+bool getUVAttrs( Alembic::Abc::ICompoundProperty & iParent,
+    std::vector< Alembic::AbcGeom::IV2fGeomParam > & ioV2s,
+    bool iUnmarkedFaceVaryingUVs);
 
 #endif  // ABCIMPORT_NODE_ITERATOR_HELPER_H_

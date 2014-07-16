@@ -779,7 +779,7 @@ bool addArrayProp(Alembic::Abc::IArrayProperty & iProp, MObject & iParent)
                 {
                     attrObj = numAttr.create(attrName, attrName,
                         MFnNumericData::k4Double);
-                    numAttr.setDefault(val[0], val[1], val[2], val[4]);
+                    numAttr.setDefault(val[0], val[1], val[2], val[3]);
                 }
             }
         }
@@ -1138,7 +1138,7 @@ addScalarExtentFourProp(Alembic::Abc::IScalarProperty& iProp,
     else if (extent == 4)
     {
         attrObj = numAttr.create(attrName, attrName, type4);
-        numAttr.setDefault(val[0], val[1], val[2], val[4]);
+        numAttr.setDefault(val[0], val[1], val[2], val[3]);
     }
 
     return VALID_NOTDONE;
@@ -1323,7 +1323,7 @@ bool addScalarProp(Alembic::Abc::IScalarProperty & iProp, MObject & iParent)
 
 
 void addProps(Alembic::Abc::ICompoundProperty & iParent, MObject & iObject,
-    bool iUnmarkedFaceVaryingColors)
+    bool iUnmarkedFaceVaryingColors, bool iUnmarkedFaceVaryingUVs)
 {
     // if the params CompoundProperty (.arbGeomParam or .userProperties)
     // aren't valid, then skip
@@ -1341,6 +1341,11 @@ void addProps(Alembic::Abc::ICompoundProperty & iParent, MObject & iObject,
         // we have a color that we want to make a colorset out of
         if ( iObject.hasFn(MFn::kMesh) && isColorSet(propHeader,
             iUnmarkedFaceVaryingColors) )
+        {
+            continue;
+        }
+        else if ( iObject.hasFn(MFn::kMesh) && isUVSet(propHeader,
+            iUnmarkedFaceVaryingUVs) )
         {
             continue;
         }
@@ -1526,7 +1531,8 @@ void getAnimatedScalarProp(Alembic::Abc::IScalarProperty prop,
 
 void getAnimatedProps(Alembic::Abc::ICompoundProperty & iParent,
                       std::vector<Prop> & oPropList,
-                      bool iUnmarkedFaceVaryingColors)
+                      bool iUnmarkedFaceVaryingColors,
+                      bool iUnmarkedFaceVaryingUVs)
 {
     // if the arbitrary geom params aren't valid, then skip
     if (!iParent)
@@ -1542,6 +1548,10 @@ void getAnimatedProps(Alembic::Abc::ICompoundProperty & iParent,
         // we have a color that we want to make a colorset out of
         // and we will do so elsewhere
         if ( isColorSet(propHeader, iUnmarkedFaceVaryingColors) )
+        {
+            continue;
+        }
+        else if ( isUVSet(propHeader, iUnmarkedFaceVaryingUVs) )
         {
             continue;
         }
@@ -2690,6 +2700,16 @@ void WriterData::getFrameRange(double & oMin, double & oMax)
             oMin = std::min(ts->getSampleTime(0), oMin);
             oMax = std::max(ts->getSampleTime(numSamples-1), oMax);
         }
+        
+        std::vector< Alembic::AbcGeom::IV2fGeomParam >::iterator v2s, v2sEnd;
+        v2sEnd = mPolyMeshList[i].mV2s.end();
+        for (v2s = mPolyMeshList[i].mV2s.begin(); v2s != v2sEnd; ++v2s)
+        {
+            ts = v2s->getTimeSampling();
+            numSamples = v2s->getNumSamples();
+            oMin = std::min(ts->getSampleTime(0), oMin);
+            oMax = std::max(ts->getSampleTime(numSamples-1), oMax);
+        }
     }
 
     iEnd = mSubDList.size();
@@ -2716,6 +2736,16 @@ void WriterData::getFrameRange(double & oMin, double & oMax)
         {
             ts = c4s->getTimeSampling();
             numSamples = c4s->getNumSamples();
+            oMin = std::min(ts->getSampleTime(0), oMin);
+            oMax = std::max(ts->getSampleTime(numSamples-1), oMax);
+        }
+        
+        std::vector< Alembic::AbcGeom::IV2fGeomParam >::iterator v2s, v2sEnd;
+        v2sEnd = mSubDList[i].mV2s.end();
+        for (v2s = mSubDList[i].mV2s.begin(); v2s != v2sEnd; ++v2s)
+        {
+            ts = v2s->getTimeSampling();
+            numSamples = v2s->getNumSamples();
             oMin = std::min(ts->getSampleTime(0), oMin);
             oMax = std::max(ts->getSampleTime(numSamples-1), oMax);
         }
@@ -2795,11 +2825,12 @@ void WriterData::getFrameRange(double & oMin, double & oMax)
 ArgData::ArgData(MString iFileName,
     bool iDebugOn, MObject iReparentObj, bool iConnect,
     MString iConnectRootNodes, bool iCreateIfNotFound, bool iRemoveIfNoUpdate,
-    bool iRecreateColorSets, MString iFilterString,
+    bool iRecreateColorSets, bool iRecreateUVSets, MString iFilterString,
     MString iExcludeFilterString) :
         mFileName(iFileName),
         mDebugOn(iDebugOn), mReparentObj(iReparentObj),
         mRecreateColorSets(iRecreateColorSets),
+        mRecreateUVSets(iRecreateUVSets),
         mConnect(iConnect),
         mConnectRootNodes(iConnectRootNodes),
         mCreateIfNotFound(iCreateIfNotFound),
@@ -2826,6 +2857,7 @@ ArgData & ArgData::operator=(const ArgData & rhs)
 
     mReparentObj = rhs.mReparentObj;
     mRecreateColorSets = rhs.mRecreateColorSets;
+    mRecreateUVSets = rhs.mRecreateUVSets;
     mIncludeFilterString = rhs.mIncludeFilterString;
     mExcludeFilterString = rhs.mExcludeFilterString;
 
@@ -2868,7 +2900,7 @@ MString createScene(ArgData & iArgData)
         action = CreateSceneVisitor::CONNECT;
 
     CreateSceneVisitor visitor(iArgData.mSequenceStartTime,
-        iArgData.mRecreateColorSets, iArgData.mReparentObj, action,
+        iArgData.mRecreateColorSets, iArgData.mRecreateUVSets, iArgData.mReparentObj, action,
         iArgData.mConnectRootNodes, iArgData.mIncludeFilterString,
         iArgData.mExcludeFilterString);
 
@@ -2917,6 +2949,15 @@ MString connectAttr(ArgData & iArgData)
     {
         MFnNumericAttribute numAttr;
         MObject attrObj = numAttr.create("allColorSets", "allColorSets",
+            MFnNumericData::kBoolean);
+        alembicNodeFn.addAttribute(attrObj,
+            MFnDependencyNode::kLocalDynamicAttr);
+    }
+
+    if (iArgData.mRecreateUVSets)
+    {
+        MFnNumericAttribute numAttr;
+        MObject attrObj = numAttr.create("allUVSets", "allUVSets",
             MFnNumericData::kBoolean);
         alembicNodeFn.addAttribute(attrObj,
             MFnDependencyNode::kLocalDynamicAttr);
@@ -3286,6 +3327,38 @@ bool getColorAttrs(Alembic::Abc::ICompoundProperty & iParent,
             }
             ioC4s.push_back(cgp);
         }
+    }
+
+    return anyAnimated;
+}
+
+bool getUVAttrs(Alembic::Abc::ICompoundProperty & iParent,
+    std::vector< Alembic::AbcGeom::IV2fGeomParam > & ioV2s,
+    bool iUnmarkedFaceVaryingUVs)
+{
+    bool anyAnimated = false;
+
+    // invalid geom params bail early
+    if (!iParent)
+        return anyAnimated;
+
+    std::size_t numProps = iParent.getNumProperties();
+    for (std::size_t i = 0; i < numProps; ++i)
+    {
+        const Alembic::Abc::PropertyHeader & propHeader =
+            iParent.getPropertyHeader(i);
+
+        if (!isUVSet(propHeader, iUnmarkedFaceVaryingUVs))
+        {
+            continue;
+        }
+
+        Alembic::AbcGeom::IV2fGeomParam vgp(iParent, propHeader.getName());
+        if (!anyAnimated)
+        {
+            anyAnimated = !vgp.isConstant();
+        }
+        ioV2s.push_back(vgp);
     }
 
     return anyAnimated;

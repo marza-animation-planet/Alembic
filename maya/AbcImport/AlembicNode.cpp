@@ -510,7 +510,8 @@ MStatus AlembicNode::compute(const MPlug & plug, MDataBlock & dataBlock)
 
         MFnDependencyNode dep(thisMObject());
         MPlug allSetsPlug = dep.findPlug("allColorSets");
-        CreateSceneVisitor visitor(inputTime, !allSetsPlug.isNull(),
+        MPlug allUVsPlug = dep.findPlug("allUVSets");
+        CreateSceneVisitor visitor(inputTime, !allSetsPlug.isNull(), !allUVsPlug.isNull(),
             MObject::kNullObj, CreateSceneVisitor::NONE, "",
             mIncludeFilterString, mExcludeFilterString);
 

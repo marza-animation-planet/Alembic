@@ -471,3 +471,12 @@ bool isColorSet(const Alembic::AbcCoreAbstract::PropertyHeader & iHeader,
             (iUnmarkedFaceVaryingColors ||
             iHeader.getMetaData().get("mayaColorSet") != "");
 }
+
+bool isUVSet(const Alembic::AbcCoreAbstract::PropertyHeader & iHeader,
+    bool iUnmarkedFaceVaryingUVs)
+{
+    return Alembic::AbcGeom::IV2fGeomParam::matches(iHeader) &&
+           Alembic::AbcGeom::GetGeometryScope(iHeader.getMetaData()) ==
+                Alembic::AbcGeom::kFacevaryingScope &&
+           (iUnmarkedFaceVaryingUVs || Alembic::AbcGeom::isUV(iHeader));
+}

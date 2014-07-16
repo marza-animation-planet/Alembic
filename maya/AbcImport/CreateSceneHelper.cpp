@@ -231,8 +231,8 @@ namespace
                 Alembic::Abc::ICompoundProperty userProp =
                     faceSet.getSchema().getUserProperties();
 
-                addProps(arbProp, shadingGroup, false);
-                addProps(userProp, shadingGroup, false);
+                addProps(arbProp, shadingGroup, false, false);
+                addProps(userProp, shadingGroup, false, false);
             }
         }
     }
@@ -313,11 +313,13 @@ namespace
 
 
 CreateSceneVisitor::CreateSceneVisitor(double iFrame,
-    bool iUnmarkedFaceVaryingColors, const MObject & iParent,
+    bool iUnmarkedFaceVaryingColors, bool iUnmarkedFaceVaryingUVs, const MObject & iParent,
     Action iAction, MString iRootNodes,
     MString iIncludeFilterString, MString iExcludeFilterString) :
     mFrame(iFrame), mParent(iParent),
-    mUnmarkedFaceVaryingColors(iUnmarkedFaceVaryingColors), mAction(iAction)
+    mUnmarkedFaceVaryingColors(iUnmarkedFaceVaryingColors),
+    mUnmarkedFaceVaryingUVs(iUnmarkedFaceVaryingUVs),
+    mAction(iAction)
 {
     mAnyRoots = false;
 
@@ -771,8 +773,8 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ICamera & iNode)
         iNode.getSchema().getUserProperties();
 
     std::size_t firstProp = mData.mPropList.size();
-    getAnimatedProps(arbProp, mData.mPropList, false);
-    getAnimatedProps(userProp, mData.mPropList, false);
+    getAnimatedProps(arbProp, mData.mPropList, false, false);
+    getAnimatedProps(userProp, mData.mPropList, false, false);
     Alembic::Abc::IScalarProperty visProp = getVisible(iNode, isConstant,
         mData.mPropList, mData.mAnimVisStaticObjList);
 
@@ -802,8 +804,8 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ICamera & iNode)
     if (cameraObj != MObject::kNullObj)
     {
         setConstantVisibility(visProp, cameraObj);
-        addProps(arbProp, cameraObj, false);
-        addProps(userProp, cameraObj, false);
+        addProps(arbProp, cameraObj, false, false);
+        addProps(userProp, cameraObj, false, false);
     }
 
     if ( mAction >= CONNECT )
@@ -869,8 +871,8 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ICurves & iNode)
     }
 
     std::size_t firstProp = mData.mPropList.size();
-    getAnimatedProps(arbProp, mData.mPropList, false);
-    getAnimatedProps(userProp, mData.mPropList, false);
+    getAnimatedProps(arbProp, mData.mPropList, false, false);
+    getAnimatedProps(userProp, mData.mPropList, false, false);
     Alembic::Abc::IScalarProperty visProp = getVisible(iNode, isConstant,
         mData.mPropList, mData.mAnimVisStaticObjList);
 
@@ -920,8 +922,8 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ICurves & iNode)
     if (curvesObj != MObject::kNullObj)
     {
         setConstantVisibility(visProp, curvesObj);
-        addProps(arbProp, curvesObj, false);
-        addProps(userProp, curvesObj, false);
+        addProps(arbProp, curvesObj, false, false);
+        addProps(userProp, curvesObj, false, false);
     }
 
 
@@ -1014,8 +1016,8 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPoints& iNode)
         Alembic::Abc::ICompoundProperty userProp =
             iNode.getSchema().getUserProperties();
 
-        addProps(arbProp, particleObj, false);
-        addProps(userProp, particleObj, false);
+        addProps(arbProp, particleObj, false, false);
+        addProps(userProp, particleObj, false, false);
     }
 
     if (hasDag)
@@ -1043,18 +1045,21 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ISubD& iNode)
     bool colorAnim = getColorAttrs(arbProp, subdColors.mC3s,
         subdColors.mC4s, mUnmarkedFaceVaryingColors);
 
+    bool uvAnim = getUVAttrs(arbProp, subdColors.mV2s,
+        mUnmarkedFaceVaryingUVs);
+
     bool isConstant = iNode.getSchema().isConstant();
 
     // add animated SubDs to the list
-    if (!isConstant || colorAnim)
+    if (!isConstant || colorAnim || uvAnim)
     {
         mData.mSubDList.push_back(subdColors);
     }
 
     std::size_t firstProp = mData.mPropList.size();
 
-    getAnimatedProps(arbProp, mData.mPropList, mUnmarkedFaceVaryingColors);
-    getAnimatedProps(userProp, mData.mPropList, mUnmarkedFaceVaryingColors);
+    getAnimatedProps(arbProp, mData.mPropList, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs);
+    getAnimatedProps(userProp, mData.mPropList, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs);
     Alembic::Abc::IScalarProperty visProp = getVisible(iNode, isConstant,
         mData.mPropList, mData.mAnimVisStaticObjList);
 
@@ -1065,7 +1070,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ISubD& iNode)
         if (hasDag)
         {
             subDObj = mConnectDagNode.node();
-            if (!isConstant || colorAnim)
+            if (!isConstant || colorAnim || uvAnim)
             {
                 mData.mSubDObjList.push_back(subDObj);
             }
@@ -1075,7 +1080,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ISubD& iNode)
     if (!hasDag && (mAction == CREATE || mAction == CREATE_REMOVE))
     {
         subDObj = createSubD(mFrame, subdColors, mParent);
-        if (!isConstant || colorAnim)
+        if (!isConstant || colorAnim || uvAnim)
         {
             mData.mSubDObjList.push_back(subDObj);
         }
@@ -1084,8 +1089,8 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ISubD& iNode)
     if (subDObj != MObject::kNullObj)
     {
         setConstantVisibility(visProp, subDObj);
-        addProps(arbProp, subDObj, mUnmarkedFaceVaryingColors);
-        addProps(userProp, subDObj, mUnmarkedFaceVaryingColors);
+        addProps(arbProp, subDObj, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs);
+        addProps(userProp, subDObj, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs);
         addFaceSets(subDObj, iNode);
     }
 
@@ -1146,13 +1151,16 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPolyMesh& iNode)
     bool colorAnim = getColorAttrs(arbProp, meshColors.mC3s,
         meshColors.mC4s, mUnmarkedFaceVaryingColors);
 
+    bool uvAnim = getUVAttrs(arbProp, meshColors.mV2s,
+        mUnmarkedFaceVaryingUVs);
+
     // add animated poly mesh to the list
-    if (!isConstant || colorAnim)
+    if (!isConstant || colorAnim || uvAnim)
         mData.mPolyMeshList.push_back(meshColors);
 
     std::size_t firstProp = mData.mPropList.size();
-    getAnimatedProps(arbProp, mData.mPropList, mUnmarkedFaceVaryingColors);
-    getAnimatedProps(userProp, mData.mPropList, mUnmarkedFaceVaryingColors);
+    getAnimatedProps(arbProp, mData.mPropList, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs);
+    getAnimatedProps(userProp, mData.mPropList, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs);
     Alembic::Abc::IScalarProperty visProp = getVisible(iNode, isConstant,
         mData.mPropList, mData.mAnimVisStaticObjList);
 
@@ -1163,7 +1171,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPolyMesh& iNode)
         if (hasDag)
         {
             polyObj = mConnectDagNode.node();
-            if (!isConstant || colorAnim)
+            if (!isConstant || colorAnim || uvAnim)
             {
                 mData.mPolyMeshObjList.push_back(polyObj);
             }
@@ -1173,7 +1181,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPolyMesh& iNode)
     if (!hasDag && (mAction == CREATE || mAction == CREATE_REMOVE))
     {
         polyObj = createPoly(mFrame, meshColors, mParent);
-        if (!isConstant || colorAnim)
+        if (!isConstant || colorAnim || uvAnim)
         {
             mData.mPolyMeshObjList.push_back(polyObj);
         }
@@ -1182,8 +1190,8 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPolyMesh& iNode)
     if (polyObj != MObject::kNullObj)
     {
         setConstantVisibility(visProp, polyObj);
-        addProps(arbProp, polyObj, mUnmarkedFaceVaryingColors);
-        addProps(userProp, polyObj, mUnmarkedFaceVaryingColors);
+        addProps(arbProp, polyObj, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs);
+        addProps(userProp, polyObj, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs);
         addFaceSets(polyObj, iNode);
     }
 
@@ -1241,8 +1249,8 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::INuPatch& iNode)
         iNode.getSchema().getUserProperties();
 
     std::size_t firstProp = mData.mPropList.size();
-    getAnimatedProps(arbProp, mData.mPropList, false);
-    getAnimatedProps(userProp, mData.mPropList, false);
+    getAnimatedProps(arbProp, mData.mPropList, false, false);
+    getAnimatedProps(userProp, mData.mPropList, false, false);
     Alembic::Abc::IScalarProperty visProp = getVisible(iNode, isConstant,
         mData.mPropList, mData.mAnimVisStaticObjList);
 
@@ -1271,8 +1279,8 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::INuPatch& iNode)
 
     if (nurbsObj != MObject::kNullObj)
     {
-        addProps(arbProp, nurbsObj, false);
-        addProps(userProp, nurbsObj, false);
+        addProps(arbProp, nurbsObj, false, false);
+        addProps(userProp, nurbsObj, false, false);
         setConstantVisibility(visProp, nurbsObj);
     }
 
@@ -1320,8 +1328,8 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IXform & iNode,
         iNode.getSchema().getUserProperties();
 
     std::size_t firstProp = mData.mPropList.size();
-    getAnimatedProps(arbProp, mData.mPropList, false);
-    getAnimatedProps(userProp, mData.mPropList, false);
+    getAnimatedProps(arbProp, mData.mPropList, false, false);
+    getAnimatedProps(userProp, mData.mPropList, false, false);
 
     if (iNode.getProperties().getPropertyHeader("locator") != NULL)
     {
@@ -1368,8 +1376,8 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IXform & iNode,
 
             if (xformObj != MObject::kNullObj)
             {
-                addProps(arbProp, xformObj, false);
-                addProps(userProp, xformObj, false);
+                addProps(arbProp, xformObj, false, false);
+                addProps(userProp, xformObj, false, false);
                 setConstantVisibility(visProp, xformObj);
             }
 
@@ -1496,8 +1504,8 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IXform & iNode,
         if (xformObj != MObject::kNullObj)
         {
             setConstantVisibility(visProp, xformObj);
-            addProps(arbProp, xformObj, false);
-            addProps(userProp, xformObj, false);
+            addProps(arbProp, xformObj, false, false);
+            addProps(userProp, xformObj, false, false);
         }
 
         if (mAction >= CONNECT)

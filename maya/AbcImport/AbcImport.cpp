@@ -66,6 +66,10 @@ Options:                                                                    \n\
                     IC3/4fArrayProperties with face varying scope on        \n\
                     IPolyMesh and ISubD are treated as color sets even if   \n\
                     they weren't written out of Maya.                       \n\
+-rus / recreateAllUVSets                                                    \n\
+                    IV2fArrayProperties with face varying scope on          \n\
+                    IPolyMesh and ISubD are treated as uv sets even if      \n\
+                    the notUV metadata is set.                              \n\
 -ct / connect       string node1 node2 ...                                  \n\
                     The nodes specified in the argument string are supposed to\
  be the names of top level nodes from the input file.                       \n\
@@ -126,6 +130,7 @@ MSyntax AbcImport::createSyntax()
     syntax.addFlag("-h",    "-help",         MSyntax::kNoArg);
     syntax.addFlag("-m",    "-mode",         MSyntax::kString);
     syntax.addFlag("-rcs",  "-recreateAllColorSets", MSyntax::kNoArg);
+    syntax.addFlag("-rus",  "-recreateAllUVSets", MSyntax::kNoArg);
 
     syntax.addFlag("-ct",   "-connect",          MSyntax::kString);
     syntax.addFlag("-crt",  "-createIfNotFound", MSyntax::kNoArg);
@@ -241,6 +246,12 @@ MStatus AbcImport::doIt(const MArgList & args)
     {
         recreateColorSets = true;
     }
+    
+    bool recreateUVSets = false;
+    if (argData.isFlagSet("recreateAllUVSets"))
+    {
+        recreateUVSets = true;
+    }
 
     status = argData.getCommandArgument(0, filename);
     MString abcNodeName;
@@ -304,7 +315,7 @@ MStatus AbcImport::doIt(const MArgList & args)
         {
             ArgData inputData(filename, debugOn, reparentObj,
                 swap, connectRootNodes, createIfNotFound, removeIfNoUpdate,
-                recreateColorSets, filterString, excludeFilterString);
+                recreateColorSets, recreateUVSets, filterString, excludeFilterString);
             abcNodeName = createScene(inputData);
 
             if (inputData.mSequenceStartTime != inputData.mSequenceEndTime &&
