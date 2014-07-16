@@ -93,26 +93,11 @@ namespace
     {
         MStatus status = MS::kSuccess;
 
-        // Create uv set on ioMesh object
-        MString tmp;
-        if ( ioMesh.getCurrentUVSetName(tmp) != MS::kSuccess )
-        {
-            // No uv set yet on mesh, create one and set it current
-            tmp = (uvSetName ? *uvSetName : "");
-            if (!createUVSet(ioMesh, tmp))
-            {
-                printError(ioMesh.fullPathName() + " Assign UVs failed");
-                return MS::kFailure;
-            }
-            status = ioMesh.setCurrentUVSetName(tmp);
-            if (uvSetName)
-            {
-                *uvSetName = tmp;
-            }
-        }
         status = ioMesh.clearUVs(uvSetName);
-        status = ioMesh.setUVs(uArray, vArray, uvSetName);
-        status = ioMesh.assignUVs(uvCounts, uvIds, uvSetName);
+        if (status == MS::kSuccess)
+            status = ioMesh.setUVs(uArray, vArray, uvSetName);
+        if (status == MS::kSuccess)
+            status = ioMesh.assignUVs(uvCounts, uvIds, uvSetName);
 
         if (status != MS::kSuccess)
             printError(ioMesh.fullPathName() + " Assign UVs failed");
@@ -214,13 +199,17 @@ namespace
             }
         }
 
-        MString _uvSetName;
         if (!iSetName)
         {
-            _uvSetName = Alembic::AbcGeom::GetSourceName(iUVs.getMetaData()).c_str();
-            if (_uvSetName.length() > 0)
+            // Master or Primary UV set
+            MString tmp;
+            
+            if ( ioMesh.getCurrentUVSetName(tmp) != MS::kSuccess )
             {
-                iSetName = &_uvSetName;
+                tmp = Alembic::AbcGeom::GetSourceName(iUVs.getMetaData()).c_str();
+                tmp = createUVSet(ioMesh, tmp);
+                // Note: this function won't work for a MFnMesh created from MFnMeshData
+                ioMesh.setCurrentUVSetName(tmp);
             }
         }
 
