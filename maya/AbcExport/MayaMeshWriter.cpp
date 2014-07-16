@@ -124,7 +124,7 @@ void getUVSet(MFnMesh &iMesh, const MString * iUVSet,
         int len = iMesh.polygonVertexCount(f);
         for (int i = len-1; i >= 0; i--)
         {
-            iMesh.getPolygonUVid(f, i, uvId);
+            iMesh.getPolygonUVid(f, i, uvId, iUVSet);
             oUVIndices.push_back(uvId);
         }
     }
