@@ -21,6 +21,8 @@ boost_python_libname  = "boost_python"
 
 
 defs    = []
+gldefs  = ["GLEW_STATIC", "GLEW_NO_GLU"] if sys.platform != "darwin" else []
+glreqs  = [glew.Require] if sys.platform != "darwin" else [gl.Require]
 pydefs  = ["BOOST_PYTHON_DYNAMIC_LIB", "BOOST_PYTHON_NO_LIB"]
 incdirs = ["lib"]
 libdirs = []
@@ -270,10 +272,11 @@ def UpdateSettings(path, replace=True):
    if glut_inc or glut_lib:
       platsettings["glut"] = ("" if not glut_inc else glut_inc, "" if not glut_lib else glut_lib)
    
-   def_inc, def_lib = (deps_inc, deps_lib) if replace else curplatsettings.get("glew", (None, None))
-   glew_inc, glew_lib = GetDirsWithDefault("glew", incdir_default=def_inc, libdir_default=def_lib)
-   if glew_inc or glew_lib:
-      platsettings["glew"] = ("" if not glew_inc else glew_inc, "" if not glew_lib else glew_lib)
+   if sys.platform != "darwin":
+      def_inc, def_lib = (deps_inc, deps_lib) if replace else curplatsettings.get("glew", (None, None))
+      glew_inc, glew_lib = GetDirsWithDefault("glew", incdir_default=def_inc, libdir_default=def_lib)
+      if glew_inc or glew_lib:
+         platsettings["glew"] = ("" if not glew_inc else glew_inc, "" if not glew_lib else glew_lib)
    
    settingschanged = False
    
@@ -439,7 +442,7 @@ prjs = [
    # OpenGL targets
    {"name": "AlembicAbcOpenGL",
     "type": "staticlib",
-    "defs": defs + ["GLEW_STATIC", "GLEW_NO_GLU"],
+    "defs": defs + gldefs,
     "incdirs": incdirs,
     "srcs": glob.glob("lib/AbcOpenGL/*.cpp"),
     "install": {"include/AbcOpenGL": glob.glob("lib/AbcOpenGL/*.h")}
@@ -448,21 +451,21 @@ prjs = [
     "type": "dynamicmodule",
     "ext": python.ModuleExtension(),
     "prefix": "%s/%s" % (python.ModulePrefix(), python.Version()),
-    "defs": defs + pydefs + ["alembicglmodule_EXPORTS"],
+    "defs": defs + pydefs + gldefs + ["alembicglmodule_EXPORTS"],
     "incdirs": incdirs + ["python/PyAbcOpenGL"],
     "libdirs": libdirs,
     "srcs": glob.glob("python/PyAbcOpenGL/*.cpp"),
     "libs": alembicgl_libs + alembic_libs + [boost_python_libname] + pyilmbase_libs + ilmbase_libs + hdf5_libs + libs,
-    "custom": [python.SoftRequire, glew.Require]
+    "custom": glreqs + [python.SoftRequire]
    },
    {"name": "SimpleAbcViewer",
     "type": "program",
-    "defs": defs,
+    "defs": defs + gldefs,
     "incdirs": incdirs + ["examples/bin/SimpleAbcViewer"],
     "libdirs": libdirs,
     "libs": alembicgl_libs + alembic_libs + ilmbase_libs + hdf5_libs + libs,
     "srcs": glob.glob("examples/bin/SimpleAbcViewer/*.cpp"),
-    "custom": [glew.Require, glut.Require]
+    "custom": glreqs + [glut.Require]
    }
 ]
 
