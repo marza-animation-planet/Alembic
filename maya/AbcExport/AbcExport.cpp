@@ -371,6 +371,11 @@ try
             {
                 jobArgs.writeUVs = true;
             }
+            
+            else if (arg == "-weu" || arg == "-writeextrauvs")
+            {
+                jobArgs.writeExtraUVs = true;
+            }
 
             else if (arg == "-wcs" || arg == "-writecolorsets")
             {
