@@ -1,21 +1,25 @@
 import os
 import sys
 import re
+import ast
 import glob
 import excons
 from excons.tools import python
-from excons.tools import arnold as arnoldbuilder
-from excons.tools import maya as mayabuilder
-from excons.tools import houdini as houdinibuilder
+from excons.tools import arnold
+from excons.tools import maya
+from excons.tools import houdini
 from excons.tools import boost
 from excons.tools import gl
 from excons.tools import glut
+from excons.tools import glew
 
-nogl    = False
-arnold  = False
-maya    = False
-houdini = False
-verbose = False
+
+build_arnold_plugins  = False
+build_maya_plugins    = False
+build_houdini_plugins = False
+boost_python_libname  = "boost_python"
+
+
 defs    = []
 pydefs  = ["BOOST_PYTHON_DYNAMIC_LIB", "BOOST_PYTHON_NO_LIB"]
 incdirs = ["lib"]
@@ -42,8 +46,6 @@ alembic_libs = ["AlembicAbcMaterial",
 
 alembicgl_libs = ["AlembicAbcOpenGL"]
 
-boost_python_libname = "boost_python"
-
 if sys.platform == "win32":
    defs.extend(["PLATFORM_WINDOWS", "PLATFORM=WINDOWS"])
 elif sys.platform == "darwin":
@@ -52,6 +54,7 @@ elif sys.platform == "darwin":
 else:
    defs.extend(["PLATFORM_LINUX", "PLATFORM=LINUX"])
    libs.extend(["dl", "rt", "m"])
+
 
 def GetArgument(name, default=None, func=None):
    val = ARGUMENTS.get(name, default)
@@ -64,7 +67,7 @@ def SetArgument(name, value):
    ARGUMENTS[name] = value
 
 def GetDirsWithDefault(name, incdirname="include", libdirname="lib", libdirarch=None, incdir_default=None, libdir_default=None):
-   inc_dir, lib_dir = excons.GetDirs(name, incdirname=incdirname, libdirname=libdirname, libdirarch=libdirarch, noexc=True)
+   inc_dir, lib_dir = excons.GetDirs(name, incdirname=incdirname, libdirname=libdirname, libdirarch=libdirarch, noexc=True, silent=True)
    
    if inc_dir is None:
       inc_dir = incdir_default
@@ -81,10 +84,10 @@ def GetDirsWithDefault(name, incdirname="include", libdirname="lib", libdirarch=
 def AddDirectories(inc_dir, lib_dir):
    global incdirs, libdirs
    
-   if os.path.isdir(inc_dir) and not inc_dir in incdirs:
+   if inc_dir and os.path.isdir(inc_dir) and not inc_dir in incdirs:
       incdirs.append(inc_dir)
    
-   if os.path.isdir(lib_dir) and not lib_dir in libdirs:
+   if lib_dir and os.path.isdir(lib_dir) and not lib_dir in libdirs:
       libdirs.append(lib_dir)
 
 def SafeRemove(lst, item):
@@ -94,127 +97,207 @@ def SafeRemove(lst, item):
       pass
    return lst
 
-def UpdateSettings(path):
-   global boost_python_libname, nogl, maya, arnold
-   
-   try:
-      deps_inc, deps_lib = excons.GetDirs("deps", noexc=False)
-   except:
-      deps_inc, deps_lib = None, None
-   
-   zlib_inc, zlib_lib = GetDirsWithDefault("zlib", incdir_default=deps_inc, libdir_default=deps_lib)
-   AddDirectories(zlib_inc, zlib_lib)
-   
-   boost_inc, boost_lib = GetDirsWithDefault("boost", incdir_default=deps_inc, libdir_default=deps_lib)
-   AddDirectories(boost_inc, boost_lib)
-   
-   boost_pyinc, boost_pylib = GetDirsWithDefault("boost-python", incdir_default=deps_inc, libdir_default=deps_lib)
-   AddDirectories(boost_pyinc, boost_pylib)
-   
-   boost_python_libname = GetArgument("with-boost-python-libname", default=boost_python_libname)
-   
-   ilmbase_inc, ilmbase_lib = GetDirsWithDefault("ilmbase", incdir_default=deps_inc, libdir_default=deps_lib)
-   AddDirectories(ilmbase_inc+"/OpenEXR", ilmbase_lib)
-   
-   pyilmbase_inc, pyilmbase_lib = GetDirsWithDefault("pyilmbase", incdir_default=deps_inc, libdir_default=deps_lib)
-   AddDirectories(pyilmbase_inc+"/OpenEXR", pyilmbase_lib)
-   
-   hdf5_inc, hdf5_lib = GetDirsWithDefault("hdf5", incdir_default=deps_inc, libdir_default=deps_lib)
-   AddDirectories(hdf5_inc, hdf5_lib)
-   
-   arnold_inc, arnold_lib = excons.GetDirs("arnold", libdirname=("bin" if sys.platform != "win32" else "lib"))
-   if arnold_inc and arnold_lib:
-      arnold = True
-   
-   maya_inc, maya_lib = excons.GetDirs("maya", noexc=True)
-   maya_ver = GetArgument("maya-ver", None)
-   if (maya_inc and maya_lib) or maya_ver:
-      maya = True
-   
-   pyspec = GetArgument("with-python", default=None)
-   
-   nogl = GetArgument("no-gl", default=False, func=lambda x: int(x) != 0)
-   glut_inc, glut_lib = None, None
-   if not nogl:
-      glut_inc, glut_lib = GetDirsWithDefault("glut", incdir_default=deps_inc, libdir_default=deps_lib)
-      AddDirectories(glut_inc, glut_lib)
-   
-   print("===--- Write build settings to %s ---===" % os.path.abspath(path))
-   c = open(excons_cache, "w")
-   c.write("%s\n" % sys.platform)
-   c.write("nogl=%d\n" % (1 if nogl else 0))
-   if pyspec is not None:
-      c.write("python=%s\n" % pyspec)
-   if maya_inc and maya_lib:
-      c.write("maya=%s,%s\n" % (maya_inc, maya_lib))
-   elif maya_ver:
-      c.write("maya-ver=%s\n" % maya_ver)
-   if arnold_inc and arnold_lib:
-      c.write("arnold=%s,%s\n" % (arnold_inc, arnold_lib))
-   c.write("zlib=%s,%s\n" % (zlib_inc, zlib_lib))
-   c.write("boost=%s,%s\n" % (boost_inc, boost_lib))
-   c.write("boost-python=%s,%s,%s\n" % (boost_pyinc, boost_pylib, boost_python_libname))
-   c.write("ilmbase=%s/OpenEXR,%s\n" % (ilmbase_inc, ilmbase_lib))
-   c.write("pyilmbase=%s/OpenEXR,%s\n" % (pyilmbase_inc, pyilmbase_lib))
-   c.write("hdf5=%s,%s\n" % (hdf5_inc, hdf5_lib))
-   if not nogl:
-      c.write("glut=%s,%s\n" % (glut_inc, glut_lib))
-   c.write("\n")
-   c.close()
 
-def ReadSettings(path):
-   print("===--- Read build settings from %s (use no-cache=1 to ignore) ---===" % os.path.abspath(path))
-   global boost_python_libname, nogl, maya, arnold
+def ReadSettings(path, silent=False):
+   if not silent:
+      print("===--- Read build settings from %s (use no-cache=1 to ignore) ---===" % os.path.abspath(path))
+   
+   platformexp = re.compile(r"^\[([^]]+)\]$")
+   
+   curplat = None
+   platsettings = {}
+   allsettings = {}
    
    c = open(path, "r")
    for l in c.readlines():
       l = l.strip()
-      try:
-         key, val = l.split("=")
-         if key == "boost-python":
-            inc, lib, boost_python_libname = val.split(",")
-            AddDirectories(inc, lib)
-         elif key == "python":
-            SetArgument("with-python", val)
-         elif key == "nogl":
-            nogl = (int(val) != 0)
-         elif key == "maya-ver":
-            SetArgument(key, val)
-            maya = True
-         else:
-            inc, lib = val.split(",")
-            AddDirectories(inc, lib)
-            if key in ["glut", "boost", "maya", "arnold"]:
-               if inc:
-                  SetArgument("with-%s-inc" % key, inc)
-               if lib:
-                  SetArgument("with-%s-lib" % key, lib)
-            if key == "maya":
-               maya = True
-            if key == "arnold":
-               arnold = True
-      except Exception, e:
-         if verbose and len(l) > 0:
-            print("Ignore line: \"%s\" (%s)" % (l, e))
+      m = platformexp.match(l)
+      if m:
+         if curplat is not None:
+            allsettings[curplat] = platsettings
+         curplat = m.group(1)
+         platsettings = {}
+      else:
+         if l.startswith("#"):
+            continue
+         spl = l.split("=")
+         if len(spl) == 2:
+            key = spl[0].strip()
+            val = spl[1].strip()
+            try:
+               platsettings[key] = ast.literal_eval(val)
+            except Exception, e:
+               print("Invalid value for setting \"%s\" in platform \"%s\": \"%s\" (%s)" % (key, curplat, val, e))
+   
+   if curplat is not None:
+      allsettings[curplat] = platsettings
+   
+   return allsettings
 
+def ApplySettings(settings):
+   global boost_python_libname, build_arnold_plugins, build_maya_plugins, build_houdini_plugins
+   
+   build_arnold_plugins = False
+   build_maya_plugins = False
+   build_houdini_plugins = False
+   boost_python_libname = "boost_python"
+   
+   platsettings = settings.get(sys.platform, {})
+   
+   print("=== Build settings ===")
+   import pprint
+   pprint.pprint(platsettings)
+   
+   for key, val in platsettings.iteritems():
+      if key == "boost-python":
+         inc, lib, boost_python_libname = val
+         AddDirectories(inc, lib)
+      
+      elif key == "python":
+         SetArgument("with-python", str(val))
+      
+      elif key == "maya":
+         ver, inc, lib = val
+         build_maya_plugins = True
+         if ver:
+            SetArgument("maya-ver", str(ver))
+         else:
+            SetArgument("with-maya-inc", inc)
+            SetArgument("with-maya-lib", lib)
+      
+      elif key == "arnold":
+         build_arnold_plugins = True
+         inc, lib = val
+         SetArgument("with-arnold-inc", inc)
+         SetArgument("with-arnold-lib", lib)
+      
+      elif key == "glut":
+         inc, lib = val
+         SetArgument("with-glut-inc", inc)
+         SetArgument("with-glut-lib", lib)
+      
+      elif key == "glew":
+         inc, lib = val
+         SetArgument("with-glew-inc", inc)
+         SetArgument("with-glew-lib", lib)
+         SetArgument("glew-static", "1")
+         SetArgument("glew-mx", "0")
+         SetArgument("glew-no-glu", "1")
+         AddDirectories(inc, None)
+      
+      else:
+         inc, lib = val
+         AddDirectories(inc, lib)
+
+def WriteSettings(path, settings):
+   print("===--- Write build settings to %s ---===" % os.path.abspath(path))
+   
+   c = open(excons_cache, "w")
+   for plat, platsettings in settings.iteritems():
+      c.write("[%s]\n" % plat)
+      for key, val in platsettings.iteritems():
+         c.write("%s=%s\n" % (key, str(val)))
+      c.write("\n")
+   c.write("\n")
+   c.close()
+
+def UpdateSettings(path, replace=True):
+   if os.path.isfile(path):
+      allsettings = ReadSettings(path, silent=True)
+   else:
+      allsettings = {}
+   
+   curplatsettings = ({} if replace else allsettings.get(sys.platform, {}))
+   platsettings = {}
+   
+   deps_inc, deps_lib = excons.GetDirs("deps", noexc=True, silent=True)
+   
+   def_inc, def_lib = (deps_inc, deps_lib) if replace else curplatsettings.get("zlib", (None, None))
+   zlib_inc, zlib_lib = GetDirsWithDefault("zlib", incdir_default=def_inc, libdir_default=def_lib)
+   if zlib_inc or zlib_lib:
+      platsettings["zlib"] = (zlib_inc, zlib_lib)
+   
+   def_inc, def_lib = (deps_inc, deps_lib) if replace else curplatsettings.get("boost", (None, None))
+   boost_inc, boost_lib = GetDirsWithDefault("boost", incdir_default=def_inc, libdir_default=def_lib)
+   if boost_inc or boost_lib:
+      platsettings["boost"] = (boost_inc, boost_lib)
+   
+   def_inc, def_lib, def_libname = (deps_inc, deps_lib, "boost_python") if replace else curplatsettings.get("boost-python", (None, None, None))
+   boost_pyinc, boost_pylib = GetDirsWithDefault("boost-python", incdir_default=def_inc, libdir_default=def_lib)
+   boost_pylibname = GetArgument("with-boost-python-libname", default=def_libname)
+   if boost_pyinc or boost_pylib or boost_pylibname:
+      platsettings["boost-python"] = (boost_pyinc, boost_pylib, boost_pylibname)
+   
+   def_inc, def_lib = (deps_inc, deps_lib) if replace else curplatsettings.get("ilmbase", (None, None))
+   ilmbase_inc, ilmbase_lib = GetDirsWithDefault("ilmbase", incdir_default=def_inc, libdir_default=def_lib)
+   if ilmbase_inc or ilmbase_lib:
+      if not ilmbase_inc.endswith("OpenEXR"):
+         ilmbase_inc += "/OpenEXR"
+      platsettings["ilmbase"] = (ilmbase_inc, ilmbase_lib)
+   
+   def_inc, def_lib = (deps_inc, deps_lib) if replace else curplatsettings.get("ilmbase-python", (None, None))
+   ilmbase_pyinc, ilmbase_pylib = GetDirsWithDefault("ilmbase-python", incdir_default=def_inc, libdir_default=def_lib)
+   if ilmbase_pyinc or ilmbase_pylib:
+      if not ilmbase_pyinc.endswith("OpenEXR"):
+         ilmbase_pyinc += "/OpenEXR"
+      platsettings["ilmbase-python"] = (ilmbase_pyinc, ilmbase_pylib)
+   
+   def_inc, def_lib = (deps_inc, deps_lib) if replace else curplatsettings.get("hdf5", (None, None))
+   hdf5_inc, hdf5_lib = GetDirsWithDefault("hdf5", incdir_default=def_inc, libdir_default=def_lib)
+   if hdf5_inc or hdf5_lib:
+      platsettings["hdf5"] = (hdf5_inc, hdf5_lib)
+   
+   arnold_inc, arnold_lib = excons.GetDirs("arnold", libdirname=("bin" if sys.platform != "win32" else "lib"), silent=True)
+   if arnold_inc and arnold_lib:
+      platsettings["arnold"] = (arnold_inc, arnold_lib)
+   
+   maya_inc, maya_lib = excons.GetDirs("maya", noexc=True, silent=True)
+   maya_ver = GetArgument("maya-ver", None)
+   if (maya_inc and maya_lib) or maya_ver:
+      if not maya_ver:
+         maya_ver = ""
+      if not maya_inc:
+         maya_inc = ""
+      if not maya_lib:
+         maya_lib = ""
+      platsettings["maya"] = (maya_ver, maya_inc, maya_lib)
+   
+   pyspec = GetArgument("with-python", default=None)
+   if pyspec is not None:
+      platsettings["python"] = pyspec
+   
+   glut_inc, glut_lib = excons.GetDirs("glut", noexc=True, silent=True)
+   if glut_inc or glut_lib:
+      platsettings["glut"] = ("" if not glut_inc else glut_inc, "" if not glut_lib else glut_lib)
+   
+   def_inc, def_lib = (deps_inc, deps_lib) if replace else curplatsettings.get("glew", (None, None))
+   glew_inc, glew_lib = GetDirsWithDefault("glew", incdir_default=def_inc, libdir_default=def_lib)
+   if glew_inc or glew_lib:
+      platsettings["glew"] = ("" if not glew_inc else glew_inc, "" if not glew_lib else glew_lib)
+   
+   settingschanged = False
+   
+   if replace:
+      allsettings[sys.platform] = platsettings
+      settingschanged = True
+   else:
+      for k, v in platsettings.iteritems():
+         if k in curplatsettings and v != curplatsettings[k]:
+            curplatsettings[k] = v
+            settingschanged = True
+      if settingschanged:
+         allsettings[sys.platform] = curplatsettings
+   
+   ApplySettings(allsettings)
+   
+   if settingschanged:
+      WriteSettings(path, allsettings)
 
 
 excons_cache = os.path.abspath("excons.cache")
 nocache = GetArgument("no-cache", False, lambda x: int(x) != 0)
 
-if nocache or not os.path.isfile(excons_cache):
-   UpdateSettings(excons_cache)
-else:
-   try:
-      f = open(excons_cache, "r")
-      l = f.readlines()[0].strip()
-      f.close()
-      if l.strip() == sys.platform:
-         ReadSettings(excons_cache)
-      else:
-         UpdateSettings(excons_cache)
-   except:
-      UpdateSettings(excons_cache)
+UpdateSettings(excons_cache, replace=nocache)
 
 
 env = excons.MakeBaseEnv()
@@ -352,76 +435,75 @@ prjs = [
     "libdirs": libdirs,
     "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
     "srcs": glob.glob("examples/bin/AbcWalk/*.cpp")
+   },
+   # OpenGL targets
+   {"name": "AlembicAbcOpenGL",
+    "type": "staticlib",
+    "defs": defs + ["GLEW_STATIC", "GLEW_NO_GLU"],
+    "incdirs": incdirs,
+    "srcs": glob.glob("lib/AbcOpenGL/*.cpp"),
+    "install": {"include/AbcOpenGL": glob.glob("lib/AbcOpenGL/*.h")}
+   },
+   {"name": "alembicglmodule",
+    "type": "dynamicmodule",
+    "ext": python.ModuleExtension(),
+    "prefix": "%s/%s" % (python.ModulePrefix(), python.Version()),
+    "defs": defs + pydefs + ["alembicglmodule_EXPORTS"],
+    "incdirs": incdirs + ["python/PyAbcOpenGL"],
+    "libdirs": libdirs,
+    "srcs": glob.glob("python/PyAbcOpenGL/*.cpp"),
+    "libs": alembicgl_libs + alembic_libs + [boost_python_libname] + pyilmbase_libs + ilmbase_libs + hdf5_libs + libs,
+    "custom": [python.SoftRequire, glew.Require]
+   },
+   {"name": "SimpleAbcViewer",
+    "type": "program",
+    "defs": defs,
+    "incdirs": incdirs + ["examples/bin/SimpleAbcViewer"],
+    "libdirs": libdirs,
+    "libs": alembicgl_libs + alembic_libs + ilmbase_libs + hdf5_libs + libs,
+    "srcs": glob.glob("examples/bin/SimpleAbcViewer/*.cpp"),
+    "custom": [glew.Require, glut.Require]
    }
 ]
 
-if not nogl:
-   prjs.extend([{"name": "AlembicAbcOpenGL",
-                 "type": "staticlib",
-                 "defs": defs,
-                 "incdirs": incdirs,
-                 "srcs": glob.glob("lib/AbcOpenGL/*.cpp"),
-                 "install": {"include/AbcOpenGL": glob.glob("lib/AbcOpenGL/*.h")}
-                },
-                {"name": "alembicglmodule",
-                 "type": "dynamicmodule",
-                 "ext": python.ModuleExtension(),
-                 "prefix": "%s/%s" % (python.ModulePrefix(), python.Version()),
-                 "defs": defs + pydefs + ["alembicglmodule_EXPORTS"],
-                 "incdirs": incdirs + ["python/PyAbcOpenGL"],
-                 "libdirs": libdirs,
-                 "srcs": glob.glob("python/PyAbcOpenGL/*.cpp"),
-                 "libs": alembicgl_libs + alembic_libs + [boost_python_libname] + pyilmbase_libs + ilmbase_libs + hdf5_libs + libs,
-                 "custom": [python.SoftRequire, gl.Require]
-                },
-                {"name": "SimpleAbcViewer",
-                 "type": "program",
-                 "defs": defs,
-                 "incdirs": incdirs + ["examples/bin/SimpleAbcViewer"],
-                 "libdirs": libdirs,
-                 "libs": alembicgl_libs + alembic_libs + ilmbase_libs + hdf5_libs + libs,
-                 "srcs": glob.glob("examples/bin/SimpleAbcViewer/*.cpp"),
-                 "custom": [gl.Require, glut.Require]
-                }])
-
-if arnold:
+if build_arnold_plugins:
    prjs.append({"name": "AlembicArnoldProcedural",
                 "type": "dynamicmodule",
-                "ext": arnoldbuilder.PluginExt(),
+                "ext": arnold.PluginExt(),
                 "prefix": "arnold",
                 "defs": defs,
                 "incdirs": incdirs + ["arnold/Procedural"],
                 "libdirs": libdirs,
                 "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
                 "srcs": glob.glob("arnold/Procedural/*.cpp"),
-                "custom": [arnoldbuilder.Require]})
+                "custom": [arnold.Require]})
 
-if maya:
+if build_maya_plugins:
    prjs.extend([{"name": "AbcImport",
                  "type": "dynamicmodule",
-                 "ext": mayabuilder.PluginExt(),
+                 "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins",
                  "defs": defs,
                  "incdirs": incdirs + ["maya/AbcImport"],
                  "libdirs": libdirs,
                  "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
                  "srcs": glob.glob("maya/AbcImport/*.cpp"),
-                 "custom": [mayabuilder.Require]
+                 "custom": [maya.Require, maya.Plugin]
                 },
                 {"name": "AbcExport",
                  "type": "dynamicmodule",
-                 "ext": mayabuilder.PluginExt(),
+                 "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins",
                  "defs": defs,
                  "incdirs": incdirs + ["maya/AbcExport"],
                  "libdirs": libdirs,
                  "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
                  "srcs": glob.glob("maya/AbcExport/*.cpp"),
-                 "custom": [mayabuilder.Require, mayabuilder.Plugin]
+                 "custom": [maya.Require, maya.Plugin]
                 }])
 
 
-if houdini:
+if build_houdini_plugins:
    # TODO
    pass
 
