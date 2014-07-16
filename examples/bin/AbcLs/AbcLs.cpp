@@ -615,10 +615,7 @@ int main( int argc, char *argv[] )
     bool opt_recursive = false; // recursive option
     bool opt_size = false; // array sample size option
     bool opt_time = false; // time info option
-<<<<<<< HEAD
-=======
     bool opt_values = false; // show all 0th values
->>>>>>> alembic/master
     int index = -1; // sample number, at tail of path
     std::string desc( "abcls [OPTION] FILE[/NAME] \n"
     "  -a          include property listings\n"
@@ -629,10 +626,6 @@ int main( int argc, char *argv[] )
     "  -r          list entries recursively\n"
     "  -s          show the size of a data property sample\n"
     "  -t          show time sampling information\n"
-<<<<<<< HEAD
-    );
-
-=======
     "  -v          show 0th value for all properties\n"
     );
 
@@ -643,7 +636,6 @@ int main( int argc, char *argv[] )
     act.sa_flags = SA_SIGINFO;
     sigaction(SIGSEGV, &act, NULL);
 
->>>>>>> alembic/master
     // check for min args
     if ( argc < 2 ) {
         std::cout << desc << std::endl;
@@ -680,10 +672,7 @@ int main( int argc, char *argv[] )
     opt_recursive = optionExists( options, "r" );
     opt_size = optionExists( options, "s" );
     opt_time = optionExists( options, "t" );
-<<<<<<< HEAD
-=======
     opt_values = optionExists( options, "v" );
->>>>>>> alembic/master
     if ( optionExists( options, "f" ) ) {
         fps = 24.0;
         opt_time = true;
@@ -831,19 +820,11 @@ int main( int argc, char *argv[] )
             printValue( props, *header, index, opt_size, opt_time, fps );
         } else {
             if ( found && header->isCompound() )
-<<<<<<< HEAD
-                visit( props, opt_all, opt_long, opt_meta, opt_recursive, true );
-            else if ( found && header->isSimple() )
-                printChild( props, *header, opt_all, opt_long );
-            else
-                visit( iObj, opt_all, opt_long, opt_meta, opt_recursive, true );
-=======
                 visit( props, opt_all, opt_long, opt_meta, opt_recursive, true, opt_values );
             else if ( found && header->isSimple() )
                 printChild( props, *header, opt_all, opt_long, opt_values );
             else
                 visit( iObj, opt_all, opt_long, opt_meta, opt_recursive, true, opt_values );
->>>>>>> alembic/master
             std::cout << RESETCOLOR;
             if ( !opt_long )
                 std::cout << std::endl;
