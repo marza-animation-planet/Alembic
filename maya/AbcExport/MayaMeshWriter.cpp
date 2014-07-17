@@ -305,8 +305,28 @@ MayaMeshWriter::MayaMeshWriter(MDagPath & iDag,
 
             if (!uvs.empty())
             {
-                std::string uvSetName = lMesh.currentUVSetName().asChar();
-                mSubDSchema.setUVSourceName(uvSetName);
+                // Only set UV source name if necessary
+                if (mWriteExtraUVs)
+                {
+                    std::string uvSetName = lMesh.currentUVSetName().asChar();
+                    if (uvSetName != "map1")
+                    {
+                        // Primary uv set name is not map1
+                        // Check if it is used by any of the secondary uv sets
+                        MStringArray uvSetNames;
+                        lMesh.getUVSetNames(uvSetNames);
+                        for (unsigned int i=0; i<uvSetNames.length(); ++i)
+                        {
+                            if (uvSetNames[i] == "map1")
+                            {
+                                // map1 used as a secondary uv set
+                                // Set UV source name so that the importer won't overwrite the primary UVs
+                                mSubDSchema.setUVSourceName(uvSetName);
+                                break;
+                            }
+                        }
+                    }
+                }
 
                 uvSamp.setScope( Alembic::AbcGeom::kFacevaryingScope );
                 uvSamp.setVals(Alembic::AbcGeom::V2fArraySample(
@@ -344,8 +364,28 @@ MayaMeshWriter::MayaMeshWriter(MDagPath & iDag,
 
             if (!uvs.empty())
             {
-                std::string uvSetName = lMesh.currentUVSetName().asChar();
-                mPolySchema.setUVSourceName(uvSetName);
+                // Only set UV source name if necessary
+                if (mWriteExtraUVs)
+                {
+                    std::string uvSetName = lMesh.currentUVSetName().asChar();
+                    if (uvSetName != "map1")
+                    {
+                        // Primary uv set name is not map1
+                        // Check if it is used by any of the secondary uv sets
+                        MStringArray uvSetNames;
+                        lMesh.getUVSetNames(uvSetNames);
+                        for (unsigned int i=0; i<uvSetNames.length(); ++i)
+                        {
+                            if (uvSetNames[i] == "map1")
+                            {
+                                // map1 used as a secondary uv set
+                                // Set UV source name so that the importer won't overwrite the primary UVs
+                                mPolySchema.setUVSourceName(uvSetName);
+                                break;
+                            }
+                        }
+                    }
+                }
 
                 uvSamp.setScope( Alembic::AbcGeom::kFacevaryingScope );
                 uvSamp.setVals(Alembic::AbcGeom::V2fArraySample(
