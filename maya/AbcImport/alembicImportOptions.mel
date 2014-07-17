@@ -1,0 +1,131 @@
+
+
+global proc int alembicImportOptions(string $parent,
+                                     string $action,
+                                     string $initialSettings,
+                                     string $resultCallback)
+{
+   int $result = 0;
+   string $flt = "";
+   string $optionsString = "";
+   
+   if ($action == "post")
+   {
+      // Build UI elements
+      setParent $parent;
+      
+      checkBoxGrp -ncb 1 -l "Fit Time Range  " -adj 2 -cal 1 right -cal 2 left -v1 false optFitTime;
+      checkBoxGrp -ncb 1 -l "Recreate All Color Sets  " -adj 2 -cal 1 right -cal 2 left -v1 false optColSets;
+      checkBoxGrp -ncb 1 -l "Recreate All UV Sets  " -adj 2 -cal 1 right -cal 2 left -v1 false optUVSets;
+      textFieldGrp -l "Include Objects  " -adj 2 -cal 1 right -cal 2 left -tx "" optFlt;
+      textFieldGrp -l "Exclude Objects  " -adj 2 -cal 1 right -cal 2 left -tx "" optExcFlt;
+      checkBoxGrp -ncb 1 -l "Verbose  " -adj 2 -cal 1 right -cal 2 left -v1 false optDbg;
+      
+      if (`optionVar -exists "alembicImportOptions"` == 1)
+      {
+         $optionsString = `optionVar -query "alembicImportOptions"`;
+      }
+      
+      if (size($optionsString) > 0)
+      {
+         // parse option string and set UI
+         string $optlist[];
+         int $n = tokenize($optionsString, ";", $optlist);
+         
+         for ($i=0; $i<$n; $i++)
+         {
+            string $keyval[];
+            int $n2 = tokenize($optlist[$i], "=", $keyval);
+            
+            if ($n2 < 2)
+            {
+               continue;
+            }
+            
+            string $key = $keyval[0];
+            string $val = $keyval[1];
+            for ($j=2; $j<$n2; $j++)
+            {
+               $val += "=";
+               $val += $keyval[$j];
+            }
+            
+            if ($key == "ftr")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optFitTime;
+            }
+            else if ($key == "rcs")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optColSets;
+            }
+            else if ($key == "rus")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optUVSets;
+            }
+            else if ($key == "d")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optDbg;
+            }
+            else if ($key == "ft")
+            {
+               textFieldGrp -e -tx $val optFlt;
+            }
+            else if ($key == "eft")
+            {
+               textFieldGrp -e -tx $val optExcFlt;
+            }
+         }
+      }
+      
+      $result = 1;
+   }
+   else if ($action == "query")
+   {
+      // Build option string
+      setParent $parent;
+      
+      if (`checkBoxGrp -q -v1 optFitTime` == true)
+      {
+         $optionsString += "ftr=1;";
+      }
+      
+      if (`checkBoxGrp -q -v1 optColSets` == true)
+      {
+         $optionsString += "rcs=1;";
+      }
+      
+      if (`checkBoxGrp -q -v1 optUVSets` == true)
+      {
+         $optionsString += "rus=1;";
+      }
+      
+      $flt = `textFieldGrp -q -tx optFlt`;
+      if (size($flt) > 0)
+      {
+         $optionsString += "ft=" + $flt + ";";
+      }
+      
+      $flt = `textFieldGrp -q -tx optExcFlt`;
+      if (size($flt) > 0)
+      {
+         $optionsString += "eft=" + $flt + ";";
+      }
+      
+      if (`checkBoxGrp -q -v1 optDbg` == true)
+      {
+         $optionsString += "d=1;";
+      }
+      
+      optionVar -sv "alembicImportOptions" $optionsString;
+      
+      // replace quotations
+      eval($resultCallback + " \"" + $optionsString + "\"");
+      $result = 1;
+   }
+   else
+   {
+      $result = 0;
+   }
+   
+   return $result;
+}

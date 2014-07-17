@@ -73,8 +73,8 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     status = plugin.registerFileTranslator("Alembic",
                                 NULL,
                                 AlembicImportFileTranslator::creator,
-                                NULL,
-                                NULL,
+                                "alembicImportOptions",
+                                "",
                                 true);
     if (!status)
     {

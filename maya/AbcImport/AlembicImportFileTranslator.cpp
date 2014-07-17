@@ -43,8 +43,91 @@ MStatus AlembicImportFileTranslator::reader(
                                         const MString& optionsString,
                                         MPxFileTranslator::FileAccessMode mode)
 {
-    MString script;
-    script.format ("AbcImport \"^1s\";", file.resolvedFullName());
+    MString script = "AbcImport";
+    MString impmode;
+    
+    if (mode == MPxFileTranslator::kOpenAccessMode)
+    {
+        impmode = "-m open";
+    }
+    else if (mode == MPxFileTranslator::kImportAccessMode)
+    {
+        impmode = "-m import";
+    }
+    else
+    {
+        return MStatus::kFailure;
+    }
+    
+    MStringArray optlist;
+    optionsString.split(';', optlist);
+    
+    for (unsigned int i=0; i<optlist.length(); ++i)
+    {
+        MStringArray keyval;
+        
+        optlist[i].split('=', keyval);
+        
+        if (keyval.length() < 2)
+        {
+            continue;
+        }
+        
+        MString key = keyval[0];
+        MString val = keyval[1];
+        for (unsigned int j=2; j<keyval.length(); ++j)
+        {
+            val += "=";
+            val += keyval[j];
+        }
+        
+        if (key == "ftr")
+        {
+            if (val == "1")
+            {
+                script += " -ftr";
+            }
+        }
+        else if (key == "rcs")
+        {
+            if (val == "1")
+            {
+                script += " -rcs";
+            }
+        }
+        else if (key == "rus")
+        {
+            if (val == "1")
+            {
+                script += " -rus";
+            }
+        }
+        else if (key == "d")
+        {
+            if (val == "1")
+            {
+                script += " -d";
+            }
+        }
+        else if (key == "ft")
+        {
+            if (val.length() > 0)
+            {
+                script += " -ft \"" + val + "\"";
+            }
+        }
+        else if (key == "eft")
+        {
+            if (val.length() > 0)
+            {
+                script += " -eft \"" + val + "\"";
+            }
+        }
+    }
+    
+    //script.format ("AbcImport ^1s ^2s \"^3s\";", impmode, optionsString, file.resolvedFullName());
+    
+    script += " \"" + file.resolvedFullName() + "\";";
 
     MStatus status = MGlobal::executeCommand (script);
 
