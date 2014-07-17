@@ -58,6 +58,20 @@
 
 namespace
 {
+    bool inStrArray( const MStringArray & iArray, const MString & iStr )
+    {
+        unsigned int arrLength = iArray.length();
+
+        for (unsigned int i = 0; i < arrLength; ++i)
+        {
+            if (iArray[i] == iStr)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     bool createUVSet(MFnMesh & meshIO, MString & iSetName)
     {
         MStatus status = MS::kSuccess;
@@ -73,17 +87,10 @@ namespace
             {
                 return false;
             }
-            else
-            {
-                iSetName = tmp;
-                return true;
-            }
         }
-        else
-        {
-            iSetName = tmp;
-            return true;
-        }
+        
+        iSetName = tmp;
+        return true;
     }
     
     MStatus setMeshUVs(MFnMesh & ioMesh,
@@ -95,12 +102,25 @@ namespace
 
         status = ioMesh.clearUVs(uvSetName);
         if (status == MS::kSuccess)
+        {
             status = ioMesh.setUVs(uArray, vArray, uvSetName);
-        if (status == MS::kSuccess)
-            status = ioMesh.assignUVs(uvCounts, uvIds, uvSetName);
-
-        if (status != MS::kSuccess)
-            printError(ioMesh.fullPathName() + " Assign UVs failed");
+            if (status == MS::kSuccess)
+            {
+                status = ioMesh.assignUVs(uvCounts, uvIds, uvSetName);
+                if (status != MS::kSuccess)
+                {
+                    printError(ioMesh.fullPathName() + " Assign UVs failed");
+                }
+            }
+            else
+            {
+                printError(ioMesh.fullPathName() + " Set UVs failed");
+            }
+        }
+        else
+        {
+            printError(ioMesh.fullPathName() + " Clear UVs failed");
+        }
 
         return status;
     }  // setMeshUVs
@@ -199,17 +219,61 @@ namespace
             }
         }
 
+        MString tmp;
+        
         if (!iSetName)
         {
-            // Master or Primary UV set
-            MString tmp;
-            
-            if ( ioMesh.getCurrentUVSetName(tmp) != MS::kSuccess )
+            // Get primary uv set name from param metadata
+            MString name = Alembic::AbcGeom::GetSourceName(iUVs.getMetaData()).c_str();
+            if (name.length() == 0)
             {
-                tmp = Alembic::AbcGeom::GetSourceName(iUVs.getMetaData()).c_str();
-                tmp = createUVSet(ioMesh, tmp);
-                // Note: this function won't work for a MFnMesh created from MFnMeshData
-                ioMesh.setCurrentUVSetName(tmp);
+                // Maya's default name
+                name = "map1";
+            }
+            
+            bool doCreate = false;
+            bool isCurrent = false;
+            
+            if (ioMesh.getCurrentUVSetName(tmp) != MS::kSuccess)
+            {
+                doCreate = true;
+            }
+            else if (tmp != name)
+            {
+                MStringArray names;
+                ioMesh.getUVSetNames(names); 
+                doCreate = !inStrArray(names, name);
+            }
+            else
+            {
+                isCurrent = true;
+            }
+            
+            if (doCreate)
+            {
+                // No uv sets on mesh yet or no matching uv set name
+                tmp = name;
+                
+                createUVSet(ioMesh, tmp);
+                
+                if (tmp != name)
+                {
+                    printWarning(
+                        ioMesh.fullPathName() +
+                        " Primary uv is not named \"" + name + "\"");
+                }
+                
+                iSetName = &tmp;
+            }
+            else if (!isCurrent)
+            {
+                // Found uv set with matching name
+                tmp = name;
+                
+                // This won't work if MFnMesh is not created from a shape but try it anyway
+                ioMesh.setCurrentUVSetName(name);
+                
+                iSetName = &tmp;
             }
         }
 
@@ -630,20 +694,6 @@ namespace
         MString colorSetName(iC4f.getName().c_str());
         Alembic::Abc::UInt32ArraySamplePtr indices = samp.getIndices();
         setColor(ioMesh, colorList, indices, colorSetName, MFnMesh::kRGBA);
-    }
-
-    bool inStrArray( const MStringArray & iArray, const MString & iStr )
-    {
-        unsigned int arrLength = iArray.length();
-
-        for (unsigned int i = 0; i < arrLength; ++i)
-        {
-            if (iArray[i] == iStr)
-            {
-                return true;
-            }
-        }
-        return false;
     }
 
     void setColors(double iFrame, MFnMesh & ioMesh,
