@@ -44,6 +44,7 @@
 #include "NurbsSurfaceHelper.h"
 #include "PointHelper.h"
 #include "XformHelper.h"
+#include "PointHelper.h"
 
 #include <maya/MAngle.h>
 #include <maya/MGlobal.h>
@@ -54,7 +55,7 @@
 #include <maya/MFloatPointArray.h>
 #include <maya/MFnDoubleArrayData.h>
 #include <maya/MFnIntArrayData.h>
-#include <maya/MFnVectorArrayData.h>
+#include <maya/MFnArrayAttrsData.h>
 
 #include <maya/MFnStringData.h>
 #include <maya/MFnMeshData.h>
@@ -66,6 +67,7 @@
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnUnitAttribute.h>
 #include <maya/MFnEnumAttribute.h>
+#include <maya/MFnCompoundAttribute.h>
 
 #include <Alembic/AbcCoreFactory/IFactory.h>
 #include <Alembic/AbcCoreHDF5/ReadWrite.h>
@@ -91,6 +93,7 @@ MObject AlembicNode::mOutNurbsSurfaceArrayAttr;
 MObject AlembicNode::mOutTransOpArrayAttr;
 MObject AlembicNode::mOutPropArrayAttr;
 MObject AlembicNode::mOutLocatorPosScaleArrayAttr;
+MObject AlembicNode::mOutPointsArrayAttr;
 
 namespace
 {
@@ -117,11 +120,12 @@ MStatus AlembicNode::initialize()
 {
     MStatus status;
 
-    MFnUnitAttribute    uAttr;
-    MFnTypedAttribute   tAttr;
-    MFnNumericAttribute nAttr;
-    MFnGenericAttribute gAttr;
-    MFnEnumAttribute    eAttr;
+    MFnUnitAttribute     uAttr;
+    MFnTypedAttribute    tAttr;
+    MFnNumericAttribute  nAttr;
+    MFnGenericAttribute  gAttr;
+    MFnEnumAttribute     eAttr;
+    MFnCompoundAttribute cAttr;
 
     // add the input attributes: time, file, sequence time
     mTimeAttr = uAttr.create("time", "tm", MFnUnitAttribute::kTime, 0.0);
@@ -251,6 +255,14 @@ MStatus AlembicNode::initialize()
     status = nAttr.setUsesArrayDataBuilder(true);
     status = addAttribute(mOutLocatorPosScaleArrayAttr);
 
+    // sampled points
+    mOutPointsArrayAttr = tAttr.create("outPoints", "opts", MFnData::kDynArrayAttrs);
+    status = tAttr.setStorable(false);
+    status = tAttr.setWritable(false);
+    status = tAttr.setArray(true);
+    status = tAttr.setUsesArrayDataBuilder(true);
+    status = addAttribute(mOutPointsArrayAttr);
+
     // sampled transform operations
     mOutTransOpArrayAttr = nAttr.create("transOp", "to",
         MFnNumericData::kDouble, 0.0, &status);
@@ -306,6 +318,7 @@ MStatus AlembicNode::initialize()
     status = attributeAffects(mTimeAttr, mOutCameraArrayAttr);
     status = attributeAffects(mTimeAttr, mOutPropArrayAttr);
     status = attributeAffects(mTimeAttr, mOutLocatorPosScaleArrayAttr);
+    status = attributeAffects(mTimeAttr, mOutPointsArrayAttr);
 
     status = attributeAffects(mSpeedAttr, mOutSubDArrayAttr);
     status = attributeAffects(mSpeedAttr, mOutPolyArrayAttr);
@@ -315,6 +328,7 @@ MStatus AlembicNode::initialize()
     status = attributeAffects(mSpeedAttr, mOutCameraArrayAttr);
     status = attributeAffects(mSpeedAttr, mOutPropArrayAttr);
     status = attributeAffects(mSpeedAttr, mOutLocatorPosScaleArrayAttr);
+    status = attributeAffects(mSpeedAttr, mOutPointsArrayAttr);
 
     status = attributeAffects(mOffsetAttr, mOutSubDArrayAttr);
     status = attributeAffects(mOffsetAttr, mOutPolyArrayAttr);
@@ -324,6 +338,7 @@ MStatus AlembicNode::initialize()
     status = attributeAffects(mOffsetAttr, mOutCameraArrayAttr);
     status = attributeAffects(mOffsetAttr, mOutPropArrayAttr);
     status = attributeAffects(mOffsetAttr, mOutLocatorPosScaleArrayAttr);
+    status = attributeAffects(mOffsetAttr, mOutPointsArrayAttr);
 
     status = attributeAffects(mCycleTypeAttr, mOutSubDArrayAttr);
     status = attributeAffects(mCycleTypeAttr, mOutPolyArrayAttr);
@@ -333,6 +348,7 @@ MStatus AlembicNode::initialize()
     status = attributeAffects(mCycleTypeAttr, mOutCameraArrayAttr);
     status = attributeAffects(mCycleTypeAttr, mOutPropArrayAttr);
     status = attributeAffects(mCycleTypeAttr, mOutLocatorPosScaleArrayAttr);
+    status = attributeAffects(mCycleTypeAttr, mOutPointsArrayAttr);
 
     MGlobal::executeCommand( UITemplateMELScriptStr );
 
@@ -1025,6 +1041,63 @@ MStatus AlembicNode::compute(const MPlug & plug, MDataBlock & dataBlock)
 
             outArrayHandle.setAllClean();
         }
+    }
+    else if (plug == mOutPointsArrayAttr)
+    {
+        if (mOutRead[9])
+        {
+            dataBlock.setClean(plug);
+            return MS::kSuccess;
+        }
+
+        mOutRead[9] = true;
+
+        unsigned int pointsSize = static_cast<unsigned int>(mData.mPointsList.size());
+
+        MArrayDataHandle outArrayHandle = dataBlock.outputValue(mOutPointsArrayAttr, &status);
+
+        if (pointsSize > 0)
+        {
+            for (unsigned int j = 0; j < pointsSize; j++)
+            {
+                if (outArrayHandle.elementIndex() != j)
+                {
+                    continue;
+                }
+
+                MDataHandle outHandle = outArrayHandle.outputValue(&status);
+                
+                MFnArrayAttrsData fnAttrs;
+                
+                MObject attrsObj = fnAttrs.create();
+                
+                Alembic::AbcGeom::IPoints &points = mData.mPointsList[j];
+                
+                read(mCurTime, points, attrsObj);
+                
+                outHandle.set(attrsObj);
+                
+                outArrayHandle.next();
+            }
+        }
+        else
+        {
+            if (outArrayHandle.elementCount() > 0)
+            {
+                do
+                {
+                    MDataHandle outHandle = outArrayHandle.outputValue(&status);
+                    
+                    MFnArrayAttrsData fnAttrs;
+                    MObject attrsObj = fnAttrs.create();
+                    
+                    outHandle.set(attrsObj);
+                }
+                while (outArrayHandle.next() == MS::kSuccess);
+            }
+        }
+        
+        outArrayHandle.setAllClean();
     }
     else
     {

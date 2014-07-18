@@ -47,7 +47,6 @@
 MStatus create(double iFrame, const Alembic::AbcGeom::IPoints & iNode,
     MObject & iParent, MObject & iObject);
 
-MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode,
-    MObject & iObject);
+MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & iObject);
 
 #endif  // ABCIMPORT_POINTHELPER_H_

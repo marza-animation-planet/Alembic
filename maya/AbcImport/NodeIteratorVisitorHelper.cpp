@@ -67,6 +67,7 @@
 #include <maya/MFnNurbsCurve.h>
 #include <maya/MFnNurbsSurface.h>
 #include <maya/MFnCamera.h>
+#include <maya/MFnParticleSystem.h>
 #include <maya/MTime.h>
 
 template <class T>
@@ -3280,7 +3281,21 @@ MString connectAttr(ArgData & iArgData)
 
     if (particleSize > 0)
     {
-        printWarning("Currently no support for animated particle system");
+        MPlug srcArrayPlug = alembicNodeFn.findPlug("outPoints", true);
+        
+        for (unsigned int i = 0; i < particleSize; i++)
+        {
+            MFnParticleSystem fnParts(iArgData.mData.mPointsObjList[i]);
+            
+            MPlug srcPlug = srcArrayPlug.elementByLogicalIndex(i);
+            
+            dstPlug = fnParts.findPlug("cacheArrayData", true);
+            modifier.connect(srcPlug, dstPlug);
+            status = modifier.doIt();
+            
+            dstPlug = fnParts.findPlug("playFromCache");
+            dstPlug.setBool(true);
+        }
     }
 
     if (nSurfaceSize > 0)
