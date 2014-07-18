@@ -37,6 +37,8 @@
 #include "AlembicImportFileTranslator.h"
 
 #include <maya/MGlobal.h>
+#include <maya/MSelectionList.h>
+#include <maya/MDagPath.h>
 
 MStatus AlembicImportFileTranslator::reader(
                                         const MFileObject& file,
@@ -44,22 +46,28 @@ MStatus AlembicImportFileTranslator::reader(
                                         MPxFileTranslator::FileAccessMode mode)
 {
     MString script = "AbcImport";
+    MString options;
     MString impmode;
+    MStringArray optlist;
+    bool reparent = false;
+    bool addnodes = false;
+    bool remnodes = false;
+    MString submode = "Add";
     
     if (mode == MPxFileTranslator::kOpenAccessMode)
     {
-        impmode = "-m open";
+        impmode = " -m open";
     }
+    
     else if (mode == MPxFileTranslator::kImportAccessMode)
     {
-        impmode = "-m import";
+        impmode = " -m import";
     }
     else
     {
         return MStatus::kFailure;
     }
     
-    MStringArray optlist;
     optionsString.split(';', optlist);
     
     for (unsigned int i=0; i<optlist.length(); ++i)
@@ -85,51 +93,132 @@ MStatus AlembicImportFileTranslator::reader(
         {
             if (val == "1")
             {
-                script += " -ftr";
+                options += " -ftr";
             }
         }
         else if (key == "rcs")
         {
             if (val == "1")
             {
-                script += " -rcs";
+                options += " -rcs";
             }
         }
         else if (key == "rus")
         {
             if (val == "1")
             {
-                script += " -rus";
+                options += " -rus";
             }
         }
         else if (key == "d")
         {
             if (val == "1")
             {
-                script += " -d";
+                options += " -d";
             }
         }
         else if (key == "ft")
         {
             if (val.length() > 0)
             {
-                script += " -ft \"" + val + "\"";
+                options += " -ft \"" + val + "\"";
             }
         }
         else if (key == "eft")
         {
             if (val.length() > 0)
             {
-                script += " -eft \"" + val + "\"";
+                options += " -eft \"" + val + "\"";
+            }
+        }
+        else if (key == "sts")
+        {
+            if (val == "1")
+            {
+                options += " -sts";
+            }
+        }
+        else if (mode == MPxFileTranslator::kImportAccessMode)
+        {
+            if (key == "mode")
+            {
+                if (val == "Add" || val == "Update" || val == "Replace")
+                {
+                    submode = val;
+                    if (val == "Replace")
+                    {
+                        impmode = " -m replace";
+                    }
+                }
+            }
+            else if (key == "rpr")
+            {
+                reparent = (val == "1");
+            }
+            else if (key == "crt")
+            {
+                addnodes = (val == "1");
+            }
+            else if (key == "rm")
+            {
+                remnodes = (val == "1");
             }
         }
     }
     
-    //script.format ("AbcImport ^1s ^2s \"^3s\";", impmode, optionsString, file.resolvedFullName());
+    if (submode == "Add")
+    {
+        if (reparent)
+        {
+            MSelectionList sel;
+            MDagPath path;
+            
+            MGlobal::getActiveSelectionList(sel);
+            
+            for (unsigned int i=0; i<sel.length(); ++i)
+            {
+                if (sel.getDagPath(i, path) == MStatus::kSuccess)
+                {
+                    options += " -rpr \"" + path.fullPathName() + "\"";
+                    break;
+                }
+            }
+        }
+    }
+    else if (submode == "Update")
+    {
+        MSelectionList sel;
+        MDagPath path;
+        MString roots;
+        
+        MGlobal::getActiveSelectionList(sel);
+        
+        for (unsigned int i=0; i<sel.length(); ++i)
+        {
+            if (sel.getDagPath(i, path) == MStatus::kSuccess)
+            {
+                if (roots.length() > 0)
+                {
+                    roots += " ";
+                }
+                roots += path.partialPathName();
+            }
+        }
+        
+        options += " -connect \"" + roots + "\"";
+        if (addnodes)
+        {
+            options += " -crt";
+        }
+        if (remnodes)
+        {
+            options += " -rm";
+        }
+    }
     
-    script += " \"" + file.resolvedFullName() + "\";";
+    script += impmode + options + " \"" + file.resolvedFullName() + "\";";
 
-    MStatus status = MGlobal::executeCommand (script);
+    MStatus status = MGlobal::executeCommand(script, true);
 
     return status;
 }

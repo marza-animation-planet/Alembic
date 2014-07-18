@@ -1,5 +1,14 @@
 
 
+global proc alembicImportOptions_modeChanged()
+{
+   string $val = `optionMenuGrp -q -v optMode`;
+   
+   checkBoxGrp -e -ed ($val == "Update") optAddNode;
+   checkBoxGrp -e -ed ($val == "Update") optRemNode;
+   checkBoxGrp -e -ed ($val == "Add") optReparent;
+}
+
 global proc int alembicImportOptions(string $parent,
                                      string $action,
                                      string $initialSettings,
@@ -14,17 +23,45 @@ global proc int alembicImportOptions(string $parent,
       // Build UI elements
       setParent $parent;
       
-      checkBoxGrp -ncb 1 -l "Fit Time Range  " -adj 2 -cal 1 right -cal 2 left -v1 false optFitTime;
-      checkBoxGrp -ncb 1 -l "Recreate All Color Sets  " -adj 2 -cal 1 right -cal 2 left -v1 false optColSets;
-      checkBoxGrp -ncb 1 -l "Recreate All UV Sets  " -adj 2 -cal 1 right -cal 2 left -v1 false optUVSets;
-      textFieldGrp -l "Include Objects  " -adj 2 -cal 1 right -cal 2 left -tx "" optFlt;
-      textFieldGrp -l "Exclude Objects  " -adj 2 -cal 1 right -cal 2 left -tx "" optExcFlt;
-      checkBoxGrp -ncb 1 -l "Verbose  " -adj 2 -cal 1 right -cal 2 left -v1 false optDbg;
+      frameLayout -collapsable false -label "Contents" -bv false;
+         columnLayout;
+            optionMenuGrp -l "Mode:" -adj 2 -cal 1 right -cal 2 left -cc "alembicImportOptions_modeChanged" optMode;
+            menuItem -l "Add";
+            menuItem -l "Update";
+            menuItem -l "Replace";
+            optionMenuGrp -e -v "Add" optMode;
+            checkBoxGrp -ncb 1 -l "" -l1 "Add Missing Nodes To Scene" -adj 2 -cal 1 right -cal 2 left -v1 false optAddNode;
+            checkBoxGrp -ncb 1 -l "" -l1 "Remove Missing Nodes From File" -adj 2 -cal 1 right -cal 2 left -v1 false optRemNode;
+            checkBoxGrp -ncb 1 -l "" -l1 "Reparent To Selection" -adj 2 -cal 1 right -cal 2 left -v1 false optReparent;
+         setParent ..;
+      setParent ..;
       
-      if (`optionVar -exists "alembicImportOptions"` == 1)
-      {
-         $optionsString = `optionVar -query "alembicImportOptions"`;
-      }
+      frameLayout -collapsable false -label "Mesh" -bv false;
+         columnLayout;
+            checkBoxGrp -ncb 1 -l "" -l1 "Recreate All Color Sets" -adj 2 -cal 1 right -cal 2 left -v1 false optColSets;
+            checkBoxGrp -ncb 1 -l "" -l1 "Recreate All UV Sets" -adj 2 -cal 1 right -cal 2 left -v1 false optUVSets;
+         setParent ..;
+      setParent ..;
+      
+      frameLayout -collapsable false -label "Time" -bv false;
+         columnLayout;
+            checkBoxGrp -ncb 1 -l "" -l1 "Fit Time Range" -adj 2 -cal 1 right -cal 2 left -v1 false optFitTime;
+            checkBoxGrp -ncb 1 -l "" -l1 "Set To Start Frame" -adj 2 -cal 1 right -cal 2 left -v1 false optStartFrame;
+         setParent ..;
+      setParent ..;
+      
+      frameLayout -collapsable false -label "Filters" -bv false;
+         columnLayout;
+            textFieldGrp -l "Include Objects:" -adj 2 -cal 1 right -cal 2 left -tx "" optFlt;
+            textFieldGrp -l "Exclude Objects:" -adj 2 -cal 1 right -cal 2 left -tx "" optExcFlt;
+         setParent ..;
+      setParent ..;
+      
+      separator -style "in";
+      
+      checkBoxGrp -ncb 1 -l "" -l1 "Debug" -adj 2 -cal 1 right -cal 2 left -v1 false optDbg;
+      
+      $optionsString = $initialSettings;
       
       if (size($optionsString) > 0)
       {
@@ -74,8 +111,31 @@ global proc int alembicImportOptions(string $parent,
             {
                textFieldGrp -e -tx $val optExcFlt;
             }
+            else if ($key == "sts")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optStartFrame;
+            }
+            else if ($key == "mode")
+            {
+               optionMenuGrp -e -v $val optMode;
+            }
+            else if ($key == "rpr")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optReparent;
+            }
+            else if ($key == "crt")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optAddNode;
+            }
+            else if ($key == "rm")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optRemNode;
+            }
          }
       }
+      
+      // Update editable state
+      alembicImportOptions_modeChanged();
       
       $result = 1;
    }
@@ -84,41 +144,66 @@ global proc int alembicImportOptions(string $parent,
       // Build option string
       setParent $parent;
       
+      $mode = `optionMenuGrp -q -v optMode`;
+      
+      $optionsString = "mode=" + $mode;
+      
+      if ($mode == "Update")
+      {
+         if (`checkBoxGrp -q -v1 optAddNode` == true)
+         {
+            $optionsString += ";crt=1";
+         }
+         if (`checkBoxGrp -q -v1 optRemNode` == true)
+         {
+            $optionsString += ";rm=1";
+         }
+      }
+      else if ($mode == "Add")
+      {
+         if (`checkBoxGrp -q -v1 optReparent` == true)
+         {
+            $optionsString += ";rpr=1";
+         }
+      }
+      
       if (`checkBoxGrp -q -v1 optFitTime` == true)
       {
-         $optionsString += "ftr=1;";
+         $optionsString += ";ftr=1";
+      }
+      
+      if (`checkBoxGrp -q -v1 optStartFrame` == true)
+      {
+         $optionsString += ";sts=1";
       }
       
       if (`checkBoxGrp -q -v1 optColSets` == true)
       {
-         $optionsString += "rcs=1;";
+         $optionsString += ";rcs=1";
       }
       
       if (`checkBoxGrp -q -v1 optUVSets` == true)
       {
-         $optionsString += "rus=1;";
+         $optionsString += ";rus=1";
       }
       
       $flt = `textFieldGrp -q -tx optFlt`;
       if (size($flt) > 0)
       {
-         $optionsString += "ft=" + $flt + ";";
+         $optionsString += ";ft=" + $flt + "";
       }
       
       $flt = `textFieldGrp -q -tx optExcFlt`;
       if (size($flt) > 0)
       {
-         $optionsString += "eft=" + $flt + ";";
+         $optionsString += ";eft=" + $flt + "";
       }
       
       if (`checkBoxGrp -q -v1 optDbg` == true)
       {
-         $optionsString += "d=1;";
+         $optionsString += ";d=1";
       }
       
-      optionVar -sv "alembicImportOptions" $optionsString;
-      
-      // replace quotations
       eval($resultCallback + " \"" + $optionsString + "\"");
       $result = 1;
    }
