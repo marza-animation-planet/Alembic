@@ -3281,7 +3281,7 @@ MString connectAttr(ArgData & iArgData)
 
     if (particleSize > 0)
     {
-        MPlug srcArrayPlug = alembicNodeFn.findPlug("outPoints", true);
+        MPlug srcArrayPlug = alembicNodeFn.findPlug("outParticles", true);
         
         for (unsigned int i = 0; i < particleSize; i++)
         {

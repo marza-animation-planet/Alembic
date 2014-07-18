@@ -93,7 +93,7 @@ MObject AlembicNode::mOutNurbsSurfaceArrayAttr;
 MObject AlembicNode::mOutTransOpArrayAttr;
 MObject AlembicNode::mOutPropArrayAttr;
 MObject AlembicNode::mOutLocatorPosScaleArrayAttr;
-MObject AlembicNode::mOutPointsArrayAttr;
+MObject AlembicNode::mOutParticlesDataArrayAttr;
 
 namespace
 {
@@ -256,12 +256,12 @@ MStatus AlembicNode::initialize()
     status = addAttribute(mOutLocatorPosScaleArrayAttr);
 
     // sampled points
-    mOutPointsArrayAttr = tAttr.create("outPoints", "opts", MFnData::kDynArrayAttrs);
+    mOutParticlesDataArrayAttr = tAttr.create("outParticles", "opar", MFnData::kDynArrayAttrs);
     status = tAttr.setStorable(false);
     status = tAttr.setWritable(false);
     status = tAttr.setArray(true);
     status = tAttr.setUsesArrayDataBuilder(true);
-    status = addAttribute(mOutPointsArrayAttr);
+    status = addAttribute(mOutParticlesDataArrayAttr);
 
     // sampled transform operations
     mOutTransOpArrayAttr = nAttr.create("transOp", "to",
@@ -318,7 +318,7 @@ MStatus AlembicNode::initialize()
     status = attributeAffects(mTimeAttr, mOutCameraArrayAttr);
     status = attributeAffects(mTimeAttr, mOutPropArrayAttr);
     status = attributeAffects(mTimeAttr, mOutLocatorPosScaleArrayAttr);
-    status = attributeAffects(mTimeAttr, mOutPointsArrayAttr);
+    status = attributeAffects(mTimeAttr, mOutParticlesDataArrayAttr);
 
     status = attributeAffects(mSpeedAttr, mOutSubDArrayAttr);
     status = attributeAffects(mSpeedAttr, mOutPolyArrayAttr);
@@ -328,7 +328,7 @@ MStatus AlembicNode::initialize()
     status = attributeAffects(mSpeedAttr, mOutCameraArrayAttr);
     status = attributeAffects(mSpeedAttr, mOutPropArrayAttr);
     status = attributeAffects(mSpeedAttr, mOutLocatorPosScaleArrayAttr);
-    status = attributeAffects(mSpeedAttr, mOutPointsArrayAttr);
+    status = attributeAffects(mSpeedAttr, mOutParticlesDataArrayAttr);
 
     status = attributeAffects(mOffsetAttr, mOutSubDArrayAttr);
     status = attributeAffects(mOffsetAttr, mOutPolyArrayAttr);
@@ -338,7 +338,7 @@ MStatus AlembicNode::initialize()
     status = attributeAffects(mOffsetAttr, mOutCameraArrayAttr);
     status = attributeAffects(mOffsetAttr, mOutPropArrayAttr);
     status = attributeAffects(mOffsetAttr, mOutLocatorPosScaleArrayAttr);
-    status = attributeAffects(mOffsetAttr, mOutPointsArrayAttr);
+    status = attributeAffects(mOffsetAttr, mOutParticlesDataArrayAttr);
 
     status = attributeAffects(mCycleTypeAttr, mOutSubDArrayAttr);
     status = attributeAffects(mCycleTypeAttr, mOutPolyArrayAttr);
@@ -348,7 +348,7 @@ MStatus AlembicNode::initialize()
     status = attributeAffects(mCycleTypeAttr, mOutCameraArrayAttr);
     status = attributeAffects(mCycleTypeAttr, mOutPropArrayAttr);
     status = attributeAffects(mCycleTypeAttr, mOutLocatorPosScaleArrayAttr);
-    status = attributeAffects(mCycleTypeAttr, mOutPointsArrayAttr);
+    status = attributeAffects(mCycleTypeAttr, mOutParticlesDataArrayAttr);
 
     MGlobal::executeCommand( UITemplateMELScriptStr );
 
@@ -1042,19 +1042,19 @@ MStatus AlembicNode::compute(const MPlug & plug, MDataBlock & dataBlock)
             outArrayHandle.setAllClean();
         }
     }
-    else if (plug == mOutPointsArrayAttr)
+    else if (plug == mOutParticlesDataArrayAttr)
     {
-        if (mOutRead[9])
+        if (mOutRead[7])
         {
             dataBlock.setClean(plug);
             return MS::kSuccess;
         }
 
-        mOutRead[9] = true;
+        mOutRead[7] = true;
 
         unsigned int pointsSize = static_cast<unsigned int>(mData.mPointsList.size());
 
-        MArrayDataHandle outArrayHandle = dataBlock.outputValue(mOutPointsArrayAttr, &status);
+        MArrayDataHandle outArrayHandle = dataBlock.outputValue(mOutParticlesDataArrayAttr, &status);
 
         if (pointsSize > 0)
         {

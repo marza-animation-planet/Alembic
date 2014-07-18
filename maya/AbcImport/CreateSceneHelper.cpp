@@ -980,58 +980,16 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPoints& iNode)
     Alembic::Abc::ICompoundProperty arbProp = iNode.getSchema().getArbGeomParams();
     Alembic::Abc::ICompoundProperty userProp = iNode.getSchema().getUserProperties();
     
-    // Check for animated arbProp and userProp
-    // if (!isAnimated)
-    // {
-    //     for (size_t i=0; i<arbProp.getNumProperties(); ++i)
-    //     {
-    //         const Alembic::Abc::PropertyHeader & propHeader = arbProp.getPropertyHeader(i);
-            
-    //         uin8_t extent = propHeader.getDataType().getExtent();
-            
-    //         switch (propHeader.getDataType().getPod())
-    //         {
-    //         case Abc::Util::kFloat32POD:
-    //         // etc...
-                
-    //         }
-    //         // Scope? (seems not to be set)
-    //         // -> check isArray
-    //         // -> what about arrayExtent?
-    //         // Directly check pod type and pod extent
-            
-    //         // Or straight check?
-            
-    //         if (Alembic::AbcGeom::IV3fGeomParam::matches(propHeader))
-    //         {
-    //             Alembic::AbcGeom::IV3fGeomParam geomParam(arbProp, propHeader.getName());
-    //             isAnimated = isAnimated || !geomParam.isConstant();
-    //         }
-    //         else if (Alembic::AbcGeom::IP3fGeomParam::matches(propHeader))
-    //         {
-    //             Alembic::AbcGeom::IP3fGeomParam geomParam(arbProp, propHeader.getName());
-    //             isAnimated = isAnimated || !geomParam.isConstant();
-    //         }
-    //         else if (Alembic::AbcGeom::IFloatGeomParam::matches(propHeader))
-    //         {
-    //             Alembic::AbcGeom::IFloatGeomParam geomParam(arbProp, propHeader.getName());
-    //             isAnimated = isAnimated || !geomParam.isConstant();
-    //         }
-    //     }
-    // }
-        
     if (!isConstant)
         mData.mPointsList.push_back(iNode);
 
     std::size_t firstProp = mData.mPropList.size();
 
-    // Only want to account those properties not passed on via the  MFnArrayAttrsData
-    //getAnimatedProps(arbProp, mData.mPropList, false, false);
-    //getAnimatedProps(userProp, mData.mPropList, false, false);
+    getAnimatedProps(arbProp, mData.mPropList, false, false);
+    getAnimatedProps(userProp, mData.mPropList, false, false);
     
     Alembic::Abc::IScalarProperty visProp = getVisible(iNode, isConstant,
         mData.mPropList, mData.mAnimVisStaticObjList);
-    
 
     bool hasDag = false;
     if (mAction != NONE && mConnectDagNode.isValid())
@@ -1059,9 +1017,8 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPoints& iNode)
     if (particleObj != MObject::kNullObj)
     {
         setConstantVisibility(visProp, particleObj);
-        // See comment above
-        //addProps(arbProp, particleObj, false, false);
-        //addProps(userProp, particleObj, false, false);
+        addProps(arbProp, particleObj, false, false);
+        addProps(userProp, particleObj, false, false);
     }
 
     if ( mAction >= CONNECT )
@@ -1084,8 +1041,8 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPoints& iNode)
         MPlug dstPlug = fn.findPlug("cacheArrayData");
         disconnectAllPlugsTo(dstPlug);
         
-        //disconnectProps(fnParts, iSampledPropList, iFirstProp);
-        //addToPropList(firstProp, particleObj);
+        disconnectProps(fn, mData.mPropList, firstProp);
+        addToPropList(firstProp, particleObj);
     }
 
     if (hasDag)

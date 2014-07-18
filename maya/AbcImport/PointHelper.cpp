@@ -139,10 +139,6 @@ MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & i
     
     size_t pSize = inFloorPos->size();
     
-    char tmpbuf[256];
-    sprintf(tmpbuf, "%lu", pSize);
-    MGlobal::displayInfo("Read " + MString(tmpbuf) + " particle(s)");
-    
     outCount.setLength(1);
     outCount[0] = double(pSize);
     
@@ -151,6 +147,7 @@ MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & i
         schema.get(ceilSamp, ceilSampSel);
                 
         Alembic::Abc::P3fArraySamplePtr inCeilPos = ceilSamp.getPositions();
+        Alembic::Abc::V3fArraySamplePtr inCeilVel = ceilSamp.getVelocities();
         Alembic::Abc::UInt64ArraySamplePtr inCeilId = ceilSamp.getIds();
         
         std::map<size_t, size_t> idmap;
@@ -169,34 +166,35 @@ MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & i
         
         for (unsigned int pId = 0; pId < pSize; pId++)
         {
-            MVector vel((*inFloorVel)[pId].x,
-                        (*inFloorVel)[pId].y,
-                        (*inFloorVel)[pId].z);
+            MVector p0((*inFloorPos)[pId].x,
+                       (*inFloorPos)[pId].y,
+                       (*inFloorPos)[pId].z);
+            
+            MVector v0((*inFloorVel)[pId].x,
+                       (*inFloorVel)[pId].y,
+                       (*inFloorVel)[pId].z);
             
             outId[pId] = (*inFloorId)[pId];
-            outVel[pId] = vel;
             
             idit = idmap.find(outId[pId]);
             
             if (idit == idmap.end())
             {
-                outPos[pId] = MVector((*inFloorPos)[pId].x + dt * vel.x,
-                                      (*inFloorPos)[pId].y + dt * vel.y,
-                                      (*inFloorPos)[pId].z + dt * vel.z);
-                
-                
+                outPos[pId] = p0 + dt * v0;
+                outVel[pId] = v0;
             }
             else
             {
-                MVector v0((*inFloorPos)[pId].x,
-                           (*inFloorPos)[pId].y,
-                           (*inFloorPos)[pId].z);
-                
-                MVector v1((*inCeilPos)[idit->second].x,
+                MVector p1((*inCeilPos)[idit->second].x,
                            (*inCeilPos)[idit->second].y,
                            (*inCeilPos)[idit->second].z);
                 
-                outPos[pId] = (1.0 - blend) * v0 + blend * v1;
+                MVector v1((*inCeilVel)[idit->second].x,
+                           (*inCeilVel)[idit->second].y,
+                           (*inCeilVel)[idit->second].z);
+                
+                outPos[pId] = (1.0 - blend) * p0 + blend * p1;
+                outVel[pId] = (1.0 - blend) * v0 + blend * v1;
             }
         }
     }
@@ -252,13 +250,15 @@ MStatus create(double iFrame, const Alembic::AbcGeom::IPoints & iNode,
 
     // convert the data to Maya format
     MFnParticleSystem fnParticle;
-    //iObject = fnParticle.create(iParent, &status);
     MDagModifier dagMod;
-    // This is not enough! It won't connect to nucleus
+
     iObject = dagMod.createNode("nParticle", iParent, &status);
     status = dagMod.doIt();
     fnParticle.setObject(iObject);
     fnParticle.setName(iNode.getName().c_str());
+
+    MGlobal::executeCommand("setupNParticleConnections " + fnParticle.name());
+    MGlobal::executeCommand("connectAttr time1.outTime " + fnParticle.name() + ".currentTime");
 
     if (pSize > 0)
     {
