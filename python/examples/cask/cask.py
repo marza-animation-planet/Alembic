@@ -270,7 +270,9 @@ def wrap(iobject, time_sampling_id=None):
     for cls in Object.__subclasses__():
         if cls.matches(iobject):
             return cls(iobject, time_sampling_id=time_sampling_id)
-    return iobject
+    #return iobject
+    print("Object of type %s can't be wrapped" % type(iobject))
+    return None
 
 def is_valid(archive):
     """
@@ -1146,6 +1148,8 @@ class Object(object):
                     iobject = self.iobject.getChild(i),
                     time_sampling_id = self.time_sampling_id
                 )
+                if child is None:
+                    continue
                 self._child_dict[child.name] = child
         return self._child_dict
 
@@ -1392,6 +1396,12 @@ class NuPatch(Object):
     __sample_class = alembic.AbcGeom.ONuPatchSchemaSample
     def __init__(self, *args, **kwargs):
         super(NuPatch, self).__init__(*args, **kwargs)
+
+class Points(Object):
+    """Points I/O Object subclass."""
+    __sample_class = alembic.AbcGeom.OPointsSchemaSample
+    def __init__(self, *args, **kwargs):
+        super(Points, self).__init__(*args, **kwargs)
 
 class Material(Object):
     """Material I/O Object subclass."""
