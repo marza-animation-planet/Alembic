@@ -3292,9 +3292,6 @@ MString connectAttr(ArgData & iArgData)
             dstPlug = fnParts.findPlug("cacheArrayData", true);
             modifier.connect(srcPlug, dstPlug);
             status = modifier.doIt();
-            
-            dstPlug = fnParts.findPlug("playFromCache");
-            dstPlug.setBool(true);
         }
     }
 

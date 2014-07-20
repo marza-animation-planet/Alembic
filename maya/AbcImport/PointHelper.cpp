@@ -257,8 +257,8 @@ MStatus create(double iFrame, const Alembic::AbcGeom::IPoints & iNode,
     fnParticle.setObject(iObject);
     fnParticle.setName(iNode.getName().c_str());
 
-    MGlobal::executeCommand("setupNParticleConnections " + fnParticle.name());
-    MGlobal::executeCommand("connectAttr time1.outTime " + fnParticle.name() + ".currentTime");
+    MGlobal::executeCommand("setupNParticleConnections " + fnParticle.fullPathName());
+    MGlobal::executeCommand("connectAttr time1.outTime " + fnParticle.fullPathName() + ".currentTime");
 
     if (pSize > 0)
     {
@@ -290,8 +290,15 @@ MStatus create(double iFrame, const Alembic::AbcGeom::IPoints & iNode,
     
     status = fnParticle.saveInitialState();
     
-    MPlug isDyn = fnParticle.findPlug("isDynamic");
-    isDyn.setBool(false);
+    MPlug plug;
+    plug = fnParticle.findPlug("isDynamic");
+    plug.setValue(false);
+    
+    plug = fnParticle.findPlug("playFromCache");
+    plug.setValue(true);
+    
+    plug = fnParticle.findPlug("particleRenderType");
+    plug.setValue(3);
 
     return status;
 }
