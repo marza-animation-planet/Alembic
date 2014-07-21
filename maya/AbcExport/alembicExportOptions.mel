@@ -1,0 +1,463 @@
+
+global proc alembicExportOptions_frameRangeChanged()
+{
+   string $val = `optionMenuGrp -q -v optRange`;
+   
+   if ($val == "Time Slider")
+   {
+      floatFieldGrp -e -v1 `playbackOptions -q -animationStartTime` optCustRange;
+      floatFieldGrp -e -v2 `playbackOptions -q -animationEndTime` optCustRange;
+   }
+   else if ($val == "Render Settings")
+   {
+      floatFieldGrp -e -v1 `getAttr defaultRenderGlobals.startFrame` optCustRange;
+      floatFieldGrp -e -v2 `getAttr defaultRenderGlobals.endFrame` optCustRange;
+   }
+   
+   floatFieldGrp -e -en ($val == "Custom") optCustRange;
+}
+
+global proc int alembicExportOptions(string $parent,
+                                      string $action,
+                                      string $initialSettings,
+                                      string $resultCallback)
+{
+    int $rv = 0;
+    
+    if (catchQuiet($rv = _alembicExportOptions($parent, $action, $initialSettings, $resultCallback)))
+    {
+        // Try one more time with an empty option string
+        if (catchQuiet($rv = _alembicExportOptions($parent, $action, "", $resultCallback)))
+        {
+            if ($action == "query")
+            {
+                eval($resultCallback + " \"\"");
+                return 1;
+            }
+            else if ($action == "post")
+            {
+                return 1;
+            }
+            else
+            {
+                return 0;
+            }
+        }
+    }
+    
+    return $rv;
+}
+
+global proc int _alembicExportOptions(string $parent,
+                                      string $action,
+                                      string $initialSettings,
+                                      string $resultCallback)
+{
+   int $result = 0;
+   string $flt = "";
+   string $optionsString = "";
+   
+   if ($action == "post")
+   {
+      // Build UI elements
+      setParent $parent;
+      
+      frameLayout -collapsable false -label "Sampling" -bv false;
+         columnLayout;
+            optionMenuGrp -l "Frame Range:" -adj 2 -cal 1 right -cal 2 left -cc "alembicExportOptions_frameRangeChanged" optRange;
+            menuItem -l "Render Settings";
+            menuItem -l "Time Slider";
+            menuItem -l "Custom";
+            optionMenuGrp -e -v "Time Slider" optRange;
+            floatFieldGrp -nf 2 -l "" -v1 1.0 -v2 24.0 optCustRange;
+            floatFieldGrp -nf 1 -l "Frame Step:" -adj 2 -cal 1 right -cal 2 left -v1 1.0 optStep;
+            textFieldGrp -l "Frame Relative Samples:" -adj 2 -cal 1 right -cal 2 left -tx "" optRelSamp;
+            floatFieldGrp -nf 1 -l "Pre-roll Frames:" -adj 2 -cal 1 right -cal 2 left -v1 0.0 optPreRoll;
+         setParent ..;
+      setParent ..;
+      
+      frameLayout -collapsable false -label "General" -bv false;
+         columnLayout;
+            checkBoxGrp -ncb 1 -l "" -l1 "Strip Namespaces" -adj 2 -cal 1 right -cal 2 left -v1 false optStripNS;
+            checkBoxGrp -ncb 1 -l "" -l1 "Whole Frame Geo" -adj 2 -cal 1 right -cal 2 left -v1 false optWholeFrameGeo;
+            checkBoxGrp -ncb 1 -l "" -l1 "Renderable Only" -adj 2 -cal 1 right -cal 2 left -v1 false optRenderOnly;
+            checkBoxGrp -ncb 1 -l "" -l1 "World Space" -adj 2 -cal 1 right -cal 2 left -v1 false optWorldSpace;
+            checkBoxGrp -ncb 1 -l "" -l1 "Write Visibility" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteVis;
+            checkBoxGrp -ncb 1 -l "" -l1 "Euler Filter" -adj 2 -cal 1 right -cal 2 left -v1 false optEulerFilter;
+         setParent ..;
+      setParent ..;
+      
+      frameLayout -collapsable false -label "Attributes" -bv false;
+         columnLayout;
+            textFieldGrp -l "Geometric Attributes:" -adj 2 -cal 1 right -cal 2 left -tx "" optGAList;
+            textFieldGrp -l "Geometric Attr. Prefices:" -adj 2 -cal 1 right -cal 2 left -tx "ABC_" optGAPref;
+            textFieldGrp -l "User Attributes:" -adj 2 -cal 1 right -cal 2 left -tx "" optUAList;
+            textFieldGrp -l "User Attr. Prefices:" -adj 2 -cal 1 right -cal 2 left -tx "" optUAPref;
+         setParent ..;
+      setParent ..;
+      
+      frameLayout -collapsable false -label "Mesh" -bv false;
+         columnLayout;
+            checkBoxGrp -ncb 1 -l "" -l1 "No Normals" -adj 2 -cal 1 right -cal 2 left -v1 false optNoNormals;
+            checkBoxGrp -ncb 1 -l "" -l1 "Write Primary UV" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteUV;
+            checkBoxGrp -ncb 1 -l "" -l1 "Write Secondary UVs" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteExtraUV;
+            checkBoxGrp -ncb 1 -l "" -l1 "Write Color Sets" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteColors;
+            checkBoxGrp -ncb 1 -l "" -l1 "Write Face Sets" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteFaceSets;
+         setParent ..;
+      setParent ..;
+      
+      frameLayout -collapsable false -label "Scripts" -bv false;
+         columnLayout;
+            textFieldGrp -l "Per Frame MEL:" -adj 2 -cal 1 right -cal 2 left -tx "" optPerFrameMel;
+            textFieldGrp -l "Per Frame Python:" -adj 2 -cal 1 right -cal 2 left -tx "" optPerFramePy;
+            textFieldGrp -l "Post Job MEL:" -adj 2 -cal 1 right -cal 2 left -tx "" optPostJobMel;
+            textFieldGrp -l "Post Job Python:" -adj 2 -cal 1 right -cal 2 left -tx "" optPostJobPy;
+         setParent ..;
+      setParent ..;
+      
+      separator -style "in";
+      
+      //-duf/-dontSkipUnwrittenFrames
+      optionMenuGrp -l "Format:" -cal 1 right -cal 2 left optFmt;
+      menuItem -l "Ogawa";
+      menuItem -l "HDF";
+      optionMenuGrp -e -v "Ogawa" optFmt;
+      checkBoxGrp -ncb 1 -l "" -l1 "Verbose" -adj 2 -cal 1 right -cal 2 left -v1 false optVerb;
+      
+      $optionsString = $initialSettings;
+      
+      //print($optionsString+"\n");
+      
+      if (size($optionsString) > 0)
+      {
+         // parse option string and set UI
+         string $optlist[];
+         int $n = tokenize($optionsString, ";", $optlist);
+         
+         string $frt;
+         string $prevkey = "";
+         string $prevval = "";
+         float $sf, $ef;
+         
+         for ($i=0; $i<$n; $i++)
+         {
+            string $keyval[];
+            
+            int $n2 = tokenize($optlist[$i], "=", $keyval);
+            
+            if ($n2 < 2)
+            {
+               continue;
+            }
+            
+            string $key = $keyval[0];
+            string $val = $keyval[1];
+            for ($j=2; $j<$n2; $j++)
+            {
+               $val += "=";
+               $val += $keyval[$j];
+            }
+            
+            if ($key == "v")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optVerb;
+            }
+            else if ($key == "frt")
+            {
+               $frt = $val;
+            }
+            else if ($key == "ff")
+            {
+               $sf = float($val);
+            }
+            else if ($key == "lf")
+            {
+               $ef = float($val);
+            }
+            else if ($key == "s")
+            {
+               float $fv = float($val);
+               floatFieldGrp -e -v1 $fv optStep;
+            }
+            else if ($key == "frs")
+            {
+               textFieldGrp -e -tx $val optRelSamp;
+            }
+            else if ($key == "pr")
+            {
+               float $fv = float($val);
+               floatFieldGrp -e -v1 $fv optPreRoll;
+            }
+            else if ($key == "df")
+            {
+               optionMenuGrp -e -v $val optFmt;
+            }
+            else if ($key == "sn")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optStripNS;
+            }
+            else if ($key == "wfg")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optWholeFrameGeo;
+            }
+            else if ($key == "ro")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optRenderOnly;
+            }
+            else if ($key == "ws")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optWorldSpace;
+            }
+            else if ($key == "wv")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optWriteVis;
+            }
+            else if ($key == "ef")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optEulerFilter;
+            }
+            else if ($key == "nn")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optNoNormals;
+            }
+            else if ($key == "uv")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optWriteUV;
+            }
+            else if ($key == "weu")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optWriteExtraUV;
+            }
+            else if ($key == "wcs")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optWriteColors;
+            }
+            else if ($key == "wfs")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optWriteFaceSets;
+            }
+            else if ($key == "fc" || $key == "pc")
+            {
+               if (size(match("^<py>", $val)) > 0)
+               {
+                  while (size(match("</py>$", $optlist[$i])) == 0)
+                  {
+                     $i++;
+                     if ($i >= size($optlist))
+                     {
+                        break;
+                     }
+                     $val += ";" + $optlist[$i];
+                  }
+                  $val = substring($val, 5, size($val)-5);
+                  if ($key == "fc")
+                  {
+                      textFieldGrp -e -tx $val optPerFramePy;
+                  }
+                  else
+                  {
+                      textFieldGrp -e -tx $val optPostJobPy;
+                  }
+               }
+               else if (size(match("^<mel>", $val)) > 0)
+               {
+                  while (size(match("</mel>$", $optlist[$i])) == 0)
+                  {
+                     $i++;
+                     if ($i >= size($optlist))
+                     {
+                        break;
+                     }
+                     $val += ";" + $optlist[$i];
+                  }
+                  $val = substring($val, 6, size($val)-6);
+                  if ($key == "fc")
+                  {
+                      textFieldGrp -e -tx $val optPerFrameMel;
+                  }
+                  else
+                  {
+                      textFieldGrp -e -tx $val optPostJobMel;
+                  }
+               }
+            }
+            else if ($key == "a")
+            {
+               textFieldGrp -e -tx $val optGAList;
+            }
+            else if ($key == "atp")
+            {
+               textFieldGrp -e -tx $val optGAPref;
+            }
+            else if ($key == "u")
+            {
+               textFieldGrp -e -tx $val optUAList;
+            }
+            else if ($key == "uatp")
+            {
+               textFieldGrp -e -tx $val optUAPref;
+            }
+            
+            $prevkey = $key;
+            $prevvak = $val;
+         }
+         
+         optionMenuGrp -e -v $frt optRange;
+         if ($frt == "Custom")
+         {
+            floatFieldGrp -e -v1 $sf -v2 $ef optCustRange;
+         }
+      }
+      
+      // Update editable state
+      alembicExportOptions_frameRangeChanged();
+      
+      $result = 1;
+   }
+   else if ($action == "query")
+   {
+      // Build option string
+      setParent $parent;
+      
+      string $text;
+      
+      $optionsString = "frt=" + `optionMenuGrp -q -v optRange`;
+      $optionsString += ";ff=" + `floatFieldGrp -q -v1 optCustRange`;
+      $optionsString += ";lf=" + `floatFieldGrp -q -v2 optCustRange`;
+      $optionsString += ";s=" + `floatFieldGrp -q -v1 optStep`;
+      $optionsString += ";frs=" + `textFieldGrp -q -tx optRelSamp`;
+      $optionsString += ";pr=" + `floatFieldGrp -q -v1 optPreRoll`;
+      
+      if (`checkBoxGrp -q -v1 optVerb` == true)
+      {
+         $optionsString += ";v=1";
+      }
+      
+      if (`checkBoxGrp -q -v1 optStripNS` == true)
+      {
+         $optionsString += ";sn=1";
+      }
+      
+      if (`checkBoxGrp -q -v1 optWholeFrameGeo` == true)
+      {
+         $optionsString += ";wfg=1";
+      }
+      
+      if (`checkBoxGrp -q -v1 optRenderOnly` == true)
+      {
+         $optionsString += ";ro=1";
+      }
+      
+      if (`checkBoxGrp -q -v1 optWorldSpace` == true)
+      {
+         $optionsString += ";ws=1";
+      }
+      
+      if (`checkBoxGrp -q -v1 optWriteVis` == true)
+      {
+         $optionsString += ";wv=1";
+      }
+      
+      if (`checkBoxGrp -q -v1 optEulerFilter` == true)
+      {
+         $optionsString += ";ef=1";
+      }
+      
+      if (`checkBoxGrp -q -v1 optNoNormals` == true)
+      {
+         $optionsString += ";nn=1";
+      }
+      
+      if (`checkBoxGrp -q -v1 optWriteUV` == true)
+      {
+         $optionsString += ";uv=1";
+      }
+      
+      if (`checkBoxGrp -q -v1 optWriteExtraUV` == true)
+      {
+         $optionsString += ";weu=1";
+      }
+      
+      if (`checkBoxGrp -q -v1 optWriteColors` == true)
+      {
+         $optionsString += ";wcs=1";
+      }
+      
+      if (`checkBoxGrp -q -v1 optWriteFaceSets` == true)
+      {
+         $optionsString += ";wfs=1";
+      }
+      
+      $text = `textFieldGrp -q -tx optGAList`;
+      if (size($text) > 0)
+      {
+         $optionsString += ";a=" + $text;
+      }
+      
+      $text = `textFieldGrp -q -tx optGAPref`;
+      if (size($text) > 0)
+      {
+         $optionsString += ";atp=" + $text;
+      }
+      
+      $text = `textFieldGrp -q -tx optUAList`;
+      if (size($text) > 0)
+      {
+         $optionsString += ";u=" + $text;
+      }
+      
+      $text = `textFieldGrp -q -tx optUAPref`;
+      if (size($text) > 0)
+      {
+         $optionsString += ";uatp=" + $text;
+      }
+      
+      $text = `textFieldGrp -q -tx optPerFrameMel`;
+      if (size($text) > 0)
+      {
+         $text = substituteAllString($text, "\\", "\\\\");
+         $text = substituteAllString($text, "\"", "\\\"");
+         $optionsString += ";fc=<mel>" + $text + "</mel>";
+      }
+      
+      $text = `textFieldGrp -q -tx optPerFramePy`;
+      if (size($text) > 0)
+      {
+         $text = substituteAllString($text, "\\", "\\\\");
+         $text = substituteAllString($text, "\"", "\\\"");
+         $optionsString += ";fc=<py>" + $text + "</py>";
+      }
+      
+      $text = `textFieldGrp -q -tx optPostJobMel`;
+      if (size($text) > 0)
+      {
+         $text = substituteAllString($text, "\\", "\\\\");
+         $text = substituteAllString($text, "\"", "\\\"");
+         $optionsString += ";pc=<mel>" + $text + "</mel>";
+      }
+      
+      $text = `textFieldGrp -q -tx optPostJobPy`;
+      if (size($text) > 0)
+      {
+         $text = substituteAllString($text, "\\", "\\\\");
+         $text = substituteAllString($text, "\"", "\\\"");
+         $optionsString += ";pc=<py>" + $text + "</py>";
+      }
+      
+      $optionsString += ";df=" + `optionMenuGrp -q -v optFmt`;
+      //print($optionsString+"\n");
+      
+      $optionsString = substituteAllString($optionsString, "\\", "\\\\");
+      $optionsString = substituteAllString($optionsString, "\"", "\\\"");
+      //print($optionsString+"\n");
+      
+      eval($resultCallback + " \"" + $optionsString + "\"");
+      $result = 1;
+   }
+   else
+   {
+      $result = 0;
+   }
+   
+   return $result;
+}

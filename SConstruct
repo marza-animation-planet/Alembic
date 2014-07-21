@@ -503,6 +503,7 @@ if build_maya_plugins:
                  "libdirs": libdirs,
                  "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
                  "srcs": glob.glob("maya/AbcExport/*.cpp"),
+                 "install": {"maya/scripts": glob.glob("maya/AbcExport/*.mel")},
                  "custom": [maya.Require, maya.Plugin]
                 }])
 

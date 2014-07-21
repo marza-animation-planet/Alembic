@@ -37,6 +37,7 @@
 #include "AbcExport.h"
 #include "AbcWriteJob.h"
 #include "MayaUtility.h"
+#include "AlembicExportFileTranslator.h"
 
 #include <maya/MFnPlugin.h>
 #include <maya/MFileObject.h>
@@ -1076,6 +1077,17 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     {
         status.perror("registerCommand");
     }
+    
+    status = plugin.registerFileTranslator("Alembic Export",
+                                NULL,
+                                AlembicExportFileTranslator::creator,
+                                "alembicExportOptions",
+                                "",
+                                true);
+    if (!status)
+    {
+        status.perror("registerFileTranslator");
+    }
 
     MString info = "AbcExport v";
     info += ABCEXPORT_VERSION;
@@ -1090,6 +1102,12 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
 {
     MStatus status;
     MFnPlugin plugin(obj);
+
+    status = plugin.deregisterFileTranslator("Alembic");
+    if (!status)
+    {
+        status.perror("deregisterFileTranslator");
+    }
 
     status = plugin.deregisterCommand("AbcExport");
     if (!status)
