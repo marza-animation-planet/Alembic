@@ -31,6 +31,7 @@ libs    = []
 #hdf5_defs = ["_LARGEFILE_SOURCE", "_LARGEFILE64_SOURCE", "_BDS_SOURCE"]
 hdf5_libs = ["hdf5_hl", "hdf5", "z", "sz"]
 
+ilmbase_libs_base = ["IlmThread", "Imath", "IexMath", "Iex", "Half"]
 ilmbase_libs = ["IlmThread", "Imath", "IexMath", "Iex", "Half"]
 
 pyilmbase_libs = ["PyImath"]
@@ -137,7 +138,7 @@ def ReadSettings(path, silent=False):
    return allsettings
 
 def ApplySettings(settings):
-   global boost_python_libname, build_arnold_plugins, build_maya_plugins, build_houdini_plugins
+   global boost_python_libname, build_arnold_plugins, build_maya_plugins, build_houdini_plugins, ilmbase_libs_base, ilmbase_libs
    
    build_arnold_plugins = False
    build_maya_plugins = False
@@ -155,6 +156,11 @@ def ApplySettings(settings):
          inc, lib, boost_python_libname = val
          AddDirectories(inc, lib)
       
+      elif key == "ilmbase":
+         inc, lib, suffix = val
+         AddDirectories(inc, lib)
+         ilmbase_libs = map(lambda x: x+suffix, ilmbase_libs_base)
+         
       elif key == "python":
          SetArgument("with-python", str(val))
       
@@ -230,12 +236,13 @@ def UpdateSettings(path, replace=True):
    if boost_pyinc or boost_pylib or boost_pylibname:
       platsettings["boost-python"] = (boost_pyinc, boost_pylib, boost_pylibname)
    
-   def_inc, def_lib = (deps_inc, deps_lib) if replace else curplatsettings.get("ilmbase", (None, None))
+   def_inc, def_lib, def_suffix = (deps_inc, deps_lib, "") if replace else curplatsettings.get("ilmbase", (None, None, ""))
    ilmbase_inc, ilmbase_lib = GetDirsWithDefault("ilmbase", incdir_default=def_inc, libdir_default=def_lib)
-   if ilmbase_inc or ilmbase_lib:
+   ilmbase_libname_suffix = GetArgument("with-ilmbase-libname-suffix", default=def_suffix)
+   if ilmbase_inc or ilmbase_lib or ilmbase_libname_suffix:
       if not ilmbase_inc.endswith("OpenEXR"):
          ilmbase_inc += "/OpenEXR"
-      platsettings["ilmbase"] = (ilmbase_inc, ilmbase_lib)
+      platsettings["ilmbase"] = (ilmbase_inc, ilmbase_lib, ilmbase_libname_suffix)
    
    def_inc, def_lib = (deps_inc, deps_lib) if replace else curplatsettings.get("ilmbase-python", (None, None))
    ilmbase_pyinc, ilmbase_pylib = GetDirsWithDefault("ilmbase-python", incdir_default=def_inc, libdir_default=def_lib)
