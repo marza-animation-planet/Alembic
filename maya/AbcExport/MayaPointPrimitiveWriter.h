@@ -54,6 +54,7 @@ class MayaPointPrimitiveWriter
     void write(double iFrame);
     bool isAnimated() const;
     unsigned int getNumCVs();
+    Alembic::Abc::OObject getObject() {return mSchema.getObject();};
     AttributesWriterPtr getAttrs() {return mAttrs;};
 
   private:

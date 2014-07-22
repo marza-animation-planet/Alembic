@@ -50,6 +50,7 @@ class MayaCameraWriter
 
     MayaCameraWriter(MDagPath & iDag, Alembic::Abc::OObject & iParent,
         Alembic::Util::uint32_t iTimeIndex, const JobArgs & iArgs);
+    Alembic::Abc::OObject getObject() {return mSchema.getObject();};
     AttributesWriterPtr getAttrs() {return mAttrs;};
     void write();
     bool isAnimated() const;

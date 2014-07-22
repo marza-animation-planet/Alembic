@@ -55,6 +55,7 @@ class MayaNurbsCurveWriter
     bool isAnimated() const;
     unsigned int getNumCVs();
     unsigned int getNumCurves();
+    Alembic::Abc::OObject getObject() {return mSchema.getObject();};
     AttributesWriterPtr getAttrs() {return mAttrs;};
 
   private:

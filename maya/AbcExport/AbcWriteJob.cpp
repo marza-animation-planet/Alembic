@@ -370,7 +370,8 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
         return;
 
     MObject ob = mCurDag.node();
-
+    MDagPath masterDag;
+    
     // skip all intermediate nodes (and their children)
     if (util::isIntermediate(ob))
     {
@@ -381,6 +382,22 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
     if (mArgs.excludeInvisible && !util::isRenderable(ob))
     {
         return;
+    }
+
+    // handles instances
+    if (mArgs.writeInstances && mCurDag.isInstanced())
+    {
+        MDagPath::getAPathTo(ob, masterDag);
+        
+        std::map<MDagPath, Alembic::Abc::OObject, util::cmpDag>::iterator it = mMasterDags.find(masterDag);
+        if (it != mMasterDags.end())
+        {
+            MFnDependencyNode fnDepNode(ob, &status);
+            MString name = fnDepNode.name();
+            name = util::stripNamespaces(name, mArgs.stripNamespace);
+            iParent->getObject().addChildInstance(it->second, name.asChar());
+            return;
+        }
     }
 
     // look for riCurves flag for flattening all curve objects to a curve group
@@ -431,6 +448,11 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
         AttributesWriterPtr attrs = nurbsCurve->getAttrs();
         if (mShapeTimeIndex != 0 && attrs->isAnimated())
             mShapeAttrList.push_back(attrs);
+        
+        if (mCurDag.isInstanced())
+        {
+            mMasterDags[masterDag] = nurbsCurve->getObject();
+        }
     }
     else if (ob.hasFn(MFn::kTransform))
     {
@@ -482,6 +504,11 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
                 mCurDag.pop();
             }
         }
+        
+        if (mCurDag.isInstanced())
+        {
+            mMasterDags[masterDag] = trans->getObject();
+        }
     }
     else if (ob.hasFn(MFn::kLocator))
     {
@@ -514,6 +541,12 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
             AttributesWriterPtr attrs = locator->getAttrs();
             if (mShapeTimeIndex != 0 && attrs->isAnimated())
                 mShapeAttrList.push_back(attrs);
+            
+            
+            if (mCurDag.isInstanced())
+            {
+                mMasterDags[masterDag] = locator->getObject();
+            }
         }
         else
         {
@@ -555,6 +588,11 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
             AttributesWriterPtr attrs = particle->getAttrs();
             if (mShapeTimeIndex != 0 && attrs->isAnimated())
                 mShapeAttrList.push_back(attrs);
+            
+            if (mCurDag.isInstanced())
+            {
+                mMasterDags[masterDag] = particle->getObject();
+            }
         }
         else
         {
@@ -616,6 +654,11 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
             AttributesWriterPtr attrs = mesh->getAttrs();
             if (mShapeTimeIndex != 0 && attrs->isAnimated())
                 mShapeAttrList.push_back(attrs);
+            
+            if (mCurDag.isInstanced())
+            {
+                mMasterDags[masterDag] = mesh->getObject();
+            }
         }
         else
         {
@@ -653,6 +696,11 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
             AttributesWriterPtr attrs = camera->getAttrs();
             if (mShapeTimeIndex != 0 && attrs->isAnimated())
                 mShapeAttrList.push_back(attrs);
+            
+            if (mCurDag.isInstanced())
+            {
+                mMasterDags[masterDag] = camera->getObject();
+            }
         }
         else
         {
@@ -694,6 +742,11 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
             AttributesWriterPtr attrs = nurbsSurface->getAttrs();
             if (mShapeTimeIndex != 0 && attrs->isAnimated())
                 mShapeAttrList.push_back(attrs);
+            
+            if (mCurDag.isInstanced())
+            {
+                mMasterDags[masterDag] = nurbsSurface->getObject();
+            }
         }
         else
         {
@@ -737,6 +790,11 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
             AttributesWriterPtr attrs = nurbsCurve->getAttrs();
             if (mShapeTimeIndex != 0 && attrs->isAnimated())
                 mShapeAttrList.push_back(attrs);
+            
+            if (mCurDag.isInstanced())
+            {
+                mMasterDags[masterDag] = nurbsCurve->getObject();
+            }
         }
         else
         {

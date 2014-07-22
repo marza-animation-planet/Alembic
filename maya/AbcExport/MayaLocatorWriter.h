@@ -54,6 +54,7 @@ class MayaLocatorWriter
     ~MayaLocatorWriter();
     void write();
     bool isAnimated() const;
+    Alembic::Abc::OObject getObject() {return mXform.getSchema().getObject();};
     AttributesWriterPtr getAttrs() {return mAttrs;};
 
   private:

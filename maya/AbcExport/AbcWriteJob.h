@@ -227,6 +227,8 @@ class AbcWriteJob
 
     AbcWriteJobStatistics mStats;
     JobArgs mArgs;
+    
+    std::map<MDagPath, Alembic::Abc::OObject, util::cmpDag> mMasterDags;
 };
 
 typedef Alembic::Util::shared_ptr < AbcWriteJob > AbcWriteJobPtr;

@@ -402,6 +402,11 @@ try
             {
                 jobArgs.writeVisibility = true;
             }
+            
+            else if (arg == "-wi" || arg == "-writeInstances")
+            {
+                jobArgs.writeInstances = true;
+            }
 
             else if (arg == "-mfc" || arg == "-melperframecallback")
             {

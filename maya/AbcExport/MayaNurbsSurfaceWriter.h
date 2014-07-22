@@ -52,6 +52,7 @@ class MayaNurbsSurfaceWriter
     void write();
     bool isAnimated() const;
     unsigned int getNumCVs();
+    Alembic::Abc::OObject getObject() {return mSchema.getObject();};
     AttributesWriterPtr getAttrs() {return mAttrs;};
 
   private:

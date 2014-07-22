@@ -83,6 +83,7 @@ global proc int _alembicExportOptions(string $parent,
             checkBoxGrp -ncb 1 -l "" -l1 "Renderable Only" -adj 2 -cal 1 right -cal 2 left -v1 false optRenderOnly;
             checkBoxGrp -ncb 1 -l "" -l1 "World Space" -adj 2 -cal 1 right -cal 2 left -v1 false optWorldSpace;
             checkBoxGrp -ncb 1 -l "" -l1 "Write Visibility" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteVis;
+            checkBoxGrp -ncb 1 -l "" -l1 "Write Instances" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteInst;
             checkBoxGrp -ncb 1 -l "" -l1 "Euler Filter" -adj 2 -cal 1 right -cal 2 left -v1 false optEulerFilter;
          setParent ..;
       setParent ..;
@@ -211,6 +212,10 @@ global proc int _alembicExportOptions(string $parent,
             else if ($key == "wv")
             {
                checkBoxGrp -e -v1 ($val == "1") optWriteVis;
+            }
+            else if ($key == "wi")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optWriteInst;
             }
             else if ($key == "ef")
             {
@@ -356,6 +361,11 @@ global proc int _alembicExportOptions(string $parent,
       if (`checkBoxGrp -q -v1 optWriteVis` == true)
       {
          $optionsString += ";wv=1";
+      }
+      
+      if (`checkBoxGrp -q -v1 optWriteInst` == true)
+      {
+         $optionsString += ";wi=1";
       }
       
       if (`checkBoxGrp -q -v1 optEulerFilter` == true)
