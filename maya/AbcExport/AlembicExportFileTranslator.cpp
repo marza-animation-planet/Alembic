@@ -5,6 +5,8 @@
 #include <maya/MDagPath.h>
 #include <maya/MAnimControl.h>
 
+#include <cstring>
+
 static MString EscapeString(const MString &s)
 {
     std::string tmp = s.asChar();
