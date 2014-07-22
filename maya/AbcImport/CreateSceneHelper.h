@@ -105,7 +105,8 @@ public:
         const MObject & iParent = MObject::kNullObj,
         Action iAction = CREATE, MString iRootNodes = MString(),
         MString iFilterString = MString(),
-        MString iExcludeFilterString = MString());
+        MString iExcludeFilterString = MString(),
+        bool iCreateInstances = false);
 
     ~CreateSceneVisitor();
 
@@ -126,6 +127,7 @@ public:
     MStatus operator()(Alembic::AbcGeom::IXform & iNode,
                        AlembicObjectPtr iNodeObject);
     MStatus createEmptyObject(AlembicObjectPtr iNodeObject);
+    void visitInstance(MDagPath &parentDag, AlembicObjectPtr childPtr);
 
     bool hasSampledData();
 
@@ -174,10 +176,16 @@ private:
     MStringArray mOnlyPatterns;
     MStringArray mExceptPatterns;
 
+    bool mCreateInstances;
+
     // special map of shaders to selection lists that have selections
     // of parts of meshes.  They are to get around a problem where a shape
     // wont shade correctly after a swap if it is shaded per face
     std::map < MObject, MSelectionList, ltMObj > mShaderMeshMap;
+    
+    std::map<std::string, MObject> mImportedObjects;
+    std::map<std::string, std::vector<MDagPath> > mPendingInstances;
+    
 };  // class CreateSceneVisitor
 
 

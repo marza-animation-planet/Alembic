@@ -2827,7 +2827,7 @@ ArgData::ArgData(MString iFileName,
     bool iDebugOn, MObject iReparentObj, bool iConnect,
     MString iConnectRootNodes, bool iCreateIfNotFound, bool iRemoveIfNoUpdate,
     bool iRecreateColorSets, bool iRecreateUVSets, MString iFilterString,
-    MString iExcludeFilterString) :
+    MString iExcludeFilterString, bool createInstances) :
         mFileName(iFileName),
         mDebugOn(iDebugOn), mReparentObj(iReparentObj),
         mRecreateColorSets(iRecreateColorSets),
@@ -2837,7 +2837,8 @@ ArgData::ArgData(MString iFileName,
         mCreateIfNotFound(iCreateIfNotFound),
         mRemoveIfNoUpdate(iRemoveIfNoUpdate),
         mIncludeFilterString(iFilterString),
-        mExcludeFilterString(iExcludeFilterString)
+        mExcludeFilterString(iExcludeFilterString),
+        mCreateInstances(createInstances)
 {
     mSequenceStartTime = -DBL_MAX;
     mSequenceEndTime = DBL_MAX;
@@ -2861,6 +2862,7 @@ ArgData & ArgData::operator=(const ArgData & rhs)
     mRecreateUVSets = rhs.mRecreateUVSets;
     mIncludeFilterString = rhs.mIncludeFilterString;
     mExcludeFilterString = rhs.mExcludeFilterString;
+    mCreateInstances = rhs.mCreateInstances;
 
     // optional information for the "connect" flag
     mConnect = rhs.mConnect;
@@ -2903,7 +2905,7 @@ MString createScene(ArgData & iArgData)
     CreateSceneVisitor visitor(iArgData.mSequenceStartTime,
         iArgData.mRecreateColorSets, iArgData.mRecreateUVSets, iArgData.mReparentObj, action,
         iArgData.mConnectRootNodes, iArgData.mIncludeFilterString,
-        iArgData.mExcludeFilterString);
+        iArgData.mExcludeFilterString, iArgData.mCreateInstances);
 
     visitor.walk(archive);
 
@@ -2944,6 +2946,7 @@ MString connectAttr(ArgData & iArgData)
         alembicNodePtr->setDebugMode(iArgData.mDebugOn);
         alembicNodePtr->setIncludeFilterString(iArgData.mIncludeFilterString);
         alembicNodePtr->setExcludeFilterString(iArgData.mExcludeFilterString);
+        alembicNodePtr->setCreateInstances(iArgData.mCreateInstances);
     }
 
     if (iArgData.mRecreateColorSets)

@@ -252,7 +252,8 @@ public:
         bool    iRecreateColorSets = false,
         bool    iRecreateUVSets = false,
         MString iIncludeFilterString = MString(""),
-        MString iExcludeFilterString = MString(""));
+        MString iExcludeFilterString = MString(""),
+        bool    createInstances = false);
     ArgData(const ArgData & rhs);
     ArgData & operator=(const ArgData & rhs);
 
@@ -273,6 +274,7 @@ public:
     bool        mRemoveIfNoUpdate;
     MString     mIncludeFilterString;
     MString     mExcludeFilterString;
+    bool        mCreateInstances;
 
     WriterData  mData;
 };  // ArgData

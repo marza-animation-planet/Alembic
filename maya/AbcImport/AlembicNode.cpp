@@ -529,7 +529,7 @@ MStatus AlembicNode::compute(const MPlug & plug, MDataBlock & dataBlock)
         MPlug allUVsPlug = dep.findPlug("allUVSets");
         CreateSceneVisitor visitor(inputTime, !allSetsPlug.isNull(), !allUVsPlug.isNull(),
             MObject::kNullObj, CreateSceneVisitor::NONE, "",
-            mIncludeFilterString, mExcludeFilterString);
+            mIncludeFilterString, mExcludeFilterString, mCreateInstances);
 
         visitor.walk(archive);
 

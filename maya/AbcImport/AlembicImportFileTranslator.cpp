@@ -138,6 +138,13 @@ MStatus AlembicImportFileTranslator::reader(
                 options += " -sts";
             }
         }
+        else if (key == "ci")
+        {
+            if (val == "1")
+            {
+                options += " -ci";
+            }
+        }
         else if (mode == MPxFileTranslator::kImportAccessMode)
         {
             if (key == "mode")

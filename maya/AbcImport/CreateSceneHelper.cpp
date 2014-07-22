@@ -316,11 +316,12 @@ namespace
 CreateSceneVisitor::CreateSceneVisitor(double iFrame,
     bool iUnmarkedFaceVaryingColors, bool iUnmarkedFaceVaryingUVs, const MObject & iParent,
     Action iAction, MString iRootNodes,
-    MString iIncludeFilterString, MString iExcludeFilterString) :
+    MString iIncludeFilterString, MString iExcludeFilterString,
+    bool createInstances) :
     mFrame(iFrame), mParent(iParent),
     mUnmarkedFaceVaryingColors(iUnmarkedFaceVaryingColors),
     mUnmarkedFaceVaryingUVs(iUnmarkedFaceVaryingUVs),
-    mAction(iAction)
+    mAction(iAction), mCreateInstances(createInstances)
 {
     mAnyRoots = false;
 
@@ -462,6 +463,11 @@ void CreateSceneVisitor::checkShaderSelection(MFnMesh & iMesh,
 void CreateSceneVisitor::visit(AlembicObjectPtr iObject)
 {
     Alembic::Abc::IObject iObj = iObject->object();
+
+    if (mCreateInstances && iObj.isInstanceRoot())
+    {
+        return;
+    }
 
     if ( Alembic::AbcGeom::IXform::matches(iObj.getHeader()) )
     {
@@ -808,6 +814,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ICamera & iNode)
         setConstantVisibility(visProp, cameraObj);
         addProps(arbProp, cameraObj, false, false);
         addProps(userProp, cameraObj, false, false);
+        mImportedObjects[iNode.getHeader().getFullName()] = cameraObj;
     }
 
     if ( mAction >= CONNECT )
@@ -926,6 +933,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ICurves & iNode)
         setConstantVisibility(visProp, curvesObj);
         addProps(arbProp, curvesObj, false, false);
         addProps(userProp, curvesObj, false, false);
+        mImportedObjects[iNode.getHeader().getFullName()] = curvesObj;
     }
 
 
@@ -1019,6 +1027,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPoints& iNode)
         setConstantVisibility(visProp, particleObj);
         addProps(arbProp, particleObj, false, false);
         addProps(userProp, particleObj, false, false);
+        mImportedObjects[iNode.getHeader().getFullName()] = particleObj;
     }
 
     if ( mAction >= CONNECT )
@@ -1117,6 +1126,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ISubD& iNode)
         addProps(arbProp, subDObj, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs);
         addProps(userProp, subDObj, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs);
         addFaceSets(subDObj, iNode);
+        mImportedObjects[iNode.getHeader().getFullName()] = subDObj;
     }
 
     if ( mAction >= CONNECT )
@@ -1218,6 +1228,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPolyMesh& iNode)
         addProps(arbProp, polyObj, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs);
         addProps(userProp, polyObj, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs);
         addFaceSets(polyObj, iNode);
+        mImportedObjects[iNode.getHeader().getFullName()] = polyObj;
     }
 
     if ( mAction >= CONNECT )
@@ -1307,6 +1318,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::INuPatch& iNode)
         addProps(arbProp, nurbsObj, false, false);
         addProps(userProp, nurbsObj, false, false);
         setConstantVisibility(visProp, nurbsObj);
+        mImportedObjects[iNode.getHeader().getFullName()] = nurbsObj;
     }
 
 
@@ -1404,6 +1416,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IXform & iNode,
                 addProps(arbProp, xformObj, false, false);
                 addProps(userProp, xformObj, false, false);
                 setConstantVisibility(visProp, xformObj);
+                mImportedObjects[iNode.getHeader().getFullName()] = xformObj;
             }
 
             if ( mAction >= CONNECT )
@@ -1429,6 +1442,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IXform & iNode,
     }
     else    // transform node
     {
+        MDagPath xformDag;
         MString name(iNode.getName().c_str());
 
         size_t numChildren = iNodeObject->getNumChildren();
@@ -1457,6 +1471,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IXform & iNode,
             if (hasDag)
             {
                 xformObj = mConnectDagNode.node();
+                xformDag = mConnectDagNode;
             }
         }
 
@@ -1479,24 +1494,16 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IXform & iNode,
 
             for (unsigned int i = 0; i < numDags; i++)
             {
-                MObject child = mConnectDagNode.child(i);
-                MFnDagNode fn(child, &status);
+                MDagPath dagPath(mConnectDagNode);
+                dagPath.push(mConnectDagNode.child(i));
+                MFnDagNode fn(dagPath);
                 if ( status == MS::kSuccess )
                 {
-                    std::string childName = fn.fullPathName().asChar();
-                    size_t found = childName.rfind("|");
-
-                    if (found != std::string::npos)
+                    std::string childName = stripPathAndNamespace(fn.name().asChar());
+                    if (childNodesInFile.find(childName) == childNodesInFile.end() ||
+                        mCreateInstances == !fn.isInstanced(false))
                     {
-                        childName = childName.substr(
-                            found+1, childName.length() - found);
-                        if (childNodesInFile.find(childName)
-                            == childNodesInFile.end())
-                        {
-                            MDagPath dagPath;
-                            getDagPathByName(fn.fullPathName(), dagPath);
-                            dagToBeRemoved.push_back(dagPath);
-                        }
+                        dagToBeRemoved.push_back(dagPath);
                     }
                 }
             }
@@ -1524,6 +1531,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IXform & iNode,
             }
 
             trans.setName(name);
+            trans.getPath(xformDag);
         }
 
         if (xformObj != MObject::kNullObj)
@@ -1531,6 +1539,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IXform & iNode,
             setConstantVisibility(visProp, xformObj);
             addProps(arbProp, xformObj, false, false);
             addProps(userProp, xformObj, false, false);
+            mImportedObjects[iNode.getHeader().getFullName()] = xformObj;
         }
 
         if (mAction >= CONNECT)
@@ -1564,7 +1573,16 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IXform & iNode,
         {
             mParent = saveParent;
 
-            this->visit(iNodeObject->getChild(i));
+            AlembicObjectPtr childPtr = iNodeObject->getChild(i);
+            
+            if (mCreateInstances)
+            {
+                this->visitInstance(xformDag, childPtr);
+            }
+            else
+            {
+                this->visit(childPtr);
+            }
         }
 
         if (hasDag)
@@ -1576,12 +1594,65 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IXform & iNode,
     return status;
 }
 
+void CreateSceneVisitor::visitInstance(MDagPath &parentDag, AlembicObjectPtr childPtr)
+{
+    if (childPtr->object().isInstanceRoot())
+    {
+        if (mAction != NONE)
+        {
+            // Instanciate object
+            std::string masterPath = childPtr->object().instanceSourcePath();
+
+            std::map<std::string, MObject>::iterator it = mImportedObjects.find(masterPath);
+            if (it == mImportedObjects.end())
+            {
+                // Instance target object not yet imported, add a "pending" instance
+                mPendingInstances[masterPath].push_back(parentDag);
+            }
+            else
+            {
+                MFnDagNode dagNode(parentDag);
+                dagNode.addChild(it->second, MFnDagNode::kNextPos, true);
+            }
+        }
+    }
+    else
+    {
+        this->visit(childPtr);
+        
+        if (mAction != NONE)
+        {
+            // Check for any pending instances
+            const std::string &path = childPtr->object().getFullName();
+            
+            std::map<std::string, MObject>::iterator oit = mImportedObjects.find(path);
+            
+            if (oit != mImportedObjects.end())
+            {
+                std::map<std::string, std::vector<MDagPath> >::iterator pit = mPendingInstances.find(path);
+                
+                if (pit != mPendingInstances.end())
+                {
+                    for (std::vector<MDagPath>::iterator dit = pit->second.begin(); dit != pit->second.end(); ++dit)
+                    {
+                        MFnDagNode dagNode(*dit);
+                        dagNode.addChild(oit->second, MFnDagNode::kNextPos, true);
+                    }
+                    
+                    pit->second.clear();
+                }
+            }
+        }
+    }
+}
+
 MStatus CreateSceneVisitor::createEmptyObject(AlembicObjectPtr iNodeObject)
 {
     Alembic::Abc::IObject iNode = iNodeObject->object();
 
     MStatus status = MS::kSuccess;
     MObject xformObj = MObject::kNullObj;
+    MDagPath xformDag;
 
     MString name(iNode.getName().c_str());
 
@@ -1595,6 +1666,7 @@ MStatus CreateSceneVisitor::createEmptyObject(AlembicObjectPtr iNodeObject)
         if (hasDag)
         {
             xformObj = mConnectDagNode.node();
+            xformDag = mConnectDagNode;
         }
     }
 
@@ -1618,24 +1690,16 @@ MStatus CreateSceneVisitor::createEmptyObject(AlembicObjectPtr iNodeObject)
 
         for (unsigned int i = 0; i < numDags; i++)
         {
-            MObject child = mConnectDagNode.child(i);
-            MFnDagNode fn(child, &status);
+            MDagPath dagPath(mConnectDagNode);
+            dagPath.push(mConnectDagNode.child(i));
+            MFnDagNode fn(dagPath);
             if ( status == MS::kSuccess )
             {
-                std::string childName = fn.fullPathName().asChar();
-                size_t found = childName.rfind("|");
-
-                if (found != std::string::npos)
+                std::string childName = stripPathAndNamespace(fn.name().asChar());
+                if (childNodesInFile.find(childName) == childNodesInFile.end() ||
+                    mCreateInstances == !fn.isInstanced(false))
                 {
-                    childName = childName.substr(
-                        found+1, childName.length() - found);
-                    if (childNodesInFile.find(childName)
-                        == childNodesInFile.end())
-                    {
-                        MDagPath dagPath;
-                        getDagPathByName(fn.fullPathName(), dagPath);
-                        dagToBeRemoved.push_back(dagPath);
-                    }
+                    dagToBeRemoved.push_back(dagPath);
                 }
             }
         }
@@ -1663,6 +1727,7 @@ MStatus CreateSceneVisitor::createEmptyObject(AlembicObjectPtr iNodeObject)
         }
 
         trans.setName(name);
+        trans.getPath(xformDag);
     }
 
     MObject saveParent = xformObj;
@@ -1670,7 +1735,21 @@ MStatus CreateSceneVisitor::createEmptyObject(AlembicObjectPtr iNodeObject)
     {
         mParent = saveParent;
 
-        this->visit(iNodeObject->getChild(i));
+        AlembicObjectPtr childPtr = iNodeObject->getChild(i);
+        
+        if (mCreateInstances)
+        {
+            this->visitInstance(xformDag, childPtr);
+        }
+        else
+        {
+            this->visit(childPtr);
+        }
+    }
+    
+    if (xformObj != MObject::kNullObj)
+    {
+        mImportedObjects[iNode.getHeader().getFullName()] = xformObj;
     }
 
     if (hasDag)

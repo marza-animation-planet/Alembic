@@ -33,6 +33,7 @@ global proc int alembicImportOptions(string $parent,
             checkBoxGrp -ncb 1 -l "" -l1 "Add Missing Nodes To Scene" -adj 2 -cal 1 right -cal 2 left -v1 false optAddNode;
             checkBoxGrp -ncb 1 -l "" -l1 "Remove Missing Nodes From File" -adj 2 -cal 1 right -cal 2 left -v1 false optRemNode;
             checkBoxGrp -ncb 1 -l "" -l1 "Reparent To Selection" -adj 2 -cal 1 right -cal 2 left -v1 false optReparent;
+            checkBoxGrp -ncb 1 -l "" -l1 "Create Instances" -adj 2 -cal 1 right -cal 2 left -v1 false optCreateInst;
          setParent ..;
       setParent ..;
       
@@ -131,6 +132,10 @@ global proc int alembicImportOptions(string $parent,
             {
                checkBoxGrp -e -v1 ($val == "1") optRemNode;
             }
+            else if ($key == "ci")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optCreateInst;
+            }
          }
       }
       
@@ -202,6 +207,11 @@ global proc int alembicImportOptions(string $parent,
       if (`checkBoxGrp -q -v1 optDbg` == true)
       {
          $optionsString += ";d=1";
+      }
+      
+      if (`checkBoxGrp -q -v1 optCreateInst` == true)
+      {
+         $optionsString += ";ci=1";
       }
       
       eval($resultCallback + " \"" + $optionsString + "\"");

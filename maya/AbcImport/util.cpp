@@ -395,7 +395,22 @@ MStatus setInitialShadingGroup(const MString & dagNodeName)
 MStatus deleteDagNode(MDagPath & dagPath)
 {
     MObject obj = dagPath.node();
-    return MGlobal::deleteNode(obj);
+    
+    if (dagPath.isInstanced())
+    {
+        MDagPath parentPath(dagPath);
+        parentPath.pop();
+        
+        if (!parentPath.isInstanced())
+        {
+            MFnDagNode parentNode(parentPath);
+            parentNode.removeChild(obj);
+        }
+    }
+    else
+    {
+        return MGlobal::deleteNode(obj);
+    }
 }
 
 MStatus deleteCurrentSelection()
