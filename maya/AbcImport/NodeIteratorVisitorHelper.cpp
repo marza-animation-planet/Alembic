@@ -3062,22 +3062,6 @@ MString connectAttr(ArgData & iArgData)
                 theError += ".inMesh connection not made";
                 printError(theError);
             }
-            
-            // Restore current UV set name
-            if (i < iArgData.mData.mSubDList.size())
-            {
-                Alembic::AbcGeom::IV2fGeomParam iUVs = iArgData.mData.mSubDList[i].mMesh.getSchema().getUVsParam();
-                if (iUVs.valid())
-                {
-                    MString name = Alembic::AbcGeom::GetSourceName(iUVs.getMetaData()).c_str();
-                    if (name.length() == 0)
-                    {
-                        // Maya's default name
-                        name = "map1";
-                    }
-                    mFn.setCurrentUVSetName(name);
-                }
-            }
         }
     }
 
@@ -3091,22 +3075,6 @@ MString connectAttr(ArgData & iArgData)
             dstPlug = mFn.findPlug("inMesh", true);
             modifier.connect(srcPlug, dstPlug);
             status = modifier.doIt();
-            
-            // Restore current UV set name
-            if (i < iArgData.mData.mPolyMeshList.size())
-            {
-                Alembic::AbcGeom::IV2fGeomParam iUVs = iArgData.mData.mPolyMeshList[i].mMesh.getSchema().getUVsParam();
-                if (iUVs.valid())
-                {
-                    MString name = Alembic::AbcGeom::GetSourceName(iUVs.getMetaData()).c_str();
-                    if (name.length() == 0)
-                    {
-                        // Maya's default name
-                        name = "map1";
-                    }
-                    mFn.setCurrentUVSetName(name);
-                }
-            }
         }
     }
 
