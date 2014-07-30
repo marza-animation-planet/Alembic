@@ -84,15 +84,17 @@ AlembicNode::VisitReturn WorldUpdate::enter(AlembicNuPatch &node)
 
 AlembicNode::VisitReturn WorldUpdate::enter(AlembicNode &node)
 {
+   AlembicNode::VisitReturn rv = AlembicNode::ContinueVisit;
+   
    if (node.isInstance())
    {
       AlembicNode *m = node.master();
-      m->enter(*this);
+      rv = m->enter(*this);
    }
    
    node.updateWorldMatrix();
    
-   return AlembicNode::ContinueVisit;
+   return rv;
 }
    
 void WorldUpdate::leave(AlembicNode &node)
@@ -145,15 +147,17 @@ AlembicNode::VisitReturn CountShapes::enter(AlembicNode &node)
    {
       if (!mNoInstances)
       {
-         node.master()->enter(*this);
+         return node.master()->enter(*this);
       }
       else
       {
          return AlembicNode::DontVisitChildren;
       }
    }
-   
-   return AlembicNode::ContinueVisit;
+   else
+   {
+      return AlembicNode::ContinueVisit;
+   }
 }
 
 void CountShapes::leave(AlembicNode &)
@@ -270,10 +274,12 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicNode &node)
 {
    if (node.isInstance())
    {
-      node.master()->enter(*this);
+      return node.master()->enter(*this);
    }
-   
-   return AlembicNode::ContinueVisit;
+   else
+   {
+      return AlembicNode::ContinueVisit;
+   }
 }
    
 void SampleGeometry::leave(AlembicNode &)
@@ -418,7 +424,7 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicNode &node)
    {
       if (!mNoInstances)
       {
-         node.master()->enter(*this);
+         return node.master()->enter(*this);
       }
       else
       {
@@ -565,7 +571,7 @@ AlembicNode::VisitReturn DrawBounds::enter(AlembicNode &node)
    {
       if (!mNoInstances)
       {
-         node.master()->enter(*this);
+         return node.master()->enter(*this);
       }
       else
       {
@@ -575,9 +581,8 @@ AlembicNode::VisitReturn DrawBounds::enter(AlembicNode &node)
    else
    {
       DrawBox(node.selfBounds(), mWidth);
+      return AlembicNode::ContinueVisit;
    }
-      
-   return AlembicNode::ContinueVisit;
 }
  
 void DrawBounds::leave(AlembicXform &node)

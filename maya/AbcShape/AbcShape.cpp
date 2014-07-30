@@ -15,6 +15,9 @@
 #include <maya/MDagPath.h>
 #include <maya/MHWGeometryUtilities.h>
 #include <maya/MFnStringData.h>
+#include <maya/MSelectionMask.h>
+#include <maya/MFnCamera.h>
+#include <maya/MSelectionList.h>
 
 #ifdef __APPLE__
 #  include <OpenGL/gl.h>
@@ -454,8 +457,8 @@ void AbcShape::updateGeometry()
 
 void AbcShape::printInfo() const
 {
-   //PrintInfo pinf(mIgnoreTransforms, mIgnoreInstances);
-   //mScene->visit(AlembicNode::VisitDepthFirst, pinf);
+   PrintInfo pinf(mIgnoreTransforms, mIgnoreInstances, mIgnoreVisibility);
+   mScene->visit(AlembicNode::VisitDepthFirst, pinf);
    
    printSceneBounds();
 }
@@ -965,12 +968,415 @@ void AbcShapeUI::draw(const MDrawRequest &request, M3dView &view) const
    }
 }
 
+// ---
+
+//using Alembic::Abc::V4d;
+using Imath::V4d;
+using Alembic::Abc::V3d;
+using Alembic::Abc::M44d;
+using Alembic::Abc::Box3d;
+
+class Plane
+{
+public:
+   
+   Plane()
+      : mNormal(0, 1, 0), mDist(0.0)
+   {
+   }
+   
+   Plane(const V3d &n, double d)
+      : mNormal(n), mDist(d)
+   {
+   }
+   
+   Plane(const V3d &p0, const V3d &p1, const V3d &p2, const V3d &above)
+   {
+      set(p0, p1, p2, above);
+   }
+   
+   Plane(const Plane &rhs)
+      : mNormal(rhs.mNormal), mDist(rhs.mDist)
+   {
+   }
+   
+   Plane& operator=(const Plane &rhs)
+   {
+      if (this != &rhs)
+      {
+         mNormal = rhs.mNormal;
+         mDist = rhs.mDist;
+      }
+      return *this;
+   }
+   
+   void set(const V3d &n, double d)
+   {
+      mNormal = n;
+      mDist = d;
+   }
+   
+   void set(const V3d &p0, const V3d &p1, const V3d &p2, const V3d &above)
+   {
+      V3d u = p2 - p1;
+      V3d v = p0 - p1;
+      mNormal = u.cross(v).normalize();
+      mDist = -(mNormal.dot(p1));
+      
+      if (distanceTo(above) < 0.0)
+      {
+         mNormal.negate();
+         mDist = -mDist;
+      }
+   }
+   
+   double distanceTo(const V3d &P) const
+   {
+      return (P.dot(mNormal) + mDist);
+   }
+   
+private:
+   
+   V3d mNormal;
+   double mDist;
+};
+
+class Frustum
+{
+public:
+   
+   enum Side
+   {
+      Left = 0,
+      Right,
+      Top,
+      Bottom,
+      Near,
+      Far
+   };
+   
+public:
+   
+   Frustum()
+   {
+      mPlanes[  Left].set(V3d( 1,  0,  0), 0);
+      mPlanes[ Right].set(V3d(-1,  0,  0), 0);
+      mPlanes[   Top].set(V3d( 0, -1,  0), 0);
+      mPlanes[Bottom].set(V3d( 0,  1,  0), 0);
+      mPlanes[  Near].set(V3d( 0,  0, -1), 0);
+      mPlanes[   Far].set(V3d( 0,  0,  1), 0);
+   }
+   
+   Frustum(M44d &projViewInv)
+   {
+      V3d ltn, rtn, lbn, rbn, ltf, rtf, lbf, rbf;
+      
+      projViewInv.multVecMatrix(V3d(-1,  1, -1), ltn);
+      projViewInv.multVecMatrix(V3d( 1,  1, -1), rtn);
+      projViewInv.multVecMatrix(V3d(-1, -1, -1), lbn);
+      projViewInv.multVecMatrix(V3d( 1, -1, -1), rbn);
+      
+      projViewInv.multVecMatrix(V3d(-1,  1,  1), ltf);
+      projViewInv.multVecMatrix(V3d( 1,  1,  1), rtf);
+      projViewInv.multVecMatrix(V3d(-1, -1,  1), lbf);
+      projViewInv.multVecMatrix(V3d( 1, -1,  1), rbf);
+      
+      // Build planes so that their normal is pointing inside the frustum
+      mPlanes[  Left].set(ltn, lbn, lbf, rbn);
+      mPlanes[ Right].set(rtn, rbn, rbf, lbn);
+      mPlanes[   Top].set(ltn, rtn, rtf, rbf);
+      mPlanes[Bottom].set(lbn, rbn, rbf, rtf);
+      mPlanes[  Near].set(ltn, rtn, rbn, rbf);
+      mPlanes[   Far].set(ltf, rtf, rbf, rbn);
+   }
+   
+   Frustum(const Frustum &rhs)
+   {
+      for (int i=0; i<6; ++i)
+      {
+         mPlanes[i] = rhs.mPlanes[i];
+      }
+   }
+   
+   Frustum& operator=(const Frustum &rhs)
+   {
+      if (this != &rhs)
+      {
+         for (int i=0; i<6; ++i)
+         {
+            mPlanes[i] = rhs.mPlanes[i];
+         }
+      }
+      return *this;
+   }
+   
+   bool isPointInside(const V3d &p) const
+   {
+      for (int i=0; i<6; ++i)
+      {
+         if (mPlanes[i].distanceTo(p) < 0.0)
+         {
+            return false;
+         }
+      }
+      return true;
+   }
+   
+   bool isPointOutside(const V3d &p) const
+   {
+      for (int i=0; i<6; ++i)
+      {
+         if (mPlanes[i].distanceTo(p) < 0.0)
+         {
+            return true;
+         }
+      }
+      return false;
+   }
+   
+   bool isBoxOutside(const Box3d &b) const
+   {
+      for (int i=0; i<6; ++i)
+      {
+         // Check if both min and max are below current plane
+         if (mPlanes[i].distanceTo(b.min) < 0.0 &&
+             mPlanes[i].distanceTo(b.max) < 0.0)
+         {
+            return true;
+         }
+      }
+      return false;
+   }
+
+private:
+   
+   Plane mPlanes[6];
+};
+
+class Select
+{
+public:
+
+   Select(const SceneGeometryData *scene,
+          const Frustum &frustum,
+          bool ignoreTransforms,
+          bool ignoreInstances,
+          bool ignoreVisibility)
+      : mScene(scene)
+      , mFrustum(frustum)
+      , mNoTransforms(ignoreTransforms)
+      , mNoInstances(ignoreInstances)
+      , mCheckVisibility(!ignoreVisibility)
+   {
+   }
+   
+   // Note: Do frustum culling
+   //       => we'll be passed the toNDC (use inverse)
+   
+   AlembicNode::VisitReturn enter(AlembicNode &node)
+   {
+      if (mCheckVisibility && !node.isVisible())
+      {
+         return AlembicNode::DontVisitChildren;
+      }
+      else if (node.isInstance() && mNoInstances)
+      {
+         return AlembicNode::DontVisitChildren;
+      }
+      else
+      {
+         Alembic::Abc::Box3d bounds = (mNoTransforms ? node.selfBounds() : node.childBounds());
+         
+         if (!bounds.isEmpty() && mFrustum.isBoxOutside(bounds))
+         {
+            #ifdef _DEBUG
+            std::cout << "[AbcShape] " << node.path() << " outside viewing frustum" << std::endl;
+            #endif
+            return AlembicNode::DontVisitChildren;
+         }
+         else
+         {
+            // if it is a shape, draw it
+            return AlembicNode::ContinueVisit;
+         }
+      }
+   }
+   
+   void leave(AlembicNode &node)
+   {
+      if (node.isInstance() && !mNoInstances && (!mCheckVisibility || node.isVisible()))
+      {
+         node.master()->leave(*this);
+      }
+   }
+   
+private:
+   
+   const SceneGeometryData *mScene;
+   Frustum mFrustum;
+   bool mNoTransforms;
+   bool mNoInstances;
+   bool mCheckVisibility;
+};
+
+// ---
+
 bool AbcShapeUI::select(MSelectInfo &selectInfo,
                         MSelectionList &selectionList,
                         MPointArray &worldSpaceSelectPts) const
 {
    // ToDo: Simple GL picking?
-   return false;
+   MSelectionMask mask("AbcShape");
+   if (!selectInfo.selectable(mask))
+   {
+      return false;
+   }
+   
+   AbcShape *shape = (AbcShape*) surfaceShape();
+   if (!shape)
+   {
+      return false;
+   }
+   
+   bool pickEdges = false;
+   bool pickPoints = false;
+   
+   switch (shape->displayMode())
+   {
+   case AbcShape::DM_box:
+   case AbcShape::DM_boxes:
+      pickEdges = true;
+      break;
+   case AbcShape::DM_points:
+      pickPoints = true;
+      break;
+   default:
+      if (M3dView::kWireFrame == selectInfo.displayStyle() || !selectInfo.singleSelection())
+      {
+         pickEdges = true;
+      }
+      break;
+   }
+   
+   M3dView view = selectInfo.view();
+   
+   MMatrix projMatrix, modelViewMatrix;
+   
+   view.projectionMatrix(projMatrix);
+   view.modelViewMatrix(modelViewMatrix);
+   
+   M44d projViewInv;
+   (modelViewMatrix * projMatrix).inverse().get(projViewInv.x);
+   
+   Frustum frustum(projViewInv);
+   
+   unsigned int numShapes = shape->numShapes();
+   GLuint *buffer = new GLuint[numShapes * 4];
+   
+   view.beginSelect(buffer, numShapes);
+   view.pushName(0);
+   
+   Select visitor(shape->sceneGeometry(), frustum,
+                  shape->ignoreTransforms(),
+                  shape->ignoreInstances(),
+                  shape->ignoreVisibility());
+   
+   if (pickPoints)
+   {
+      #ifdef _DEBUG
+      std::cout << "[AbcShape] Select points" << std::endl;
+      #endif
+      
+   }
+   else if (pickEdges)
+   {
+      #ifdef _DEBUG
+      std::cout << "[AbcShape] Select edges" << std::endl;
+      #endif
+   }
+   else
+   {
+      #ifdef _DEBUG
+      std::cout << "[AbcShape] Select faces" << std::endl;
+      #endif
+   }
+   
+   view.popName();
+   int hitCount = view.endSelect();
+   
+   if (hitCount > 0)
+   {
+      unsigned int izdepth = 0xFFFFFFFF;
+      GLuint *curHit = buffer;
+      
+      for (int i=hitCount; i>=0; --i)
+      {
+         if (curHit[0] && izdepth > curHit[1])
+         {
+            izdepth = curHit[1];
+         }
+         curHit += curHit[0] + 3;
+      }
+      
+      MDagPath path = selectInfo.multiPath();
+      while (path.pop() == MStatus::kSuccess)
+      {
+         if (path.hasFn(MFn::kTransform))
+         {
+            break;
+         }
+      }
+      
+      MSelectionList selectionItem;
+      selectionItem.add(path);
+      
+      MPoint worldSpacePoint;
+      // compute hit point
+      {
+         float zdepth = float(izdepth) / 0xFFFFFFFF;
+      
+         MDagPath cameraPath;
+         view.getCamera(cameraPath);
+         
+         MFnCamera camera(cameraPath);
+         
+         if (!camera.isOrtho())
+         {
+            // z is normalized but non linear
+            double nearp = camera.nearClippingPlane();
+            double farp = camera.farClippingPlane();
+            
+            zdepth *= (nearp / (farp - zdepth * (farp - nearp)));
+         }
+         
+         MPoint O;
+         MVector D;
+         
+         selectInfo.getLocalRay(O, D);
+         O = O * selectInfo.multiPath().inclusiveMatrix();
+         
+         short x, y;
+         view.worldToView(O, x, y);
+         
+         MPoint Pn, Pf;
+         view.viewToWorld(x, y, Pn, Pf);
+         
+         worldSpacePoint = Pn + zdepth * (Pf - Pn);
+      }
+      
+      selectInfo.addSelection(selectionItem,
+                              worldSpacePoint,
+                              selectionList,
+                              worldSpaceSelectPts,
+                              mask,
+                              false);
+      
+      return true;
+   }
+   else
+   {
+      return false;
+   }
 }
 
 void AbcShapeUI::drawBox(AbcShape *shape, const MDrawRequest &request, M3dView &view) const

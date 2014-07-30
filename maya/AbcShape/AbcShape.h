@@ -85,6 +85,7 @@ public:
     inline DisplayMode displayMode() const { return mDisplayMode; }
     inline float lineWidth() const { return mLineWidth; }
     inline float pointWidth() const { return mPointWidth; }
+    inline unsigned int numShapes() const { return mNumShapes; }
 
 private:
     
