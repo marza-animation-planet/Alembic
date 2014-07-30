@@ -1,0 +1,323 @@
+#include "GeometryData.h"
+
+#include <iostream>
+
+std::ostream& operator<<(std::ostream &os, MeshData::Tri &tri)
+{
+   os << "Tri " << tri.v0 << " - " << tri.v1 << " - " << tri.v2;
+   return os;
+}
+
+// ---
+
+MeshData::MeshData()
+   : mNumPoints(0)
+   , mPoints(0)
+   , mNode(0)
+{
+}
+
+MeshData::~MeshData()
+{
+   clear();
+}
+   
+void MeshData::_update(bool varyingTopology,
+                       Alembic::Abc::Int32ArraySamplePtr fc,
+                       Alembic::Abc::Int32ArraySamplePtr fi,
+                       float t0,
+                       float w0,
+                       Alembic::Abc::P3fArraySamplePtr p0,
+                       Alembic::Abc::V3fArraySamplePtr v0,
+                       float t1,
+                       float w1,
+                       Alembic::Abc::P3fArraySamplePtr p1)
+{  
+   size_t np = p0->size();
+   size_t nf = fc->size();
+   size_t ni = fi->size();
+   
+   if (np < 1 || nf < 1 || ni < 1)
+   {
+      clear();
+      return;
+   }
+   
+   if (varyingTopology || (mNumPoints > 0 && mNumPoints != np))
+   {
+      clear();
+   }
+   
+   // Update topology
+   if (mTriangles.size() == 0)
+   {
+      #ifdef _DEBUG
+      std::cout << "[MeshData] Rebuild faces" << std::endl;
+      #endif
+      
+      const int32_t *counts = fc->get();
+      const int32_t *indices = fi->get();
+      size_t ii = 0;
+      
+      for (size_t i=0; i<nf; ++i)
+      {
+         size_t count = counts[i];
+         bool skip = false;
+         
+         if (count >= 3)
+         {
+            if (ii + count > ni)
+            {
+               #ifdef _DEBUG
+               std::cout << "[MeshData] Skip remaining faces" << std::endl;
+               #endif
+               break;
+            }
+            
+            for (size_t j=ii; j<ii+count; ++j)
+            {
+               if (size_t(indices[j]) >= np)
+               {
+                  #ifdef _DEBUG
+                  std::cout << "[MeshData] Skip face with invalid point index" << std::endl;
+                  #endif
+                  skip = true;
+                  break;
+               }
+            }
+            
+            if (!skip)
+            {
+               // Note: Alembic store indices in clock-wise order
+               for (size_t j=2; j<count; ++j)
+               {
+                  mTriangles.push_back(Tri(indices[ii], indices[ii+j], indices[ii+j-1]));
+               }
+            }
+         }
+         else
+         {
+            #ifdef _DEBUG
+            std::cout << "[MeshData] Skip invalid face" << std::endl;
+            #endif
+         }
+         
+         ii += count;
+      }
+   }
+   
+   mNumPoints = np;
+   
+   // Update points & normals
+   if (w1 > 0.0f)
+   {
+      if (varyingTopology)
+      {
+         if (v0 && v0->size() == np)
+         {
+            // Extrapolate using velocity
+            
+            float vs = w0 * (t1 - t0);
+            
+            mLocalPoints.resize(p0->size());
+            for (size_t i=0; i<np; ++i)
+            {
+               mLocalPoints[i] = (*p0)[i] +  vs * (*v0)[i];
+            }
+            
+            mPoints = &(mLocalPoints[0]);
+         }
+         else
+         {
+            // No velocities to rely on, cannot extrapolate
+            mLocalPoints.clear();
+            mPoints = p0->get();
+         }
+      }
+      else
+      {
+         if (p1 && p1->size() == np)
+         {
+            // Interpolate 2 samples
+            
+            mLocalPoints.resize(p0->size());
+            for (size_t i=0; i<np; ++i)
+            {
+               mLocalPoints[i] = w0 * (*p0)[i] + w1 * (*p1)[i];
+            }
+            
+            mPoints = &(mLocalPoints[0]);
+         }
+         else
+         {
+            // Point count mismatch, cannot interpolate
+            mLocalPoints.clear();
+            mPoints = p0->get();
+         }
+      }
+   }
+   else
+   {
+      mLocalPoints.clear();
+      mPoints = p0->get();
+   }
+   
+   _computeNormals();
+}
+
+void MeshData::_computeNormals()
+{
+   if (!isValid())
+   {
+      mNormals.clear();
+      return;
+   }
+   
+   #ifdef _DEBUG
+   std::cout << "[MeshData] Recompute normals" << std::endl;
+   #endif
+   
+   mNormals.resize(mNumPoints);
+   std::fill(mNormals.begin(), mNormals.end(), Alembic::Abc::V3f(0.0f));
+
+   for (size_t ti=0; ti<mTriangles.size(); ++ti)
+   {
+      const Tri &tri = mTriangles[ti];
+
+      const Alembic::Abc::V3f &v0 = mPoints[tri.v0];
+      const Alembic::Abc::V3f &v1 = mPoints[tri.v1];
+      const Alembic::Abc::V3f &v2 = mPoints[tri.v2];
+
+      Alembic::Abc::V3f e0 = v1 - v0;
+      Alembic::Abc::V3f e2 = v2 - v0;
+      Alembic::Abc::V3f wN = e0.cross(e2);
+      
+      mNormals[tri.v0] += wN;
+      mNormals[tri.v1] += wN;
+      mNormals[tri.v2] += wN;
+   }
+
+   // Normalize normals.
+   for (size_t ni=0; ni<mNumPoints; ++ni)
+   {
+      mNormals[ni].normalize();
+   }
+}
+
+void MeshData::draw(bool wireframe, float lineWidth) const
+{
+   if (!isValid())
+   {
+      return;
+   }
+   
+   if (wireframe)
+   {
+      glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+      if (lineWidth > 0.0f)
+      {
+         glEnable(GL_BLEND);
+         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+         glEnable(GL_LINE_SMOOTH);
+         glLineWidth(lineWidth);
+      }
+   }
+   else
+   {
+      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+   }
+   
+   glEnableClientState(GL_VERTEX_ARRAY);
+   
+   if (mNormals.size() > 0)
+   {
+      glEnableClientState(GL_NORMAL_ARRAY);
+      glNormalPointer(GL_FLOAT, 0, (const GLvoid*) &(mNormals[0]));
+   }
+   
+   glVertexPointer(3, GL_FLOAT, 0, (const GLvoid*) mPoints);
+   
+   glDrawElements(GL_TRIANGLES, (GLsizei) 3 * mTriangles.size(), GL_UNSIGNED_INT, (const GLvoid*) &(mTriangles[0].v0));
+   
+   if (mNormals.size() > 0)
+   {
+      glDisableClientState(GL_NORMAL_ARRAY);
+   }
+   
+   glDisableClientState(GL_VERTEX_ARRAY);
+}
+
+void MeshData::drawPoints(float pointWidth) const
+{
+   if (!isValid())
+   {
+      return;
+   }
+   
+   if (pointWidth > 0.0f)
+   {
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+      glEnable(GL_POINT_SMOOTH);
+      glPointSize(pointWidth);
+   }
+   
+   glEnableClientState(GL_VERTEX_ARRAY);
+   glVertexPointer(3, GL_FLOAT, 0, (const GLvoid*) mPoints);
+   glDrawArrays(GL_POINTS, 0, (GLsizei) mNumPoints);
+   glDisableClientState(GL_VERTEX_ARRAY);
+}
+
+bool MeshData::isValid() const
+{
+   return (mTriangles.size() > 0  && mNumPoints > 0 && mPoints && mNode);
+}
+
+void MeshData::clear()
+{
+   mTriangles.clear();
+   mNumPoints = 0;
+   mPoints = 0;
+   mLocalPoints.clear();
+   mNormals.clear();
+   mNode = 0;
+}
+
+// ---
+
+SceneGeometryData::SceneGeometryData()
+{
+}
+
+SceneGeometryData::~SceneGeometryData()
+{
+   clear();
+}
+
+void SceneGeometryData::remove(const AlembicNode &node)
+{
+   NodeIndexMap::iterator it;
+   
+   it = mMeshIndices.find(node.path());
+   if (it != mMeshIndices.end())
+   {
+      mMeshData[it->second].clear();
+      mFreeMeshIndices.insert(it->second);
+      mMeshIndices.erase(it);
+   }
+}
+
+void SceneGeometryData::clear()
+{
+   mMeshIndices.clear();
+   mPointsIndices.clear();
+   mCurvesIndices.clear();
+   mNuPatchIndices.clear();
+   
+   mFreeMeshIndices.clear();
+   mFreePointsIndices.clear();
+   mFreeCurvesIndices.clear();
+   mFreeNuPatchIndices.clear();
+   
+   mMeshData.clear();
+}

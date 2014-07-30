@@ -473,6 +473,14 @@ prjs = [
     "libs": alembicgl_libs + alembic_libs + ilmbase_libs + hdf5_libs + libs,
     "srcs": glob.glob("examples/bin/SimpleAbcViewer/*.cpp"),
     "custom": glreqs + [glut.Require]
+   },
+   {"name": "SceneHelper",
+    "type": "program",
+    "defs": defs,
+    "incdirs": incdirs + ["examples/bin/SceneHelper", "lib/SceneHelper"],
+    "libdirs": libdirs,
+    "libs": ["boost_regex"] + alembic_libs + ilmbase_libs + hdf5_libs + libs,
+    "srcs": glob.glob("examples/bin/SceneHelper/*.cpp") + glob.glob("lib/SceneHelper/*.cpp")
    }
 ]
 
@@ -512,8 +520,17 @@ if build_maya_plugins:
                  "srcs": glob.glob("maya/AbcExport/*.cpp"),
                  "install": {"maya/scripts": glob.glob("maya/AbcExport/*.mel")},
                  "custom": [maya.Require, maya.Plugin]
-                }])
-
+                },
+                {"name": "AbcShape",
+                 "type": "dynamicmodule",
+                 "ext": maya.PluginExt(),
+                 "prefix": "maya/plug-ins",
+                 "defs": defs,
+                 "incdirs": incdirs + ["maya/AbcShape", "lib/SceneHelper"],
+                 "libdirs": libdirs,
+                 "libs": ["boost_regex"] + alembic_libs + ilmbase_libs + hdf5_libs + libs,
+                 "srcs": glob.glob("maya/AbcShape/*.cpp") + glob.glob("lib/SceneHelper/*.cpp"),
+                 "custom": [maya.Require, maya.Plugin]}])
 
 if build_houdini_plugins:
    # TODO
