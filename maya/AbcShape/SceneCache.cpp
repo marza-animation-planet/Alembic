@@ -6,9 +6,9 @@ AlembicScene* SceneCache::Ref(const std::string &filepath)
    return Instance().ref(filepath);
 }
 
-void SceneCache::Unref(AlembicScene *scene)
+bool SceneCache::Unref(AlembicScene *scene)
 {
-   Instance().unref(scene);
+   return Instance().unref(scene);
 }
 
 SceneCache& SceneCache::Instance()
@@ -25,15 +25,11 @@ SceneCache::SceneCache()
 
 SceneCache::~SceneCache()
 {
-   mMutex.lock();
-   
    #ifdef _DEBUG
    std::cout << "[AbcShape] Clear cached scene(s) (" << mScenes.size() << " remaining)" << std::endl;
    #endif
    
    mScenes.clear();
-   
-   mMutex.unlock();
 }
 
 std::string SceneCache::formatPath(const std::string &filepath)
@@ -63,7 +59,7 @@ AlembicScene* SceneCache::ref(const std::string &filepath)
    std::string path = formatPath(filepath);
    AlembicScene *rv = 0;
    
-   mMutex.lock();
+   //mMutex.lock();
    
    std::map<std::string, CacheEntry>::iterator it = mScenes.find(path);
    
@@ -92,23 +88,25 @@ AlembicScene* SceneCache::ref(const std::string &filepath)
       }
    }
    
-   mMutex.unlock();
+   //mMutex.unlock();
    
    return rv;
 }
 
-void SceneCache::unref(AlembicScene *scene)
+bool SceneCache::unref(AlembicScene *scene)
 {
    if (!scene)
    {
-      return;
+      return false;
    }
+   
+   bool rv = false;
    
    #ifdef _DEBUG
    std::cout << "[AbcShape] Unreferencing scene" << std::endl;
    #endif
    
-   mMutex.lock();
+   //mMutex.lock();
    
    std::string path = formatPath(scene->archive().getName());
    
@@ -127,7 +125,11 @@ void SceneCache::unref(AlembicScene *scene)
       }
       
       delete scene;
+      
+      rv = true;
    }
    
-   mMutex.unlock();
+   //mMutex.unlock();
+   
+   return rv;
 }

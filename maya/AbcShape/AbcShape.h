@@ -94,7 +94,7 @@ private:
     double computeRetime(double inputTime, double firstTime, double lastTime, CycleType cycleType) const;
     double getSampleTime() const;
     
-    void printInfo() const;
+    void printInfo(bool detailed=false) const;
     void printSceneBounds() const;
     
     void pullInternals();

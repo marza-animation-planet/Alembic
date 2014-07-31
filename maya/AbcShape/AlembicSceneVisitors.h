@@ -3,6 +3,7 @@
 
 #include "AlembicScene.h"
 #include "GeometryData.h"
+#include "MathUtils.h"
 
 #include <set>
 #include <string>
@@ -301,19 +302,56 @@ public:
    void leave(AlembicXform &node);
    void leave(AlembicNode &);
    
+   inline void drawAsPoints(bool on) { mAsPoints = on; }
    inline void setWidth(float w) { mWidth = w; }
    
-public:
-
-   static void DrawBox(const Alembic::Abc::Box3d &bounds, float lineWidth=0.0f);
-
 private:
    
    bool mNoTransforms;
    bool mNoInstances;
    bool mCheckVisibility;
    float mWidth;
+   bool mAsPoints;
    std::deque<Alembic::Abc::M44d> mMatrixStack;
+};
+
+
+class Select
+{
+public:
+   
+   Select(const SceneGeometryData *scene,
+          const Frustum &frustum,
+          bool ignoreTransforms,
+          bool ignoreInstances,
+          bool ignoreVisibility);
+   
+   inline void setWidth(float w) { mWidth = w; }
+   inline void drawAsPoints(bool on) { mAsPoints = on; }
+   inline void drawWireframe(bool on) { mWireframe = on; }
+   inline void drawBounds(bool on) { mBounds = on; }
+   
+   AlembicNode::VisitReturn enter(AlembicNode &node);
+   void leave(AlembicNode &node);
+   
+private:
+   
+   bool isVisible(AlembicNode &node) const;
+   bool inFrustum(AlembicNode &node) const;
+
+private:
+   
+   const SceneGeometryData *mScene;
+   Frustum mFrustum;
+   bool mNoTransforms;
+   bool mNoInstances;
+   bool mCheckVisibility;
+   bool mBounds;
+   bool mAsPoints;
+   bool mWireframe;
+   float mWidth;
+   std::deque<Alembic::Abc::M44d> mMatrixStack;
+   std::set<AlembicNode*> mProcessedXforms;
 };
 
 

@@ -89,10 +89,15 @@ void MeshData::_update(bool varyingTopology,
             if (!skip)
             {
                // Note: Alembic store indices in clock-wise order
+               mLines.push_back(Line(indices[ii], indices[ii+1]));
+               
                for (size_t j=2; j<count; ++j)
                {
                   mTriangles.push_back(Tri(indices[ii], indices[ii+j], indices[ii+j-1]));
+                  mLines.push_back(Line(indices[ii+j-1], indices[ii+j]));
                }
+               
+               mLines.push_back(Line(indices[ii+count-1], indices[ii]));
             }
          }
          else
@@ -173,10 +178,6 @@ void MeshData::_computeNormals()
       return;
    }
    
-   #ifdef _DEBUG
-   std::cout << "[MeshData] Recompute normals" << std::endl;
-   #endif
-   
    mNormals.resize(mNumPoints);
    std::fill(mNormals.begin(), mNormals.end(), Alembic::Abc::V3f(0.0f));
 
@@ -211,25 +212,17 @@ void MeshData::draw(bool wireframe, float lineWidth) const
       return;
    }
    
-   if (wireframe)
+   if (wireframe && lineWidth > 0.0f)
    {
-      glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-      if (lineWidth > 0.0f)
-      {
-         glEnable(GL_BLEND);
-         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-         glEnable(GL_LINE_SMOOTH);
-         glLineWidth(lineWidth);
-      }
-   }
-   else
-   {
-      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+      glEnable(GL_LINE_SMOOTH);
+      glLineWidth(lineWidth);
    }
    
    glEnableClientState(GL_VERTEX_ARRAY);
    
-   if (mNormals.size() > 0)
+   if (!wireframe && mNormals.size() > 0)
    {
       glEnableClientState(GL_NORMAL_ARRAY);
       glNormalPointer(GL_FLOAT, 0, (const GLvoid*) &(mNormals[0]));
@@ -237,9 +230,16 @@ void MeshData::draw(bool wireframe, float lineWidth) const
    
    glVertexPointer(3, GL_FLOAT, 0, (const GLvoid*) mPoints);
    
-   glDrawElements(GL_TRIANGLES, (GLsizei) 3 * mTriangles.size(), GL_UNSIGNED_INT, (const GLvoid*) &(mTriangles[0].v0));
+   if (wireframe)
+   {
+      glDrawElements(GL_LINES, (GLsizei) 2 * mLines.size(), GL_UNSIGNED_INT, (const GLvoid*) &(mLines[0].v0));
+   }
+   else
+   {
+      glDrawElements(GL_TRIANGLES, (GLsizei) 3 * mTriangles.size(), GL_UNSIGNED_INT, (const GLvoid*) &(mTriangles[0].v0));
+   }
    
-   if (mNormals.size() > 0)
+   if (!wireframe && mNormals.size() > 0)
    {
       glDisableClientState(GL_NORMAL_ARRAY);
    }
@@ -276,11 +276,96 @@ bool MeshData::isValid() const
 void MeshData::clear()
 {
    mTriangles.clear();
+   mLines.clear();
    mNumPoints = 0;
    mPoints = 0;
    mLocalPoints.clear();
    mNormals.clear();
    mNode = 0;
+}
+
+// ---
+
+void DrawBox(const Alembic::Abc::Box3d &bounds, bool asPoints, float width)
+{
+   if (bounds.isEmpty() || bounds.isInfinite())
+   {
+      return;
+   }
+   
+   if (width > 0.0f)
+   {
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+      if (asPoints)
+      {
+         glEnable(GL_POINT_SMOOTH);
+         glPointSize(width);
+      }
+      else
+      {
+         glEnable(GL_LINE_SMOOTH);
+         glLineWidth(width);
+      }
+   }
+   
+   float min_x = bounds.min[0];
+   float min_y = bounds.min[1];
+   float min_z = bounds.min[2];
+   float max_x = bounds.max[0];
+   float max_y = bounds.max[1];
+   float max_z = bounds.max[2];
+   
+   float w = max_x - min_x;
+   float h = max_y - min_y;
+   float d = max_z - min_z;
+   
+   if (asPoints)
+   {
+      glBegin(GL_POINTS);
+      
+      glVertex3f(min_x,   min_y,   min_z  );
+      glVertex3f(min_x,   min_y,   min_z+d);
+      glVertex3f(min_x,   min_y+h, min_z  );
+      glVertex3f(min_x,   min_y+h, min_z+d);
+      glVertex3f(min_x+w, min_y,   min_z  );
+      glVertex3f(min_x+w, min_y,   min_z+d);
+      glVertex3f(min_x+w, min_y+h, min_z  );
+      glVertex3f(min_x+w, min_y+h, min_z+d);
+      
+      glEnd();
+   }
+   else
+   {
+      glBegin(GL_LINES);
+
+      glVertex3f(min_x, min_y, min_z);
+      glVertex3f(min_x+w, min_y, min_z);
+      glVertex3f(min_x, min_y, min_z);
+      glVertex3f(min_x, min_y+h, min_z);
+      glVertex3f(min_x, min_y, min_z);
+      glVertex3f(min_x, min_y, min_z+d);
+      glVertex3f(min_x+w, min_y, min_z);
+      glVertex3f(min_x+w, min_y+h, min_z);
+      glVertex3f(min_x+w, min_y+h, min_z);
+      glVertex3f(min_x, min_y+h, min_z);
+      glVertex3f(min_x, min_y, min_z+d);
+      glVertex3f(min_x+w, min_y, min_z+d);
+      glVertex3f(min_x+w, min_y, min_z+d);
+      glVertex3f(min_x+w, min_y, min_z);
+      glVertex3f(min_x, min_y, min_z+d);
+      glVertex3f(min_x, min_y+h, min_z+d);
+      glVertex3f(min_x, min_y+h, min_z+d);
+      glVertex3f(min_x, min_y+h, min_z);
+      glVertex3f(min_x+w, min_y+h, min_z);
+      glVertex3f(min_x+w, min_y+h, min_z+d);
+      glVertex3f(min_x+w, min_y, min_z+d);
+      glVertex3f(min_x+w, min_y+h, min_z+d);
+      glVertex3f(min_x, min_y+h, min_z+d);
+      glVertex3f(min_x+w, min_y+h, min_z+d);
+
+      glEnd();
+   }
 }
 
 // ---

@@ -5,7 +5,7 @@
 
 #include <Alembic/AbcCoreFactory/All.h>
 
-#include <maya/MMutexLock.h>
+//#include <maya/MMutexLock.h>
 
 #include <map>
 #include <string>
@@ -15,7 +15,7 @@ class SceneCache
 public:
    
    static AlembicScene* Ref(const std::string &filepath);
-   static void Unref(AlembicScene *scene);
+   static bool Unref(AlembicScene *scene);
    
 private:
    
@@ -27,7 +27,7 @@ private:
    std::string formatPath(const std::string &filepath);
    
    AlembicScene* ref(const std::string &filepath);
-   void unref(AlembicScene *scene);
+   bool unref(AlembicScene *scene);
    
    
    
@@ -39,7 +39,7 @@ private:
       int refcount;
    };
    
-   MMutexLock mMutex;
+   //MMutexLock mMutex;
    std::map<std::string, CacheEntry> mScenes;
 };
 

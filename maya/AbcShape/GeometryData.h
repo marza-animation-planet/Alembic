@@ -48,7 +48,36 @@ public:
       }
    };
    
+   struct Line
+   {
+      GLuint v0;
+      GLuint v1;
+      
+      inline Line()
+         : v0(0), v1(0)
+      {
+      }  
+      
+      inline Line(int32_t _v0, int32_t _v1)
+         : v0(_v0), v1(_v1)
+      {
+      }
+      
+      inline Line(const Line &rhs)
+         : v0(rhs.v0), v1(rhs.v1)
+      {
+      }
+      
+      inline Line& operator=(const Line &rhs)
+      {
+         v0 = rhs.v0;
+         v1 = rhs.v1;
+         return *this;
+      }
+   };
+   
    typedef std::vector<Tri> TriArray;
+   typedef std::vector<Line> LineArray;
    
 public:
    
@@ -135,6 +164,7 @@ private:
    size_t mNumPoints;
    const Alembic::Abc::V3f *mPoints;
    TriArray mTriangles;
+   LineArray mLines;
    
    std::vector<Alembic::Abc::V3f> mLocalPoints;
    std::vector<Alembic::Abc::V3f> mNormals;
@@ -145,6 +175,8 @@ private:
 // PointsData
 // CurvesData
 // NuPatchData
+
+void DrawBox(const Alembic::Abc::Box3d &bounds, bool asPoints=false, float width=0.0f);
 
 // ---
 

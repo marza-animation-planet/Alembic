@@ -530,6 +530,7 @@ if build_maya_plugins:
                  "libdirs": libdirs,
                  "libs": ["boost_regex"] + alembic_libs + ilmbase_libs + hdf5_libs + libs,
                  "srcs": glob.glob("maya/AbcShape/*.cpp") + glob.glob("lib/SceneHelper/*.cpp"),
+                 "install": {"maya/scripts": glob.glob("maya/AbcShape/*.mel")},
                  "custom": [maya.Require, maya.Plugin]}])
 
 if build_houdini_plugins:

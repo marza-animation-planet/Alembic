@@ -193,10 +193,6 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicMesh &node)
    
    if (!hasBeenSampled(node) && node.sampleData(mTime, &updated))
    {
-      #ifdef _DEBUG
-      std::cout << "Valid sample for mesh data (updated: " << updated << ")" << std::endl;
-      #endif
-      
       if (mSceneData)
       {
          MeshData *data = mSceneData->mesh(node);
@@ -218,10 +214,6 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicSubD &node)
    
    if (!hasBeenSampled(node) && node.sampleData(mTime, &updated))
    {
-      #ifdef _DEBUG
-      std::cout << "Valid sample for mesh data (updated: " << updated << ")" << std::endl;
-      #endif
-      
       if (mSceneData)
       {
          MeshData *data = mSceneData->mesh(node);
@@ -463,74 +455,8 @@ DrawBounds::DrawBounds(bool ignoreTransforms, bool ignoreInstances, bool ignoreV
    , mNoInstances(ignoreInstances)
    , mCheckVisibility(!ignoreVisibility)
    , mWidth(0.0f)
+   , mAsPoints(false)
 {
-}
-
-void DrawBounds::DrawBox(const Alembic::Abc::Box3d &bounds, float lineWidth)
-{
-   if (bounds.isEmpty() || bounds.isInfinite())
-   {
-      return;
-   }
-   
-   if (lineWidth > 0.0f)
-   {
-      glEnable(GL_BLEND);
-      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-      glEnable(GL_LINE_SMOOTH);
-      glLineWidth(lineWidth);
-   }
-   
-   float min_x = bounds.min[0];
-   float min_y = bounds.min[1];
-   float min_z = bounds.min[2];
-   float max_x = bounds.max[0];
-   float max_y = bounds.max[1];
-   float max_z = bounds.max[2];
-
-   float w = max_x - min_x;
-   float h = max_y - min_y;
-   float d = max_z - min_z;
-
-   glBegin(GL_LINES);
-
-   glVertex3f(min_x, min_y, min_z);
-   glVertex3f(min_x+w, min_y, min_z);
-   glVertex3f(min_x, min_y, min_z);
-   glVertex3f(min_x, min_y+h, min_z);
-   glVertex3f(min_x, min_y, min_z);
-   glVertex3f(min_x, min_y, min_z+d);
-   glVertex3f(min_x+w, min_y, min_z);
-   glVertex3f(min_x+w, min_y+h, min_z);
-   glVertex3f(min_x+w, min_y+h, min_z);
-   glVertex3f(min_x, min_y+h, min_z);
-   glVertex3f(min_x, min_y, min_z+d);
-   glVertex3f(min_x+w, min_y, min_z+d);
-   glVertex3f(min_x+w, min_y, min_z+d);
-   glVertex3f(min_x+w, min_y, min_z);
-   glVertex3f(min_x, min_y, min_z+d);
-   glVertex3f(min_x, min_y+h, min_z+d);
-   glVertex3f(min_x, min_y+h, min_z+d);
-   glVertex3f(min_x, min_y+h, min_z);
-   glVertex3f(min_x+w, min_y+h, min_z);
-   glVertex3f(min_x+w, min_y+h, min_z+d);
-   glVertex3f(min_x+w, min_y, min_z+d);
-   glVertex3f(min_x+w, min_y+h, min_z+d);
-   glVertex3f(min_x, min_y+h, min_z+d);
-   glVertex3f(min_x+w, min_y+h, min_z+d);
-
-   float cx = bounds.center()[0];
-   float cy = bounds.center()[1];
-   float cz = bounds.center()[2];
-
-   glVertex3f(cx-0.1, cy, cz);
-   glVertex3f(cx+0.1, cy, cz);
-   glVertex3f(cx, cy-0.1, cz);
-   glVertex3f(cx, cy+0.1, cz);
-   glVertex3f(cx, cy, cz-0.1);
-   glVertex3f(cx, cy, cz+0.1);
-
-   glEnd();
 }
 
 AlembicNode::VisitReturn DrawBounds::enter(AlembicXform &node)
@@ -580,7 +506,7 @@ AlembicNode::VisitReturn DrawBounds::enter(AlembicNode &node)
    }
    else
    {
-      DrawBox(node.selfBounds(), mWidth);
+      DrawBox(node.selfBounds(), mAsPoints, mWidth);
       return AlembicNode::ContinueVisit;
    }
 }
@@ -605,6 +531,149 @@ void DrawBounds::leave(AlembicNode &node)
       node.master()->leave(*this);
    }
 }
+
+// ---
+
+Select::Select(const SceneGeometryData *scene,
+               const Frustum &frustum,
+               bool ignoreTransforms,
+               bool ignoreInstances,
+               bool ignoreVisibility)
+   : mScene(scene)
+   , mFrustum(frustum)
+   , mNoTransforms(ignoreTransforms)
+   , mNoInstances(ignoreInstances)
+   , mCheckVisibility(!ignoreVisibility)
+   , mBounds(false)
+   , mAsPoints(false)
+   , mWireframe(false)
+   , mWidth(0.0f)
+{
+}
+
+AlembicNode::VisitReturn Select::enter(AlembicNode &node)
+{
+   if ((node.isInstance() && mNoInstances) ||
+       !isVisible(node) ||
+       !inFrustum(node))
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   
+   AlembicNode *master = (node.isInstance() ? node.master() : &node);
+      
+   switch (master->type())
+   {
+   case AlembicNode::TypeMesh:
+   case AlembicNode::TypeSubD:
+      {
+         if (mBounds)
+         {
+            DrawBox(master->selfBounds(), mAsPoints, mWidth);
+         }
+         else
+         {
+            const MeshData *data = mScene->mesh(*master);
+            if (data)
+            {
+               if (mAsPoints)
+               {
+                  data->drawPoints(mWidth);
+               }
+               else
+               {
+                  data->draw(mWireframe, mWidth);
+               }
+            }
+         }
+      }
+      break;
+   case AlembicNode::TypePoints:
+   case AlembicNode::TypeCurves:
+   case AlembicNode::TypeNuPatch:
+      // Not yet supported
+      break;
+   case AlembicNode::TypeXform:
+      {
+         if (!mNoTransforms)
+         {
+            Alembic::Abc::M44d currentMatrix;
+            glGetDoublev(GL_MODELVIEW_MATRIX, currentMatrix.getValue());
+            mMatrixStack.push_back(currentMatrix);
+            
+            glMatrixMode(GL_MODELVIEW);
+            if (master->inheritsTransform())
+            {
+               glMultMatrixd(master->selfMatrix().getValue());
+            }
+            else
+            {
+               glLoadMatrixd(master->selfMatrix().getValue());
+            }
+            
+            mProcessedXforms.insert(&node);
+         }
+      }
+      break;
+   case AlembicNode::TypeGeneric:
+      // Unsupported type
+   default:
+      break;
+   }
+   
+   return AlembicNode::ContinueVisit;
+}
+
+void Select::leave(AlembicNode &node)
+{
+   std::set<AlembicNode*>::iterator it = mProcessedXforms.find(&node);
+   
+   if (it != mProcessedXforms.end())
+   {
+      if (mMatrixStack.size() > 0)
+      {
+         glMatrixMode(GL_MODELVIEW);
+         glLoadMatrixd(mMatrixStack.back().getValue());
+         mMatrixStack.pop_back();
+      }
+      
+      mProcessedXforms.erase(it);
+   }
+}
+
+bool Select::isVisible(AlembicNode &node) const
+{
+   return (!mCheckVisibility || node.isVisible());
+}
+
+bool Select::inFrustum(AlembicNode &node) const
+{
+   Alembic::Abc::Box3d bounds;
+   
+   if (!mNoTransforms)
+   {
+      bounds = node.childBounds();
+   }
+   else
+   {
+      if (node.isInstance())
+      {
+         if (node.master()->type() == AlembicNode::TypeXform)
+         {
+            return true;
+         }
+      }
+      else if (node.type() == AlembicNode::TypeXform)
+      {
+         return true;
+      }
+      
+      bounds = node.selfBounds();
+   }
+   
+   return (!bounds.isEmpty() && !mFrustum.isBoxTotallyOutside(bounds));
+}
+
 
 // ---
 

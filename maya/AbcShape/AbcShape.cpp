@@ -1,6 +1,7 @@
 #include "AbcShape.h"
 #include "AlembicSceneVisitors.h"
 #include "SceneCache.h"
+#include "MathUtils.h"
 
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnEnumAttribute.h>
@@ -218,14 +219,38 @@ AbcShape::AbcShape()
 
 AbcShape::~AbcShape()
 {
-   SceneCache::Unref(mScene);
+   #ifdef _DEBUG
+   std::cout << "[AbcShape] Destructor called" << std::endl;
+   #endif
+   
+   if (mScene && !SceneCache::Unref(mScene))
+   {
+      #ifdef _DEBUG
+      std::cout << "[AbcShape] Force delete scene" << std::endl;
+      #endif
+      
+      delete mScene;
+   }
 }
 
 void AbcShape::postConstructor()
 {
    setRenderable(true);
-   // visibleInReflections 1
-   // visibleInRefractions 1
+   
+   MFnDependencyNode dn(thisMObject());
+   MPlug plug;
+   
+   plug = dn.findPlug("visibleInReflections");
+   if (!plug.isNull())
+   {
+      plug.setBool(true);
+   }
+   
+   plug = dn.findPlug("visibleInRefractions");
+   if (!plug.isNull())
+   {
+      plug.setBool(true);
+   }
 }
 
 MStatus AbcShape::compute(const MPlug &, MDataBlock &)
@@ -428,10 +453,6 @@ void AbcShape::updateSceneBounds()
    mScene->visit(AlembicNode::VisitDepthFirst, visitor);
    mScene->setSelfBounds(visitor.bounds());
    mScene->updateChildBounds();
-   
-   #ifdef _DEBUG
-   printSceneBounds();
-   #endif
 }
 
 void AbcShape::updateShapesCount()
@@ -455,30 +476,26 @@ void AbcShape::updateGeometry()
    mScene->visit(AlembicNode::VisitDepthFirst, visitor);
 }
 
-void AbcShape::printInfo() const
+void AbcShape::printInfo(bool detailed) const
 {
-   PrintInfo pinf(mIgnoreTransforms, mIgnoreInstances, mIgnoreVisibility);
-   mScene->visit(AlembicNode::VisitDepthFirst, pinf);
+   if (detailed)
+   {
+      PrintInfo pinf(mIgnoreTransforms, mIgnoreInstances, mIgnoreVisibility);
+      mScene->visit(AlembicNode::VisitDepthFirst, pinf);
+   }
    
    printSceneBounds();
 }
 
 void AbcShape::printSceneBounds() const
 {
-   std::cout << "Scene:" << std::endl;
-   std::cout << "  self bounds: " << mScene->selfBounds().min << " - " << mScene->selfBounds().max << std::endl;
-   std::cout << "  child bounds: " << mScene->childBounds().min << " - " << mScene->childBounds().max << std::endl;
+   std::cout << "Scene " << mScene->selfBounds().min << " - " << mScene->selfBounds().max << std::endl;
 }
 
 bool AbcShape::updateInternals(const std::string &filePath, const std::string &objectExpression, double t, bool forceGeometrySampling)
 {
    bool updateObjectList = (mScene != 0 && (objectExpression != mObjectExpression));
    bool timeChanged = (mScene != 0 && (fabs(t - mSampleTime) > 0.0001));
-   bool anythingChanged = false;
-   
-   #ifdef _DEBUG
-   std::cout << "[AbcShape] updateInternals: timeChanged? " << timeChanged << ", objectsChanged? " << updateObjectList << std::endl;
-   #endif
    
    if (mFilePath != filePath)
    {
@@ -502,8 +519,6 @@ bool AbcShape::updateInternals(const std::string &filePath, const std::string &o
       }
       
       mGeometry.clear();
-      
-      anythingChanged = true;
    }
    
    if (updateObjectList)
@@ -530,22 +545,11 @@ bool AbcShape::updateInternals(const std::string &filePath, const std::string &o
    if (timeChanged)
    {
       updateWorld();
-      
-      anythingChanged = true;
    }
       
    if (mDisplayMode >= DM_points && (timeChanged || forceGeometrySampling))
    {
       updateGeometry();
-      
-      anythingChanged = true;
-   }
-   
-   if (anythingChanged)
-   {
-      #ifdef _DEBUG
-      printInfo();
-      #endif
    }
    
    return true;
@@ -637,9 +641,6 @@ bool AbcShape::getInternalValueInContext(const MPlug &plug, MDataHandle &handle,
 
 bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &handle, MDGContext &ctx)
 {
-   #ifdef _DEBUG
-   std::cout << "[AbcShape] setInternalValueInContext: " << plug.name().asChar() << std::endl;
-   #endif
    bool sampleTimeUpdate = false;
    MTime t = mTime;
    double s = mSpeed;
@@ -838,7 +839,7 @@ AbcShapeUI::~AbcShapeUI()
 }
 
 void AbcShapeUI::getDrawRequests(const MDrawInfo &info,
-                                 bool objectAndActiveOnly,
+                                 bool /*objectAndActiveOnly*/,
                                  MDrawRequestQueue &queue)
 {
    MDrawData data;
@@ -860,6 +861,34 @@ void AbcShapeUI::getDrawRequests(const MDrawInfo &info,
    
    MDagPath path = info.multiPath();
    
+   M3dView view = info.view();
+   
+   MColor color;
+   
+   switch (displayStatus)
+   {
+   case M3dView::kLive:
+      color = M3dView::liveColor();
+      break;
+   case M3dView::kHilite:
+      color = M3dView::hiliteColor();
+      break;
+   case M3dView::kTemplate:
+      color = M3dView::templateColor();
+      break;
+   case M3dView::kActiveTemplate:
+      color = M3dView::activeTemplateColor();
+      break;
+   case M3dView::kLead:
+      color = M3dView::leadColor();
+      break;
+   case M3dView::kActiveAffected:
+      color = M3dView::activeAffectedColor();
+      break;
+   default:
+      color = MHWRender::MGeometryUtilities::wireframeColor(path);
+   }
+   
    switch (appearance)
    {
    case M3dView::kBoundingBox:
@@ -868,7 +897,7 @@ void AbcShapeUI::getDrawRequests(const MDrawInfo &info,
          
          request.setDrawData(data);
          request.setToken(kDrawBox);
-         request.setColor(MHWRender::MGeometryUtilities::wireframeColor(path));
+         request.setColor(color);
          
          queue.add(request);
       }
@@ -879,24 +908,21 @@ void AbcShapeUI::getDrawRequests(const MDrawInfo &info,
          
          request.setDrawData(data);
          request.setToken(kDrawPoints);
-         request.setColor(MHWRender::MGeometryUtilities::wireframeColor(path));
+         request.setColor(color);
          
          queue.add(request);
       }
       break;
    default:
       {
-         if (appearance == M3dView::kWireFrame ||
-             displayStatus == M3dView::kActive ||
-             displayStatus == M3dView::kLead ||
-             displayStatus == M3dView::kHilite)
+         if (appearance == M3dView::kWireFrame || view.wireframeOnShaded())
          {
             MDrawRequest request = info.getPrototype(*this);
             
             request.setDrawData(data);
             request.setToken(kDrawGeometry);
             request.setDisplayStyle(M3dView::kWireFrame);
-            request.setColor(MHWRender::MGeometryUtilities::wireframeColor(path));
+            request.setColor(color);
             
             queue.add(request);
          }
@@ -905,19 +931,27 @@ void AbcShapeUI::getDrawRequests(const MDrawInfo &info,
          {
             MDrawRequest request = info.getPrototype(*this);
             
-            M3dView view = info.view();
-            MMaterial material = (view.usingDefaultMaterial() ? MMaterial::defaultMaterial() : MPxSurfaceShapeUI::material(path));
-            material.evaluateMaterial(view, path);
-            //material.evaluateTexture(data);
-            //bool isTransparent = false;
-            //if (material.getHasTransparency(isTransparent) && isTransparent)
-            //{
-            //  request.setIsTransparent(true);
-            //}
-            
             request.setDrawData(data);
             request.setToken(kDrawGeometry);
-            request.setMaterial(material);
+            
+            // Only set material info if necessary
+            AbcShape *shape = (AbcShape*) surfaceShape();
+            if (shape && shape->displayMode() == AbcShape::DM_geometry)
+            {
+               MMaterial material = (view.usingDefaultMaterial() ? MMaterial::defaultMaterial() : MPxSurfaceShapeUI::material(path));
+               material.evaluateMaterial(view, path);
+               //material.evaluateTexture(data);
+               //bool isTransparent = false;
+               //if (material.getHasTransparency(isTransparent) && isTransparent)
+               //{
+               //  request.setIsTransparent(true);
+               //}
+               request.setMaterial(material);
+            }
+            else
+            {
+               request.setColor(color);
+            }
             
             queue.add(request);
          }
@@ -939,15 +973,7 @@ void AbcShapeUI::draw(const MDrawRequest &request, M3dView &view) const
       drawBox(shape, request, view);
       break;
    case kDrawPoints:
-      if (shape->displayMode() < AbcShape::DM_points)
-      {
-         // no geometry data available in scene
-         drawBox(shape, request, view);
-      }
-      else
-      {
-         drawPoints(shape, request, view);
-      }
+      drawPoints(shape, request, view);
       break;
    default:
       {
@@ -968,264 +994,10 @@ void AbcShapeUI::draw(const MDrawRequest &request, M3dView &view) const
    }
 }
 
-// ---
-
-//using Alembic::Abc::V4d;
-using Imath::V4d;
-using Alembic::Abc::V3d;
-using Alembic::Abc::M44d;
-using Alembic::Abc::Box3d;
-
-class Plane
-{
-public:
-   
-   Plane()
-      : mNormal(0, 1, 0), mDist(0.0)
-   {
-   }
-   
-   Plane(const V3d &n, double d)
-      : mNormal(n), mDist(d)
-   {
-   }
-   
-   Plane(const V3d &p0, const V3d &p1, const V3d &p2, const V3d &above)
-   {
-      set(p0, p1, p2, above);
-   }
-   
-   Plane(const Plane &rhs)
-      : mNormal(rhs.mNormal), mDist(rhs.mDist)
-   {
-   }
-   
-   Plane& operator=(const Plane &rhs)
-   {
-      if (this != &rhs)
-      {
-         mNormal = rhs.mNormal;
-         mDist = rhs.mDist;
-      }
-      return *this;
-   }
-   
-   void set(const V3d &n, double d)
-   {
-      mNormal = n;
-      mDist = d;
-   }
-   
-   void set(const V3d &p0, const V3d &p1, const V3d &p2, const V3d &above)
-   {
-      V3d u = p2 - p1;
-      V3d v = p0 - p1;
-      mNormal = u.cross(v).normalize();
-      mDist = -(mNormal.dot(p1));
-      
-      if (distanceTo(above) < 0.0)
-      {
-         mNormal.negate();
-         mDist = -mDist;
-      }
-   }
-   
-   double distanceTo(const V3d &P) const
-   {
-      return (P.dot(mNormal) + mDist);
-   }
-   
-private:
-   
-   V3d mNormal;
-   double mDist;
-};
-
-class Frustum
-{
-public:
-   
-   enum Side
-   {
-      Left = 0,
-      Right,
-      Top,
-      Bottom,
-      Near,
-      Far
-   };
-   
-public:
-   
-   Frustum()
-   {
-      mPlanes[  Left].set(V3d( 1,  0,  0), 0);
-      mPlanes[ Right].set(V3d(-1,  0,  0), 0);
-      mPlanes[   Top].set(V3d( 0, -1,  0), 0);
-      mPlanes[Bottom].set(V3d( 0,  1,  0), 0);
-      mPlanes[  Near].set(V3d( 0,  0, -1), 0);
-      mPlanes[   Far].set(V3d( 0,  0,  1), 0);
-   }
-   
-   Frustum(M44d &projViewInv)
-   {
-      V3d ltn, rtn, lbn, rbn, ltf, rtf, lbf, rbf;
-      
-      projViewInv.multVecMatrix(V3d(-1,  1, -1), ltn);
-      projViewInv.multVecMatrix(V3d( 1,  1, -1), rtn);
-      projViewInv.multVecMatrix(V3d(-1, -1, -1), lbn);
-      projViewInv.multVecMatrix(V3d( 1, -1, -1), rbn);
-      
-      projViewInv.multVecMatrix(V3d(-1,  1,  1), ltf);
-      projViewInv.multVecMatrix(V3d( 1,  1,  1), rtf);
-      projViewInv.multVecMatrix(V3d(-1, -1,  1), lbf);
-      projViewInv.multVecMatrix(V3d( 1, -1,  1), rbf);
-      
-      // Build planes so that their normal is pointing inside the frustum
-      mPlanes[  Left].set(ltn, lbn, lbf, rbn);
-      mPlanes[ Right].set(rtn, rbn, rbf, lbn);
-      mPlanes[   Top].set(ltn, rtn, rtf, rbf);
-      mPlanes[Bottom].set(lbn, rbn, rbf, rtf);
-      mPlanes[  Near].set(ltn, rtn, rbn, rbf);
-      mPlanes[   Far].set(ltf, rtf, rbf, rbn);
-   }
-   
-   Frustum(const Frustum &rhs)
-   {
-      for (int i=0; i<6; ++i)
-      {
-         mPlanes[i] = rhs.mPlanes[i];
-      }
-   }
-   
-   Frustum& operator=(const Frustum &rhs)
-   {
-      if (this != &rhs)
-      {
-         for (int i=0; i<6; ++i)
-         {
-            mPlanes[i] = rhs.mPlanes[i];
-         }
-      }
-      return *this;
-   }
-   
-   bool isPointInside(const V3d &p) const
-   {
-      for (int i=0; i<6; ++i)
-      {
-         if (mPlanes[i].distanceTo(p) < 0.0)
-         {
-            return false;
-         }
-      }
-      return true;
-   }
-   
-   bool isPointOutside(const V3d &p) const
-   {
-      for (int i=0; i<6; ++i)
-      {
-         if (mPlanes[i].distanceTo(p) < 0.0)
-         {
-            return true;
-         }
-      }
-      return false;
-   }
-   
-   bool isBoxOutside(const Box3d &b) const
-   {
-      for (int i=0; i<6; ++i)
-      {
-         // Check if both min and max are below current plane
-         if (mPlanes[i].distanceTo(b.min) < 0.0 &&
-             mPlanes[i].distanceTo(b.max) < 0.0)
-         {
-            return true;
-         }
-      }
-      return false;
-   }
-
-private:
-   
-   Plane mPlanes[6];
-};
-
-class Select
-{
-public:
-
-   Select(const SceneGeometryData *scene,
-          const Frustum &frustum,
-          bool ignoreTransforms,
-          bool ignoreInstances,
-          bool ignoreVisibility)
-      : mScene(scene)
-      , mFrustum(frustum)
-      , mNoTransforms(ignoreTransforms)
-      , mNoInstances(ignoreInstances)
-      , mCheckVisibility(!ignoreVisibility)
-   {
-   }
-   
-   // Note: Do frustum culling
-   //       => we'll be passed the toNDC (use inverse)
-   
-   AlembicNode::VisitReturn enter(AlembicNode &node)
-   {
-      if (mCheckVisibility && !node.isVisible())
-      {
-         return AlembicNode::DontVisitChildren;
-      }
-      else if (node.isInstance() && mNoInstances)
-      {
-         return AlembicNode::DontVisitChildren;
-      }
-      else
-      {
-         Alembic::Abc::Box3d bounds = (mNoTransforms ? node.selfBounds() : node.childBounds());
-         
-         if (!bounds.isEmpty() && mFrustum.isBoxOutside(bounds))
-         {
-            #ifdef _DEBUG
-            std::cout << "[AbcShape] " << node.path() << " outside viewing frustum" << std::endl;
-            #endif
-            return AlembicNode::DontVisitChildren;
-         }
-         else
-         {
-            // if it is a shape, draw it
-            return AlembicNode::ContinueVisit;
-         }
-      }
-   }
-   
-   void leave(AlembicNode &node)
-   {
-      if (node.isInstance() && !mNoInstances && (!mCheckVisibility || node.isVisible()))
-      {
-         node.master()->leave(*this);
-      }
-   }
-   
-private:
-   
-   const SceneGeometryData *mScene;
-   Frustum mFrustum;
-   bool mNoTransforms;
-   bool mNoInstances;
-   bool mCheckVisibility;
-};
-
-// ---
-
 bool AbcShapeUI::select(MSelectInfo &selectInfo,
                         MSelectionList &selectionList,
                         MPointArray &worldSpaceSelectPts) const
 {
-   // ToDo: Simple GL picking?
    MSelectionMask mask("AbcShape");
    if (!selectInfo.selectable(mask))
    {
@@ -1238,25 +1010,9 @@ bool AbcShapeUI::select(MSelectInfo &selectInfo,
       return false;
    }
    
-   bool pickEdges = false;
-   bool pickPoints = false;
+   M3dView::DisplayStyle style = selectInfo.displayStyle();
    
-   switch (shape->displayMode())
-   {
-   case AbcShape::DM_box:
-   case AbcShape::DM_boxes:
-      pickEdges = true;
-      break;
-   case AbcShape::DM_points:
-      pickPoints = true;
-      break;
-   default:
-      if (M3dView::kWireFrame == selectInfo.displayStyle() || !selectInfo.singleSelection())
-      {
-         pickEdges = true;
-      }
-      break;
-   }
+   DrawToken target = (style == M3dView::kBoundingBox ? kDrawBox : (style == M3dView::kPoints ? kDrawPoints : kDrawGeometry));
    
    M3dView view = selectInfo.view();
    
@@ -1270,38 +1026,71 @@ bool AbcShapeUI::select(MSelectInfo &selectInfo,
    
    Frustum frustum(projViewInv);
    
-   unsigned int numShapes = shape->numShapes();
-   GLuint *buffer = new GLuint[numShapes * 4];
+   // As we use same name for all shapes, without hierarchy, don't really need a big buffer
+   GLuint *buffer = new GLuint[16];
    
-   view.beginSelect(buffer, numShapes);
+   view.beginSelect(buffer, 16);
    view.pushName(0);
+   view.loadName(1); // Use same name for all 
    
-   Select visitor(shape->sceneGeometry(), frustum,
-                  shape->ignoreTransforms(),
-                  shape->ignoreInstances(),
-                  shape->ignoreVisibility());
+   glPushAttrib(GL_COLOR_BUFFER_BIT | GL_LIGHTING_BIT | GL_LINE_BIT | GL_POINT_BIT);
+   glDisable(GL_LIGHTING);
    
-   if (pickPoints)
+   if (shape->displayMode() == AbcShape::DM_box)
    {
-      #ifdef _DEBUG
-      std::cout << "[AbcShape] Select points" << std::endl;
-      #endif
-      
-   }
-   else if (pickEdges)
-   {
-      #ifdef _DEBUG
-      std::cout << "[AbcShape] Select edges" << std::endl;
-      #endif
+      if (target == kDrawPoints)
+      {
+         DrawBox(shape->scene()->selfBounds(), true, shape->pointWidth());
+      }
+      else
+      {
+         DrawBox(shape->scene()->selfBounds(), false, shape->lineWidth());
+      }
    }
    else
    {
-      #ifdef _DEBUG
-      std::cout << "[AbcShape] Select faces" << std::endl;
-      #endif
+      Select visitor(shape->sceneGeometry(), frustum,
+                     shape->ignoreTransforms(),
+                     shape->ignoreInstances(),
+                     shape->ignoreVisibility());
+      
+      if (target == kDrawBox)
+      {
+         visitor.drawBounds(true);
+         visitor.setWidth(shape->lineWidth());
+      }
+      else if (target == kDrawPoints)
+      {
+         visitor.drawBounds(shape->displayMode() == AbcShape::DM_boxes);
+         visitor.drawAsPoints(true);
+         visitor.setWidth(shape->pointWidth());
+      }
+      else
+      {
+         if (shape->displayMode() == AbcShape::DM_boxes)
+         {
+            visitor.drawBounds(true);
+            visitor.setWidth(shape->lineWidth());
+         }
+         else if (shape->displayMode() == AbcShape::DM_points)
+         {
+            visitor.drawAsPoints(true);
+            visitor.setWidth(shape->pointWidth());
+         }
+         else if (style == M3dView::kWireFrame)
+         {
+            visitor.drawWireframe(true);
+            visitor.setWidth(shape->lineWidth());
+         }
+      }
+      
+      shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
    }
    
+   glPopAttrib();
+   
    view.popName();
+   
    int hitCount = view.endSelect();
    
    if (hitCount > 0)
@@ -1334,7 +1123,7 @@ bool AbcShapeUI::select(MSelectInfo &selectInfo,
       // compute hit point
       {
          float zdepth = float(izdepth) / 0xFFFFFFFF;
-      
+         
          MDagPath cameraPath;
          view.getCamera(cameraPath);
          
@@ -1371,6 +1160,8 @@ bool AbcShapeUI::select(MSelectInfo &selectInfo,
                               mask,
                               false);
       
+      delete[] buffer;
+      
       return true;
    }
    else
@@ -1379,21 +1170,23 @@ bool AbcShapeUI::select(MSelectInfo &selectInfo,
    }
 }
 
-void AbcShapeUI::drawBox(AbcShape *shape, const MDrawRequest &request, M3dView &view) const
+void AbcShapeUI::drawBox(AbcShape *shape, const MDrawRequest &, M3dView &view) const
 {
    view.beginGL();
    
    glPushAttrib(GL_COLOR_BUFFER_BIT | GL_LIGHTING_BIT | GL_LINE_BIT);
+   
    glDisable(GL_LIGHTING);
    
    if (shape->displayMode() == AbcShape::DM_box)
    {
-      DrawBounds::DrawBox(shape->scene()->selfBounds(), shape->lineWidth());
+      DrawBox(shape->scene()->selfBounds(), false, shape->lineWidth());
    }
    else
    {
       DrawBounds visitor(shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
       visitor.setWidth(shape->lineWidth());
+      visitor.drawAsPoints(false);
       shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
    }
    
@@ -1402,17 +1195,32 @@ void AbcShapeUI::drawBox(AbcShape *shape, const MDrawRequest &request, M3dView &
    view.endGL();
 }
 
-void AbcShapeUI::drawPoints(AbcShape *shape, const MDrawRequest &request, M3dView &view) const
+void AbcShapeUI::drawPoints(AbcShape *shape, const MDrawRequest &, M3dView &view) const
 {
    view.beginGL();
    
    glPushAttrib(GL_COLOR_BUFFER_BIT | GL_LIGHTING_BIT | GL_POINT_BIT);
+   
    glDisable(GL_LIGHTING);
    
-   DrawGeometry dg(shape->sceneGeometry(), shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
-   dg.drawAsPoints(true);
-   dg.setWidth(shape->pointWidth());
-   shape->scene()->visit(AlembicNode::VisitDepthFirst, dg);
+   if (shape->displayMode() == AbcShape::DM_box)
+   {
+      DrawBox(shape->scene()->selfBounds(), true, shape->pointWidth());
+   }
+   else if (shape->displayMode() == AbcShape::DM_boxes)
+   {
+      DrawBounds visitor(shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
+      visitor.drawAsPoints(true);
+      visitor.setWidth(shape->pointWidth());
+      shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
+   }
+   else
+   {
+      DrawGeometry dg(shape->sceneGeometry(), shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
+      dg.drawAsPoints(true);
+      dg.setWidth(shape->pointWidth());
+      shape->scene()->visit(AlembicNode::VisitDepthFirst, dg);
+   }
       
    glPopAttrib();
       
@@ -1428,7 +1236,6 @@ void AbcShapeUI::drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dV
    
    glPushAttrib(GL_COLOR_BUFFER_BIT | GL_LIGHTING_BIT | GL_LINE_BIT | GL_POLYGON_BIT);
    
-   glEnable(GL_POLYGON_OFFSET_FILL);
    if (wireframe)
    {
       glDisable(GL_LIGHTING);
@@ -1436,6 +1243,8 @@ void AbcShapeUI::drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dV
    }
    else
    {
+      glEnable(GL_POLYGON_OFFSET_FILL);
+      
       //glShadeModel(flat ? GL_FLAT : GL_SMOOTH);
       // Note: as we only store 1 smooth normal per point in mesh, flat shaded will look strange: ignore it
       glShadeModel(GL_SMOOTH);
