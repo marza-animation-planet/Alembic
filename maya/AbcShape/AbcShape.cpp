@@ -915,7 +915,11 @@ void AbcShapeUI::getDrawRequests(const MDrawInfo &info,
       break;
    default:
       {
-         if (appearance == M3dView::kWireFrame || view.wireframeOnShaded())
+         if (appearance == M3dView::kWireFrame ||
+             view.wireframeOnShaded() ||
+             displayStatus == M3dView::kActive ||
+             displayStatus == M3dView::kHilite ||
+             displayStatus == M3dView::kLead)
          {
             MDrawRequest request = info.getPrototype(*this);
             
