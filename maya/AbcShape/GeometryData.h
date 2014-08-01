@@ -86,7 +86,6 @@ public:
    
    inline void update(const AlembicMesh &mesh) { _update(mesh); }
    inline void update(const AlembicSubD &subd) { _update(subd); }
-   inline const AlembicNode* node() const { return mNode; }
    
    void draw(bool wireframe, float lineWidth=0.0) const;
    void drawPoints(float pointWidth=0.0) const;
@@ -141,8 +140,6 @@ private:
          }
       }
       
-      mNode = &node;
-      
       _update(varyingTopology, fc, fi, t0, w0, p0, v0, t1, w1, p1);
    }
    
@@ -168,10 +165,28 @@ private:
    
    std::vector<Alembic::Abc::V3f> mLocalPoints;
    std::vector<Alembic::Abc::V3f> mNormals;
-   
-   const AlembicNode *mNode;
 };
 
+class PointsData
+{
+public:
+   
+   PointsData();
+   ~PointsData();
+   
+   void update(const AlembicPoints &points);
+   
+   void draw(float pointWidth=0.0) const;
+   
+   bool isValid() const;
+   void clear();
+   
+private:
+   
+   size_t mNumPoints;
+   const Alembic::Abc::V3f *mPoints;
+   std::vector<Alembic::Abc::V3f> mLocalPoints;
+};
 // PointsData
 // CurvesData
 // NuPatchData
@@ -197,8 +212,15 @@ public:
       return data<MeshData>(node, mMeshData, mMeshIndices);
    }
    
-   //PointsData& points(const AlembicNode &node);
-   //const PointsData& points(const AlembicNode &node) const;
+   inline PointsData* points(const AlembicNode &node)
+   {
+      return data<PointsData>(node, mPointsData, mPointsIndices, mFreePointsIndices);
+   }
+   
+   inline const PointsData* points(const AlembicNode &node) const
+   {
+      return data<PointsData>(node, mPointsData, mPointsIndices);
+   }
    
    //CurvesData& curves(const AlembicNode &node);
    //const CurvesData& curves(const AlembicNode &node) const;
@@ -266,7 +288,7 @@ private:
 private:
    
    std::deque<MeshData> mMeshData;
-   //std::deque<PointsData> mPointsData;
+   std::deque<PointsData> mPointsData;
    //std::deque<CurvesData> mCurvesData;
    //std::deque<NuPatchData> mNuPatchData;
    

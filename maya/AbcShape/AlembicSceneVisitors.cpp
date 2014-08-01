@@ -231,9 +231,19 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicSubD &node)
 
 AlembicNode::VisitReturn SampleGeometry::enter(AlembicPoints &node)
 {
-   if (!hasBeenSampled(node) && node.sampleData(mTime))
+   bool updated = true;
+   
+   if (!hasBeenSampled(node) && node.sampleData(mTime, &updated))
    {
-      // ToDo
+      if (mSceneData)
+      {
+         PointsData *data = mSceneData->points(node);
+         if (data && (!data->isValid() || updated))
+         {
+            data->update(node);
+         }
+      }
+      
       setSampled(node);
    }
    
@@ -283,7 +293,8 @@ void SampleGeometry::leave(AlembicNode &)
 DrawGeometry::DrawGeometry(const SceneGeometryData *sceneData, bool ignoreTransforms, bool ignoreInstances, bool ignoreVisibility)
    : mAsPoints(false)
    , mWireframe(false)
-   , mWidth(0.0f)
+   , mLineWidth(0.0f)
+   , mPointWidth(0.0f)
    , mNoTransforms(ignoreTransforms)
    , mNoInstances(ignoreInstances)
    , mCheckVisibility(!ignoreVisibility)
@@ -307,11 +318,11 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicMesh &node)
       {
          if (mAsPoints)
          {
-            data->drawPoints(mWidth);
+            data->drawPoints(mPointWidth);
          }
          else
          {
-            data->draw(mWireframe, mWidth);
+            data->draw(mWireframe, mLineWidth);
          }
       }
    }
@@ -333,11 +344,11 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicSubD &node)
       {
          if (mAsPoints)
          {
-            data->drawPoints(mWidth);
+            data->drawPoints(mPointWidth);
          }
          else
          {
-            data->draw(mWireframe, mWidth);
+            data->draw(mWireframe, mLineWidth);
          }
       }
    }
@@ -352,7 +363,15 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicPoints &node)
       return AlembicNode::DontVisitChildren;
    }
    
-   // ToDo
+   if (mSceneData)
+   {
+      const PointsData *data = mSceneData->points(node);
+      if (data)
+      {
+         data->draw(mPointWidth);
+      }
+   }
+   
    return AlembicNode::ContinueVisit;
 }
 
@@ -589,6 +608,21 @@ AlembicNode::VisitReturn Select::enter(AlembicNode &node)
       }
       break;
    case AlembicNode::TypePoints:
+      {
+         if (mBounds)
+         {
+            DrawBox(master->selfBounds(), mAsPoints, mWidth);
+         }
+         else
+         {
+            const PointsData *data = mScene->points(*master);
+            if (data)
+            {
+               data->draw(mWidth);
+            }
+         }
+      }
+      break;
    case AlembicNode::TypeCurves:
    case AlembicNode::TypeNuPatch:
       // Not yet supported

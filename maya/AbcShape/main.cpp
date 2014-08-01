@@ -19,6 +19,12 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
 {
    MFnPlugin plugin(obj);
 
+   if (AbcShape::CallbackID != 0)
+   {
+      MDGMessage::removeCallback(AbcShape::CallbackID);
+      AbcShape::CallbackID = 0;
+   }
+
    MStatus status = plugin.deregisterNode(AbcShape::ID);
    
    return status;

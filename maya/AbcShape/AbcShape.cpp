@@ -19,6 +19,7 @@
 #include <maya/MSelectionMask.h>
 #include <maya/MFnCamera.h>
 #include <maya/MSelectionList.h>
+#include <maya/MDGModifier.h>
 
 #ifdef __APPLE__
 #  include <OpenGL/gl.h>
@@ -38,6 +39,7 @@
 
 
 const MTypeId AbcShape::ID(0x00082698);
+MCallbackId AbcShape::CallbackID;
 MObject AbcShape::aFilePath;
 MObject AbcShape::aObjectExpression;
 MObject AbcShape::aDisplayMode;
@@ -57,6 +59,47 @@ MObject AbcShape::aLineWidth;
 void* AbcShape::creator()
 {
    return new AbcShape();
+}
+
+void AbcShape::createdCallback(MObject& node, void*)
+{
+   MFnDependencyNode dn(node);
+   MPlug plug;
+   
+   plug = dn.findPlug("visibleInReflections");
+   if (!plug.isNull())
+   {
+      plug.setBool(true);
+   }
+   
+   plug = dn.findPlug("visibleInRefractions");
+   if (!plug.isNull())
+   {
+      plug.setBool(true);
+   }
+   
+   plug = dn.findPlug("time");
+   if (!plug.isNull())
+   {
+      MSelectionList sl;
+      MObject obj;
+      
+      sl.add("time1");
+      
+      if (sl.getDependNode(0, obj) == MStatus::kSuccess)
+      {
+         MFnDependencyNode timeNode(obj);
+         MPlug srcPlug = timeNode.findPlug("outTime");
+         
+         if (!srcPlug.isNull())
+         {
+            MDGModifier mod;
+            
+            mod.connect(srcPlug, plug);
+            mod.doIt();
+         }
+      }
+   }
 }
 
 MStatus AbcShape::initialize()
@@ -130,7 +173,7 @@ MStatus AbcShape::initialize()
    stat = addAttribute(aCycleType);
    MCHECKERROR(stat, "Could not add 'cycleType' attribute");
    
-   aStartFrame = nAttr.create("startFrame", "sf", MFnNumericData::kDouble, 0, &stat);
+   aStartFrame = nAttr.create("startFrame", "sf", MFnNumericData::kDouble, 1.0, &stat);
    MCHECKERROR(stat, "Could not create 'startFrame' attribute");
    nAttr.setWritable(true);
    nAttr.setStorable(true);
@@ -138,7 +181,7 @@ MStatus AbcShape::initialize()
    stat = addAttribute(aStartFrame);
    MCHECKERROR(stat, "Could not add 'startFrame' attribute");
 
-   aEndFrame = nAttr.create("endFrame", "ef", MFnNumericData::kDouble, 0, &stat);
+   aEndFrame = nAttr.create("endFrame", "ef", MFnNumericData::kDouble, 1.0, &stat);
    MCHECKERROR(stat, "Could not create 'endFrame' attribute");
    nAttr.setWritable(true);
    nAttr.setStorable(true);
@@ -237,20 +280,7 @@ void AbcShape::postConstructor()
 {
    setRenderable(true);
    
-   MFnDependencyNode dn(thisMObject());
-   MPlug plug;
-   
-   plug = dn.findPlug("visibleInReflections");
-   if (!plug.isNull())
-   {
-      plug.setBool(true);
-   }
-   
-   plug = dn.findPlug("visibleInRefractions");
-   if (!plug.isNull())
-   {
-      plug.setBool(true);
-   }
+   AbcShape::CallbackID = MDGMessage::addNodeAddedCallback(AbcShape::createdCallback, "AbcShape");
 }
 
 MStatus AbcShape::compute(const MPlug &, MDataBlock &)
@@ -1222,7 +1252,8 @@ void AbcShapeUI::drawPoints(AbcShape *shape, const MDrawRequest &, M3dView &view
    {
       DrawGeometry dg(shape->sceneGeometry(), shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
       dg.drawAsPoints(true);
-      dg.setWidth(shape->pointWidth());
+      dg.setLineWidth(shape->lineWidth());
+      dg.setPointWidth(shape->pointWidth());
       shape->scene()->visit(AlembicNode::VisitDepthFirst, dg);
    }
       
@@ -1277,7 +1308,8 @@ void AbcShapeUI::drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dV
    
    DrawGeometry dg(shape->sceneGeometry(), shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
    dg.drawWireframe(wireframe);
-   dg.setWidth(shape->lineWidth());
+   dg.setLineWidth(shape->lineWidth());
+   dg.setPointWidth(shape->pointWidth());
    shape->scene()->visit(AlembicNode::VisitDepthFirst, dg);
    
    glPopAttrib();

@@ -13,7 +13,6 @@ std::ostream& operator<<(std::ostream &os, MeshData::Tri &tri)
 MeshData::MeshData()
    : mNumPoints(0)
    , mPoints(0)
-   , mNode(0)
 {
 }
 
@@ -122,7 +121,7 @@ void MeshData::_update(bool varyingTopology,
          {
             // Extrapolate using velocity
             
-            float vs = w0 * (t1 - t0);
+            float vs = w1 * (t1 - t0);
             
             mLocalPoints.resize(p0->size());
             for (size_t i=0; i<np; ++i)
@@ -270,7 +269,7 @@ void MeshData::drawPoints(float pointWidth) const
 
 bool MeshData::isValid() const
 {
-   return (mTriangles.size() > 0  && mNumPoints > 0 && mPoints && mNode);
+   return (mTriangles.size() > 0  && mNumPoints > 0 && mPoints);
 }
 
 void MeshData::clear()
@@ -281,7 +280,128 @@ void MeshData::clear()
    mPoints = 0;
    mLocalPoints.clear();
    mNormals.clear();
-   mNode = 0;
+}
+
+// ---
+
+PointsData::PointsData()
+   : mNumPoints(0)
+   , mPoints(0)
+{
+}
+
+PointsData::~PointsData()
+{
+   clear();
+}
+
+void PointsData::update(const AlembicPoints &node)
+{
+   const typename AlembicPoints::Sample &samp0 = node.firstSample();
+   const typename AlembicPoints::Sample &samp1 = node.secondSample();
+   
+   if (!samp0.valid(node.typedObject()))
+   {
+      clear();
+      return;
+   }
+   
+   float t0 = float(samp0.dataTime);
+   float w0 = float(samp0.dataWeight);
+   float t1 = 0.0f;
+   float w1 = 0.0f;
+   
+   Alembic::Abc::P3fArraySamplePtr p0 = samp0.data.getPositions();
+   Alembic::Abc::V3fArraySamplePtr v0 = samp0.data.getVelocities();
+   Alembic::Abc::UInt64ArraySamplePtr id0 = samp0.data.getIds();
+   
+   mNumPoints = p0->size();
+   
+   if (mNumPoints == 0 || v0->size() != mNumPoints || id0->size() != mNumPoints)
+   {
+      clear();
+      return;
+   }
+   
+   if (samp1.dataWeight > 0.0)
+   {
+      mLocalPoints.resize(mNumPoints);
+      
+      t1 = float(samp1.dataTime);
+      w1 = float(samp1.dataWeight);
+      
+      Alembic::Abc::P3fArraySamplePtr p1 = samp1.data.getPositions();
+      Alembic::Abc::UInt64ArraySamplePtr id1 = samp1.data.getIds();
+      
+      float dt = w1 * (t1 - t0);
+      
+      std::map<size_t, size_t> idmap;
+      std::map<size_t, size_t>::iterator idit;
+
+      for (size_t j=0; j<id1->size(); ++j)
+      {
+         idmap[(*id1)[j]] = j;
+      }
+      
+      for (size_t i = 0; i < mNumPoints; ++i)
+      {
+         Alembic::Abc::V3f p = (*p0)[i];
+         Alembic::Abc::V3f v = (*v0)[i];
+         
+         size_t id = (*id0)[i];
+         
+         idit = idmap.find(id);
+         
+         if (idit == idmap.end())
+         {
+            mLocalPoints[i] = p + dt * v;
+         }
+         else
+         {
+            mLocalPoints[i] = w0 * p + w1 * (*p1)[idit->second];
+         }
+      }
+      
+      mPoints = &(mLocalPoints[0]);
+   }
+   else
+   {
+      mPoints = p0->get();
+      mLocalPoints.clear();
+   }
+}
+
+void PointsData::draw(float pointWidth) const
+{
+   if (!isValid())
+   {
+      return;
+   }
+   
+   if (pointWidth > 0.0f)
+   {
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+      glEnable(GL_POINT_SMOOTH);
+      glPointSize(pointWidth);
+   }
+   
+   glEnableClientState(GL_VERTEX_ARRAY);
+   glVertexPointer(3, GL_FLOAT, 0, (const GLvoid*) mPoints);
+   glDrawArrays(GL_POINTS, 0, (GLsizei) mNumPoints);
+   glDisableClientState(GL_VERTEX_ARRAY);
+}
+
+bool PointsData::isValid() const
+{
+   return (mNumPoints > 0 && mPoints);
+}
+
+void PointsData::clear()
+{
+   mLocalPoints.clear();
+   mPoints = 0;
+   mNumPoints = 0;
 }
 
 // ---
@@ -390,6 +510,14 @@ void SceneGeometryData::remove(const AlembicNode &node)
       mFreeMeshIndices.insert(it->second);
       mMeshIndices.erase(it);
    }
+   
+   it = mPointsIndices.find(node.path());
+   if (it != mPointsIndices.end())
+   {
+      mPointsData[it->second].clear();
+      mFreePointsIndices.insert(it->second);
+      mPointsIndices.erase(it);
+   }
 }
 
 void SceneGeometryData::clear()
@@ -405,4 +533,5 @@ void SceneGeometryData::clear()
    mFreeNuPatchIndices.clear();
    
    mMeshData.clear();
+   mPointsData.clear();
 }

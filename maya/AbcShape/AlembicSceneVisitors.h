@@ -275,13 +275,15 @@ public:
    
    inline void drawAsPoints(bool on) { mAsPoints = on; }
    inline void drawWireframe(bool on) { mWireframe = on; }
-   inline void setWidth(float w) { mWidth = w; }
+   inline void setLineWidth(float w) { mLineWidth = w; }
+   inline void setPointWidth(float w) { mPointWidth = w; }
    
 private:
    
    bool mAsPoints;
    bool mWireframe;
-   float mWidth;
+   float mLineWidth;
+   float mPointWidth;
    bool mNoTransforms;
    bool mNoInstances;
    bool mCheckVisibility;

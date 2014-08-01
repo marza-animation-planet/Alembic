@@ -14,6 +14,7 @@
 #include <maya/MDGContext.h>
 #include <maya/MTime.h>
 #include <maya/M3dView.h>
+#include <maya/MDGMessage.h>
 
 
 class AbcShape : public MPxSurfaceShape
@@ -21,6 +22,7 @@ class AbcShape : public MPxSurfaceShape
 public:
     
     static const MTypeId ID;
+    static MCallbackId CallbackID;
     
     static MObject aFilePath;
     static MObject aObjectExpression;
@@ -39,6 +41,8 @@ public:
     static MObject aLineWidth;
     
     static void* creator();
+    static void createdCallback(MObject& node, void* clientData);
+    
     static MStatus initialize();
     
     enum CycleType
