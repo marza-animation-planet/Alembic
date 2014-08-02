@@ -285,7 +285,7 @@ struct SchemaUtils
 template <>
 struct SchemaUtils<Alembic::AbcGeom::IXformSchema>
 {
-   typedef typename Alembic::AbcGeom::IXformSchema::sample_type ISampleClass;
+   typedef Alembic::AbcGeom::IXformSchema::sample_type ISampleClass;
    
    static bool IsValid(const ISampleClass &samp)
    {
