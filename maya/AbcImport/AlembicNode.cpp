@@ -78,6 +78,7 @@ MObject AlembicNode::mTimeAttr;
 MObject AlembicNode::mAbcFileNameAttr;
 
 MObject AlembicNode::mSpeedAttr;
+MObject AlembicNode::mPreserveStartFrame;
 MObject AlembicNode::mOffsetAttr;
 MObject AlembicNode::mCycleTypeAttr;
 MObject AlembicNode::mStartFrameAttr;
@@ -107,6 +108,7 @@ namespace
 "editorTemplate -addControl \"endFrame\";\n"
 "editorTemplate -addControl \"time\";\n"
 "editorTemplate -addControl \"speed\";\n"
+"editorTemplate -addControl \"preserveStartFrame\";\n"
 "editorTemplate -addControl \"offset\";\n"
 "editorTemplate -addControl \"cycleType\";\n"
 "editorTemplate -endLayout;\n"
@@ -148,6 +150,13 @@ MStatus AlembicNode::initialize()
     status = nAttr.setStorable(true);
     status = nAttr.setKeyable(true);
     status = addAttribute(mSpeedAttr);
+
+    // preserve start frame (when using speed)
+    mPreserveStartFrame = nAttr.create("preserveStartFrame", "psf", MFnNumericData::kBoolean, 0, &status);
+    status = nAttr.setWritable(true);
+    status = nAttr.setStorable(true);
+    status = nAttr.setKeyable(false);
+    status = addAttribute(mPreserveStartFrame);
 
     // frame offset
     mOffsetAttr = nAttr.create("offset", "of",
@@ -329,6 +338,16 @@ MStatus AlembicNode::initialize()
     status = attributeAffects(mSpeedAttr, mOutPropArrayAttr);
     status = attributeAffects(mSpeedAttr, mOutLocatorPosScaleArrayAttr);
     status = attributeAffects(mSpeedAttr, mOutParticlesDataArrayAttr);
+    
+    status = attributeAffects(mPreserveStartFrame, mOutSubDArrayAttr);
+    status = attributeAffects(mPreserveStartFrame, mOutPolyArrayAttr);
+    status = attributeAffects(mPreserveStartFrame, mOutNurbsSurfaceArrayAttr);
+    status = attributeAffects(mPreserveStartFrame, mOutNurbsCurveGrpArrayAttr);
+    status = attributeAffects(mPreserveStartFrame, mOutTransOpArrayAttr);
+    status = attributeAffects(mPreserveStartFrame, mOutCameraArrayAttr);
+    status = attributeAffects(mPreserveStartFrame, mOutPropArrayAttr);
+    status = attributeAffects(mPreserveStartFrame, mOutLocatorPosScaleArrayAttr);
+    status = attributeAffects(mPreserveStartFrame, mOutParticlesDataArrayAttr);
 
     status = attributeAffects(mOffsetAttr, mOutSubDArrayAttr);
     status = attributeAffects(mOffsetAttr, mOutPolyArrayAttr);
@@ -450,6 +469,9 @@ MStatus AlembicNode::compute(const MPlug & plug, MDataBlock & dataBlock)
     MStatus status;
 
     // update the frame number to be imported
+    MDataHandle preserveStartFrameHandle = dataBlock.inputValue(mPreserveStartFrame, &status);
+    bool preserveStartFrame = preserveStartFrameHandle.asBool();
+    
     MDataHandle speedHandle = dataBlock.inputValue(mSpeedAttr, &status);
     double speed = speedHandle.asDouble();
 
@@ -463,7 +485,7 @@ MStatus AlembicNode::compute(const MPlug & plug, MDataBlock & dataBlock)
     double fps = getFPS();
 
     // scale and offset inputTime.
-    inputTime = computeAdjustedTime(inputTime, speed, offset/fps);
+    //inputTime = computeAdjustedTime(inputTime, speed, offset/fps);
 
     // this should be done only once per file
     if (mFileInitialized == false)
@@ -527,6 +549,10 @@ MStatus AlembicNode::compute(const MPlug & plug, MDataBlock & dataBlock)
         MFnDependencyNode dep(thisMObject());
         MPlug allSetsPlug = dep.findPlug("allColorSets");
         MPlug allUVsPlug = dep.findPlug("allUVSets");
+        
+        // we don't know yet the frame range so we can't observe preserveStartFrame yet
+        inputTime = computeAdjustedTime(inputTime, speed, offset/fps);
+        
         CreateSceneVisitor visitor(inputTime, !allSetsPlug.isNull(), !allUVsPlug.isNull(),
             MObject::kNullObj, CreateSceneVisitor::NONE, "",
             mIncludeFilterString, mExcludeFilterString, mCreateInstances);
@@ -545,7 +571,27 @@ MStatus AlembicNode::compute(const MPlug & plug, MDataBlock & dataBlock)
             MDataHandle endFrameHandle = dataBlock.inputValue(mEndFrameAttr,
                                                                 &status);
             endFrameHandle.set(mSequenceEndTime*fps);
+            
+            if (preserveStartFrame && fabs(speed) > 0.0001)
+            {
+                // Recompute inputTime takine frame range into account
+                // Note: offset is in frames
+                double startOffset = mSequenceStartTime * (speed - 1.0) / speed;
+                inputTime = computeAdjustedTime(t.as(MTime::kSeconds), speed, startOffset + offset/fps);
+            }
         }
+    }
+    else
+    {
+        double startOffset = 0.0;
+        
+        if (preserveStartFrame && fabs(speed) > 0.0001)
+        {
+            // Additional offset in order to preserve startFrame
+            startOffset = mSequenceStartTime * (speed - 1.0) / speed;
+        }
+        
+        inputTime = computeAdjustedTime(inputTime, speed, startOffset + offset/fps);
     }
 
     // Retime

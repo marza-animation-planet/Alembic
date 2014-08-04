@@ -86,6 +86,7 @@ public:
     static MObject mTimeAttr;
     static MObject mAbcFileNameAttr;
     static MObject mSpeedAttr;
+    static MObject mPreserveStartFrame;
     static MObject mOffsetAttr;
     static MObject mCycleTypeAttr;
     static MObject mIncludeFilterAttr;
