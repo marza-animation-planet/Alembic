@@ -22,7 +22,7 @@ public:
    {
    }
    
-   AlembicNode::VisitReturn enter(AlembicNode &node)
+   AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0)
    {
       Indent(mCurDepth);
       std::cout << node.formatPartialPath("cubes:", AlembicNode::LocalPrefix, '|'); // << std::endl;
@@ -39,7 +39,7 @@ public:
       return AlembicNode::ContinueVisit;
    }
    
-   void leave(AlembicNode &)
+   void leave(AlembicNode &, AlembicNode *instance=0)
    {
       --mCurDepth;
    }
@@ -58,7 +58,7 @@ public:
    {
    }
    
-   AlembicNode::VisitReturn enter(AlembicXform &node)
+   AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0)
    {
       node.sampleBounds(mTime);
       
@@ -93,7 +93,7 @@ public:
    }
    
    template <class T>
-   AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node)
+   AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance=0)
    {
       node.sampleBounds(mTime);
       
@@ -119,37 +119,37 @@ public:
       return AlembicNode::ContinueVisit;
    }
    
-   AlembicNode::VisitReturn enter(AlembicMesh &node)
+   AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0)
    {
-      return shapeEnter(node);
+      return shapeEnter(node, instance);
    }
    
-   AlembicNode::VisitReturn enter(AlembicSubD &node)
+   AlembicNode::VisitReturn enter(AlembicSubD &node, AlembicNode *instance=0)
    {
-      return shapeEnter(node);
+      return shapeEnter(node, instance);
    }
    
-   AlembicNode::VisitReturn enter(AlembicPoints &node)
+   AlembicNode::VisitReturn enter(AlembicPoints &node, AlembicNode *instance=0)
    {
-      return shapeEnter(node);
+      return shapeEnter(node, instance);
    }
    
-   AlembicNode::VisitReturn enter(AlembicCurves &node)
+   AlembicNode::VisitReturn enter(AlembicCurves &node, AlembicNode *instance=0)
    {
-      return shapeEnter(node);
+      return shapeEnter(node, instance);
    }
    
-   AlembicNode::VisitReturn enter(AlembicNuPatch &node)
+   AlembicNode::VisitReturn enter(AlembicNuPatch &node, AlembicNode *instance=0)
    {
-      return shapeEnter(node);
+      return shapeEnter(node, instance);
    }
    
-   AlembicNode::VisitReturn enter(AlembicNode &node)
+   AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0)
    {
       if (node.isInstance())
       {
          AlembicNode *m = node.master();
-         m->enter(*this);
+         m->enter(*this, &node);
       }
       
       node.updateWorldMatrix();
@@ -157,7 +157,7 @@ public:
       return AlembicNode::ContinueVisit;
    }
       
-   void leave(AlembicNode &node)
+   void leave(AlembicNode &node, AlembicNode *instance=0)
    {
       node.updateChildBounds();
       

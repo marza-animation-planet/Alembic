@@ -16,7 +16,7 @@ WorldUpdate::WorldUpdate(double t)
 {
 }
 
-AlembicNode::VisitReturn WorldUpdate::enter(AlembicXform &node)
+AlembicNode::VisitReturn WorldUpdate::enter(AlembicXform &node, AlembicNode *instance)
 {
    bool updated = true;
    
@@ -54,42 +54,42 @@ AlembicNode::VisitReturn WorldUpdate::enter(AlembicXform &node)
       node.setSelfMatrix(id);
    }
    
-   return anyEnter(node);
+   return anyEnter(node, instance);
 }
 
-AlembicNode::VisitReturn WorldUpdate::enter(AlembicMesh &node)
+AlembicNode::VisitReturn WorldUpdate::enter(AlembicMesh &node, AlembicNode *instance)
 {
-   return shapeEnter(node);
+   return shapeEnter(node, instance);
 }
 
-AlembicNode::VisitReturn WorldUpdate::enter(AlembicSubD &node)
+AlembicNode::VisitReturn WorldUpdate::enter(AlembicSubD &node, AlembicNode *instance)
 {
-   return shapeEnter(node);
+   return shapeEnter(node, instance);
 }
 
-AlembicNode::VisitReturn WorldUpdate::enter(AlembicPoints &node)
+AlembicNode::VisitReturn WorldUpdate::enter(AlembicPoints &node, AlembicNode *instance)
 {
-   return shapeEnter(node);
+   return shapeEnter(node, instance);
 }
 
-AlembicNode::VisitReturn WorldUpdate::enter(AlembicCurves &node)
+AlembicNode::VisitReturn WorldUpdate::enter(AlembicCurves &node, AlembicNode *instance)
 {
-   return shapeEnter(node);
+   return shapeEnter(node, instance);
 }
 
-AlembicNode::VisitReturn WorldUpdate::enter(AlembicNuPatch &node)
+AlembicNode::VisitReturn WorldUpdate::enter(AlembicNuPatch &node, AlembicNode *instance)
 {
-   return shapeEnter(node);
+   return shapeEnter(node, instance);
 }
 
-AlembicNode::VisitReturn WorldUpdate::enter(AlembicNode &node)
+AlembicNode::VisitReturn WorldUpdate::enter(AlembicNode &node, AlembicNode *)
 {
    AlembicNode::VisitReturn rv = AlembicNode::ContinueVisit;
    
    if (node.isInstance())
    {
       AlembicNode *m = node.master();
-      rv = m->enter(*this);
+      rv = m->enter(*this, &node);
    }
    
    node.updateWorldMatrix();
@@ -97,7 +97,7 @@ AlembicNode::VisitReturn WorldUpdate::enter(AlembicNode &node)
    return rv;
 }
    
-void WorldUpdate::leave(AlembicNode &node)
+void WorldUpdate::leave(AlembicNode &node, AlembicNode *)
 {
    node.updateChildBounds();
 }
@@ -111,43 +111,43 @@ CountShapes::CountShapes(bool ignoreInstances, bool ignoreVisibility)
 {
 }
 
-AlembicNode::VisitReturn CountShapes::enter(AlembicXform &node)
+AlembicNode::VisitReturn CountShapes::enter(AlembicXform &node, AlembicNode *)
 {
    return ((mCheckVisibility && !node.isVisible()) ? AlembicNode::DontVisitChildren : AlembicNode::ContinueVisit);
 }
 
-AlembicNode::VisitReturn CountShapes::enter(AlembicMesh &node)
+AlembicNode::VisitReturn CountShapes::enter(AlembicMesh &node, AlembicNode *instance)
 {
-   return shapeEnter(node);
+   return shapeEnter(node, instance);
 }
 
-AlembicNode::VisitReturn CountShapes::enter(AlembicSubD &node)
+AlembicNode::VisitReturn CountShapes::enter(AlembicSubD &node, AlembicNode *instance)
 {
-   return shapeEnter(node);
+   return shapeEnter(node, instance);
 }
 
-AlembicNode::VisitReturn CountShapes::enter(AlembicPoints &node)
+AlembicNode::VisitReturn CountShapes::enter(AlembicPoints &node, AlembicNode *instance)
 {
-   return shapeEnter(node);
+   return shapeEnter(node, instance);
 }
 
-AlembicNode::VisitReturn CountShapes::enter(AlembicCurves &node)
+AlembicNode::VisitReturn CountShapes::enter(AlembicCurves &node, AlembicNode *instance)
 {
-   return shapeEnter(node);
+   return shapeEnter(node, instance);
 }
 
-AlembicNode::VisitReturn CountShapes::enter(AlembicNuPatch &node)
+AlembicNode::VisitReturn CountShapes::enter(AlembicNuPatch &node, AlembicNode *instance)
 {
-   return shapeEnter(node);
+   return shapeEnter(node, instance);
 }
 
-AlembicNode::VisitReturn CountShapes::enter(AlembicNode &node)
+AlembicNode::VisitReturn CountShapes::enter(AlembicNode &node, AlembicNode *)
 {
    if (node.isInstance())
    {
       if (!mNoInstances)
       {
-         return node.master()->enter(*this);
+         return node.master()->enter(*this, &node);
       }
       else
       {
@@ -160,7 +160,7 @@ AlembicNode::VisitReturn CountShapes::enter(AlembicNode &node)
    }
 }
 
-void CountShapes::leave(AlembicNode &)
+void CountShapes::leave(AlembicNode &, AlembicNode *)
 {
 }
 
@@ -182,33 +182,12 @@ void SampleGeometry::setSampled(AlembicNode &node)
    mSampledNodes.insert(node.path());
 }
 
-AlembicNode::VisitReturn SampleGeometry::enter(AlembicXform &)
+AlembicNode::VisitReturn SampleGeometry::enter(AlembicXform &, AlembicNode *)
 {
    return AlembicNode::ContinueVisit;
 }
 
-AlembicNode::VisitReturn SampleGeometry::enter(AlembicMesh &node)
-{
-   bool updated = true;
-   
-   if (!hasBeenSampled(node) && node.sampleData(mTime, &updated))
-   {
-      if (mSceneData)
-      {
-         MeshData *data = mSceneData->mesh(node);
-         if (data && (!data->isValid() || updated))
-         {
-            data->update(node);
-         }
-      }
-      
-      setSampled(node);
-   }
-   
-   return AlembicNode::ContinueVisit;
-}
-
-AlembicNode::VisitReturn SampleGeometry::enter(AlembicSubD &node)
+AlembicNode::VisitReturn SampleGeometry::enter(AlembicMesh &node, AlembicNode *)
 {
    bool updated = true;
    
@@ -229,7 +208,28 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicSubD &node)
    return AlembicNode::ContinueVisit;
 }
 
-AlembicNode::VisitReturn SampleGeometry::enter(AlembicPoints &node)
+AlembicNode::VisitReturn SampleGeometry::enter(AlembicSubD &node, AlembicNode *)
+{
+   bool updated = true;
+   
+   if (!hasBeenSampled(node) && node.sampleData(mTime, &updated))
+   {
+      if (mSceneData)
+      {
+         MeshData *data = mSceneData->mesh(node);
+         if (data && (!data->isValid() || updated))
+         {
+            data->update(node);
+         }
+      }
+      
+      setSampled(node);
+   }
+   
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn SampleGeometry::enter(AlembicPoints &node, AlembicNode *)
 {
    bool updated = true;
    
@@ -250,7 +250,7 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicPoints &node)
    return AlembicNode::ContinueVisit;
 }
 
-AlembicNode::VisitReturn SampleGeometry::enter(AlembicCurves &node)
+AlembicNode::VisitReturn SampleGeometry::enter(AlembicCurves &node, AlembicNode *)
 {
    if (!hasBeenSampled(node) && node.sampleData(mTime))
    {
@@ -261,7 +261,7 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicCurves &node)
    return AlembicNode::ContinueVisit;
 }
 
-AlembicNode::VisitReturn SampleGeometry::enter(AlembicNuPatch &node)
+AlembicNode::VisitReturn SampleGeometry::enter(AlembicNuPatch &node, AlembicNode *)
 {
    if (!hasBeenSampled(node) && node.sampleData(mTime))
    {
@@ -272,11 +272,11 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicNuPatch &node)
    return AlembicNode::ContinueVisit;
 }
 
-AlembicNode::VisitReturn SampleGeometry::enter(AlembicNode &node)
+AlembicNode::VisitReturn SampleGeometry::enter(AlembicNode &node, AlembicNode *)
 {
    if (node.isInstance())
    {
-      return node.master()->enter(*this);
+      return node.master()->enter(*this, &node);
    }
    else
    {
@@ -284,441 +284,286 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicNode &node)
    }
 }
    
-void SampleGeometry::leave(AlembicNode &)
+void SampleGeometry::leave(AlembicNode &, AlembicNode *)
 {
 }
 
 // ---
 
-DrawGeometry::DrawGeometry(const SceneGeometryData *sceneData, bool ignoreTransforms, bool ignoreInstances, bool ignoreVisibility)
-   : mAsPoints(false)
+DrawGeometry::DrawGeometry(const SceneGeometryData *sceneData,
+                           bool ignoreTransforms,
+                           bool ignoreInstances,
+                           bool ignoreVisibility)
+   : mBounds(sceneData == 0)
+   , mAsPoints(false)
    , mWireframe(false)
    , mLineWidth(0.0f)
    , mPointWidth(0.0f)
    , mNoTransforms(ignoreTransforms)
    , mNoInstances(ignoreInstances)
    , mCheckVisibility(!ignoreVisibility)
+   , mCull(false)
    , mSceneData(sceneData)
 {
-   // line width ?
-   // point width ?
 }
 
-AlembicNode::VisitReturn DrawGeometry::enter(AlembicMesh &node)
-{
-   if (mCheckVisibility && !node.isVisible())
-   {
-      return AlembicNode::DontVisitChildren;
-   }
-   
-   if (mSceneData)
-   {
-      const MeshData *data = mSceneData->mesh(node);
-      if (data)
-      {
-         if (mAsPoints)
-         {
-            data->drawPoints(mPointWidth);
-         }
-         else
-         {
-            data->draw(mWireframe, mLineWidth);
-         }
-      }
-   }
-   
-   return AlembicNode::ContinueVisit;
-}
-
-AlembicNode::VisitReturn DrawGeometry::enter(AlembicSubD &node)
-{
-   if (mCheckVisibility && !node.isVisible())
-   {
-      return AlembicNode::DontVisitChildren;
-   }
-   
-   if (mSceneData)
-   {
-      const MeshData *data = mSceneData->mesh(node);
-      if (data)
-      {
-         if (mAsPoints)
-         {
-            data->drawPoints(mPointWidth);
-         }
-         else
-         {
-            data->draw(mWireframe, mLineWidth);
-         }
-      }
-   }
-   
-   return AlembicNode::ContinueVisit;
-}
-
-AlembicNode::VisitReturn DrawGeometry::enter(AlembicPoints &node)
-{
-   if (mCheckVisibility && !node.isVisible())
-   {
-      return AlembicNode::DontVisitChildren;
-   }
-   
-   if (mSceneData)
-   {
-      const PointsData *data = mSceneData->points(node);
-      if (data)
-      {
-         data->draw(mPointWidth);
-      }
-   }
-   
-   return AlembicNode::ContinueVisit;
-}
-
-AlembicNode::VisitReturn DrawGeometry::enter(AlembicCurves &node)
-{
-   if (mCheckVisibility && !node.isVisible())
-   {
-      return AlembicNode::DontVisitChildren;
-   }
-   
-   // ToDo
-   return AlembicNode::ContinueVisit;
-}
-
-AlembicNode::VisitReturn DrawGeometry::enter(AlembicNuPatch &node)
-{
-   if (mCheckVisibility && !node.isVisible())
-   {
-      return AlembicNode::DontVisitChildren;
-   }
-   
-   // ToDo
-   return AlembicNode::ContinueVisit;
-}
-
-AlembicNode::VisitReturn DrawGeometry::enter(AlembicXform &node)
-{
-   if (mCheckVisibility && !node.isVisible())
-   {
-      return AlembicNode::DontVisitChildren;
-   }
-   else if (!mNoTransforms)
-   {
-      // Do not use gl matrix stack, won't work with deep hierarchies
-      // => Make our own stack
-      Alembic::Abc::M44d currentMatrix;
-      glGetDoublev(GL_MODELVIEW_MATRIX, currentMatrix.getValue());
-      mMatrixStack.push_back(currentMatrix);
-      
-      glMatrixMode(GL_MODELVIEW);
-      if (node.inheritsTransform())
-      {
-         glMultMatrixd(node.selfMatrix().getValue());
-      }
-      else
-      {
-         glLoadMatrixd(node.selfMatrix().getValue());
-      }
-   }
-   
-   return AlembicNode::ContinueVisit;
-}
-
-AlembicNode::VisitReturn DrawGeometry::enter(AlembicNode &node)
-{
-   if (mCheckVisibility && !node.isVisible())
-   {
-      return AlembicNode::DontVisitChildren;
-   }
-   else if (node.isInstance())
-   {
-      if (!mNoInstances)
-      {
-         return node.master()->enter(*this);
-      }
-      else
-      {
-         return AlembicNode::DontVisitChildren;
-      }
-   }
-   
-   return AlembicNode::ContinueVisit;
-}
- 
-void DrawGeometry::leave(AlembicXform &node)
-{
-   if (!mNoTransforms && (!mCheckVisibility || node.isVisible()))
-   {
-      if (mMatrixStack.size() > 0)
-      {
-         glMatrixMode(GL_MODELVIEW);
-         glLoadMatrixd(mMatrixStack.back().getValue());
-         mMatrixStack.pop_back();
-      }
-   }
-}
-  
-void DrawGeometry::leave(AlembicNode &node)
-{
-   if (node.isInstance() && !mNoInstances)
-   {
-      node.master()->leave(*this);
-   }
-}
-
-// ---
-
-DrawBounds::DrawBounds(bool ignoreTransforms, bool ignoreInstances, bool ignoreVisibility)
-   : mNoTransforms(ignoreTransforms)
-   , mNoInstances(ignoreInstances)
-   , mCheckVisibility(!ignoreVisibility)
-   , mWidth(0.0f)
-   , mAsPoints(false)
-{
-}
-
-AlembicNode::VisitReturn DrawBounds::enter(AlembicXform &node)
-{
-   if (mCheckVisibility && !node.isVisible())
-   {
-      return AlembicNode::DontVisitChildren;
-   }
-   else if (!mNoTransforms)
-   {
-      // Do not use gl matrix stack, won't work with deep hierarchies
-      // => Make our own stack
-      Alembic::Abc::M44d currentMatrix;
-      glGetDoublev(GL_MODELVIEW_MATRIX, currentMatrix.getValue());
-      mMatrixStack.push_back(currentMatrix);
-      
-      glMatrixMode(GL_MODELVIEW);
-      if (node.inheritsTransform())
-      {
-         glMultMatrixd(node.selfMatrix().getValue());
-      }
-      else
-      {
-         glLoadMatrixd(node.selfMatrix().getValue());
-      }
-   }
-   
-   return AlembicNode::ContinueVisit;
-}
-
-AlembicNode::VisitReturn DrawBounds::enter(AlembicNode &node)
-{
-   if (mCheckVisibility && !node.isVisible())
-   {
-      return AlembicNode::DontVisitChildren;
-   }
-   else if (node.isInstance())
-   {
-      if (!mNoInstances)
-      {
-         return node.master()->enter(*this);
-      }
-      else
-      {
-         return AlembicNode::DontVisitChildren;
-      }
-   }
-   else
-   {
-      DrawBox(node.selfBounds(), mAsPoints, mWidth);
-      return AlembicNode::ContinueVisit;
-   }
-}
- 
-void DrawBounds::leave(AlembicXform &node)
-{
-   if (!mNoTransforms && (!mCheckVisibility || node.isVisible()))
-   {
-      if (mMatrixStack.size() > 0)
-      {
-         glMatrixMode(GL_MODELVIEW);
-         glLoadMatrixd(mMatrixStack.back().getValue());
-         mMatrixStack.pop_back();
-      }
-   }
-}
-  
-void DrawBounds::leave(AlembicNode &node)
-{
-   if (node.isInstance() && !mNoInstances)
-   {
-      node.master()->leave(*this);
-   }
-}
-
-// ---
-
-Select::Select(const SceneGeometryData *scene,
-               const Frustum &frustum,
-               bool ignoreTransforms,
-               bool ignoreInstances,
-               bool ignoreVisibility)
-   : mScene(scene)
-   , mFrustum(frustum)
-   , mNoTransforms(ignoreTransforms)
-   , mNoInstances(ignoreInstances)
-   , mCheckVisibility(!ignoreVisibility)
-   , mBounds(false)
-   , mAsPoints(false)
-   , mWireframe(false)
-   , mWidth(0.0f)
-{
-}
-
-AlembicNode::VisitReturn Select::enter(AlembicNode &node)
-{
-   if ((node.isInstance() && mNoInstances) ||
-       !isVisible(node) ||
-       !inFrustum(node))
-   {
-      return AlembicNode::DontVisitChildren;
-   }
-   
-   AlembicNode *master = (node.isInstance() ? node.master() : &node);
-      
-   switch (master->type())
-   {
-   case AlembicNode::TypeMesh:
-   case AlembicNode::TypeSubD:
-      {
-         if (mBounds)
-         {
-            DrawBox(master->selfBounds(), mAsPoints, mWidth);
-         }
-         else
-         {
-            const MeshData *data = mScene->mesh(*master);
-            if (data)
-            {
-               if (mAsPoints)
-               {
-                  data->drawPoints(mWidth);
-               }
-               else
-               {
-                  data->draw(mWireframe, mWidth);
-               }
-            }
-         }
-      }
-      break;
-   case AlembicNode::TypePoints:
-      {
-         if (mBounds)
-         {
-            DrawBox(master->selfBounds(), mAsPoints, mWidth);
-         }
-         else
-         {
-            const PointsData *data = mScene->points(*master);
-            if (data)
-            {
-               data->draw(mWidth);
-            }
-         }
-      }
-      break;
-   case AlembicNode::TypeCurves:
-   case AlembicNode::TypeNuPatch:
-      // Not yet supported
-      break;
-   case AlembicNode::TypeXform:
-      {
-         if (!mNoTransforms)
-         {
-            Alembic::Abc::M44d currentMatrix;
-            glGetDoublev(GL_MODELVIEW_MATRIX, currentMatrix.getValue());
-            mMatrixStack.push_back(currentMatrix);
-            
-            glMatrixMode(GL_MODELVIEW);
-            if (master->inheritsTransform())
-            {
-               glMultMatrixd(master->selfMatrix().getValue());
-            }
-            else
-            {
-               glLoadMatrixd(master->selfMatrix().getValue());
-            }
-            
-            mProcessedXforms.insert(&node);
-         }
-      }
-      break;
-   case AlembicNode::TypeGeneric:
-      // Unsupported type
-   default:
-      break;
-   }
-   
-   return AlembicNode::ContinueVisit;
-}
-
-void Select::leave(AlembicNode &node)
-{
-   std::set<AlembicNode*>::iterator it = mProcessedXforms.find(&node);
-   
-   if (it != mProcessedXforms.end())
-   {
-      if (mMatrixStack.size() > 0)
-      {
-         glMatrixMode(GL_MODELVIEW);
-         glLoadMatrixd(mMatrixStack.back().getValue());
-         mMatrixStack.pop_back();
-      }
-      
-      mProcessedXforms.erase(it);
-   }
-}
-
-bool Select::isVisible(AlembicNode &node) const
+bool DrawGeometry::isVisible(AlembicNode &node) const
 {
    return (!mCheckVisibility || node.isVisible());
 }
 
-bool Select::inFrustum(AlembicNode &node) const
+bool DrawGeometry::cull(AlembicNode &node)
 {
-   Alembic::Abc::Box3d bounds;
-   
-   if (!mNoTransforms)
+   if (!mCull)
    {
-      bounds = node.childBounds();
+      return false;
    }
    else
    {
-      if (node.isInstance())
+      Alembic::Abc::Box3d bounds = (mNoTransforms ? node.selfBounds() : node.childBounds());
+      
+      bool culled = (bounds.isEmpty() || mFrustum.isBoxTotallyOutside(bounds));
+      
+      if (culled)
       {
-         if (node.master()->type() == AlembicNode::TypeXform)
+         #ifdef _DEBUG
+         if (!bounds.isEmpty())
          {
-            return true;
+            std::cout << "[AbcShape] " << node.path() << " culled" << std::endl;
          }
-      }
-      else if (node.type() == AlembicNode::TypeXform)
-      {
-         return true;
+         #endif
+         mCulledNodes.insert(&node);
       }
       
-      bounds = node.selfBounds();
+      return culled;
    }
-   
-   return (!bounds.isEmpty() && !mFrustum.isBoxTotallyOutside(bounds));
 }
 
+bool DrawGeometry::culled(AlembicNode &node) const
+{
+   return (mCulledNodes.find(&node) != mCulledNodes.end());
+}
+
+AlembicNode::VisitReturn DrawGeometry::enter(AlembicMesh &node, AlembicNode *)
+{
+   if (!isVisible(node))
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   
+   if (mBounds)
+   {
+      DrawBox(node.selfBounds(), mAsPoints, (mAsPoints ? mPointWidth : mLineWidth));
+   }
+   else
+   {
+      if (mSceneData)
+      {
+         const MeshData *data = mSceneData->mesh(node);
+         if (data)
+         {
+            if (mAsPoints)
+            {
+               data->drawPoints(mPointWidth);
+            }
+            else
+            {
+               data->draw(mWireframe, mLineWidth);
+            }
+         }
+      }
+   }
+   
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn DrawGeometry::enter(AlembicSubD &node, AlembicNode *)
+{
+   if (!isVisible(node))
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   
+   if (mBounds)
+   {
+      DrawBox(node.selfBounds(), mAsPoints, (mAsPoints ? mPointWidth : mLineWidth));
+   }
+   else
+   {
+      if (mSceneData)
+      {
+         const MeshData *data = mSceneData->mesh(node);
+         if (data)
+         {
+            if (mAsPoints)
+            {
+               data->drawPoints(mPointWidth);
+            }
+            else
+            {
+               data->draw(mWireframe, mLineWidth);
+            }
+         }
+      }
+   }
+   
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn DrawGeometry::enter(AlembicPoints &node, AlembicNode *)
+{
+   if (!isVisible(node))
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   
+   if (mBounds)
+   {
+      DrawBox(node.selfBounds(), mAsPoints, (mAsPoints ? mPointWidth : mLineWidth));
+   }
+   else
+   {
+      if (mSceneData)
+      {
+         const PointsData *data = mSceneData->points(node);
+         if (data)
+         {
+            data->draw(mPointWidth);
+         }
+      }
+   }
+   
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn DrawGeometry::enter(AlembicCurves &node, AlembicNode *)
+{
+   if (!isVisible(node))
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   
+   if (mBounds)
+   {
+      DrawBox(node.selfBounds(), mAsPoints, (mAsPoints ? mPointWidth : mLineWidth));
+   }
+   else
+   {
+      // ToDo
+   }
+   
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn DrawGeometry::enter(AlembicNuPatch &node, AlembicNode *)
+{
+   if (!isVisible(node))
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   
+   if (mBounds)
+   {
+      DrawBox(node.selfBounds(), mAsPoints, (mAsPoints ? mPointWidth : mLineWidth));
+   }
+   else
+   {
+      // ToDo
+   }
+   
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn DrawGeometry::enter(AlembicXform &node, AlembicNode *instance)
+{
+   if (!isVisible(node))
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   
+   if (cull(instance ? *instance : node))
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   
+   if (!mNoTransforms)
+   {
+      // Do not use gl matrix stack, won't work with deep hierarchies
+      // => Make our own stack
+      Alembic::Abc::M44d currentMatrix;
+      glGetDoublev(GL_MODELVIEW_MATRIX, currentMatrix.getValue());
+      mMatrixStack.push_back(currentMatrix);
+      
+      glMatrixMode(GL_MODELVIEW);
+      if (node.inheritsTransform())
+      {
+         glMultMatrixd(node.selfMatrix().getValue());
+      }
+      else
+      {
+         glLoadMatrixd(node.selfMatrix().getValue());
+      }
+   }
+   
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn DrawGeometry::enter(AlembicNode &node, AlembicNode *)
+{
+   if (!isVisible(node))
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   else if (node.isInstance())
+   {
+      if (!mNoInstances)
+      {
+         return node.master()->enter(*this, &node);
+      }
+      else
+      {
+         return AlembicNode::DontVisitChildren;
+      }
+   }
+   else
+   {
+      return AlembicNode::ContinueVisit;
+   }
+}
+ 
+void DrawGeometry::leave(AlembicXform &node, AlembicNode *instance)
+{
+   if (isVisible(node) && !culled(instance ? *instance : node) && !mNoTransforms)
+   {
+      if (mMatrixStack.size() > 0)
+      {
+         glMatrixMode(GL_MODELVIEW);
+         glLoadMatrixd(mMatrixStack.back().getValue());
+         mMatrixStack.pop_back();
+      }
+   }
+}
+  
+void DrawGeometry::leave(AlembicNode &node, AlembicNode *)
+{
+   if (isVisible(node) && node.isInstance() && !mNoInstances)
+   {
+      node.master()->leave(*this, &node);
+   }
+}
 
 // ---
 
-PrintInfo::PrintInfo(bool ignoreTransforms, bool ignoreInstances, bool ignoreVisibility)
+PrintInfo::PrintInfo(bool ignoreTransforms,
+                     bool ignoreInstances,
+                     bool ignoreVisibility)
    : mNoTransforms(ignoreTransforms)
    , mNoInstances(ignoreInstances)
    , mCheckVisibility(!ignoreVisibility)
 {
 }
 
-AlembicNode::VisitReturn PrintInfo::enter(AlembicNode &node)
+AlembicNode::VisitReturn PrintInfo::enter(AlembicNode &node, AlembicNode *)
 {
    if (!node.isInstance() || !mNoInstances || !mCheckVisibility || node.isVisible())
    {
@@ -756,6 +601,6 @@ AlembicNode::VisitReturn PrintInfo::enter(AlembicNode &node)
    }
 }
 
-void PrintInfo::leave(AlembicNode &)
+void PrintInfo::leave(AlembicNode &, AlembicNode *)
 {
 }

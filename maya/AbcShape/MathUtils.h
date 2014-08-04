@@ -51,8 +51,10 @@ public:
 public:
    
    Frustum();
-   Frustum(M44d &projViewInv);
+   Frustum(const M44d &projViewInv);
    Frustum(const Frustum &rhs);
+   
+   void setup(const M44d &projViewInv);
    
    Frustum& operator=(const Frustum &rhs);
    

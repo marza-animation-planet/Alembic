@@ -294,6 +294,20 @@ void AbcShape::postConstructor()
    AbcShape::CallbackID = MDGMessage::addNodeAddedCallback(AbcShape::createdCallback, "AbcShape");
 }
 
+bool AbcShape::ignoreCulling() const
+{
+   MFnDependencyNode node(thisMObject());
+   MPlug plug = node.findPlug("ignoreCulling");
+   if (!plug.isNull())
+   {
+      return plug.asBool();
+   }
+   else
+   {
+      return false;
+   }
+}
+
 MStatus AbcShape::compute(const MPlug &, MDataBlock &)
 {
    return MS::kUnknownParameter;
@@ -909,18 +923,8 @@ void AbcShapeUI::getDrawRequests(const MDrawInfo &info,
    getDrawData(0, data);
    
    M3dView::DisplayStyle appearance = info.displayStyle();
-   // => kBoundingBox, kFlatShaded, kGouraudShaded, kWireFrame, kPoints
-   
+
    M3dView::DisplayStatus displayStatus = info.displayStatus();
-   // => kActive, kLive, kInvisible, kHilite, kTemplate, kActiveTemplate, kActiveComponent
-   //    kLead, kIntermediateObject, kActiveAffected, kNoStatus
-   
-   //info.objectDisplayStatus(M3dView::kXXX) -> true|false
-   // => kDisplayEverything, kDisplayNurbsCurve, kDisplayNurbsSurface, kDisplayMeshes,
-   //    kDisplayNParticles, kDisplayLocators, kDisplaySubdivSurfaces, kDisplayFluids,
-   //    kDisplayFollicles, kDisplayHairSystems, kExcludePluginShapes
-   
-   //info.pluginObjectDisplayStatus(displayFilterName) -> true|false
    
    MDagPath path = info.multiPath();
    
@@ -1061,6 +1065,54 @@ void AbcShapeUI::draw(const MDrawRequest &request, M3dView &view) const
    }
 }
 
+bool AbcShapeUI::computeFrustum(M3dView &view, Frustum &frustum) const
+{
+   MMatrix projMatrix, modelViewMatrix;
+   
+   view.projectionMatrix(projMatrix);
+   view.modelViewMatrix(modelViewMatrix);
+   
+   MMatrix tmp = (modelViewMatrix * projMatrix).inverse();
+   
+   if (tmp.isSingular())
+   {
+      return false;
+   }
+   else
+   {
+      M44d projViewInv;
+      
+      tmp.get(projViewInv.x);
+      
+      frustum.setup(projViewInv);
+      
+      return true;
+   }
+}
+
+bool AbcShapeUI::computeFrustum(Frustum &frustum) const
+{
+   // using GL matrix
+   M44d projMatrix;
+   M44d modelViewMatrix;
+   
+   glGetDoublev(GL_PROJECTION_MATRIX, &(projMatrix.x[0][0]));
+   glGetDoublev(GL_MODELVIEW_MATRIX, &(modelViewMatrix.x[0][0]));
+   
+   M44d projViewInv = modelViewMatrix * projMatrix;
+   
+   try
+   {
+      projViewInv.invert(true);
+      frustum.setup(projViewInv);
+      return true;
+   }
+   catch (std::exception &)
+   {
+      return false;
+   }
+}
+
 bool AbcShapeUI::select(MSelectInfo &selectInfo,
                         MSelectionList &selectionList,
                         MPointArray &worldSpaceSelectPts) const
@@ -1083,15 +1135,7 @@ bool AbcShapeUI::select(MSelectInfo &selectInfo,
    
    M3dView view = selectInfo.view();
    
-   MMatrix projMatrix, modelViewMatrix;
-   
-   view.projectionMatrix(projMatrix);
-   view.modelViewMatrix(modelViewMatrix);
-   
-   M44d projViewInv;
-   (modelViewMatrix * projMatrix).inverse().get(projViewInv.x);
-   
-   Frustum frustum(projViewInv);
+   Frustum frustum;
    
    // As we use same name for all shapes, without hierarchy, don't really need a big buffer
    GLuint *buffer = new GLuint[16];
@@ -1116,38 +1160,70 @@ bool AbcShapeUI::select(MSelectInfo &selectInfo,
    }
    else
    {
-      Select visitor(shape->sceneGeometry(), frustum,
-                     shape->ignoreTransforms(),
-                     shape->ignoreInstances(),
-                     shape->ignoreVisibility());
+      DrawGeometry visitor(shape->sceneGeometry(),
+                           shape->ignoreTransforms(),
+                           shape->ignoreInstances(),
+                           shape->ignoreVisibility());
+      
+      // Use matrices staight from OpenGL as those will include the picking matrix so
+      //   that more geometry can get culled
+      if (computeFrustum(frustum))
+      {
+         #ifdef _DEBUG
+         #if 0
+         // Let's see the difference
+         M44d glProjMatrix;
+         M44d glModelViewMatrix;
+         MMatrix mayaProjMatrix;
+         MMatrix mayaModelViewMatrix;
+         
+         glGetDoublev(GL_PROJECTION_MATRIX, &(glProjMatrix.x[0][0]));
+         glGetDoublev(GL_MODELVIEW_MATRIX, &(glModelViewMatrix.x[0][0]));
+         
+         M44d glProjView = glModelViewMatrix * glProjMatrix;
+         
+         view.projectionMatrix(mayaProjMatrix);
+         view.modelViewMatrix(mayaModelViewMatrix);
+   
+         MMatrix tmp = (mayaModelViewMatrix * mayaProjMatrix);
+         M44d mayaProjView;
+         tmp.get(mayaProjView.x);
+         
+         std::cout << "Proj/View from GL:" << std::endl;
+         std::cout << glProjView << std::endl;
+         
+         std::cout << "Proj/View from Maya:" << std::endl;
+         std::cout << mayaProjView << std::endl;
+         #endif
+         #endif
+         
+         visitor.doCull(frustum);
+      }
+      visitor.setLineWidth(shape->lineWidth());
+      visitor.setPointWidth(shape->pointWidth());
       
       if (target == kDrawBox)
       {
          visitor.drawBounds(true);
-         visitor.setWidth(shape->lineWidth());
       }
       else if (target == kDrawPoints)
       {
          visitor.drawBounds(shape->displayMode() == AbcShape::DM_boxes);
          visitor.drawAsPoints(true);
-         visitor.setWidth(shape->pointWidth());
       }
       else
       {
          if (shape->displayMode() == AbcShape::DM_boxes)
          {
             visitor.drawBounds(true);
-            visitor.setWidth(shape->lineWidth());
          }
          else if (shape->displayMode() == AbcShape::DM_points)
          {
             visitor.drawAsPoints(true);
-            visitor.setWidth(shape->pointWidth());
          }
          else if (style == M3dView::kWireFrame)
          {
             visitor.drawWireframe(true);
-            visitor.setWidth(shape->lineWidth());
          }
       }
       
@@ -1251,9 +1327,15 @@ void AbcShapeUI::drawBox(AbcShape *shape, const MDrawRequest &, M3dView &view) c
    }
    else
    {
-      DrawBounds visitor(shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
-      visitor.setWidth(shape->lineWidth());
+      Frustum frustum;
+      
+      DrawGeometry visitor(NULL, shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
       visitor.drawAsPoints(false);
+      if (!shape->ignoreCulling() && computeFrustum(view, frustum))
+      {
+         visitor.doCull(frustum);
+      }
+      
       shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
    }
    
@@ -1274,20 +1356,22 @@ void AbcShapeUI::drawPoints(AbcShape *shape, const MDrawRequest &, M3dView &view
    {
       DrawBox(shape->scene()->selfBounds(), true, shape->pointWidth());
    }
-   else if (shape->displayMode() == AbcShape::DM_boxes)
-   {
-      DrawBounds visitor(shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
-      visitor.drawAsPoints(true);
-      visitor.setWidth(shape->pointWidth());
-      shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
-   }
    else
    {
-      DrawGeometry dg(shape->sceneGeometry(), shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
-      dg.drawAsPoints(true);
-      dg.setLineWidth(shape->lineWidth());
-      dg.setPointWidth(shape->pointWidth());
-      shape->scene()->visit(AlembicNode::VisitDepthFirst, dg);
+      Frustum frustum;
+   
+      DrawGeometry visitor(shape->sceneGeometry(), shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
+      
+      visitor.drawBounds(shape->displayMode() == AbcShape::DM_boxes);
+      visitor.drawAsPoints(true);
+      visitor.setLineWidth(shape->lineWidth());
+      visitor.setPointWidth(shape->pointWidth());
+      if (!shape->ignoreCulling() && computeFrustum(view, frustum))
+      {
+         visitor.doCull(frustum);
+      }
+      
+      shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
    }
       
    glPopAttrib();
@@ -1297,6 +1381,8 @@ void AbcShapeUI::drawPoints(AbcShape *shape, const MDrawRequest &, M3dView &view
 
 void AbcShapeUI::drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dView &view) const
 {
+   Frustum frustum;
+   
    view.beginGL();
    
    bool wireframe = (request.displayStyle() == M3dView::kWireFrame);
@@ -1339,11 +1425,16 @@ void AbcShapeUI::drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dV
       glColor3f(defaultDiffuse.r, defaultDiffuse.g, defaultDiffuse.b);
    }
    
-   DrawGeometry dg(shape->sceneGeometry(), shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
-   dg.drawWireframe(wireframe);
-   dg.setLineWidth(shape->lineWidth());
-   dg.setPointWidth(shape->pointWidth());
-   shape->scene()->visit(AlembicNode::VisitDepthFirst, dg);
+   DrawGeometry visitor(shape->sceneGeometry(), shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
+   visitor.drawWireframe(wireframe);
+   visitor.setLineWidth(shape->lineWidth());
+   visitor.setPointWidth(shape->pointWidth());
+   if (!shape->ignoreCulling() && computeFrustum(view, frustum))
+   {
+      visitor.doCull(frustum);
+   }
+   
+   shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
    
    glPopAttrib();
    

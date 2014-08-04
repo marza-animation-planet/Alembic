@@ -15,98 +15,105 @@ public:
    
    WorldUpdate(double t);
    
-   AlembicNode::VisitReturn enter(AlembicXform &node);
-   AlembicNode::VisitReturn enter(AlembicMesh &node);
-   AlembicNode::VisitReturn enter(AlembicSubD &node);
-   AlembicNode::VisitReturn enter(AlembicPoints &node);
-   AlembicNode::VisitReturn enter(AlembicCurves &node);
-   AlembicNode::VisitReturn enter(AlembicNuPatch &node);
-   AlembicNode::VisitReturn enter(AlembicNode &node);
+   AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicSubD &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicPoints &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicCurves &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicNuPatch &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0);
       
-   void leave(AlembicNode &node);
+   void leave(AlembicNode &node, AlembicNode *instance=0);
    
 private:
    
    template <class T>
-   AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node)
-   {
-      bool updated = true;
-      
-      if (node.sampleBounds(mTime, &updated))
-      {
-         if (updated)
-         {
-            typename AlembicNodeT<T>::Sample &samp0 = node.firstSample();
-            typename AlembicNodeT<T>::Sample &samp1 = node.secondSample();
-            
-            if (samp1.boundsWeight > 0.0)
-            {
-               
-               Alembic::Abc::Box3d b0 = samp0.bounds;
-               Alembic::Abc::Box3d b1 = samp1.bounds;
-               
-               node.setSelfBounds(Alembic::Abc::Box3d(samp0.boundsWeight * b0.min + samp1.boundsWeight * b1.min,
-                                                      samp0.boundsWeight * b0.max + samp1.boundsWeight * b1.max));
-            }
-            else
-            {
-               node.setSelfBounds(samp0.bounds);
-            }
-         }
-      }
-      else
-      {
-         Alembic::Abc::Box3d box;
-         node.setSelfBounds(box);
-      }
-      
-      return anyEnter(node);
-   }
+   AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance=0);
    
    template <class T> 
-   AlembicNode::VisitReturn anyEnter(AlembicNodeT<T> &node)
-   {
-      Alembic::Util::bool_t visible = true;
-      
-      Alembic::Abc::ICompoundProperty props = node.object().getProperties();
-      
-      if (props.valid())
-      {
-         const Alembic::Abc::PropertyHeader *header = props.getPropertyHeader("visible");
-         
-         if (header)
-         {
-            if (Alembic::Abc::ICharProperty::matches(*header))
-            {
-               Alembic::Abc::ICharProperty prop(props, "visible");
-               
-               Alembic::Util::int8_t v = 1;
-               
-               prop.get(v, Alembic::Abc::ISampleSelector(node.getSampleIndex(mTime, prop)));
-               
-               visible = (v != 0);
-            }
-            else if (Alembic::Abc::IBoolProperty::matches(*header))
-            {
-               Alembic::Abc::IBoolProperty prop(props, "visible");
-               
-               prop.get(visible, Alembic::Abc::ISampleSelector(node.getSampleIndex(mTime, prop)));
-            }
-         }
-      }
-      
-      node.setVisible(visible);
-      
-      node.updateWorldMatrix();
-         
-      return AlembicNode::ContinueVisit;
-   }
+   AlembicNode::VisitReturn anyEnter(AlembicNodeT<T> &node, AlembicNode *instance=0);
 
 private:
 
    double mTime;
 };
 
+template <class T>
+AlembicNode::VisitReturn WorldUpdate::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance)
+{
+   bool updated = true;
+   
+   if (node.sampleBounds(mTime, &updated))
+   {
+      if (updated)
+      {
+         typename AlembicNodeT<T>::Sample &samp0 = node.firstSample();
+         typename AlembicNodeT<T>::Sample &samp1 = node.secondSample();
+         
+         if (samp1.boundsWeight > 0.0)
+         {
+            
+            Alembic::Abc::Box3d b0 = samp0.bounds;
+            Alembic::Abc::Box3d b1 = samp1.bounds;
+            
+            node.setSelfBounds(Alembic::Abc::Box3d(samp0.boundsWeight * b0.min + samp1.boundsWeight * b1.min,
+                                                   samp0.boundsWeight * b0.max + samp1.boundsWeight * b1.max));
+         }
+         else
+         {
+            node.setSelfBounds(samp0.bounds);
+         }
+      }
+   }
+   else
+   {
+      Alembic::Abc::Box3d box;
+      node.setSelfBounds(box);
+   }
+   
+   return anyEnter(node, instance);
+}
+
+template <class T> 
+AlembicNode::VisitReturn WorldUpdate::anyEnter(AlembicNodeT<T> &node, AlembicNode *)
+{
+   Alembic::Util::bool_t visible = true;
+   
+   Alembic::Abc::ICompoundProperty props = node.object().getProperties();
+   
+   if (props.valid())
+   {
+      const Alembic::Abc::PropertyHeader *header = props.getPropertyHeader("visible");
+      
+      if (header)
+      {
+         if (Alembic::Abc::ICharProperty::matches(*header))
+         {
+            Alembic::Abc::ICharProperty prop(props, "visible");
+            
+            Alembic::Util::int8_t v = 1;
+            
+            prop.get(v, Alembic::Abc::ISampleSelector(node.getSampleIndex(mTime, prop)));
+            
+            visible = (v != 0);
+         }
+         else if (Alembic::Abc::IBoolProperty::matches(*header))
+         {
+            Alembic::Abc::IBoolProperty prop(props, "visible");
+            
+            prop.get(visible, Alembic::Abc::ISampleSelector(node.getSampleIndex(mTime, prop)));
+         }
+      }
+   }
+   
+   node.setVisible(visible);
+   
+   node.updateWorldMatrix();
+      
+   return AlembicNode::ContinueVisit;
+}
+
+// ---
 
 class CountShapes
 {
@@ -114,36 +121,22 @@ public:
    
    CountShapes(bool ignoreInstances, bool ignoreVisibility);
    
-   AlembicNode::VisitReturn enter(AlembicXform &node);
-   AlembicNode::VisitReturn enter(AlembicMesh &node);
-   AlembicNode::VisitReturn enter(AlembicSubD &node);
-   AlembicNode::VisitReturn enter(AlembicPoints &node);
-   AlembicNode::VisitReturn enter(AlembicCurves &node);
-   AlembicNode::VisitReturn enter(AlembicNuPatch &node);
-   AlembicNode::VisitReturn enter(AlembicNode &node);
+   AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicSubD &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicPoints &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicCurves &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicNuPatch &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0);
    
-   void leave(AlembicNode &node);
+   void leave(AlembicNode &node, AlembicNode *instance=0);
    
-   inline unsigned int count() const
-   {
-      return mCount;
-   }
+   unsigned int count() const;
 
 private:
    
    template <class T>
-   AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node)
-   {
-      if (mCheckVisibility && !node.isVisible())
-      {
-         return AlembicNode::DontVisitChildren;
-      }
-      else
-      {
-         ++mCount;
-         return AlembicNode::ContinueVisit;
-      }
-   }
+   AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance=0);
 
 private:
    
@@ -152,73 +145,41 @@ private:
    unsigned int mCount;
 };
 
+inline unsigned int CountShapes::count() const
+{
+   return mCount;
+}
+
+template <class T>
+AlembicNode::VisitReturn CountShapes::shapeEnter(AlembicNodeT<T> &node, AlembicNode *)
+{
+   if (mCheckVisibility && !node.isVisible())
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   else
+   {
+      ++mCount;
+      return AlembicNode::ContinueVisit;
+   }
+}
+
+// ---
 
 class ComputeSceneBounds
 {
 public:
    
-   inline ComputeSceneBounds(bool ignoreTransforms,
-                             bool ignoreInstances,
-                             bool ignoreVisibility)
-      : mNoTransforms(ignoreTransforms)
-      , mNoInstances(ignoreInstances)
-      , mCheckVisibility(!ignoreVisibility)
-   {
-   }
+   ComputeSceneBounds(bool ignoreTransforms,
+                      bool ignoreInstances,
+                      bool ignoreVisibility);
    
-   inline AlembicNode::VisitReturn enter(AlembicXform &node)
-   {
-      // don't merge in transform bounds (childBounds only)
-      if (mCheckVisibility && !node.isVisible())
-      {
-         return AlembicNode::DontVisitChildren;
-      }
-      else
-      {
-         return AlembicNode::ContinueVisit;
-      }
-   }
+   AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0);
    
-   inline AlembicNode::VisitReturn enter(AlembicNode &node)
-   {
-      if (mCheckVisibility && !node.isVisible())
-      {
-         return AlembicNode::DontVisitChildren;
-      }
-      else
-      {
-         Alembic::Abc::Box3d bounds;
-         
-         if (!mNoTransforms)
-         {
-            if (!node.isInstance() || !mNoInstances)
-            {
-               bounds = node.childBounds();
-            }
-         }
-         else if (!node.isInstance())
-         {
-            // without no transforms, all instances have the same bounds
-            bounds = node.selfBounds();
-         }
-         
-         if (!bounds.isEmpty() && !bounds.isInfinite())
-         {
-            mBounds.extendBy(bounds);
-         }
-         
-         return AlembicNode::ContinueVisit;
-      }
-   }
+   void leave(AlembicNode &, AlembicNode *instance=0);
    
-   inline void leave(AlembicNode &)
-   {
-   }
-   
-   inline const Alembic::Abc::Box3d bounds() const
-   {
-      return mBounds;
-   }
+   const Alembic::Abc::Box3d bounds() const;
    
 private:
    
@@ -228,6 +189,70 @@ private:
    Alembic::Abc::Box3d mBounds;
 };
 
+inline ComputeSceneBounds::ComputeSceneBounds(bool ignoreTransforms,
+                                              bool ignoreInstances,
+                                              bool ignoreVisibility)
+   : mNoTransforms(ignoreTransforms)
+   , mNoInstances(ignoreInstances)
+   , mCheckVisibility(!ignoreVisibility)
+{
+}
+
+inline AlembicNode::VisitReturn ComputeSceneBounds::enter(AlembicXform &node, AlembicNode *)
+{
+   // don't merge in transform bounds (childBounds only)
+   if (mCheckVisibility && !node.isVisible())
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   else
+   {
+      return AlembicNode::ContinueVisit;
+   }
+}
+
+inline AlembicNode::VisitReturn ComputeSceneBounds::enter(AlembicNode &node, AlembicNode *)
+{
+   if (mCheckVisibility && !node.isVisible())
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   else
+   {
+      Alembic::Abc::Box3d bounds;
+      
+      if (!mNoTransforms)
+      {
+         if (!node.isInstance() || !mNoInstances)
+         {
+            bounds = node.childBounds();
+         }
+      }
+      else if (!node.isInstance())
+      {
+         // without no transforms, all instances have the same bounds
+         bounds = node.selfBounds();
+      }
+      
+      if (!bounds.isEmpty() && !bounds.isInfinite())
+      {
+         mBounds.extendBy(bounds);
+      }
+      
+      return AlembicNode::ContinueVisit;
+   }
+}
+
+inline void ComputeSceneBounds::leave(AlembicNode &, AlembicNode *)
+{
+}
+
+inline const Alembic::Abc::Box3d ComputeSceneBounds::bounds() const
+{
+   return mBounds;
+}
+
+// ---
 
 class SampleGeometry
 {
@@ -235,15 +260,15 @@ public:
    
    SampleGeometry(double t, SceneGeometryData *sceneData);
    
-   AlembicNode::VisitReturn enter(AlembicXform &node);
-   AlembicNode::VisitReturn enter(AlembicMesh &node);
-   AlembicNode::VisitReturn enter(AlembicSubD &node);
-   AlembicNode::VisitReturn enter(AlembicPoints &node);
-   AlembicNode::VisitReturn enter(AlembicCurves &node);
-   AlembicNode::VisitReturn enter(AlembicNuPatch &node);
-   AlembicNode::VisitReturn enter(AlembicNode &node);
+   AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicSubD &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicPoints &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicCurves &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicNuPatch &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0);
       
-   void leave(AlembicNode &);
+   void leave(AlembicNode &, AlembicNode *instance=0);
    
 private:
 
@@ -257,6 +282,7 @@ private:
    SceneGeometryData *mSceneData;
 };
 
+// ---
 
 class DrawGeometry
 {
@@ -267,24 +293,34 @@ public:
                 bool ignoreInstances,
                 bool ignoreVisibility);
    
-   AlembicNode::VisitReturn enter(AlembicXform &node);
-   AlembicNode::VisitReturn enter(AlembicMesh &node);
-   AlembicNode::VisitReturn enter(AlembicSubD &node);
-   AlembicNode::VisitReturn enter(AlembicPoints &node);
-   AlembicNode::VisitReturn enter(AlembicCurves &node);
-   AlembicNode::VisitReturn enter(AlembicNuPatch &node);
-   AlembicNode::VisitReturn enter(AlembicNode &node);
+   AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicSubD &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicPoints &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicCurves &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicNuPatch &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0);
    
-   void leave(AlembicXform &node);
-   void leave(AlembicNode &);
+   void leave(AlembicXform &node, AlembicNode *instance=0);
+   void leave(AlembicNode &, AlembicNode *instance=0);
    
+   inline void drawBounds(bool on) { if (!on || mSceneData) mBounds = on; }
    inline void drawAsPoints(bool on) { mAsPoints = on; }
    inline void drawWireframe(bool on) { mWireframe = on; }
    inline void setLineWidth(float w) { mLineWidth = w; }
    inline void setPointWidth(float w) { mPointWidth = w; }
+   inline void doCull(const Frustum &f) { mCull = true; mFrustum = f; }
+   inline void dontCull() { mCull = false; }
    
 private:
    
+   bool isVisible(AlembicNode &node) const;
+   bool cull(AlembicNode &node);
+   bool culled(AlembicNode &node) const;
+   
+private:
+   
+   bool mBounds;
    bool mAsPoints;
    bool mWireframe;
    float mLineWidth;
@@ -292,77 +328,14 @@ private:
    bool mNoTransforms;
    bool mNoInstances;
    bool mCheckVisibility;
+   bool mCull;
+   Frustum mFrustum;
    const SceneGeometryData *mSceneData;
    std::deque<Alembic::Abc::M44d> mMatrixStack;
+   std::set<AlembicNode*> mCulledNodes;
 };
 
-
-class DrawBounds
-{
-public:
-   
-   DrawBounds(bool ignoreTransforms,
-              bool ignoreInstances,
-              bool ignoreVisibility);
-   
-   AlembicNode::VisitReturn enter(AlembicXform &node);
-   AlembicNode::VisitReturn enter(AlembicNode &node);
-   
-   void leave(AlembicXform &node);
-   void leave(AlembicNode &);
-   
-   inline void drawAsPoints(bool on) { mAsPoints = on; }
-   inline void setWidth(float w) { mWidth = w; }
-   
-private:
-   
-   bool mNoTransforms;
-   bool mNoInstances;
-   bool mCheckVisibility;
-   float mWidth;
-   bool mAsPoints;
-   std::deque<Alembic::Abc::M44d> mMatrixStack;
-};
-
-
-class Select
-{
-public:
-   
-   Select(const SceneGeometryData *scene,
-          const Frustum &frustum,
-          bool ignoreTransforms,
-          bool ignoreInstances,
-          bool ignoreVisibility);
-   
-   inline void setWidth(float w) { mWidth = w; }
-   inline void drawAsPoints(bool on) { mAsPoints = on; }
-   inline void drawWireframe(bool on) { mWireframe = on; }
-   inline void drawBounds(bool on) { mBounds = on; }
-   
-   AlembicNode::VisitReturn enter(AlembicNode &node);
-   void leave(AlembicNode &node);
-   
-private:
-   
-   bool isVisible(AlembicNode &node) const;
-   bool inFrustum(AlembicNode &node) const;
-
-private:
-   
-   const SceneGeometryData *mScene;
-   Frustum mFrustum;
-   bool mNoTransforms;
-   bool mNoInstances;
-   bool mCheckVisibility;
-   bool mBounds;
-   bool mAsPoints;
-   bool mWireframe;
-   float mWidth;
-   std::deque<Alembic::Abc::M44d> mMatrixStack;
-   std::set<AlembicNode*> mProcessedXforms;
-};
-
+// ---
 
 class PrintInfo
 {
@@ -372,8 +345,8 @@ public:
              bool ignoreInstances,
              bool ignoreVisibility);
    
-   AlembicNode::VisitReturn enter(AlembicNode &node);
-   void leave(AlembicNode &node);
+   AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0);
+   void leave(AlembicNode &node, AlembicNode *instance=0);
 
 private:
    

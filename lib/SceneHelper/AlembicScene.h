@@ -125,10 +125,10 @@ public:
    bool visit(VisitMode mode, AlembicScene *scene, Visitor &visitor);
    
    template <class Visitor>
-   VisitReturn enter(Visitor &visitor);
+   VisitReturn enter(Visitor &visitor, AlembicNode *instance=0);
    
    template <class Visitor>
-   void leave(Visitor &visitor);
+   void leave(Visitor &visitor, AlembicNode *instance=0);
    
    inline AlembicNode* child(const std::string &name) { return child(name.c_str()); }
    inline const AlembicNode* child(const std::string &name) const { return child(name.c_str()); }
@@ -793,24 +793,24 @@ private:
 // ---
 
 template <class Visitor>
-AlembicNode::VisitReturn AlembicNode::enter(Visitor &visitor)
+AlembicNode::VisitReturn AlembicNode::enter(Visitor &visitor, AlembicNode *instance)
 {
    switch (mType)
    {
    case TypeGeneric:
-      return visitor.enter(*((typename TypeToClass<TypeGeneric>::Class*)this));
+      return visitor.enter(*((typename TypeToClass<TypeGeneric>::Class*)this), instance);
    case TypeMesh:
-      return visitor.enter(*((typename TypeToClass<TypeMesh>::Class*)this));
+      return visitor.enter(*((typename TypeToClass<TypeMesh>::Class*)this), instance);
    case TypeSubD:
-      return visitor.enter(*((typename TypeToClass<TypeSubD>::Class*)this));
+      return visitor.enter(*((typename TypeToClass<TypeSubD>::Class*)this), instance);
    case TypePoints:
-      return visitor.enter(*((typename TypeToClass<TypePoints>::Class*)this));
+      return visitor.enter(*((typename TypeToClass<TypePoints>::Class*)this), instance);
    case TypeCurves:
-      return visitor.enter(*((typename TypeToClass<TypeCurves>::Class*)this));
+      return visitor.enter(*((typename TypeToClass<TypeCurves>::Class*)this), instance);
    case TypeNuPatch:
-      return visitor.enter(*((typename TypeToClass<TypeNuPatch>::Class*)this));
+      return visitor.enter(*((typename TypeToClass<TypeNuPatch>::Class*)this), instance);
    case TypeXform:
-      return visitor.enter(*((typename TypeToClass<TypeXform>::Class*)this));
+      return visitor.enter(*((typename TypeToClass<TypeXform>::Class*)this), instance);
    default:
       std::cout << "AlembicNode::enter: Ignore node \"" << path() << "\" (Unhandled type)" << std::endl;
       return ContinueVisit;
@@ -818,30 +818,30 @@ AlembicNode::VisitReturn AlembicNode::enter(Visitor &visitor)
 }
 
 template <class Visitor>
-void AlembicNode::leave(Visitor &visitor)
+void AlembicNode::leave(Visitor &visitor, AlembicNode *instance)
 {
    switch (mType)
    {
    case TypeGeneric:
-      visitor.leave(*((typename TypeToClass<TypeGeneric>::Class*)this));
+      visitor.leave(*((typename TypeToClass<TypeGeneric>::Class*)this), instance);
       break;
    case TypeMesh:
-      visitor.leave(*((typename TypeToClass<TypeMesh>::Class*)this));
+      visitor.leave(*((typename TypeToClass<TypeMesh>::Class*)this), instance);
       break;
    case TypeSubD:
-      visitor.leave(*((typename TypeToClass<TypeSubD>::Class*)this));
+      visitor.leave(*((typename TypeToClass<TypeSubD>::Class*)this), instance);
       break;
    case TypePoints:
-      visitor.leave(*((typename TypeToClass<TypePoints>::Class*)this));
+      visitor.leave(*((typename TypeToClass<TypePoints>::Class*)this), instance);
       break;
    case TypeCurves:
-      visitor.leave(*((typename TypeToClass<TypeCurves>::Class*)this));
+      visitor.leave(*((typename TypeToClass<TypeCurves>::Class*)this), instance);
       break;
    case TypeNuPatch:
-      visitor.leave(*((typename TypeToClass<TypeNuPatch>::Class*)this));
+      visitor.leave(*((typename TypeToClass<TypeNuPatch>::Class*)this), instance);
       break;
    case TypeXform:
-      visitor.leave(*((typename TypeToClass<TypeXform>::Class*)this));
+      visitor.leave(*((typename TypeToClass<TypeXform>::Class*)this), instance);
       break;
    default:
       std::cout << "AlembicNode::leave: Ignore node \"" << path() << "\" (Unhandled type)" << std::endl;

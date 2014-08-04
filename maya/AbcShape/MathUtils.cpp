@@ -67,27 +67,9 @@ Frustum::Frustum()
    mPlanes[   Far].set(V3d( 0,  0,  1), 0);
 }
 
-Frustum::Frustum(M44d &projViewInv)
+Frustum::Frustum(const M44d &projViewInv)
 {
-   V3d ltn, rtn, lbn, rbn, ltf, rtf, lbf, rbf;
-   
-   projViewInv.multVecMatrix(V3d(-1,  1, -1), ltn);
-   projViewInv.multVecMatrix(V3d( 1,  1, -1), rtn);
-   projViewInv.multVecMatrix(V3d(-1, -1, -1), lbn);
-   projViewInv.multVecMatrix(V3d( 1, -1, -1), rbn);
-   
-   projViewInv.multVecMatrix(V3d(-1,  1,  1), ltf);
-   projViewInv.multVecMatrix(V3d( 1,  1,  1), rtf);
-   projViewInv.multVecMatrix(V3d(-1, -1,  1), lbf);
-   projViewInv.multVecMatrix(V3d( 1, -1,  1), rbf);
-   
-   // Build planes so that their normal is pointing inside the frustum
-   mPlanes[  Left].set(ltn, lbn, lbf, rbn);
-   mPlanes[ Right].set(rtn, rbn, rbf, lbn);
-   mPlanes[   Top].set(ltn, rtn, rtf, rbf);
-   mPlanes[Bottom].set(lbn, rbn, rbf, rtf);
-   mPlanes[  Near].set(ltn, rtn, rbn, rbf);
-   mPlanes[   Far].set(ltf, rtf, rbf, rbn);
+   setup(projViewInv);
 }
 
 Frustum::Frustum(const Frustum &rhs)
@@ -108,6 +90,29 @@ Frustum& Frustum::operator=(const Frustum &rhs)
       }
    }
    return *this;
+}
+
+void Frustum::setup(const M44d &projViewInv)
+{
+   V3d ltn, rtn, lbn, rbn, ltf, rtf, lbf, rbf;
+   
+   projViewInv.multVecMatrix(V3d(-1,  1, -1), ltn);
+   projViewInv.multVecMatrix(V3d( 1,  1, -1), rtn);
+   projViewInv.multVecMatrix(V3d(-1, -1, -1), lbn);
+   projViewInv.multVecMatrix(V3d( 1, -1, -1), rbn);
+   
+   projViewInv.multVecMatrix(V3d(-1,  1,  1), ltf);
+   projViewInv.multVecMatrix(V3d( 1,  1,  1), rtf);
+   projViewInv.multVecMatrix(V3d(-1, -1,  1), lbf);
+   projViewInv.multVecMatrix(V3d( 1, -1,  1), rbf);
+   
+   // Build planes so that their normal is pointing inside the frustum
+   mPlanes[  Left].set(ltn, lbn, lbf, rbn);
+   mPlanes[ Right].set(rtn, rbn, rbf, lbn);
+   mPlanes[   Top].set(ltn, rtn, rtf, rbf);
+   mPlanes[Bottom].set(lbn, rbn, rbf, rtf);
+   mPlanes[  Near].set(ltn, rtn, rbn, rbf);
+   mPlanes[   Far].set(ltf, rtf, rbf, rbn);
 }
 
 bool Frustum::isPointInside(const V3d &p) const
@@ -136,19 +141,154 @@ bool Frustum::isPointOutside(const V3d &p) const
 
 bool Frustum::isBoxTotallyInside(const Box3d &b) const
 {
-   return (isPointInside(b.min) && isPointInside(b.max));
+   V3d corner;
+   
+   corner.setValue(b.min);
+   if (!isPointInside(corner))
+   {
+      return false;
+   }
+   
+   corner.setValue(b.min.x, b.min.y, b.max.z);
+   if (!isPointInside(corner))
+   {
+      return false;
+   }
+   
+   corner.setValue(b.min.x, b.max.y, b.min.z);
+   if (!isPointInside(corner))
+   {
+      return false;
+   }
+   
+   corner.setValue(b.min.x, b.max.y, b.max.z);
+   if (!isPointInside(corner))
+   {
+      return false;
+   }
+   
+   corner.setValue(b.max.x, b.min.y, b.min.z);
+   if (!isPointInside(corner))
+   {
+      return false;
+   }
+   
+   corner.setValue(b.max.x, b.min.y, b.max.z);
+   if (!isPointInside(corner))
+   {
+      return false;
+   }
+   
+   corner.setValue(b.max.x, b.max.y, b.min.z);
+   if (!isPointInside(corner))
+   {
+      return false;
+   }
+   
+   corner.setValue(b.max);
+   if (!isPointInside(corner))
+   {
+      return false;
+   }
+   
+   return true;
 }
 
 bool Frustum::isBoxTotallyOutside(const Box3d &b) const
 {
+   V3d corner;
+   
+   double dist;
+   double dists[6] = {0, 0, 0, 0, 0, 0};
+   
    for (int i=0; i<6; ++i)
    {
-      // Check if both min and max are below current plane
-      if (mPlanes[i].distanceTo(b.min) < 0.0 &&
-          mPlanes[i].distanceTo(b.max) < 0.0)
+      dists[i] = mPlanes[i].distanceTo(b.min);
+   }
+   
+   corner.setValue(b.min.x, b.min.y, b.max.z);
+   for (int i=0; i<6; ++i)
+   {
+      dist = mPlanes[i].distanceTo(corner);
+      if (dist * dists[i] < 0.0)
+      {
+         return false;
+      }
+   }
+   
+   corner.setValue(b.min.x, b.max.y, b.min.z);
+   for (int i=0; i<6; ++i)
+   {
+      dist = mPlanes[i].distanceTo(corner);
+      if (dist * dists[i] < 0.0)
+      {
+         return false;
+      }
+   }
+   
+   corner.setValue(b.min.x, b.max.y, b.max.z);
+   for (int i=0; i<6; ++i)
+   {
+      dist = mPlanes[i].distanceTo(corner);
+      if (dist * dists[i] < 0.0)
+      {
+         return false;
+      }
+   }
+   
+   corner.setValue(b.max.x, b.min.y, b.min.z);
+   for (int i=0; i<6; ++i)
+   {
+      dist = mPlanes[i].distanceTo(corner);
+      if (dist * dists[i] < 0.0)
+      {
+         return false;
+      }
+   }
+   
+   corner.setValue(b.max.x, b.min.y, b.max.z);
+   for (int i=0; i<6; ++i)
+   {
+      dist = mPlanes[i].distanceTo(corner);
+      if (dist * dists[i] < 0.0)
+      {
+         return false;
+      }
+   }
+   
+   corner.setValue(b.max.x, b.max.y, b.min.z);
+   for (int i=0; i<6; ++i)
+   {
+      dist = mPlanes[i].distanceTo(corner);
+      if (dist * dists[i] < 0.0)
+      {
+         return false;
+      }
+   }
+   
+   corner.setValue(b.max);
+   for (int i=0; i<6; ++i)
+   {
+      dist = mPlanes[i].distanceTo(corner);
+      if (dist * dists[i] < 0.0)
+      {
+         return false;
+      }
+   }
+   
+   // If we reach here we know that for any given frustum planes
+   //   all box corners lie on the same side
+   // If any of the the first corner (b.min) distance to any plane is below zero
+   //   the box is completely outside of the frustum as all other corner
+   //   will also have a value below zero
+   
+   for (int i=0; i<6; ++i)
+   {
+      if (dists[i] < 0.0)
       {
          return true;
       }
    }
+   
    return false;
 }

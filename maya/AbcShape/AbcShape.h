@@ -3,6 +3,7 @@
 
 #include "AlembicScene.h"
 #include "GeometryData.h"
+#include "MathUtils.h"
 
 #include <maya/MPxSurfaceShape.h>
 #include <maya/MPxSurfaceShapeUI.h>
@@ -91,6 +92,8 @@ public:
     inline float lineWidth() const { return mLineWidth; }
     inline float pointWidth() const { return mPointWidth; }
     inline unsigned int numShapes() const { return mNumShapes; }
+    
+    bool ignoreCulling() const;
 
 private:
     
@@ -160,6 +163,12 @@ public:
     virtual bool select(MSelectInfo &selectInfo,
                         MSelectionList &selectionList,
                         MPointArray &worldSpaceSelectPts) const;
+    
+    // Compute frustum from maya view projection and modelview matrices
+    bool computeFrustum(M3dView &view, Frustum &frustum) const;
+    
+    // Compute frustum straight from OpenGL projection and modelview matrices
+    bool computeFrustum(Frustum &frustum) const;
 
 private:
     
