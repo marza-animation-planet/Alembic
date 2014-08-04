@@ -29,6 +29,7 @@ public:
     static MObject aDisplayMode;
     static MObject aTime;
     static MObject aSpeed;
+    static MObject aPreserveStartFrame;
     static MObject aStartFrame;
     static MObject aEndFrame;
     static MObject aOffset;
@@ -129,6 +130,7 @@ private:
     unsigned int mNumShapes;
     float mPointWidth;
     float mLineWidth;
+    bool mPreserveStartFrame;
 };
 
 class AbcShapeUI : public MPxSurfaceShapeUI

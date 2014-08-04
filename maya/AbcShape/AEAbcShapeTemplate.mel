@@ -99,6 +99,7 @@ global proc AEAbcShapeTemplate(string $nodeName)
    editorTemplate -label "End Frame" -addControl "endFrame";
    editorTemplate -label "Time" -addControl "time";
    editorTemplate -label "Speed" -addControl "speed";
+   editorTemplate -label "Preserve Start Frame" -addControl "preserveStartFrame";
    editorTemplate -label "Offset" -addControl "offset";
    editorTemplate -label "Cycle Type" -addControl "cycleType";
    editorTemplate -addSeparator;

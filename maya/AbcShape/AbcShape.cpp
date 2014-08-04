@@ -45,6 +45,7 @@ MObject AbcShape::aObjectExpression;
 MObject AbcShape::aDisplayMode;
 MObject AbcShape::aTime;
 MObject AbcShape::aSpeed;
+MObject AbcShape::aPreserveStartFrame;
 MObject AbcShape::aStartFrame;
 MObject AbcShape::aEndFrame;
 MObject AbcShape::aOffset;
@@ -150,6 +151,15 @@ MStatus AbcShape::initialize()
    nAttr.setInternal(true);
    stat = addAttribute(aSpeed);
    MCHECKERROR(stat, "Could not add 'speed' attribute");
+   
+   aPreserveStartFrame = nAttr.create("preserveStartFrame", "psf", MFnNumericData::kBoolean, 0, &stat);
+   MCHECKERROR(stat, "Could not create 'preserveStartFrame' attribute");
+   nAttr.setWritable(true);
+   nAttr.setStorable(true);
+   nAttr.setKeyable(false);
+   nAttr.setInternal(true);
+   stat = addAttribute(aPreserveStartFrame);
+   MCHECKERROR(stat, "Could not add 'preserveStartFrame' attribute");
 
    aOffset = nAttr.create("offset", "of", MFnNumericData::kDouble, 0, &stat);
    MCHECKERROR(stat, "Could not create 'offset' attribute");
@@ -257,6 +267,7 @@ AbcShape::AbcShape()
    , mNumShapes(0)
    , mPointWidth(1.0f)
    , mLineWidth(1.0f)
+   , mPreserveStartFrame(false)
 {
 }
 
@@ -300,6 +311,9 @@ void AbcShape::pullInternals()
    
    plug.setAttribute(aSpeed);
    mSpeed = plug.asDouble();
+   
+   plug.setAttribute(aPreserveStartFrame);
+   mPreserveStartFrame = plug.asBool();
    
    plug.setAttribute(aOffset);
    mOffset = plug.asDouble();
@@ -457,7 +471,12 @@ double AbcShape::computeRetime(const double inputTime,
 double AbcShape::getSampleTime() const
 {
    double invFPS = 1.0 / getFPS();
-   double sampleTime = computeAdjustedTime(mTime.as(MTime::kSeconds), mSpeed, mOffset * invFPS);
+   double startOffset = 0.0f;
+   if (mPreserveStartFrame && fabs(mSpeed) > 0.0001)
+   {
+      startOffset = (mStartFrame * (mSpeed - 1.0) / mSpeed);
+   }
+   double sampleTime = computeAdjustedTime(mTime.as(MTime::kSeconds), mSpeed, (startOffset + mOffset) * invFPS);
    return computeRetime(sampleTime, mStartFrame * invFPS, mEndFrame * invFPS, mCycleType);
 }
 
@@ -613,6 +632,11 @@ bool AbcShape::getInternalValueInContext(const MPlug &plug, MDataHandle &handle,
       handle.setDouble(mSpeed);
       return true;
    }
+   else if (plug == aPreserveStartFrame)
+   {
+      handle.setBool(mPreserveStartFrame);
+      return true;
+   }
    else if (plug == aCycleType)
    {
       handle.setInt(mCycleType);
@@ -678,6 +702,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
    double sf = mStartFrame;
    double ef = mEndFrame;
    CycleType c = mCycleType;
+   bool psf = mPreserveStartFrame;
    
    if (plug == aFilePath)
    {
@@ -763,6 +788,11 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       s = handle.asDouble();
       sampleTimeUpdate = true;
    }
+   else if (plug == aPreserveStartFrame)
+   {
+      psf = handle.asBool();
+      sampleTimeUpdate = true;
+   }
    else if (plug == aOffset)
    {
       o = handle.asDouble();
@@ -796,6 +826,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       mStartFrame = sf;
       mEndFrame = ef;
       mCycleType = c;
+      mPreserveStartFrame = psf;
       
       double sampleTime = getSampleTime();
       
@@ -829,6 +860,7 @@ void AbcShape::copyInternalData(MPxNode *source)
       mLineWidth = node->mLineWidth;
       mPointWidth = node->mPointWidth;
       mDisplayMode = node->mDisplayMode;
+      mPreserveStartFrame = node->mPreserveStartFrame;
       
       // if mFilePath is identical, first referencing will avoid inadvertant destruction
       AlembicScene *scn = SceneCache::Ref(node->mFilePath);
