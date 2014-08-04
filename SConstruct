@@ -292,7 +292,7 @@ def UpdateSettings(path, replace=True):
       settingschanged = True
    else:
       for k, v in platsettings.iteritems():
-         if k in curplatsettings and v != curplatsettings[k]:
+         if not k in curplatsettings or v != curplatsettings[k]:
             curplatsettings[k] = v
             settingschanged = True
       if settingschanged:
