@@ -230,7 +230,7 @@ MStatus AbcShape::initialize()
    stat = addAttribute(aNumShapes);
    MCHECKERROR(stat, "Could not add 'numShapes' attribute");
    
-   aPointWidth = nAttr.create("pointWidth", "ptw", MFnNumericData::kFloat, 1.0, &stat);
+   aPointWidth = nAttr.create("pointWidth", "ptw", MFnNumericData::kFloat, 0.0, &stat);
    MCHECKERROR(stat, "Could not create 'pointWidth' attribute");
    nAttr.setWritable(true);
    nAttr.setStorable(true);
@@ -239,7 +239,7 @@ MStatus AbcShape::initialize()
    stat = addAttribute(aPointWidth);
    MCHECKERROR(stat, "Could not add 'pointWidth' attribute");
    
-   aLineWidth = nAttr.create("lineWidth", "lnw", MFnNumericData::kFloat, 1.0, &stat);
+   aLineWidth = nAttr.create("lineWidth", "lnw", MFnNumericData::kFloat, 0.0, &stat);
    MCHECKERROR(stat, "Could not create 'lineWidth' attribute");
    nAttr.setWritable(true);
    nAttr.setStorable(true);
