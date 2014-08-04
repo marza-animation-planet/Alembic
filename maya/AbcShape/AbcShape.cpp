@@ -354,6 +354,110 @@ void AbcShape::pullInternals()
    mDisplayMode = (DisplayMode) plug.asShort();
 }
 
+void AbcShape::updateInternals()
+{
+   bool contentsChanged = false;
+   bool timeUpdate = false;
+   bool boundsUpdate = false;
+   bool countUpdate = false;
+   bool forceReadGeometry = false;
+   
+   MPlug plug(thisMObject(), aTime);
+   MTime t = plug.asMTime();
+   timeUpdate = timeUpdate || (fabs(t.as(MTime::kSeconds) - mTime.as(MTime::kSeconds)) > 0.0001);
+   
+   plug.setAttribute(aSpeed);
+   double s = plug.asDouble();
+   timeUpdate = timeUpdate || (fabs(s - mSpeed) > 0.0001);
+   
+   plug.setAttribute(aPreserveStartFrame);
+   bool psf = plug.asBool();
+   timeUpdate = timeUpdate || (psf != mPreserveStartFrame);
+   
+   plug.setAttribute(aOffset);
+   double o = plug.asDouble();
+   timeUpdate = timeUpdate || (fabs(o - mOffset) > 0.0001);
+   
+   plug.setAttribute(aStartFrame);
+   double sf = plug.asDouble();
+   timeUpdate = timeUpdate || (fabs(sf - mStartFrame) > 0.0001);
+   
+   plug.setAttribute(aEndFrame);
+   double ef = plug.asDouble();
+   timeUpdate = timeUpdate || (fabs(ef - mEndFrame) > 0.0001);
+   
+   plug.setAttribute(aCycleType);
+   CycleType c = (CycleType) plug.asShort();
+   timeUpdate = timeUpdate || (c != mCycleType);
+   
+   plug.setAttribute(aDisplayMode);
+   DisplayMode dm = (DisplayMode) plug.asShort();
+   forceReadGeometry = (dm != mDisplayMode && mDisplayMode <= DM_boxes && dm >= DM_points);
+   
+   plug.setAttribute(aIgnoreXforms);
+   bool it = plug.asBool();
+   boundsUpdate = boundsUpdate || (it != mIgnoreTransforms);
+   mIgnoreTransforms = it;
+   
+   plug.setAttribute(aIgnoreInstances);
+   bool ii = plug.asBool();
+   countUpdate = countUpdate || (ii != mIgnoreInstances);
+   boundsUpdate = boundsUpdate || (ii != mIgnoreInstances);
+   mIgnoreInstances = ii;
+   
+   plug.setAttribute(aIgnoreVisibility);
+   bool iv = plug.asBool();
+   countUpdate = countUpdate || (iv != mIgnoreVisibility);
+   boundsUpdate = boundsUpdate || (iv != mIgnoreVisibility);
+   mIgnoreVisibility = iv;
+   
+   plug.setAttribute(aObjectExpression);
+   MString oe = plug.asString();
+   contentsChanged = contentsChanged || (oe != mObjectExpression.c_str());
+   
+   plug.setAttribute(aFilePath);
+   MString fp = plug.asString();
+   contentsChanged = contentsChanged || (fp != mFilePath.c_str());
+   
+   if (contentsChanged || forceReadGeometry || timeUpdate)
+   {
+      mTime = t;
+      mSpeed = s;
+      mOffset = o;
+      mStartFrame = sf;
+      mEndFrame = ef;
+      mCycleType = c;
+      mPreserveStartFrame = psf;
+      mDisplayMode = dm;
+      
+      double sampleTime = getSampleTime();
+      
+      bool timeChanged = (fabs(sampleTime - mSampleTime) > 0.0001);
+      
+      updateInternals(fp.asChar(), oe.asChar(), sampleTime, forceReadGeometry);
+      
+      if (contentsChanged)
+      {
+         boundsUpdate = false;
+         countUpdate = false;
+      }
+      else if (timeChanged)
+      {
+         boundsUpdate = false;
+      }
+   }
+   
+   if (countUpdate)
+   {
+      updateShapesCount();
+   }
+   
+   if (boundsUpdate)
+   {
+      updateSceneBounds();
+   }
+}
+
 MBoundingBox AbcShape::boundingBox() const
 {
    MBoundingBox bbox;

@@ -1,5 +1,9 @@
 #include <maya/MFnPlugin.h>
+#include <maya/MDrawRegistry.h>
 #include "AbcShape.h"
+#include "VP2.h"
+
+
 
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
@@ -10,7 +14,23 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
                                          AbcShape::ID,
                                          AbcShape::creator,
                                          AbcShape::initialize,
-                                         AbcShapeUI::creator);
+                                         AbcShapeUI::creator,
+                                         &AbcShapeOverride::Classification);
+   if (status != MS::kSuccess)
+   {
+      status.perror("Failed to register shape 'AbcShape'");
+      return status;
+   }
+   
+   status = MHWRender::MDrawRegistry::registerDrawOverrideCreator(AbcShapeOverride::Classification,
+                                                                  AbcShapeOverride::Registrant,
+                                                                  AbcShapeOverride::create);
+   
+   if (status != MS::kSuccess)
+   {
+      status.perror("Failed to register draw override for 'AbcShape'");
+      return status;
+   }
    
    return status;
 }
@@ -25,7 +45,22 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
       AbcShape::CallbackID = 0;
    }
 
-   MStatus status = plugin.deregisterNode(AbcShape::ID);
+   MStatus status = MHWRender::MDrawRegistry::deregisterDrawOverrideCreator(AbcShapeOverride::Classification,
+                                                                            AbcShapeOverride::Registrant);
+   
+  if (status != MS::kSuccess)
+  {
+     status.perror("Failed to deregister draw override for 'AbcShape'");
+     return status;
+  }
+   
+   status = plugin.deregisterNode(AbcShape::ID);
+   
+   if (status != MS::kSuccess)
+   {
+      status.perror("Failed to deregister shape 'AbcShape'");
+      return status;
+   }
    
    return status;
 }

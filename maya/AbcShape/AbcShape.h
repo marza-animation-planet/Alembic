@@ -65,6 +65,8 @@ public:
     
 public:
     
+    friend class AbcShapeOverride;
+    
     AbcShape();
     virtual ~AbcShape();
     
@@ -84,6 +86,7 @@ public:
     virtual void copyInternalData(MPxNode *source);
     
     inline AlembicScene* scene() { return mScene; }
+    inline const AlembicScene* scene() const { return mScene; }
     inline const SceneGeometryData* sceneGeometry() const { return &mGeometry; }
     inline bool ignoreInstances() const { return mIgnoreInstances; }
     inline bool ignoreTransforms() const { return mIgnoreTransforms; }
@@ -107,7 +110,9 @@ private:
     
     void pullInternals();
     
+    void updateInternals();
     bool updateInternals(const std::string &filePath, const std::string &objectExpression, double st, bool forceGeometrySampling=false);
+    
     void updateWorld();
     void updateSceneBounds();
     void updateShapesCount();

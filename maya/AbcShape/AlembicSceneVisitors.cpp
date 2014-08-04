@@ -371,6 +371,18 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicMesh &node, AlembicNode *)
                data->draw(mWireframe, mLineWidth);
             }
          }
+         else
+         {
+            #ifdef _DEBUG
+            std::cout << "No geometry data for " << node.path() << std::endl;
+            #endif
+         }
+      }
+      else
+      {
+         #ifdef _DEBUG
+         std::cout << "No scene geometry data at all" << std::endl;
+         #endif
       }
    }
    
@@ -404,6 +416,18 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicSubD &node, AlembicNode *)
                data->draw(mWireframe, mLineWidth);
             }
          }
+         else
+         {
+            #ifdef _DEBUG
+            std::cout << "No geometry data for " << node.path() << std::endl;
+            #endif
+         }
+      }
+      else
+      {
+         #ifdef _DEBUG
+         std::cout << "No scene geometry data at all" << std::endl;
+         #endif
       }
    }
    
@@ -430,6 +454,18 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicPoints &node, AlembicNode *)
          {
             data->draw(mPointWidth);
          }
+         else
+         {
+            #ifdef _DEBUG
+            std::cout << "No geometry data for " << node.path() << std::endl;
+            #endif
+         }
+      }
+      else
+      {
+         #ifdef _DEBUG
+         std::cout << "No scene geometry data at all" << std::endl;
+         #endif
       }
    }
    
@@ -449,7 +485,9 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicCurves &node, AlembicNode *)
    }
    else
    {
-      // ToDo
+      #ifdef _DEBUG
+      std::cout << "No geometry data for curves yet (" << node.path() << ")" << std::endl;
+      #endif
    }
    
    return AlembicNode::ContinueVisit;
@@ -468,7 +506,9 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicNuPatch &node, AlembicNode *
    }
    else
    {
-      // ToDo
+      #ifdef _DEBUG
+      std::cout << "No geometry data for patches yet (" << node.path() << ")" << std::endl;
+      #endif
    }
    
    return AlembicNode::ContinueVisit;
