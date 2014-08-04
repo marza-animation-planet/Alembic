@@ -131,7 +131,7 @@ public:
                   MHWRender::MRasterizerStateDesc desc(currentRasterState->desc());
                   
                   desc.depthBiasIsFloat = true;
-                  desc.depthBias = 1.0f;
+                  desc.depthBias = 0.0f;
                   desc.slopeScaledDepthBias = 1.0f;
                   
                   rasterState = stateMgr->acquireRasterizerState(desc);
@@ -190,7 +190,7 @@ public:
       if (nlights > 0)
       {
          GLfloat black[4]  = { 0.0f, 0.0f, 0.0f, 1.0f };
-         GLfloat white[4] = {1.0f, 1.0f, 1.0f, 1.0f };
+         //GLfloat white[4] = {1.0f, 1.0f, 1.0f, 1.0f };
          
          GLfloat *ldiff = 0;
          GLfloat *lamb = 0;

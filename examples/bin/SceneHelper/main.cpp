@@ -17,160 +17,188 @@ class PrintVisitor
 {
 public:
    
-   PrintVisitor()
-      : mCurDepth(0)
-   {
-   }
+   PrintVisitor();
    
-   AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0)
-   {
-      Indent(mCurDepth);
-      std::cout << node.formatPartialPath("cubes:", AlembicNode::LocalPrefix, '|'); // << std::endl;
-      if (node.isInstance())
-      {
-         std::cout << " [" << node.instanceNumber() << "] [instance: " << node.masterPath() << "]";
-      }
-      else
-      {
-         std::cout << " [" << node.typeName() << "]";
-      }
-      std::cout << std::endl;
-      ++mCurDepth;
-      return AlembicNode::ContinueVisit;
-   }
-   
-   void leave(AlembicNode &, AlembicNode *instance=0)
-   {
-      --mCurDepth;
-   }
+   AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0);
+   void leave(AlembicNode &, AlembicNode *instance=0);
 
 private:
    
    int mCurDepth;
 };
 
+PrintVisitor::PrintVisitor()
+   : mCurDepth(0)
+{
+}
+
+AlembicNode::VisitReturn PrintVisitor::enter(AlembicNode &node, AlembicNode *)
+{
+   Indent(mCurDepth);
+   std::cout << node.formatPartialPath("cubes:", AlembicNode::LocalPrefix, '|'); // << std::endl;
+   if (node.isInstance())
+   {
+      std::cout << " [" << node.instanceNumber() << "] [instance: " << node.masterPath() << "]";
+   }
+   else
+   {
+      std::cout << " [" << node.typeName() << "]";
+   }
+   std::cout << std::endl;
+   ++mCurDepth;
+   return AlembicNode::ContinueVisit;
+}
+
+void PrintVisitor::leave(AlembicNode &, AlembicNode *)
+{
+   --mCurDepth;
+}
+
+// ---
+
 class SampleBoundsVisitor
 {
 public:
    
-   SampleBoundsVisitor(double t)
-      : mTime(t)
-   {
-   }
-   
-   AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0)
-   {
-      node.sampleBounds(mTime);
-      
-      AlembicXform::Sample &samp0 = node.firstSample();
-      AlembicXform::Sample &samp1 = node.secondSample();
-      
-      if (samp1.dataWeight > 0.0)
-      {
-         if (samp0.data.getInheritsXforms() != samp1.data.getInheritsXforms())
-         {
-            std::cout << node.path() << ": Animated inherits transform property found, use first sample value" << std::endl;
-            node.setSelfMatrix(samp0.data.getMatrix());
-         }
-         else
-         {
-            Alembic::Abc::M44d m0 = samp0.data.getMatrix();
-            Alembic::Abc::M44d m1 = samp1.data.getMatrix();
-            
-            node.setSelfMatrix(samp0.dataWeight * m0 + samp1.dataWeight * m1);
-         }
-      }
-      else
-      {
-         node.setSelfMatrix(samp0.data.getMatrix());
-      }
-      
-      node.setInheritsTransform(samp0.data.getInheritsXforms());
-      
-      node.updateWorldMatrix();
-      
-      return AlembicNode::ContinueVisit;
-   }
+   SampleBoundsVisitor(double t);
    
    template <class T>
-   AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance=0)
-   {
-      node.sampleBounds(mTime);
-      
-      typename AlembicNodeT<T>::Sample &samp0 = node.firstSample();
-      typename AlembicNodeT<T>::Sample &samp1 = node.secondSample();
-      
-      if (samp1.boundsWeight > 0.0)
-      {
-         
-         Alembic::Abc::Box3d b0 = samp0.bounds;
-         Alembic::Abc::Box3d b1 = samp1.bounds;
-         
-         node.setSelfBounds(Alembic::Abc::Box3d(samp0.boundsWeight * b0.min + samp1.boundsWeight * b1.min,
-                                                samp0.boundsWeight * b0.max + samp1.boundsWeight * b1.max));
-      }
-      else
-      {
-         node.setSelfBounds(samp0.bounds);
-      }
-      
-      node.updateWorldMatrix();
-      
-      return AlembicNode::ContinueVisit;
-   }
+   AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance=0);
    
-   AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0)
-   {
-      return shapeEnter(node, instance);
-   }
-   
-   AlembicNode::VisitReturn enter(AlembicSubD &node, AlembicNode *instance=0)
-   {
-      return shapeEnter(node, instance);
-   }
-   
-   AlembicNode::VisitReturn enter(AlembicPoints &node, AlembicNode *instance=0)
-   {
-      return shapeEnter(node, instance);
-   }
-   
-   AlembicNode::VisitReturn enter(AlembicCurves &node, AlembicNode *instance=0)
-   {
-      return shapeEnter(node, instance);
-   }
-   
-   AlembicNode::VisitReturn enter(AlembicNuPatch &node, AlembicNode *instance=0)
-   {
-      return shapeEnter(node, instance);
-   }
-   
-   AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0)
-   {
-      if (node.isInstance())
-      {
-         AlembicNode *m = node.master();
-         m->enter(*this, &node);
-      }
+   AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicSubD &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicPoints &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicCurves &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicNuPatch &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0);
       
-      node.updateWorldMatrix();
-      
-      return AlembicNode::ContinueVisit;
-   }
-      
-   void leave(AlembicNode &node, AlembicNode *instance=0)
-   {
-      node.updateChildBounds();
-      
-      std::cout << "\"" << node.path() << "\" updated" << std::endl;
-      std::cout << "  World matrix: " << node.worldMatrix() << std::endl;
-      std::cout << "  Child bounds: " << node.childBounds().min << " - " << node.childBounds().max << std::endl;
-      std::cout << std::endl;
-   }
+   void leave(AlembicNode &node, AlembicNode *instance=0);
    
 private:
    
    double mTime;
 };
+
+SampleBoundsVisitor::SampleBoundsVisitor(double t)
+   : mTime(t)
+{
+}
+
+AlembicNode::VisitReturn SampleBoundsVisitor::enter(AlembicXform &node, AlembicNode *instance)
+{
+   node.sampleBounds(mTime);
+   
+   AlembicXform::Sample &samp0 = node.firstSample();
+   AlembicXform::Sample &samp1 = node.secondSample();
+   
+   if (samp1.dataWeight > 0.0)
+   {
+      if (samp0.data.getInheritsXforms() != samp1.data.getInheritsXforms())
+      {
+         std::cout << node.path() << ": Animated inherits transform property found, use first sample value" << std::endl;
+         node.setSelfMatrix(samp0.data.getMatrix());
+      }
+      else
+      {
+         Alembic::Abc::M44d m0 = samp0.data.getMatrix();
+         Alembic::Abc::M44d m1 = samp1.data.getMatrix();
+         
+         node.setSelfMatrix(samp0.dataWeight * m0 + samp1.dataWeight * m1);
+      }
+   }
+   else
+   {
+      node.setSelfMatrix(samp0.data.getMatrix());
+   }
+   
+   node.setInheritsTransform(samp0.data.getInheritsXforms());
+   
+   if (instance == 0)
+   {
+      node.updateWorldMatrix();
+   }
+   
+   return AlembicNode::ContinueVisit;
+}
+
+template <class T>
+AlembicNode::VisitReturn SampleBoundsVisitor::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance)
+{
+   node.sampleBounds(mTime);
+   
+   typename AlembicNodeT<T>::Sample &samp0 = node.firstSample();
+   typename AlembicNodeT<T>::Sample &samp1 = node.secondSample();
+   
+   if (samp1.boundsWeight > 0.0)
+   {
+      
+      Alembic::Abc::Box3d b0 = samp0.bounds;
+      Alembic::Abc::Box3d b1 = samp1.bounds;
+      
+      node.setSelfBounds(Alembic::Abc::Box3d(samp0.boundsWeight * b0.min + samp1.boundsWeight * b1.min,
+                                             samp0.boundsWeight * b0.max + samp1.boundsWeight * b1.max));
+   }
+   else
+   {
+      node.setSelfBounds(samp0.bounds);
+   }
+   
+   if (instance == 0)
+   {
+      node.updateWorldMatrix();
+   }
+   
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn SampleBoundsVisitor::enter(AlembicMesh &node, AlembicNode *instance)
+{
+   return shapeEnter(node, instance);
+}
+
+AlembicNode::VisitReturn SampleBoundsVisitor::enter(AlembicSubD &node, AlembicNode *instance)
+{
+   return shapeEnter(node, instance);
+}
+
+AlembicNode::VisitReturn SampleBoundsVisitor::enter(AlembicPoints &node, AlembicNode *instance)
+{
+   return shapeEnter(node, instance);
+}
+
+AlembicNode::VisitReturn SampleBoundsVisitor::enter(AlembicCurves &node, AlembicNode *instance)
+{
+   return shapeEnter(node, instance);
+}
+
+AlembicNode::VisitReturn SampleBoundsVisitor::enter(AlembicNuPatch &node, AlembicNode *instance)
+{
+   return shapeEnter(node, instance);
+}
+
+AlembicNode::VisitReturn SampleBoundsVisitor::enter(AlembicNode &node, AlembicNode *)
+{
+   if (node.isInstance())
+   {
+      AlembicNode *m = node.master();
+      m->enter(*this, &node);
+   }
+   
+   node.updateWorldMatrix();
+   
+   return AlembicNode::ContinueVisit;
+}
+   
+void SampleBoundsVisitor::leave(AlembicNode &node, AlembicNode *)
+{
+   node.updateChildBounds();
+   
+   std::cout << "\"" << node.path() << "\" updated" << std::endl;
+   std::cout << "  World matrix: " << node.worldMatrix() << std::endl;
+   std::cout << "  Child bounds: " << node.childBounds().min << " - " << node.childBounds().max << std::endl;
+   std::cout << std::endl;
+}
 
 // ---
 
