@@ -297,8 +297,8 @@ PointsData::~PointsData()
 
 void PointsData::update(const AlembicPoints &node)
 {
-   const typename AlembicPoints::Sample &samp0 = node.firstSample();
-   const typename AlembicPoints::Sample &samp1 = node.secondSample();
+   const AlembicPoints::Sample &samp0 = node.firstSample();
+   const AlembicPoints::Sample &samp1 = node.secondSample();
    
    if (!samp0.valid(node.typedObject()))
    {
