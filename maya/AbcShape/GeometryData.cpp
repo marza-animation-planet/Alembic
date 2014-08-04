@@ -213,8 +213,8 @@ void MeshData::draw(bool wireframe, float lineWidth) const
    
    if (wireframe && lineWidth > 0.0f)
    {
-      glEnable(GL_BLEND);
-      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+      //glEnable(GL_BLEND);
+      //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
       glEnable(GL_LINE_SMOOTH);
       glLineWidth(lineWidth);
    }
@@ -255,8 +255,8 @@ void MeshData::drawPoints(float pointWidth) const
    
    if (pointWidth > 0.0f)
    {
-      glEnable(GL_BLEND);
-      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+      //glEnable(GL_BLEND);
+      //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
       glEnable(GL_POINT_SMOOTH);
       glPointSize(pointWidth);
    }
@@ -380,8 +380,8 @@ void PointsData::draw(float pointWidth) const
    
    if (pointWidth > 0.0f)
    {
-      glEnable(GL_BLEND);
-      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+      //glEnable(GL_BLEND);
+      //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
       glEnable(GL_POINT_SMOOTH);
       glPointSize(pointWidth);
    }
@@ -415,8 +415,8 @@ void DrawBox(const Alembic::Abc::Box3d &bounds, bool asPoints, float width)
    
    if (width > 0.0f)
    {
-      glEnable(GL_BLEND);
-      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+      //glEnable(GL_BLEND);
+      //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
       if (asPoints)
       {
          glEnable(GL_POINT_SMOOTH);
