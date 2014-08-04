@@ -304,6 +304,7 @@ DrawGeometry::DrawGeometry(const SceneGeometryData *sceneData,
    , mCheckVisibility(!ignoreVisibility)
    , mCull(false)
    , mSceneData(sceneData)
+   , mTransformBounds(false)
 {
 }
 
@@ -342,6 +343,11 @@ bool DrawGeometry::cull(AlembicNode &node)
 bool DrawGeometry::culled(AlembicNode &node) const
 {
    return (mCulledNodes.find(&node) != mCulledNodes.end());
+}
+
+void DrawGeometry::setViewMatrix(const Alembic::Abc::M44d &view)
+{
+   mViewMatrixInv = view.inverse();
 }
 
 AlembicNode::VisitReturn DrawGeometry::enter(AlembicMesh &node, AlembicNode *)
@@ -524,6 +530,42 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicXform &node, AlembicNode *in
    if (cull(instance ? *instance : node))
    {
       return AlembicNode::DontVisitChildren;
+   }
+   
+   if (mTransformBounds)
+   {
+      Alembic::Abc::M44d currentMatrix;
+      GLdouble currentColor[4] = {0, 0, 0, 1};
+      
+      bool lightingOn = glIsEnabled(GL_LIGHTING);
+      glGetDoublev(GL_MODELVIEW_MATRIX, currentMatrix.getValue());
+      glGetDoublev(GL_CURRENT_COLOR, currentColor);
+      
+      if (lightingOn)
+      {
+         glDisable(GL_LIGHTING);
+      }
+      
+      glMatrixMode(GL_MODELVIEW);
+      glLoadMatrixd(mViewMatrixInv.getValue());
+      
+      glColor3d(0, 0, 0);
+      if (!mNoTransforms)
+      {
+         DrawBox(instance ? instance->childBounds() : node.childBounds(), false, mLineWidth);
+      }
+      else
+      {
+         DrawBox(node.selfBounds(), false, mLineWidth);
+      }
+      
+      glLoadMatrixd(currentMatrix.getValue());
+      glColor4dv(currentColor);
+      
+      if (lightingOn)
+      {
+         glEnable(GL_LIGHTING);
+      }
    }
    
    if (!mNoTransforms)

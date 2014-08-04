@@ -41,6 +41,7 @@ public:
     static MObject aNumShapes;
     static MObject aPointWidth;
     static MObject aLineWidth;
+    static MObject aDrawTransformBounds;
     
     static void* creator();
     static void createdCallback(MObject& node, void* clientData);
@@ -94,6 +95,7 @@ public:
     inline DisplayMode displayMode() const { return mDisplayMode; }
     inline float lineWidth() const { return mLineWidth; }
     inline float pointWidth() const { return mPointWidth; }
+    inline bool drawTransformBounds() const { return mDrawTransformBounds; }
     inline unsigned int numShapes() const { return mNumShapes; }
     
     bool ignoreCulling() const;
@@ -139,6 +141,7 @@ private:
     float mPointWidth;
     float mLineWidth;
     bool mPreserveStartFrame;
+    bool mDrawTransformBounds;
 };
 
 class AbcShapeUI : public MPxSurfaceShapeUI
@@ -174,6 +177,8 @@ public:
     
     // Compute frustum straight from OpenGL projection and modelview matrices
     bool computeFrustum(Frustum &frustum) const;
+    
+    void getViewMatrix(M3dView &view, Alembic::Abc::M44d &viewMatrix) const;
 
 private:
     

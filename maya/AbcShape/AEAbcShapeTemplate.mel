@@ -109,6 +109,7 @@ global proc AEAbcShapeTemplate(string $nodeName)
    editorTemplate -label "Ignore Visibility" -addControl "ignoreVisibility";
    editorTemplate -endNoOptimize;
    editorTemplate -addSeparator;
+   editorTemplate -label "Draw Transform Bounds" -addControl "drawTransformBounds";
    editorTemplate -label "Point Width" -addControl "pointWidth";
    editorTemplate -label "Line Width" -addControl "lineWidth";
    editorTemplate -endLayout;

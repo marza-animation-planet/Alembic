@@ -56,6 +56,7 @@ MObject AbcShape::aIgnoreVisibility;
 MObject AbcShape::aNumShapes;
 MObject AbcShape::aPointWidth;
 MObject AbcShape::aLineWidth;
+MObject AbcShape::aDrawTransformBounds;
 
 void* AbcShape::creator()
 {
@@ -248,6 +249,15 @@ MStatus AbcShape::initialize()
    stat = addAttribute(aLineWidth);
    MCHECKERROR(stat, "Could not add 'lineWidth' attribute");
    
+   aDrawTransformBounds = nAttr.create("drawTransformBounds", "dtb", MFnNumericData::kBoolean, 0, &stat);
+   MCHECKERROR(stat, "Could not create 'drawTransformBounds' attribute");
+   nAttr.setWritable(true);
+   nAttr.setStorable(true);
+   nAttr.setKeyable(true);
+   nAttr.setInternal(true);
+   stat = addAttribute(aDrawTransformBounds);
+   MCHECKERROR(stat, "Could not add 'drawTransformBounds' attribute");
+   
    return MS::kSuccess;
 }
 
@@ -265,9 +275,10 @@ AbcShape::AbcShape()
    , mScene(0)
    , mDisplayMode(DM_box)
    , mNumShapes(0)
-   , mPointWidth(1.0f)
-   , mLineWidth(1.0f)
+   , mPointWidth(0.0f)
+   , mLineWidth(0.0f)
    , mPreserveStartFrame(false)
+   , mDrawTransformBounds(false)
 {
 }
 
@@ -723,7 +734,6 @@ bool AbcShape::updateInternals(const std::string &filePath, const std::string &o
    return true;
 }
 
-
 bool AbcShape::getInternalValueInContext(const MPlug &plug, MDataHandle &handle, MDGContext &ctx)
 {
    if (plug == aFilePath)
@@ -804,6 +814,11 @@ bool AbcShape::getInternalValueInContext(const MPlug &plug, MDataHandle &handle,
    else if (plug == aPointWidth)
    {
       handle.setFloat(mPointWidth);
+      return true;
+   }
+   else if (plug == aDrawTransformBounds)
+   {
+      handle.setBool(mDrawTransformBounds);
       return true;
    }
    else
@@ -897,6 +912,11 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       mPointWidth = handle.asFloat();
       return true;
    }
+   else if (plug == aDrawTransformBounds)
+   {
+      mDrawTransformBounds = handle.asBool();
+      return true;
+   }
    else if (plug == aTime)
    {
       t = handle.asTime();
@@ -980,6 +1000,7 @@ void AbcShape::copyInternalData(MPxNode *source)
       mPointWidth = node->mPointWidth;
       mDisplayMode = node->mDisplayMode;
       mPreserveStartFrame = node->mPreserveStartFrame;
+      mDrawTransformBounds = node->mDrawTransformBounds;
       
       // if mFilePath is identical, first referencing will avoid inadvertant destruction
       AlembicScene *scn = SceneCache::Ref(node->mFilePath);
@@ -1217,6 +1238,14 @@ bool AbcShapeUI::computeFrustum(Frustum &frustum) const
    }
 }
 
+void AbcShapeUI::getViewMatrix(M3dView &view, Alembic::Abc::M44d &viewMatrix) const
+{
+   MDagPath camera;
+   
+   view.getCamera(camera);
+   camera.inclusiveMatrix().get(viewMatrix.x);
+}
+
 bool AbcShapeUI::select(MSelectInfo &selectInfo,
                         MSelectionList &selectionList,
                         MPointArray &worldSpaceSelectPts) const
@@ -1439,6 +1468,12 @@ void AbcShapeUI::drawBox(AbcShape *shape, const MDrawRequest &, M3dView &view) c
       {
          visitor.doCull(frustum);
       }
+      if (shape->drawTransformBounds())
+      {
+         Alembic::Abc::M44d viewMatrix;
+         getViewMatrix(view, viewMatrix);
+         visitor.drawTransformBounds(true, viewMatrix);
+      }
       
       shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
    }
@@ -1473,6 +1508,12 @@ void AbcShapeUI::drawPoints(AbcShape *shape, const MDrawRequest &, M3dView &view
       if (!shape->ignoreCulling() && computeFrustum(view, frustum))
       {
          visitor.doCull(frustum);
+      }
+      if (shape->drawTransformBounds())
+      {
+         Alembic::Abc::M44d viewMatrix;
+         getViewMatrix(view, viewMatrix);
+         visitor.drawTransformBounds(true, viewMatrix);
       }
       
       shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
@@ -1536,6 +1577,12 @@ void AbcShapeUI::drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dV
    if (!shape->ignoreCulling() && computeFrustum(view, frustum))
    {
       visitor.doCull(frustum);
+   }
+   if (shape->drawTransformBounds())
+   {
+      Alembic::Abc::M44d viewMatrix;
+      getViewMatrix(view, viewMatrix);
+      visitor.drawTransformBounds(true, viewMatrix);
    }
    
    shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);

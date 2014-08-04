@@ -51,9 +51,20 @@ public:
          return;
       }
       
-      M44d projViewInv;
+      M44d projViewInv, viewMatrix;
+      
       tmp.get(projViewInv.x);
       Frustum frustum(projViewInv);
+      
+      if (shape->drawTransformBounds())
+      {
+         const MMatrix vm = context.getMatrix(MHWRender::MDrawContext::kViewMtx, &status);
+         if (status != MStatus::kSuccess)
+         {
+            return;
+         }
+         vm.get(viewMatrix.x);
+      }
       
       glMatrixMode(GL_PROJECTION);
       glPushMatrix();
@@ -74,7 +85,7 @@ public:
       {
          visitor.doCull(frustum);
       }
-
+      
       glPushAttrib(GL_COLOR_BUFFER_BIT | GL_LIGHTING_BIT | GL_LINE_BIT | GL_POINT_BIT | GL_POLYGON_BIT);
       
       // No MHWRender::MDrawContext::kBoundingBox?
@@ -93,6 +104,7 @@ public:
          else
          {
             visitor.drawBounds(true);
+            visitor.drawTransformBounds(shape->drawTransformBounds(), viewMatrix);
             
             shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
          }
@@ -105,6 +117,7 @@ public:
          
          visitor.drawBounds(false);
          visitor.drawAsPoints(true);
+         visitor.drawTransformBounds(shape->drawTransformBounds(), viewMatrix);
          
          shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
       }
@@ -139,6 +152,10 @@ public:
                
                stateMgr->setRasterizerState(rasterState);
             }
+            else
+            {
+               visitor.drawTransformBounds(shape->drawTransformBounds(), viewMatrix);
+            }
             
             if (!setupLights(context))
             {
@@ -146,6 +163,7 @@ public:
             }
             
             shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
+            visitor.drawBounds(false);
             
             if (drawWireframe)
             {
@@ -156,6 +174,7 @@ public:
          if (drawWireframe)
          {
             visitor.drawWireframe(true);
+            visitor.drawTransformBounds(shape->drawTransformBounds(), viewMatrix);
             
             glDisable(GL_LIGHTING);
             
@@ -339,6 +358,7 @@ public:
    bool selected;
    double time; // current time
    bool ignoreCulling;
+   Alembic::Abc::M44d viewMatrix;
 };
 
 // ---

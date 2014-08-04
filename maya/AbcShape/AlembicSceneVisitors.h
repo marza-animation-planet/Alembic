@@ -75,7 +75,7 @@ AlembicNode::VisitReturn WorldUpdate::shapeEnter(AlembicNodeT<T> &node, AlembicN
 }
 
 template <class T> 
-AlembicNode::VisitReturn WorldUpdate::anyEnter(AlembicNodeT<T> &node, AlembicNode *)
+AlembicNode::VisitReturn WorldUpdate::anyEnter(AlembicNodeT<T> &node, AlembicNode *instance)
 {
    Alembic::Util::bool_t visible = true;
    
@@ -108,8 +108,11 @@ AlembicNode::VisitReturn WorldUpdate::anyEnter(AlembicNodeT<T> &node, AlembicNod
    
    node.setVisible(visible);
    
-   node.updateWorldMatrix();
-      
+   if (!instance)
+   {
+      node.updateWorldMatrix();
+   }
+   
    return AlembicNode::ContinueVisit;
 }
 
@@ -230,7 +233,7 @@ inline AlembicNode::VisitReturn ComputeSceneBounds::enter(AlembicNode &node, Ale
       }
       else if (!node.isInstance())
       {
-         // without no transforms, all instances have the same bounds
+         // without transforms, all instances have the same bounds
          bounds = node.selfBounds();
       }
       
@@ -311,6 +314,8 @@ public:
    inline void setPointWidth(float w) { mPointWidth = w; }
    inline void doCull(const Frustum &f) { mCull = true; mFrustum = f; }
    inline void dontCull() { mCull = false; }
+   inline void drawTransformBounds(bool on, const Alembic::Abc::M44d &view) { mTransformBounds = on; setViewMatrix(view); }
+   void setViewMatrix(const Alembic::Abc::M44d &view);
    
 private:
    
@@ -331,6 +336,8 @@ private:
    bool mCull;
    Frustum mFrustum;
    const SceneGeometryData *mSceneData;
+   bool mTransformBounds;
+   Alembic::Abc::M44d mViewMatrixInv;
    std::deque<Alembic::Abc::M44d> mMatrixStack;
    std::set<AlembicNode*> mCulledNodes;
 };
