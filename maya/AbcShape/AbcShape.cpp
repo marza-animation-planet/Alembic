@@ -500,8 +500,9 @@ void AbcShape::updateSceneBounds()
    
    ComputeSceneBounds visitor(mIgnoreTransforms, mIgnoreInstances, mIgnoreVisibility);
    mScene->visit(AlembicNode::VisitDepthFirst, visitor);
-   mScene->setSelfBounds(visitor.bounds());
    mScene->updateChildBounds();
+   // override scene self bounds to take into account the ignore transforms/instances/visibility flags
+   mScene->setSelfBounds(visitor.bounds());
 }
 
 void AbcShape::updateShapesCount()

@@ -358,18 +358,29 @@ void AlembicNode::updateChildBounds()
    
    if (childCount() > 0)
    {
+      Alembic::Abc::Box3d bb;
+      
+      mSelfBounds.makeEmpty();
+      
       for (Array::iterator it = beginChild(); it != endChild(); ++it)
       {
-         Alembic::Abc::Box3d bb = (*it)->childBounds();
+         bb = (*it)->childBounds();
          if (!bb.isEmpty())
          {
             mChildBounds.extendBy(bb);
+         }
+         
+         bb = (*it)->selfBounds();
+         if (!bb.isEmpty())
+         {
+            mSelfBounds.extendBy(bb);
          }
       }
    }
    else
    {
       Alembic::Abc::Box3d bb = selfBounds();
+      
       if (!bb.isEmpty())
       {
          Alembic::Abc::V3d bbmin = bb.min;

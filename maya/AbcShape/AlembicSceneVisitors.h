@@ -157,7 +157,9 @@ class ComputeSceneBounds
 {
 public:
    
-   inline ComputeSceneBounds(bool ignoreTransforms, bool ignoreInstances, bool ignoreVisibility)
+   inline ComputeSceneBounds(bool ignoreTransforms,
+                             bool ignoreInstances,
+                             bool ignoreVisibility)
       : mNoTransforms(ignoreTransforms)
       , mNoInstances(ignoreInstances)
       , mCheckVisibility(!ignoreVisibility)
@@ -260,7 +262,10 @@ class DrawGeometry
 {
 public:
    
-   DrawGeometry(const SceneGeometryData *sceneData, bool ignoreTransforms, bool ignoreInstances, bool ignoreVisibility);
+   DrawGeometry(const SceneGeometryData *sceneData,
+                bool ignoreTransforms,
+                bool ignoreInstances,
+                bool ignoreVisibility);
    
    AlembicNode::VisitReturn enter(AlembicXform &node);
    AlembicNode::VisitReturn enter(AlembicMesh &node);
@@ -296,7 +301,9 @@ class DrawBounds
 {
 public:
    
-   DrawBounds(bool ignoreTransforms, bool ignoreInstances, bool ignoreVisibility);
+   DrawBounds(bool ignoreTransforms,
+              bool ignoreInstances,
+              bool ignoreVisibility);
    
    AlembicNode::VisitReturn enter(AlembicXform &node);
    AlembicNode::VisitReturn enter(AlembicNode &node);
@@ -361,7 +368,9 @@ class PrintInfo
 {
 public:
    
-   PrintInfo(bool ignoreTransforms, bool ignoreInstances, bool ignoreVisibility);
+   PrintInfo(bool ignoreTransforms,
+             bool ignoreInstances,
+             bool ignoreVisibility);
    
    AlembicNode::VisitReturn enter(AlembicNode &node);
    void leave(AlembicNode &node);
