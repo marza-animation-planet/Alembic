@@ -131,7 +131,7 @@ public:
                   MHWRender::MRasterizerStateDesc desc(currentRasterState->desc());
                   
                   desc.depthBiasIsFloat = true;
-                  desc.depthBias = 0.0f;
+                  desc.depthBias = 0.0001f;
                   desc.slopeScaledDepthBias = 1.0f;
                   
                   rasterState = stateMgr->acquireRasterizerState(desc);
