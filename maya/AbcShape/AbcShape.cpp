@@ -1107,6 +1107,8 @@ void AbcShapeUI::getDrawRequests(const MDrawInfo &info,
       break;
    default:
       {
+         bool drawWireframe = false;
+         
          if (appearance == M3dView::kWireFrame ||
              view.wireframeOnShaded() ||
              displayStatus == M3dView::kActive ||
@@ -1116,11 +1118,13 @@ void AbcShapeUI::getDrawRequests(const MDrawInfo &info,
             MDrawRequest request = info.getPrototype(*this);
             
             request.setDrawData(data);
-            request.setToken(kDrawGeometry);
+            request.setToken(appearance != M3dView::kWireFrame ? kDrawGeometryAndWireframe : kDrawGeometry);
             request.setDisplayStyle(M3dView::kWireFrame);
             request.setColor(color);
             
             queue.add(request);
+            
+            drawWireframe = true;
          }
          
          if (appearance != M3dView::kWireFrame)
@@ -1128,7 +1132,7 @@ void AbcShapeUI::getDrawRequests(const MDrawInfo &info,
             MDrawRequest request = info.getPrototype(*this);
             
             request.setDrawData(data);
-            request.setToken(kDrawGeometry);
+            request.setToken(drawWireframe ? kDrawGeometryAndWireframe : kDrawGeometry);
             
             // Only set material info if necessary
             AbcShape *shape = (AbcShape*) surfaceShape();
@@ -1171,6 +1175,8 @@ void AbcShapeUI::draw(const MDrawRequest &request, M3dView &view) const
    case kDrawPoints:
       drawPoints(shape, request, view);
       break;
+   case kDrawGeometry:
+   case kDrawGeometryAndWireframe:
    default:
       {
          switch (shape->displayMode())
@@ -1530,6 +1536,7 @@ void AbcShapeUI::drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dV
    
    view.beginGL();
    
+   bool wireframeOnShaded = (require.token() == kDrawGeometryAndWireframe);
    bool wireframe = (request.displayStyle() == M3dView::kWireFrame);
    //bool flat = (request.displayStyle() == M3dView::kFlatShaded);
    
@@ -1578,7 +1585,8 @@ void AbcShapeUI::drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dV
    {
       visitor.doCull(frustum);
    }
-   if (shape->drawTransformBounds())
+   // only draw transform bounds when on wireframeOnShaded is set
+   if (shape->drawTransformBounds() && (!wireframeOnShaded || wireframe))
    {
       Alembic::Abc::M44d viewMatrix;
       getViewMatrix(view, viewMatrix);

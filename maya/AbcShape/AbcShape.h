@@ -156,7 +156,8 @@ public:
     {
         kDrawBox = 0,
         kDrawPoints,
-        kDrawGeometry
+        kDrawGeometry,
+        kDrawGeometryAndWireframe
     };
     
     AbcShapeUI();
