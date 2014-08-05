@@ -1536,7 +1536,7 @@ void AbcShapeUI::drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dV
    
    view.beginGL();
    
-   bool wireframeOnShaded = (require.token() == kDrawGeometryAndWireframe);
+   bool wireframeOnShaded = (request.token() == kDrawGeometryAndWireframe);
    bool wireframe = (request.displayStyle() == M3dView::kWireFrame);
    //bool flat = (request.displayStyle() == M3dView::kFlatShaded);
    
@@ -1555,8 +1555,8 @@ void AbcShapeUI::drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dV
       // Note: as we only store 1 smooth normal per point in mesh, flat shaded will look strange: ignore it
       glShadeModel(GL_SMOOTH);
       
-      glEnable(GL_CULL_FACE);
-      glCullFace(GL_BACK);
+      //glEnable(GL_CULL_FACE);
+      //glCullFace(GL_BACK);
       
       glEnable(GL_COLOR_MATERIAL);
       glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
