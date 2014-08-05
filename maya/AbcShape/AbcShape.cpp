@@ -58,6 +58,8 @@ MObject AbcShape::aPointWidth;
 MObject AbcShape::aLineWidth;
 MObject AbcShape::aDrawTransformBounds;
 MObject AbcShape::aDrawLocators;
+MObject AbcShape::aOutBoxMin;
+MObject AbcShape::aOutBoxMax;
 
 void* AbcShape::creator()
 {
@@ -227,8 +229,7 @@ MStatus AbcShape::initialize()
    
    aNumShapes = nAttr.create("numShapes", "nsh", MFnNumericData::kLong, 0, &stat);
    nAttr.setWritable(false);
-   nAttr.setStorable(true);
-   nAttr.setInternal(true);
+   nAttr.setStorable(false);
    stat = addAttribute(aNumShapes);
    MCHECKERROR(stat, "Could not add 'numShapes' attribute");
    
@@ -267,6 +268,52 @@ MStatus AbcShape::initialize()
    nAttr.setInternal(true);
    stat = addAttribute(aDrawLocators);
    MCHECKERROR(stat, "Could not add 'drawLocators' attribute");
+   
+   aOutBoxMin = nAttr.create("outBoxMin", "obmin", MFnNumericData::k3Double, 0.0, &stat);
+   MCHECKERROR(stat, "Could not create 'outBoxMin' attribute");
+   nAttr.setWritable(false);
+   nAttr.setStorable(false);
+   stat = addAttribute(aOutBoxMin);
+   MCHECKERROR(stat, "Could not add 'outBoxMin' attribute");
+   
+   aOutBoxMax = nAttr.create("outBoxMax", "obmax", MFnNumericData::k3Double, 0.0, &stat);
+   MCHECKERROR(stat, "Could not create 'outBoxMax' attribute");
+   nAttr.setWritable(false);
+   nAttr.setStorable(false);
+   stat = addAttribute(aOutBoxMax);
+   MCHECKERROR(stat, "Could not add 'outBoxMax' attribute");
+   
+   attributeAffects(aFilePath, aNumShapes);
+   attributeAffects(aObjectExpression, aNumShapes);
+   attributeAffects(aIgnoreInstances, aNumShapes);
+   attributeAffects(aIgnoreVisibility, aNumShapes);
+   
+   attributeAffects(aObjectExpression, aOutBoxMin);
+   attributeAffects(aDisplayMode, aOutBoxMin);
+   attributeAffects(aCycleType, aOutBoxMin);
+   attributeAffects(aTime, aOutBoxMin);
+   attributeAffects(aSpeed, aOutBoxMin);
+   attributeAffects(aOffset, aOutBoxMin);
+   attributeAffects(aPreserveStartFrame, aOutBoxMin);
+   attributeAffects(aStartFrame, aOutBoxMin);
+   attributeAffects(aEndFrame, aOutBoxMin);
+   attributeAffects(aIgnoreXforms, aOutBoxMin);
+   attributeAffects(aIgnoreInstances, aOutBoxMin);
+   attributeAffects(aIgnoreVisibility, aOutBoxMin);
+   
+   attributeAffects(aFilePath, aOutBoxMax);
+   attributeAffects(aObjectExpression, aOutBoxMax);
+   attributeAffects(aDisplayMode, aOutBoxMax);
+   attributeAffects(aCycleType, aOutBoxMax);
+   attributeAffects(aTime, aOutBoxMax);
+   attributeAffects(aSpeed, aOutBoxMax);
+   attributeAffects(aOffset, aOutBoxMax);
+   attributeAffects(aPreserveStartFrame, aOutBoxMax);
+   attributeAffects(aStartFrame, aOutBoxMax);
+   attributeAffects(aEndFrame, aOutBoxMax);
+   attributeAffects(aIgnoreXforms, aOutBoxMax);
+   attributeAffects(aIgnoreInstances, aOutBoxMax);
+   attributeAffects(aIgnoreVisibility, aOutBoxMax);
    
    return MS::kSuccess;
 }
@@ -332,7 +379,48 @@ bool AbcShape::ignoreCulling() const
 
 MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
 {
-   return MS::kUnknownParameter;
+   if (plug.attribute() == aOutBoxMin || plug.attribute() == aOutBoxMax)
+   {
+      syncInternals(block);
+      
+      Alembic::Abc::V3d out(0, 0, 0);
+      
+      if (mScene)
+      {
+         if (plug.attribute() == aOutBoxMin)
+         {
+            out = mScene->selfBounds().min;
+         }
+         else
+         {
+            out = mScene->selfBounds().max;
+         }
+      }
+      
+      MDataHandle hOut = block.outputValue(plug.attribute());
+      
+      hOut.set3Double(out.x, out.y, out.z);
+      
+      block.setClean(plug);
+      
+      return MS::kSuccess;
+   }
+   else if (plug.attribute() == aNumShapes)
+   {
+      syncInternals(block);
+      
+      MDataHandle hOut = block.outputValue(plug.attribute());
+      
+      hOut.setInt(mNumShapes);
+      
+      block.setClean(plug);
+      
+      return MS::kSuccess;
+   }
+   else
+   {
+      return MS::kUnknownParameter;
+   }
 }
 
 bool AbcShape::isBounded() const
@@ -340,144 +428,27 @@ bool AbcShape::isBounded() const
    return true;
 }
 
-void AbcShape::pullInternals()
+void AbcShape::syncInternals()
 {
-   MPlug plug(thisMObject(), aTime);
-   mTime = plug.asMTime();
-   
-   plug.setAttribute(aSpeed);
-   mSpeed = plug.asDouble();
-   
-   plug.setAttribute(aPreserveStartFrame);
-   mPreserveStartFrame = plug.asBool();
-   
-   plug.setAttribute(aOffset);
-   mOffset = plug.asDouble();
-   
-   plug.setAttribute(aStartFrame);
-   mStartFrame = plug.asDouble();
-   
-   plug.setAttribute(aEndFrame);
-   mEndFrame = plug.asDouble();
-   
-   plug.setAttribute(aCycleType);
-   mCycleType = (CycleType) plug.asShort();
-   
-   plug.setAttribute(aIgnoreXforms);
-   mIgnoreTransforms = plug.asBool();
-   
-   plug.setAttribute(aIgnoreInstances);
-   mIgnoreInstances = plug.asBool();
-   
-   plug.setAttribute(aIgnoreVisibility);
-   mIgnoreVisibility = plug.asBool();
-   
-   plug.setAttribute(aDisplayMode);
-   mDisplayMode = (DisplayMode) plug.asShort();
+   MDataBlock block = forceCache();
+   syncInternals(block);
 }
 
-void AbcShape::updateInternals()
+void AbcShape::syncInternals(MDataBlock &block)
 {
-   bool contentsChanged = false;
-   bool timeUpdate = false;
-   bool boundsUpdate = false;
-   bool countUpdate = false;
-   bool forceReadGeometry = false;
-   
-   MPlug plug(thisMObject(), aTime);
-   MTime t = plug.asMTime();
-   timeUpdate = timeUpdate || (fabs(t.as(MTime::kSeconds) - mTime.as(MTime::kSeconds)) > 0.0001);
-   
-   plug.setAttribute(aSpeed);
-   double s = plug.asDouble();
-   timeUpdate = timeUpdate || (fabs(s - mSpeed) > 0.0001);
-   
-   plug.setAttribute(aPreserveStartFrame);
-   bool psf = plug.asBool();
-   timeUpdate = timeUpdate || (psf != mPreserveStartFrame);
-   
-   plug.setAttribute(aOffset);
-   double o = plug.asDouble();
-   timeUpdate = timeUpdate || (fabs(o - mOffset) > 0.0001);
-   
-   plug.setAttribute(aStartFrame);
-   double sf = plug.asDouble();
-   timeUpdate = timeUpdate || (fabs(sf - mStartFrame) > 0.0001);
-   
-   plug.setAttribute(aEndFrame);
-   double ef = plug.asDouble();
-   timeUpdate = timeUpdate || (fabs(ef - mEndFrame) > 0.0001);
-   
-   plug.setAttribute(aCycleType);
-   CycleType c = (CycleType) plug.asShort();
-   timeUpdate = timeUpdate || (c != mCycleType);
-   
-   plug.setAttribute(aDisplayMode);
-   DisplayMode dm = (DisplayMode) plug.asShort();
-   forceReadGeometry = (dm != mDisplayMode && mDisplayMode <= DM_boxes && dm >= DM_points);
-   
-   plug.setAttribute(aIgnoreXforms);
-   bool it = plug.asBool();
-   boundsUpdate = boundsUpdate || (it != mIgnoreTransforms);
-   mIgnoreTransforms = it;
-   
-   plug.setAttribute(aIgnoreInstances);
-   bool ii = plug.asBool();
-   countUpdate = countUpdate || (ii != mIgnoreInstances);
-   boundsUpdate = boundsUpdate || (ii != mIgnoreInstances);
-   mIgnoreInstances = ii;
-   
-   plug.setAttribute(aIgnoreVisibility);
-   bool iv = plug.asBool();
-   countUpdate = countUpdate || (iv != mIgnoreVisibility);
-   boundsUpdate = boundsUpdate || (iv != mIgnoreVisibility);
-   mIgnoreVisibility = iv;
-   
-   plug.setAttribute(aObjectExpression);
-   MString oe = plug.asString();
-   contentsChanged = contentsChanged || (oe != mObjectExpression.c_str());
-   
-   plug.setAttribute(aFilePath);
-   MString fp = plug.asString();
-   contentsChanged = contentsChanged || (fp != mFilePath.c_str());
-   
-   if (contentsChanged || forceReadGeometry || timeUpdate)
-   {
-      mTime = t;
-      mSpeed = s;
-      mOffset = o;
-      mStartFrame = sf;
-      mEndFrame = ef;
-      mCycleType = c;
-      mPreserveStartFrame = psf;
-      mDisplayMode = dm;
-      
-      double sampleTime = getSampleTime();
-      
-      bool timeChanged = (fabs(sampleTime - mSampleTime) > 0.0001);
-      
-      updateInternals(fp.asChar(), oe.asChar(), sampleTime, forceReadGeometry);
-      
-      if (contentsChanged)
-      {
-         boundsUpdate = false;
-         countUpdate = false;
-      }
-      else if (timeChanged)
-      {
-         boundsUpdate = false;
-      }
-   }
-   
-   if (countUpdate)
-   {
-      updateShapesCount();
-   }
-   
-   if (boundsUpdate)
-   {
-      updateSceneBounds();
-   }
+   block.inputValue(aFilePath).asString();
+   block.inputValue(aObjectExpression).asString();
+   block.inputValue(aTime).asTime();
+   block.inputValue(aSpeed).asDouble();
+   block.inputValue(aOffset).asDouble();
+   block.inputValue(aStartFrame).asDouble();
+   block.inputValue(aEndFrame).asDouble();
+   block.inputValue(aCycleType).asShort();
+   block.inputValue(aIgnoreXforms).asBool();
+   block.inputValue(aIgnoreInstances).asBool();
+   block.inputValue(aIgnoreVisibility).asBool();
+   block.inputValue(aDisplayMode).asShort();
+   block.inputValue(aPreserveStartFrame).asBool();
 }
 
 MBoundingBox AbcShape::boundingBox() const
@@ -487,7 +458,8 @@ MBoundingBox AbcShape::boundingBox() const
    if (mScene)
    {
       AbcShape *this2 = const_cast<AbcShape*>(this);
-      this2->pullInternals();
+      
+      this2->syncInternals();
       
       // Use self bounds here as those are taking ignore transform/instance flag into account
       Alembic::Abc::Box3d bounds = mScene->selfBounds();
@@ -716,7 +688,7 @@ void AbcShape::printSceneBounds() const
    std::cout << "Scene " << mScene->selfBounds().min << " - " << mScene->selfBounds().max << std::endl;
 }
 
-bool AbcShape::updateInternals(const std::string &filePath, const std::string &objectExpression, double t, bool forceGeometrySampling)
+bool AbcShape::updateScene(const MString &filePath, const MString &objectExpression, double t, bool forceGeometrySampling)
 {
    bool updateObjectList = (mScene != 0 && (objectExpression != mObjectExpression));
    bool timeChanged = (mScene != 0 && (fabs(t - mSampleTime) > 0.0001));
@@ -728,7 +700,7 @@ bool AbcShape::updateInternals(const std::string &filePath, const std::string &o
       #endif
       SceneCache::Unref(mScene);
       
-      mScene = SceneCache::Ref(filePath);
+      mScene = SceneCache::Ref(filePath.asChar());
       
       if (mScene)
       {
@@ -737,7 +709,7 @@ bool AbcShape::updateInternals(const std::string &filePath, const std::string &o
          if (updateFrameRange())
          {
             // This will force instant refresh of AE values
-            // but won't trigger any update as mStartFrame and mEndFrame as unchanged
+            // but won't trigger any update as mStartFrame and mEndFrame are unchanged
             MPlug plug(thisMObject(), aStartFrame);
             plug.setDouble(mStartFrame);
             
@@ -769,7 +741,7 @@ bool AbcShape::updateInternals(const std::string &filePath, const std::string &o
       }
       #endif
       
-      mScene->setFilter(objectExpression);
+      mScene->setFilter(objectExpression.asChar());
       
       updateShapesCount();
       
@@ -798,12 +770,12 @@ bool AbcShape::getInternalValueInContext(const MPlug &plug, MDataHandle &handle,
 {
    if (plug == aFilePath)
    {
-      handle.setString(mFilePath.c_str());
+      handle.setString(mFilePath);
       return true;
    }
    else if (plug == aObjectExpression)
    {
-      handle.setString(mObjectExpression.c_str());
+      handle.setString(mObjectExpression);
       return true;
    }
    else if (plug == aTime)
@@ -856,11 +828,6 @@ bool AbcShape::getInternalValueInContext(const MPlug &plug, MDataHandle &handle,
       handle.setBool(mIgnoreVisibility);
       return true;
    }
-   else if (plug == aNumShapes)
-   {
-      handle.setInt(mNumShapes);
-      return true;
-   }
    else if (plug == aDisplayMode)
    {
       handle.setInt(mDisplayMode);
@@ -908,15 +875,15 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       MFileObject file;
       file.setRawFullName(handle.asString());
       
-      std::string filePath = file.resolvedFullName().asChar();
+      MString filePath = file.resolvedFullName();
       
-      return updateInternals(filePath, mObjectExpression, mSampleTime);
+      return updateScene(filePath, mObjectExpression, mSampleTime);
    }
    else if (plug == aObjectExpression)
    {
-      std::string objectExpression = handle.asString().asChar();
+      MString &objectExpression = handle.asString();
       
-      return updateInternals(mFilePath, objectExpression, mSampleTime);
+      return updateScene(mFilePath, objectExpression, mSampleTime);
    }
    else if (plug == aIgnoreXforms)
    {
@@ -962,7 +929,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       if (needGeometryUpdate)
       {
          // Force fetch geometry
-         updateInternals(mFilePath, mObjectExpression, mSampleTime, true);
+         updateScene(mFilePath, mObjectExpression, mSampleTime, true);
       }
       
       return true;
@@ -1022,10 +989,6 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       ef = handle.asDouble();
       sampleTimeUpdate = (fabs(ef - mEndFrame) > 0.0001);
    }
-   else if (plug == aNumShapes)
-   {
-      return false;
-   }
    else
    {
       return MPxNode::setInternalValueInContext(plug, handle, ctx);
@@ -1043,7 +1006,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       
       double sampleTime = getSampleTime();
       
-      return updateInternals(mFilePath, mObjectExpression, sampleTime);
+      return updateScene(mFilePath, mObjectExpression, sampleTime);
    }
    else
    {
@@ -1078,7 +1041,7 @@ void AbcShape::copyInternalData(MPxNode *source)
       mDrawLocators = node->mDrawLocators;
       
       // if mFilePath is identical, first referencing will avoid inadvertant destruction
-      AlembicScene *scn = SceneCache::Ref(node->mFilePath);
+      AlembicScene *scn = SceneCache::Ref(node->mFilePath.asChar());
       SceneCache::Unref(mScene);
       mScene = scn;
       
@@ -1086,7 +1049,7 @@ void AbcShape::copyInternalData(MPxNode *source)
       
       if (mScene)
       {
-         mScene->setFilter(mObjectExpression);
+         mScene->setFilter(mObjectExpression.asChar());
          
          updateWorld();
          

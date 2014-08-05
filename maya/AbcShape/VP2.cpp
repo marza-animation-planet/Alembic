@@ -452,7 +452,7 @@ MUserData* AbcShapeOverride::prepareForDraw(const MDagPath &objPath, const MDagP
       data->selected = false;
    }
    
-   abcShape->updateInternals();
+   abcShape->syncInternals();
    
    return data;
 }

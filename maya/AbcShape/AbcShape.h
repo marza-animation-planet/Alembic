@@ -43,6 +43,8 @@ public:
     static MObject aLineWidth;
     static MObject aDrawTransformBounds;
     static MObject aDrawLocators;
+    static MObject aOutBoxMin;
+    static MObject aOutBoxMax;
     
     static void* creator();
     static void createdCallback(MObject& node, void* clientData);
@@ -112,11 +114,10 @@ private:
     void printInfo(bool detailed=false) const;
     void printSceneBounds() const;
     
-    void pullInternals();
+    void syncInternals();
+    void syncInternals(MDataBlock &block);
     
-    void updateInternals();
-    bool updateInternals(const std::string &filePath, const std::string &objectExpression, double st, bool forceGeometrySampling=false);
-    
+    bool updateScene(const MString &filePath, const MString &objectExpression, double st, bool forceGeometrySampling=false);
     bool updateFrameRange();
     void updateWorld();
     void updateSceneBounds();
@@ -125,8 +126,8 @@ private:
     
 private:
     
-    std::string mFilePath;
-    std::string mObjectExpression;
+    MString mFilePath;
+    MString mObjectExpression;
     MTime mTime;
     double mOffset;
     double mSpeed;
