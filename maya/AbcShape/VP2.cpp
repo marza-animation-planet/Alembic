@@ -287,6 +287,8 @@ public:
                      
                      for (unsigned int p=0; p<params.length(); ++p)
                      {
+                        static float sRadToDeg = 180.0f / M_PI;
+                        
                         MHWRender::MLightParameterInformation::StockParameterSemantic semantic = lpi->parameterSemantic(params[p]);
                         MHWRender::MLightParameterInformation::ParameterType type = lpi->parameterType(params[p]);
                         
@@ -294,7 +296,7 @@ public:
                             type == MHWRender::MLightParameterInformation::kFloat)
                         {
                            lpi->getParameter(params[p], vals);
-                           cutoff = acosf(vals[0]);
+                           cutoff = acosf(vals[0]) * sRadToDeg;
                         }
                         else if (semantic == MHWRender::MLightParameterInformation::kDropoff &&
                                  type == MHWRender::MLightParameterInformation::kFloat)
