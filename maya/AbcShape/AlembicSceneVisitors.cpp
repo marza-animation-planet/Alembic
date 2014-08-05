@@ -104,6 +104,92 @@ void WorldUpdate::leave(AlembicNode &node, AlembicNode *)
 
 // ---
 
+GetFrameRange::GetFrameRange()
+   : mStartFrame(std::numeric_limits<double>::max())
+   , mEndFrame(-std::numeric_limits<double>::max())
+{
+}
+   
+AlembicNode::VisitReturn GetFrameRange::enter(AlembicXform &node, AlembicNode *instance)
+{
+   if (!instance)
+   {
+      updateFrameRange(node);
+   }
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn GetFrameRange::enter(AlembicMesh &node, AlembicNode *instance)
+{
+   if (!instance)
+   {
+      updateFrameRange(node);
+   }
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn GetFrameRange::enter(AlembicSubD &node, AlembicNode *instance)
+{
+   if (!instance)
+   {
+      updateFrameRange(node);
+   }
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn GetFrameRange::enter(AlembicPoints &node, AlembicNode *instance)
+{
+   if (!instance)
+   {
+      updateFrameRange(node);
+   }
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn GetFrameRange::enter(AlembicCurves &node, AlembicNode *instance)
+{
+   if (!instance)
+   {
+      updateFrameRange(node);
+   }
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn GetFrameRange::enter(AlembicNuPatch &node, AlembicNode *instance)
+{
+   if (!instance)
+   {
+      updateFrameRange(node);
+   }
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn GetFrameRange::enter(AlembicNode &, AlembicNode *)
+{
+   return AlembicNode::ContinueVisit;
+}
+   
+void GetFrameRange::leave(AlembicNode &, AlembicNode *)
+{
+}
+
+
+bool GetFrameRange::getFrameRange(double &start, double &end) const
+{
+   if (mStartFrame < mEndFrame)
+   {
+      start = mStartFrame;
+      end = mEndFrame;
+      return true;
+   }
+   else
+   {
+      return false;
+   }
+}
+
+// ---
+
 CountShapes::CountShapes(bool ignoreInstances, bool ignoreVisibility)
    : mNoInstances(ignoreInstances)
    , mCheckVisibility(!ignoreVisibility)

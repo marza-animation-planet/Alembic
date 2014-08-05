@@ -513,7 +513,7 @@ double AbcShape::getFPS() const
 double AbcShape::computeAdjustedTime(const double inputTime, const double speed, const double timeOffset) const
 {
    #ifdef _DEBUG
-   std::cout << "[AbcTime] Adjust time: " << inputTime << " -> " << ((inputTime - timeOffset) * speed) << std::endl;
+   std::cout << "[AbcShape] Adjust time: " << (inputTime * getFPS()) << " -> " << ((inputTime - timeOffset) * speed * getFPS()) << std::endl;
    #endif
    
    return (inputTime - timeOffset) * speed;
@@ -591,7 +591,7 @@ double AbcShape::computeRetime(const double inputTime,
    }
 
    #ifdef _DEBUG
-   std::cout << "[AbcTime] Retime: " << inputTime << " -> " << retime << std::endl;
+   std::cout << "[AbcShape] Retime: " << (inputTime * getFPS()) << " -> " << (retime * getFPS()) << std::endl;
    #endif
    
    return retime;
@@ -655,6 +655,40 @@ void AbcShape::updateGeometry()
    mScene->visit(AlembicNode::VisitDepthFirst, visitor);
 }
 
+bool AbcShape::updateFrameRange()
+{
+   #ifdef _DEBUG
+   std::cout << "[AbcShape] Update frame range" << std::endl;
+   #endif
+   
+   GetFrameRange visitor;
+   mScene->visit(AlembicNode::VisitDepthFirst, visitor);
+   
+   double start, end;
+   
+   if (visitor.getFrameRange(start, end))
+   {
+      double fps = getFPS();
+      start *= fps;
+      end *= fps;
+      
+      if (fabs(mStartFrame - start) > 0.0001 ||
+          fabs(mEndFrame - end) > 0.0001)
+      {
+         #ifdef _DEBUG
+         std::cout << "[AbcShape] Frame range: " << start << "-" << end << std::endl;
+         #endif
+         
+         mStartFrame = start;
+         mEndFrame = end;
+         
+         return true;
+      }
+   }
+   
+   return false;
+}
+
 void AbcShape::printInfo(bool detailed) const
 {
    if (detailed)
@@ -688,6 +722,21 @@ bool AbcShape::updateInternals(const std::string &filePath, const std::string &o
       if (mScene)
       {
          updateObjectList = true;
+         
+         if (updateFrameRange())
+         {
+            // This will force instant refresh of AE values
+            // but won't trigger any update as mStartFrame and mEndFrame as unchanged
+            MPlug plug(thisMObject(), aStartFrame);
+            plug.setDouble(mStartFrame);
+            
+            plug.setAttribute(aEndFrame);
+            plug.setDouble(mEndFrame);
+            
+            // update sample time
+            t = getSampleTime();
+            timeChanged = (fabs(t - mSampleTime) > 0.0001);
+         }
       }
       else
       {
@@ -920,41 +969,45 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
    else if (plug == aTime)
    {
       t = handle.asTime();
-      sampleTimeUpdate = true;
+      sampleTimeUpdate = (fabs(t.as(MTime::kSeconds) - mTime.as(MTime::kSeconds)) > 0.0001);
    }
    else if (plug == aSpeed)
    {
       s = handle.asDouble();
-      sampleTimeUpdate = true;
+      sampleTimeUpdate = (fabs(s - mSpeed) > 0.0001);
    }
    else if (plug == aPreserveStartFrame)
    {
       psf = handle.asBool();
-      sampleTimeUpdate = true;
+      sampleTimeUpdate = (psf != mPreserveStartFrame);
    }
    else if (plug == aOffset)
    {
       o = handle.asDouble();
-      sampleTimeUpdate = true;
+      sampleTimeUpdate = (fabs(o - mOffset) > 0.0001);
    }
    else if (plug == aCycleType)
    {
       c = (CycleType) handle.asShort();
-      sampleTimeUpdate = true;
+      sampleTimeUpdate = (c != mCycleType);
    }
    else if (plug == aStartFrame)
    {
       sf = handle.asDouble();
-      sampleTimeUpdate = true;
+      sampleTimeUpdate = (fabs(sf - mStartFrame) > 0.0001);
    }
    else if (plug == aEndFrame)
    {
       ef = handle.asDouble();
-      sampleTimeUpdate = true;
+      sampleTimeUpdate = (fabs(ef - mEndFrame) > 0.0001);
    }
    else if (plug == aNumShapes)
    {
       return false;
+   }
+   else
+   {
+      return MPxNode::setInternalValueInContext(plug, handle, ctx);
    }
    
    if (sampleTimeUpdate)
@@ -973,7 +1026,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
    }
    else
    {
-      return MPxNode::setInternalValueInContext(plug, handle, ctx);
+      return true;
    }
 }
 

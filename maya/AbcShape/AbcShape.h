@@ -115,6 +115,7 @@ private:
     void updateInternals();
     bool updateInternals(const std::string &filePath, const std::string &objectExpression, double st, bool forceGeometrySampling=false);
     
+    bool updateFrameRange();
     void updateWorld();
     void updateSceneBounds();
     void updateShapesCount();
