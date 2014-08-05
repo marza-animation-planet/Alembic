@@ -101,6 +101,13 @@ public:
    const AlembicNode* master() const;
    AlembicNode* instance(size_t i);
    const AlembicNode* instance(size_t i) const;
+   
+   bool isLocator() const;
+   const Alembic::Abc::IScalarProperty& locatorProperty() const;
+   void setLocatorPosition(const Alembic::Abc::V3d &p);
+   void setLocatorScale(const Alembic::Abc::V3d &s);
+   inline const Alembic::Abc::V3d& locatorPosition() const { return mLocatorPosition; }
+   inline const Alembic::Abc::V3d& locatorScale() const { return mLocatorScale; }
 
    inline const Alembic::Abc::Box3d selfBounds() const { return (mMaster ? mMaster->selfBounds() : mSelfBounds); }
    inline const Alembic::Abc::M44d selfMatrix() const { return (mMaster ? mMaster->selfMatrix() : mSelfMatrix); }
@@ -208,6 +215,8 @@ public:
    }
    
 protected:
+
+   void setType(NodeType nt);
    
    void addInstance(AlembicNode *node);
    void removeInstance(AlembicNode *node);
@@ -236,6 +245,10 @@ protected:
    
    Alembic::Abc::Box3d mChildBounds;
    Alembic::Abc::M44d mWorldMatrix;
+   
+   Alembic::Abc::IScalarProperty mLocatorProp;
+   Alembic::Abc::V3d mLocatorPosition;
+   Alembic::Abc::V3d mLocatorScale;
    
    bool mInheritsTransform;
    
@@ -353,6 +366,8 @@ public:
       double dataTime;
       double dataWeight;
       Alembic::AbcCoreAbstract::index_t dataIndex;
+      
+      double locator[6];
    };
    
 public:
@@ -360,14 +375,14 @@ public:
    AlembicNodeT()
       : AlembicNode()
    {
-      mType = (NodeType) ClassToType<ThisType>::Type;
+      setType((NodeType) ClassToType<ThisType>::Type);
       initSamples();
    }
    
    AlembicNodeT(IClass iObject, AlembicNode *iParent=0)
       : AlembicNode(iObject, iParent), mITypedObj(iObject)
    {
-      mType = (NodeType) ClassToType<ThisType>::Type;
+      setType((NodeType) ClassToType<ThisType>::Type);
       initSamples();
    }
    
@@ -454,33 +469,13 @@ public:
    // use updated optional argument to know wether or not dataa has been re-sampled
    bool sampleData(double t, bool *updated=0)
    {
-      ISchemaClass &schema = mITypedObj.getSchema();
-      
-      bool weightsChanged = false;
-      
-      if (needsDataReSampling(schema, t, weightsChanged))
+      if (isLocator())
       {
-         #ifdef _DEBUG
-         std::cout << "Sample " << typeName() << " data for \"" << path() << "\"" << std::endl;
-         #endif
-         findDataSamples(schema, t);
-         
-         if (updated)
-         {
-            *updated = true;
-         }
-         
-         return sampleDataInternal(schema);
+         return sampleData(locatorProperty(), t, updated);
       }
       else
       {
-         // Note: weights may have changed
-         if (updated)
-         {
-            *updated = weightsChanged;
-         }
-         
-         return true;
+         return sampleData(mITypedObj.getSchema(), t, updated);
       }
    }
    
@@ -517,7 +512,19 @@ protected:
    void resetSamplesData()
    {
       mSample0.reset(mITypedObj);
+      mSample0.locator[0] = 0.0;
+      mSample0.locator[1] = 0.0;
+      mSample0.locator[2] = 0.0;
+      mSample0.locator[3] = 1.0;
+      mSample0.locator[4] = 1.0;
+      mSample0.locator[5] = 1.0;
       mSample1.reset(mITypedObj);
+      mSample1.locator[0] = 0.0;
+      mSample1.locator[1] = 0.0;
+      mSample1.locator[2] = 0.0;
+      mSample1.locator[3] = 1.0;
+      mSample1.locator[4] = 1.0;
+      mSample1.locator[5] = 1.0;
    }
    
    bool updateBoundsSampleWeights(double t)
@@ -615,7 +622,52 @@ protected:
       }
    }
    
-   bool needsDataReSampling(ISchemaClass &, double t, bool &weightsChanged)
+   bool needsDataReSampling(const Alembic::Abc::IScalarProperty &locatorProp, double t, bool &weightsChanged)
+   {
+      if (mSample0.dataIndex < 0) 
+      {
+         return true;
+      }
+      else
+      {
+         if (locatorProp.isConstant())
+         {
+            weightsChanged = false;
+            return false;
+         }
+         else
+         {
+            if (fabs(t - mSample0.dataTime) > 0.0001)
+            {
+               weightsChanged = updateDataSampleWeights(t);
+               return !weightsChanged;
+            }
+            else if (mSample0.dataWeight < 1.0)
+            {
+               // Don't need to re-sample geometry, but update blend weights if necessary
+               #ifdef _DEBUG
+               std::cout << path() << ": Reset data blend weights" << std::endl;
+               #endif
+               
+               if (mSample1.dataIndex >= 0)
+               {
+                  mSample1.dataWeight = 0.0;
+               }
+               mSample0.dataWeight = 1.0;
+               
+               weightsChanged = true;
+               return false;
+            }
+            else
+            {
+               weightsChanged = false;
+               return false;
+            }
+         }
+      }
+   }
+   
+   bool needsDataReSampling(const ISchemaClass &, double t, bool &weightsChanged)
    {
       if (mSample0.dataIndex < 0 || !mSample0.valid(mITypedObj))
       {
@@ -673,11 +725,12 @@ protected:
       mSample1.boundsWeight = blend;
    }
    
-   void findDataSamples(ISchemaClass &schema, double t)
+   template <class T>
+   void findDataSamples(const T &target, double t)
    {
       double blend = 0.0;
       
-      getSamplesInfo(t, schema,
+      getSamplesInfo(t, target,
                      mSample0.dataIndex, mSample1.dataIndex,
                      mSample0.dataTime, mSample1.dataTime,
                      blend);
@@ -700,7 +753,52 @@ protected:
       return true;
    }
    
-   bool sampleDataInternal(ISchemaClass &)
+   template <class T>
+   bool sampleData(const T &target, double t, bool *updated=0)
+   {
+      bool weightsChanged = false;
+      
+      if (needsDataReSampling(target, t, weightsChanged))
+      {
+         #ifdef _DEBUG
+         std::cout << "Sample " << (isLocator() ? "locator" : typeName()) << " data for \"" << path() << "\"" << std::endl;
+         #endif
+         findDataSamples(target, t);
+         
+         if (updated)
+         {
+            *updated = true;
+         }
+         
+         return sampleDataInternal(target);
+      }
+      else
+      {
+         // Note: weights may have changed
+         if (updated)
+         {
+            *updated = weightsChanged;
+         }
+         
+         return true;
+      }
+   }
+   
+   bool sampleDataInternal(const Alembic::Abc::IScalarProperty &locatorProp)
+   {
+      resetSamplesData();
+      
+      locatorProp.get(mSample0.locator, mSample0.dataIndex);
+      
+      if (mSample1.dataWeight > 0.0)
+      {
+         locatorProp.get(mSample1.locator, mSample1.dataIndex);
+      }
+      
+      return true;
+   }
+   
+   bool sampleDataInternal(const ISchemaClass &)
    {
       resetSamplesData();
       

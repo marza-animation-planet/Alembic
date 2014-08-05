@@ -21,6 +21,8 @@ AlembicNode::AlembicNode()
    mChildBounds.makeEmpty();
    mSelfMatrix.makeIdentity();
    mWorldMatrix.makeIdentity();
+   mLocatorPosition.setValue(0, 0, 0);
+   mLocatorScale.setValue(1, 1, 1);
 }
 
 AlembicNode::AlembicNode(Alembic::Abc::IObject iObj, AlembicNode *parent)
@@ -37,6 +39,8 @@ AlembicNode::AlembicNode(Alembic::Abc::IObject iObj, AlembicNode *parent)
    mChildBounds.makeEmpty();
    mSelfMatrix.makeIdentity();
    mWorldMatrix.makeIdentity();
+   mLocatorPosition.setValue(0, 0, 0);
+   mLocatorScale.setValue(1, 1, 1);
    
    if (mIObj.valid())
    {
@@ -362,26 +366,40 @@ void AlembicNode::updateChildBounds()
       
       mSelfBounds.makeEmpty();
       
+      bool allInfinite = true;
+      
       for (Array::iterator it = beginChild(); it != endChild(); ++it)
       {
          bb = (*it)->childBounds();
-         if (!bb.isEmpty())
+         if (!bb.isInfinite())
          {
             mChildBounds.extendBy(bb);
+            allInfinite = false;
          }
          
          bb = (*it)->selfBounds();
-         if (!bb.isEmpty())
+         if (!bb.isInfinite())
          {
             mSelfBounds.extendBy(bb);
          }
+      }
+      
+      // Only make bounds infinite if all children have inifnite bounds
+      if (allInfinite)
+      {
+         mSelfBounds.makeInfinite();
+         mChildBounds.makeInfinite();
       }
    }
    else
    {
       Alembic::Abc::Box3d bb = selfBounds();
       
-      if (!bb.isEmpty())
+      if (bb.isInfinite())
+      {
+         mChildBounds.makeInfinite();
+      }
+      else if (!bb.isEmpty())
       {
          Alembic::Abc::V3d bbmin = bb.min;
          Alembic::Abc::V3d bbmax = bb.max;
@@ -536,59 +554,57 @@ Alembic::Abc::IObject AlembicNode::object() const
    return mIObj;
 }
 
-/*
-void AlembicNode::getSamplesInfo(double iFrame,
-                                 Alembic::AbcCoreAbstract::TimeSamplingPtr iTime,
-                                 size_t numSamps,
-                                 Alembic::AbcCoreAbstract::index_t &oFloorIndex,
-                                 Alembic::AbcCoreAbstract::index_t &oCeilIndex,
-                                 double &oFloorFrame,
-                                 double &oCeilFrame,
-                                 double &oBlend) const
+void AlembicNode::setType(AlembicNode::NodeType nt)
 {
-    if (numSamps == 0)
-    {
-        numSamps = 1;
-    }
+   mLocatorProp.reset();
+   
+   if (nt == TypeXform && mIObj.valid())
+   {
+      Alembic::Abc::ICompoundProperty props = mIObj.getProperties();
+      
+      if (props.valid())
+      {
+         const Alembic::AbcCoreAbstract::PropertyHeader *header = props.getPropertyHeader("locator");
 
-    std::pair<Alembic::AbcCoreAbstract::index_t, double> floorTime = iTime->getFloorIndex(iFrame, numSamps);
-
-    oFloorIndex = floorTime.first;
-    oFloorFrame = floorTime.second;
-    oCeilIndex = oFloorIndex;
-    oCeilFrame = oFloorFrame;
-    
-    if (fabs(iFrame - floorTime.second) < 0.0001)
-    {
-        oBlend = 0.0;
-        return;
-    }
-
-    std::pair<Alembic::AbcCoreAbstract::index_t, double> ceilTime = iTime->getCeilIndex(iFrame, numSamps);
-
-    if (oFloorIndex == ceilTime.first)
-    {
-        oBlend = 0.0;
-        return;
-    }
-
-    oCeilIndex = ceilTime.first;
-    oCeilFrame = ceilTime.second;
-
-    double blend = (iFrame - floorTime.second) / (ceilTime.second - floorTime.second);
-
-    if (fabs(1.0 - blend) < 0.0001)
-    {
-        oFloorIndex = oCeilIndex;
-        oFloorFrame = oCeilFrame;
-        oBlend = 0.0;
-    }
-    else
-    {
-        oBlend = blend;
-    }
+         if (header != 0 && header->isScalar() &&
+             header->getDataType().getPod() == Alembic::Util::kFloat64POD &&
+             header->getDataType().getExtent() == 6)
+         {
+            mLocatorProp = Alembic::Abc::IScalarProperty(props, "locator");
+            
+            mSelfBounds.makeInfinite();
+         }
+      }
+   }
+   
+   mType = nt;
 }
-*/
+
+bool AlembicNode::isLocator() const
+{
+   return (mType == TypeXform && mLocatorProp.valid());
+}
+
+const Alembic::Abc::IScalarProperty& AlembicNode::locatorProperty() const
+{
+   return mLocatorProp;
+}
+
+void AlembicNode::setLocatorPosition(const Alembic::Abc::V3d &p)
+{
+   if (isLocator())
+   {
+      mLocatorPosition = p;
+   }
+}
+
+void AlembicNode::setLocatorScale(const Alembic::Abc::V3d &s)
+{
+   if (isLocator())
+   {
+      mLocatorScale = s;
+   }
+}
 
 // ---
 

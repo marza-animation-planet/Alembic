@@ -105,6 +105,7 @@ public:
          {
             visitor.drawBounds(true);
             visitor.drawTransformBounds(shape->drawTransformBounds(), viewMatrix);
+            visitor.drawLocators(shape->drawLocators());
             
             shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
          }
@@ -118,6 +119,7 @@ public:
          visitor.drawBounds(false);
          visitor.drawAsPoints(true);
          visitor.drawTransformBounds(shape->drawTransformBounds(), viewMatrix);
+         visitor.drawLocators(shape->drawLocators());
          
          shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
       }
@@ -155,6 +157,7 @@ public:
             else
             {
                visitor.drawTransformBounds(shape->drawTransformBounds(), viewMatrix);
+               visitor.drawLocators(shape->drawLocators());
             }
             
             if (!setupLights(context))
@@ -174,6 +177,7 @@ public:
          if (drawWireframe)
          {
             visitor.drawWireframe(true);
+            visitor.drawLocators(shape->drawLocators());
             visitor.drawTransformBounds(shape->drawTransformBounds(), viewMatrix);
             
             glDisable(GL_LIGHTING);

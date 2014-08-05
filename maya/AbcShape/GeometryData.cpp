@@ -490,6 +490,55 @@ void DrawBox(const Alembic::Abc::Box3d &bounds, bool asPoints, float width)
 
 // ---
 
+void DrawLocator(const Alembic::Abc::V3d &p, const Alembic::Abc::V3d &s, float width)
+{
+   if (s.length2() < 0.01)
+   {
+      return;
+   }
+   
+   if (width > 0.0f)
+   {
+      glEnable(GL_LINE_SMOOTH);
+      glLineWidth(width);
+   }
+   
+   GLdouble curColor[4];
+   glGetDoublev(GL_CURRENT_COLOR, curColor);
+   
+   bool lightingOn = glIsEnabled(GL_LIGHTING);
+   
+   if (lightingOn)
+   {
+      glDisable(GL_LIGHTING);
+   }
+   
+   glBegin(GL_LINES);
+   
+   glColor3d(0.7, 0, 0);
+   glVertex3d(p.x - s.x, p.y, p.z);
+   glVertex3d(p.x + s.x, p.y, p.z);
+   
+   glColor3d(0, 0.7, 0);
+   glVertex3d(p.x, p.y - s.y, p.z);
+   glVertex3d(p.x, p.y + s.y, p.z);
+   
+   glColor3d(0, 0, 0.7);
+   glVertex3d(p.x, p.y, p.z - s.z);
+   glVertex3d(p.x, p.y, p.z + s.z);
+   
+   if (lightingOn)
+   {
+      glEnable(GL_LIGHTING);
+   }
+   
+   glColor4dv(curColor);
+   
+   glEnd();
+}
+
+// ---
+
 SceneGeometryData::SceneGeometryData()
 {
 }

@@ -165,6 +165,8 @@ class CountShapes
 {
 public:
    
+   // Note: doesn't count locators as shapes
+   
    CountShapes(bool ignoreInstances, bool ignoreVisibility);
    
    AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
@@ -358,6 +360,7 @@ public:
    inline void doCull(const Frustum &f) { mCull = true; mFrustum = f; }
    inline void dontCull() { mCull = false; }
    inline void drawTransformBounds(bool on, const Alembic::Abc::M44d &view) { mTransformBounds = on; setViewMatrix(view); }
+   inline void drawLocators(bool on) { mLocators = on; }
    void setViewMatrix(const Alembic::Abc::M44d &view);
    
 private:
@@ -380,6 +383,7 @@ private:
    Frustum mFrustum;
    const SceneGeometryData *mSceneData;
    bool mTransformBounds;
+   bool mLocators;
    Alembic::Abc::M44d mViewMatrixInv;
    std::deque<Alembic::Abc::M44d> mMatrixStack;
    std::set<AlembicNode*> mCulledNodes;

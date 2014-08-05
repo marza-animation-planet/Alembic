@@ -109,9 +109,12 @@ global proc AEAbcShapeTemplate(string $nodeName)
    editorTemplate -label "Ignore Visibility" -addControl "ignoreVisibility";
    editorTemplate -endNoOptimize;
    editorTemplate -addSeparator;
+   editorTemplate -beginNoOptimize;
+   editorTemplate -label "Draw Locators" -addControl "drawLocators";
    editorTemplate -label "Draw Transform Bounds" -addControl "drawTransformBounds";
    editorTemplate -label "Point Width" -addControl "pointWidth";
    editorTemplate -label "Line Width" -addControl "lineWidth";
+   editorTemplate -endNoOptimize;
    editorTemplate -endLayout;
    
    source AEgeometryShapeTemplate;

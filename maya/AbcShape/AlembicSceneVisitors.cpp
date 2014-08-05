@@ -20,6 +20,8 @@ AlembicNode::VisitReturn WorldUpdate::enter(AlembicXform &node, AlembicNode *ins
 {
    bool updated = true;
    
+   bool locator = node.isLocator();
+   
    if (node.sampleBounds(mTime, &updated))
    {
       if (updated)
@@ -29,29 +31,65 @@ AlembicNode::VisitReturn WorldUpdate::enter(AlembicXform &node, AlembicNode *ins
          
          if (samp1.dataWeight > 0.0)
          {
-            if (samp0.data.getInheritsXforms() != samp1.data.getInheritsXforms())
+            if (locator)
             {
-               std::cout << node.path() << ": Animated inherits transform property found, use first sample value" << std::endl;
-               node.setSelfMatrix(samp0.data.getMatrix());
+               Alembic::Abc::V3d v0, v1;
+               
+               v0.setValue(samp0.locator[0], samp0.locator[1], samp0.locator[2]);
+               v1.setValue(samp1.locator[0], samp1.locator[1], samp1.locator[2]);
+               
+               node.setLocatorPosition(samp0.dataWeight * v0 + samp1.dataWeight * v1);
+               
+               v0.setValue(samp0.locator[3], samp0.locator[4], samp0.locator[5]);
+               v1.setValue(samp1.locator[3], samp1.locator[4], samp1.locator[5]);
+               
+               node.setLocatorScale(samp0.dataWeight * v0 + samp1.dataWeight * v1);
             }
             else
             {
-               node.setSelfMatrix(samp0.dataWeight * samp0.data.getMatrix() +
-                                  samp1.dataWeight * samp1.data.getMatrix());
+               if (samp0.data.getInheritsXforms() != samp1.data.getInheritsXforms())
+               {
+                  std::cout << node.path() << ": Animated inherits transform property found, use first sample value" << std::endl;
+                  node.setSelfMatrix(samp0.data.getMatrix());
+               }
+               else
+               {
+                  node.setSelfMatrix(samp0.dataWeight * samp0.data.getMatrix() +
+                                     samp1.dataWeight * samp1.data.getMatrix());
+               }
             }
          }
          else
          {
-            node.setSelfMatrix(samp0.data.getMatrix());
+            if (locator)
+            {
+               node.setLocatorPosition(Alembic::Abc::V3d(samp0.locator[0], samp0.locator[1], samp0.locator[2]));
+               node.setLocatorScale(Alembic::Abc::V3d(samp0.locator[3], samp0.locator[4], samp0.locator[5]));
+            }
+            else
+            {
+               node.setSelfMatrix(samp0.data.getMatrix());
+            }
          }
          
-         node.setInheritsTransform(samp0.data.getInheritsXforms());
+         if (!locator)
+         {
+            node.setInheritsTransform(samp0.data.getInheritsXforms());
+         }
       }
    }
    else
    {
-      Alembic::Abc::M44d id;
-      node.setSelfMatrix(id);
+      if (locator)
+      {
+         node.setLocatorPosition(Alembic::Abc::V3d(0, 0, 0));
+         node.setLocatorScale(Alembic::Abc::V3d(1, 1, 1));
+      }
+      else
+      {
+         Alembic::Abc::M44d id;
+         node.setSelfMatrix(id);
+      }
    }
    
    return anyEnter(node, instance);
@@ -114,8 +152,25 @@ AlembicNode::VisitReturn GetFrameRange::enter(AlembicXform &node, AlembicNode *i
 {
    if (!instance)
    {
-      updateFrameRange(node);
+      if (node.isLocator())
+      {
+         const Alembic::Abc::IScalarProperty &prop = node.locatorProperty();
+         
+         Alembic::AbcCoreAbstract::TimeSamplingPtr ts = prop.getTimeSampling();
+         size_t nsamples = prop.getNumSamples();
+         
+         if (nsamples > 1)
+         {
+            mStartFrame = std::min(ts->getSampleTime(0), mStartFrame);
+            mEndFrame = std::max(ts->getSampleTime(nsamples-1), mEndFrame);
+         }
+      }
+      else
+      {
+         updateFrameRange(node);
+      }
    }
+   
    return AlembicNode::ContinueVisit;
 }
 
@@ -391,6 +446,7 @@ DrawGeometry::DrawGeometry(const SceneGeometryData *sceneData,
    , mCull(false)
    , mSceneData(sceneData)
    , mTransformBounds(false)
+   , mLocators(false)
 {
 }
 
@@ -408,6 +464,11 @@ bool DrawGeometry::cull(AlembicNode &node)
    else
    {
       Alembic::Abc::Box3d bounds = (mNoTransforms ? node.selfBounds() : node.childBounds());
+      
+      if (bounds.isInfinite())
+      {
+         return false;
+      }
       
       bool culled = (bounds.isEmpty() || mFrustum.isBoxTotallyOutside(bounds));
       
@@ -618,6 +679,15 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicXform &node, AlembicNode *in
       return AlembicNode::DontVisitChildren;
    }
    
+   if (node.isLocator())
+   {
+      if (mLocators)
+      {
+         DrawLocator(node.locatorPosition(), node.locatorScale(), mLineWidth);
+      }
+      return AlembicNode::ContinueVisit;
+   }
+   
    if (mTransformBounds)
    {
       Alembic::Abc::M44d currentMatrix;
@@ -701,7 +771,7 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicNode &node, AlembicNode *)
  
 void DrawGeometry::leave(AlembicXform &node, AlembicNode *instance)
 {
-   if (isVisible(node) && !culled(instance ? *instance : node) && !mNoTransforms)
+   if (isVisible(node) && !culled(instance ? *instance : node) && !node.isLocator() && !mNoTransforms)
    {
       if (mMatrixStack.size() > 0)
       {
@@ -741,6 +811,7 @@ AlembicNode::VisitReturn PrintInfo::enter(AlembicNode &node, AlembicNode *)
       std::cout << "  inherits transform: " << node.inheritsTransform() << std::endl;
       std::cout << "  self matrix: " << node.selfMatrix() << std::endl;
       std::cout << "  self bounds: " << node.selfBounds().min << " - " << node.selfBounds().max << std::endl;
+      std::cout << "  locator: " << node.isLocator() << std::endl;
       
       if (!mNoTransforms)
       {

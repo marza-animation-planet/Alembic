@@ -193,6 +193,8 @@ private:
 
 void DrawBox(const Alembic::Abc::Box3d &bounds, bool asPoints=false, float width=0.0f);
 
+void DrawLocator(const Alembic::Abc::V3d &p, const Alembic::Abc::V3d &s, float width=0.0f);
+
 // ---
 
 class SceneGeometryData

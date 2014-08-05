@@ -57,6 +57,7 @@ MObject AbcShape::aNumShapes;
 MObject AbcShape::aPointWidth;
 MObject AbcShape::aLineWidth;
 MObject AbcShape::aDrawTransformBounds;
+MObject AbcShape::aDrawLocators;
 
 void* AbcShape::creator()
 {
@@ -258,6 +259,15 @@ MStatus AbcShape::initialize()
    stat = addAttribute(aDrawTransformBounds);
    MCHECKERROR(stat, "Could not add 'drawTransformBounds' attribute");
    
+   aDrawLocators = nAttr.create("drawLocators", "dl", MFnNumericData::kBoolean, 0, &stat);
+   MCHECKERROR(stat, "Could not create 'drawLocators' attribute");
+   nAttr.setWritable(true);
+   nAttr.setStorable(true);
+   nAttr.setKeyable(true);
+   nAttr.setInternal(true);
+   stat = addAttribute(aDrawLocators);
+   MCHECKERROR(stat, "Could not add 'drawLocators' attribute");
+   
    return MS::kSuccess;
 }
 
@@ -279,6 +289,7 @@ AbcShape::AbcShape()
    , mLineWidth(0.0f)
    , mPreserveStartFrame(false)
    , mDrawTransformBounds(false)
+   , mDrawLocators(false)
 {
 }
 
@@ -319,7 +330,7 @@ bool AbcShape::ignoreCulling() const
    }
 }
 
-MStatus AbcShape::compute(const MPlug &, MDataBlock &)
+MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
 {
    return MS::kUnknownParameter;
 }
@@ -870,6 +881,11 @@ bool AbcShape::getInternalValueInContext(const MPlug &plug, MDataHandle &handle,
       handle.setBool(mDrawTransformBounds);
       return true;
    }
+   else if (plug == aDrawLocators)
+   {
+      handle.setBool(mDrawLocators);
+      return true;
+   }
    else
    {
       return MPxNode::getInternalValueInContext(plug, handle, ctx);
@@ -966,6 +982,11 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       mDrawTransformBounds = handle.asBool();
       return true;
    }
+   else if (plug == aDrawLocators)
+   {
+      mDrawLocators = handle.asBool();
+      return true;
+   }
    else if (plug == aTime)
    {
       t = handle.asTime();
@@ -1054,6 +1075,7 @@ void AbcShape::copyInternalData(MPxNode *source)
       mDisplayMode = node->mDisplayMode;
       mPreserveStartFrame = node->mPreserveStartFrame;
       mDrawTransformBounds = node->mDrawTransformBounds;
+      mDrawLocators = node->mDrawLocators;
       
       // if mFilePath is identical, first referencing will avoid inadvertant destruction
       AlembicScene *scn = SceneCache::Ref(node->mFilePath);
@@ -1523,6 +1545,7 @@ void AbcShapeUI::drawBox(AbcShape *shape, const MDrawRequest &, M3dView &view) c
       
       DrawGeometry visitor(NULL, shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
       visitor.drawAsPoints(false);
+      visitor.drawLocators(shape->drawLocators());
       if (!shape->ignoreCulling() && computeFrustum(view, frustum))
       {
          visitor.doCull(frustum);
@@ -1564,6 +1587,7 @@ void AbcShapeUI::drawPoints(AbcShape *shape, const MDrawRequest &, M3dView &view
       visitor.drawAsPoints(true);
       visitor.setLineWidth(shape->lineWidth());
       visitor.setPointWidth(shape->pointWidth());
+      visitor.drawLocators(shape->drawLocators());
       if (!shape->ignoreCulling() && computeFrustum(view, frustum))
       {
          visitor.doCull(frustum);
@@ -1638,12 +1662,17 @@ void AbcShapeUI::drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dV
    {
       visitor.doCull(frustum);
    }
-   // only draw transform bounds when on wireframeOnShaded is set
-   if (shape->drawTransformBounds() && (!wireframeOnShaded || wireframe))
+   
+   // only draw transform bounds and locators once
+   if (!wireframeOnShaded || wireframe)
    {
-      Alembic::Abc::M44d viewMatrix;
-      getViewMatrix(view, viewMatrix);
-      visitor.drawTransformBounds(true, viewMatrix);
+      visitor.drawLocators(shape->drawLocators());
+      if (shape->drawTransformBounds())
+      {
+         Alembic::Abc::M44d viewMatrix;
+         getViewMatrix(view, viewMatrix);
+         visitor.drawTransformBounds(true, viewMatrix);
+      }
    }
    
    shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);

@@ -42,6 +42,7 @@ public:
     static MObject aPointWidth;
     static MObject aLineWidth;
     static MObject aDrawTransformBounds;
+    static MObject aDrawLocators;
     
     static void* creator();
     static void createdCallback(MObject& node, void* clientData);
@@ -96,6 +97,7 @@ public:
     inline float lineWidth() const { return mLineWidth; }
     inline float pointWidth() const { return mPointWidth; }
     inline bool drawTransformBounds() const { return mDrawTransformBounds; }
+    inline bool drawLocators() const { return mDrawLocators; }
     inline unsigned int numShapes() const { return mNumShapes; }
     
     bool ignoreCulling() const;
@@ -143,6 +145,7 @@ private:
     float mLineWidth;
     bool mPreserveStartFrame;
     bool mDrawTransformBounds;
+    bool mDrawLocators;
 };
 
 class AbcShapeUI : public MPxSurfaceShapeUI
