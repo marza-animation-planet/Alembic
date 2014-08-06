@@ -1,0 +1,771 @@
+#include "AbcShapeImport.h"
+#include <maya/MArgList.h>
+#include <maya/MArgParser.h>
+#include <maya/MSelectionList.h>
+#include <maya/MDagPath.h>
+#include <maya/MDagModifier.h>
+#include <maya/MGlobal.h>
+#include <maya/MNamespace.h>
+#include <maya/MFnDagNode.h>
+#include <maya/MAnimControl.h>
+#include <maya/MPlug.h>
+#include <maya/MSyntax.h>
+#include <maya/MTransformationMatrix.h>
+#include <maya/MFnTransform.h>
+#include <maya/MMatrix.h>
+#include <maya/MFnAnimCurve.h>
+#include <maya/MPoint.h>
+#include <maya/MVector.h>
+#include <maya/MEulerRotation.h>
+#include <maya/MTime.h>
+#include <maya/MAngle.h>
+#include <maya/MQuaternion.h>
+#include <maya/MFileObject.h>
+#include "AbcShape.h"
+#include "SceneCache.h"
+#include "AlembicSceneVisitors.h"
+#include "Keyframer.h"
+
+MSyntax AbcShapeImport::createSyntax()
+{
+   MSyntax syntax;
+   
+   syntax.addFlag("-m", "-mode", MSyntax::kString);
+   syntax.addFlag("-n", "-namespace", MSyntax::kString);
+   syntax.addFlag("-r", "-reparent", MSyntax::kString);
+   syntax.addFlag("-ftr", "-fitTimeRange", MSyntax::kNoArg);
+   syntax.addFlag("-sts", "-setToStartFrame", MSyntax::kNoArg);
+   syntax.addFlag("-ci", "-createInstances", MSyntax::kNoArg);
+   syntax.addFlag("-s", "-speed", MSyntax::kDouble);
+   syntax.addFlag("-o", "-offset", MSyntax::kDouble);
+   syntax.addFlag("-psf", "-preserveStartFrame", MSyntax::kNoArg);
+   syntax.addFlag("-ct", "-cycleType", MSyntax::kString);
+   syntax.addFlag("-ri", "-rotationInterpolation", MSyntax::kString);
+   syntax.addFlag("-h", "-help", MSyntax::kNoArg);
+   
+   syntax.addArg(MSyntax::kString);
+   
+   syntax.enableQuery(false);
+   syntax.enableEdit(false);
+   
+   return syntax;
+}
+
+void* AbcShapeImport::create()
+{
+   return new AbcShapeImport();
+}
+
+// ---
+
+class CreateTree
+{
+public:
+   
+   CreateTree(const std::string &abcPath,
+              AbcShape::DisplayMode mode,
+              bool createInstances,
+              double speed,
+              double offset,
+              bool preserveStartFrame,
+              AbcShape::CycleType cycleType);
+   
+   AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicSubD &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicPoints &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicCurves &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicNuPatch &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0);
+   
+   void leave(AlembicNode &node, AlembicNode *instance=0);
+
+   const MDagPath& getDag(const std::string &path) const;
+   
+   void keyTransforms(const MString &rotationInterpolation);
+   
+private:
+
+   template <class T>
+   AlembicNode::VisitReturn enterShape(AlembicNodeT<T> &node, AlembicNode *instance=0);
+   
+   bool hasDag(const std::string &path) const;
+   bool addDag(const std::string &path, const MDagPath &dag);
+   bool createDag(const char *dagType, AlembicNode *node);
+   
+private:
+   
+   std::string mAbcPath;
+   AbcShape::DisplayMode mMode;
+   bool mCreateInstances;
+   double mSpeed;
+   double mOffset;
+   bool mPreserveStartFrame;
+   AbcShape::CycleType mCycleType;
+   std::map<std::string, MDagPath> mCreatedDags;
+   Keyframer mKeyframer;
+};
+
+CreateTree::CreateTree(const std::string &abcPath,
+                       AbcShape::DisplayMode mode,
+                       bool createInstances,
+                       double speed,
+                       double offset,
+                       bool preserveStartFrame,
+                       AbcShape::CycleType cycleType)
+   : mAbcPath(abcPath)
+   , mMode(mode)
+   , mCreateInstances(createInstances)
+   , mSpeed(speed)
+   , mOffset(offset)
+   , mPreserveStartFrame(preserveStartFrame)
+   , mCycleType(cycleType)
+{
+}
+
+bool CreateTree::hasDag(const std::string &path) const
+{
+   return (mCreatedDags.find(path) != mCreatedDags.end());
+}
+
+const MDagPath& CreateTree::getDag(const std::string &path) const
+{
+   static MDagPath sInvalidDag;
+   std::map<std::string, MDagPath>::const_iterator it = mCreatedDags.find(path);
+   return (it != mCreatedDags.end() ? it->second : sInvalidDag);
+}
+
+bool CreateTree::addDag(const std::string &path, const MDagPath &dag)
+{
+   if (hasDag(path))
+   {
+      return false;
+   }
+   
+   mCreatedDags[path] = dag;
+   
+   return true;
+}
+
+bool CreateTree::createDag(const char *dagType, AlembicNode *node)
+{
+   if (!dagType || !node)
+   {
+      return false;
+   }
+   else if (!hasDag(node->path()))
+   {
+      MDagModifier dagmod;
+      MStatus status;
+      MObject parentObj = MObject::kNullObj;
+      AlembicNode *parent = node->parent();
+      
+      if (parent)
+      {
+         MDagPath parentDag = getDag(parent->path());
+         if (parentDag.isValid())
+         {
+            parentObj = parentDag.node();
+         }
+      }
+      
+      MObject obj = dagmod.createNode(dagType, parentObj, &status);
+      
+      if (status == MS::kSuccess && dagmod.doIt() == MS::kSuccess)
+      {
+         MDagPath dag;
+         
+         MDagPath::getAPathTo(obj, dag);
+         
+         dagmod.renameNode(obj, node->name().c_str());
+         dagmod.doIt();
+         
+         return addDag(node->path(), dag);
+      }
+      else
+      {
+         return false;
+      }
+   }
+   else
+   {
+      return true;
+   }
+}
+
+template <class T>
+AlembicNode::VisitReturn CreateTree::enterShape(AlembicNodeT<T> &node, AlembicNode *instance)
+{
+   AlembicNode *target = (instance ? instance : &node);
+   
+   if (!createDag("AbcShape", target))
+   {
+      return AlembicNode::StopVisit;
+   }
+   
+   // Set AbcShape (the order in which attributes are set is though as to have the lowest possible update cost)
+   MPlug plug;
+   MFnDagNode dagNode(getDag(target->path()));
+   
+   plug = dagNode.findPlug("ignoreXforms");
+   plug.setBool(true);
+   
+   plug = dagNode.findPlug("ignoreInstances");
+   plug.setBool(true);
+   
+   plug = dagNode.findPlug("ignoreVisibility");
+   plug.setBool(true);
+   
+   plug = dagNode.findPlug("cycleType");
+   plug.setShort(short(mCycleType));
+   
+   plug = dagNode.findPlug("speed");
+   plug.setDouble(mSpeed);
+   
+   plug = dagNode.findPlug("offset");
+   plug.setDouble(mOffset);
+   
+   plug = dagNode.findPlug("preserveStartFrame");
+   plug.setBool(mPreserveStartFrame);
+   
+   plug = dagNode.findPlug("objectExpression");
+   plug.setString(node.path().c_str());
+   
+   plug = dagNode.findPlug("filePath");
+   plug.setString(mAbcPath.c_str());
+   
+   plug = dagNode.findPlug("displayMode");
+   plug.setShort(short(mMode));
+   
+   // add and key user attributes
+   
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn CreateTree::enter(AlembicMesh &node, AlembicNode *instance)
+{
+   return enterShape(node, instance);
+}
+
+AlembicNode::VisitReturn CreateTree::enter(AlembicSubD &node, AlembicNode *instance)
+{
+   return enterShape(node, instance);
+}
+
+AlembicNode::VisitReturn CreateTree::enter(AlembicPoints &node, AlembicNode *instance)
+{
+   return enterShape(node, instance);
+}
+
+AlembicNode::VisitReturn CreateTree::enter(AlembicCurves &node, AlembicNode *instance)
+{
+   return enterShape(node, instance);
+}
+
+AlembicNode::VisitReturn CreateTree::enter(AlembicNuPatch &node, AlembicNode *instance)
+{
+   return enterShape(node, instance);
+}
+
+AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *instance)
+{
+   AlembicNode *target = (instance ? instance : &node);
+   
+   if (node.isLocator())
+   {
+      if (!createDag("locator", target))
+      {
+         return AlembicNode::StopVisit;
+      }
+      // key locator attributes
+      // add and key user attributes
+   }
+   else
+   {
+      if (!createDag("transform", target))
+      {
+         return AlembicNode::StopVisit;
+      }
+      
+      Alembic::AbcGeom::IXformSchema schema = node.typedObject().getSchema();
+      
+      // key xform attributes, visibilty and inheritsTransform
+      
+      MFnTransform xform(getDag(target->path()));
+      MObject xformObj = xform.object();
+      
+      MPlug pIT = xform.findPlug("inheritsTransform");
+      
+      // Get default sample and set node state
+      Alembic::AbcGeom::XformSample sample = schema.getValue();
+      
+      MTransformationMatrix mmat(MMatrix(sample.getMatrix().x));
+      xform.set(mmat);
+      
+      bool inheritsXforms = sample.getInheritsXforms();
+      pIT.setBool(inheritsXforms);
+      
+      if (!schema.isConstant())
+      {
+         size_t numSamples = schema.getNumSamples();
+         
+         Alembic::AbcCoreAbstract::TimeSamplingPtr ts = schema.getTimeSampling();
+         
+         for (size_t i=0; i<numSamples; ++i)
+         {
+            Alembic::AbcCoreAbstract::index_t idx = i;
+            
+            double t = ts->getSampleTime(idx);
+            
+            Alembic::AbcGeom::XformSample sample = schema.getValue(Alembic::Abc::ISampleSelector(idx));
+            
+            MMatrix mmat(sample.getMatrix().x);
+            
+            mKeyframer.setCurrentTime(t);
+            mKeyframer.addTransformKey(xformObj, mmat);
+            mKeyframer.addInheritsTransformKey(xformObj, sample.getInheritsXforms());
+         }
+      }
+      
+      Alembic::Abc::ICompoundProperty props = node.object().getProperties();
+   
+      if (props.valid())
+      {
+         const Alembic::Abc::PropertyHeader *header = props.getPropertyHeader("visible");
+         
+         if (header)
+         {
+            if (Alembic::Abc::ICharProperty::matches(*header))
+            {
+               MPlug pVis = xform.findPlug("visibility");
+               
+               Alembic::Abc::ICharProperty prop(props, "visible");
+               Alembic::Util::int8_t v = 1;
+               
+               prop.get(v);
+               pVis.setBool(v != 0);
+                  
+               if (!prop.isConstant())
+               {
+                  Alembic::AbcCoreAbstract::TimeSamplingPtr ts = prop.getTimeSampling();
+                  
+                  size_t numSamples = prop.getNumSamples();
+                  
+                  for (size_t i=0; i<numSamples; ++i)
+                  {
+                     Alembic::AbcCoreAbstract::index_t idx = i;
+                     
+                     double t = ts->getSampleTime(idx);
+                     
+                     prop.get(v, Alembic::Abc::ISampleSelector(idx));
+                     
+                     mKeyframer.setCurrentTime(t);
+                     mKeyframer.addVisibilityKey(xformObj, v != 0);
+                  }
+               }
+            }
+            else if (Alembic::Abc::IBoolProperty::matches(*header))
+            {
+               MPlug pVis = xform.findPlug("visibility");
+               
+               Alembic::Abc::IBoolProperty prop(props, "visible");
+               Alembic::Util::bool_t v = true;
+               
+               prop.get(v);
+               pVis.setBool(v);
+                  
+               if (!prop.isConstant())
+               {
+                  Alembic::AbcCoreAbstract::TimeSamplingPtr ts = prop.getTimeSampling();
+                  
+                  size_t numSamples = prop.getNumSamples();
+                  
+                  for (size_t i=0; i<numSamples; ++i)
+                  {
+                     Alembic::AbcCoreAbstract::index_t idx = i;
+                     
+                     double t = ts->getSampleTime(idx);
+                     
+                     prop.get(v, Alembic::Abc::ISampleSelector(idx));
+                     
+                     mKeyframer.setCurrentTime(t);
+                     mKeyframer.addVisibilityKey(xformObj, v);
+                  }
+               }
+            }
+         }
+      }
+   }
+   
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn CreateTree::enter(AlembicNode &node, AlembicNode *)
+{
+   if (node.isInstance())
+   {
+      if (mCreateInstances)
+      {
+         // get master
+         // need to be sure master is created befoer
+         AlembicNode::VisitReturn rv = node.master()->enter(*this);
+         if (rv != AlembicNode::ContinueVisit)
+         {
+            return rv;
+         }
+         
+         MDagPath masterDag = getDag(node.masterPath());
+         
+         if (!masterDag.isValid())
+         {
+            return AlembicNode::StopVisit;
+         }
+         
+         if (!node.parent())
+         {
+            return AlembicNode::StopVisit;
+         }
+         
+         MDagPath parentDag = getDag(node.parent()->path());
+         
+         if (!parentDag.isValid())
+         {
+            return AlembicNode::StopVisit;
+         }
+         
+         MFnDagNode parentNode(parentDag);
+         MObject masterObj = masterDag.node();
+         
+         if (parentNode.addChild(masterObj, MFnDagNode::kNextPos, true) != MS::kSuccess)
+         {
+            return AlembicNode::StopVisit;
+         }
+         
+         return AlembicNode::DontVisitChildren;
+      }
+      else
+      {
+         return node.master()->enter(*this, &node);
+      }
+   }
+   
+   return AlembicNode::ContinueVisit;
+}
+
+void CreateTree::leave(AlembicNode &, AlembicNode *)
+{
+}
+
+void CreateTree::keyTransforms(const MString &rotationInterpolation)
+{
+   MFnAnimCurve::InfinityType inf = MFnAnimCurve::kConstant;
+   
+   // Note: CT_reverse is like CT_hold as far as infinity is concerned
+   
+   switch (mCycleType)
+   {
+   case AbcShape::CT_loop:
+      inf = MFnAnimCurve::kCycle;
+      break;
+   case AbcShape::CT_bounce:
+      inf = MFnAnimCurve::kOscillate;
+   default:
+      break;
+   }
+   
+   mKeyframer.createCurves(inf, inf);
+   mKeyframer.setRotationCurvesInterpolation(rotationInterpolation);
+}
+
+// ---
+
+AbcShapeImport::AbcShapeImport()
+   : MPxCommand()
+{
+}
+
+AbcShapeImport::~AbcShapeImport()
+{
+}
+
+bool AbcShapeImport::hasSyntax() const
+{
+   return true;
+}
+
+bool AbcShapeImport::isUndoable() const
+{
+   return false;
+}
+
+MStatus AbcShapeImport::doIt(const MArgList& args)
+{
+   MStatus status;
+   
+   MArgParser argData(syntax(), args, &status);
+   
+   MString filename("");
+   MString mode("box");
+   MString parent("");
+   MString ns("");
+   MString rotInterp("quaternion");
+   MString curNs = MNamespace::currentNamespace();
+   AbcShape::DisplayMode dm = AbcShape::DM_box;
+   AbcShape::CycleType ct = AbcShape::CT_hold;
+   double speed = 1.0;
+   double offset = 0.0;
+   
+   MDagPath parentDag;
+   
+   bool fitTimeRange = argData.isFlagSet("fitTimeRange");
+   bool setToStartFrame = argData.isFlagSet("setToStartFrame");
+   bool createInstances = argData.isFlagSet("createInstances");
+   bool preserveStartFrame = argData.isFlagSet("preserveStartFrame");
+   
+   if (argData.isFlagSet("help"))
+   {
+      MGlobal::displayInfo("AbcShapeImport [options] abc_file_path");
+      MGlobal::displayInfo("Options:");
+      MGlobal::displayInfo("-r / -reparent               : dagpath");
+      MGlobal::displayInfo("                               Reparent the whole hierarchy under a node in the current Maya scene.");
+      MGlobal::displayInfo("-n / -namespace              : string");
+      MGlobal::displayInfo("                               Namespace to add nodes to (default to current namespace).");
+      MGlobal::displayInfo("-m / -mode                   : string (box|boxes|points|geometry)");
+      MGlobal::displayInfo("                               AbcShape nodes display mode (default to box).");
+      MGlobal::displayInfo("-s / -speed                  : double");
+      MGlobal::displayInfo("                               AbcShape nodes speed (default to 1.0).");
+      MGlobal::displayInfo("-o / -offset                 : double");
+      MGlobal::displayInfo("                               AbcShape nodes offset (default to 0.0).");
+      MGlobal::displayInfo("-psf / -preserveStartFrame   :");
+      MGlobal::displayInfo("                               Preserve range start frame when using speed.");
+      MGlobal::displayInfo("-ct / -cycleType             : string (hold|loop|reverse|bounce)");
+      MGlobal::displayInfo("                               AbcShape nodes cycle type (default to hold).");
+      MGlobal::displayInfo("-ci / -createInstances       :");
+      MGlobal::displayInfo("                               Create maya instances.");
+      MGlobal::displayInfo("-ri / -rotationInterpolation : string (none|euler|quaternion|quaternionSlerp|quaternionSquad)");
+      MGlobal::displayInfo("                               Set created rotation curves interpolation type (default to quaternion).");
+      MGlobal::displayInfo("-ftr / -fitTimeRange         :");
+      MGlobal::displayInfo("                               Change Maya time slider to fit the range of input file.");
+      MGlobal::displayInfo("-sts / -setToStartFrame      :");
+      MGlobal::displayInfo("                               Set the current time to the start of the frame range.");
+      MGlobal::displayInfo("-h / -help                   :");
+      MGlobal::displayInfo("                               Display this help.");
+   }
+   
+   if (argData.isFlagSet("reparent"))
+   {
+      MSelectionList sl;
+      
+      status = argData.getFlagArgument("reparent", 0, parent);
+      
+      if (status != MS::kSuccess ||
+          sl.add(parent) != MS::kSuccess ||
+          sl.getDagPath(0, parentDag) != MS::kSuccess)
+      {
+         MGlobal::displayWarning(parent + " is not a valid dag path");
+      }
+   }
+   
+   if (argData.isFlagSet("namespace"))
+   {
+      status = argData.getFlagArgument("namespace", 0, ns);
+      
+      if (status != MS::kSuccess ||
+          (!MNamespace::namespaceExists(ns) && MNamespace::addNamespace(ns) != MS::kSuccess) ||
+          MNamespace::setCurrentNamespace(ns) != MS::kSuccess)
+      {
+         MGlobal::displayWarning(ns + " is not a valid namespace");
+      }
+   }
+   
+   if (argData.isFlagSet("speed"))
+   {
+      status = argData.getFlagArgument("speed", 0, speed);
+      
+      if (status != MS::kSuccess)
+      {
+         MGlobal::displayWarning("Invalid speed flag argument");
+      }
+   }
+   
+   if (argData.isFlagSet("offset"))
+   {
+      status = argData.getFlagArgument("offset", 0, offset);
+      
+      if (status != MS::kSuccess)
+      {
+         MGlobal::displayWarning("Invalid offset flag argument");
+      }
+   }
+   
+   if (argData.isFlagSet("mode"))
+   {
+      status = argData.getFlagArgument("mode", 0, mode);
+      
+      if (mode == "box")
+      {
+         dm = AbcShape::DM_box;
+      }
+      else if (mode == "boxes")
+      {
+         dm = AbcShape::DM_boxes;
+      }
+      else if (mode == "points")
+      {
+         dm = AbcShape::DM_points;
+      }
+      else if (mode == "geometry")
+      {
+         dm = AbcShape::DM_geometry;
+      }
+      else
+      {
+         MGlobal::displayWarning(mode + " is not a valid mode");
+      }
+   }
+   
+   if (argData.isFlagSet("cycleType"))
+   {
+      MString val;
+      status = argData.getFlagArgument("cycleType", 0, val);
+      
+      if (val == "hold")
+      {
+         ct = AbcShape::CT_hold;
+      }
+      else if (val == "loop")
+      {
+         ct = AbcShape::CT_loop;
+      }
+      else if (val == "reverse")
+      {
+         ct = AbcShape::CT_reverse;
+      }
+      else if (val == "bounce")
+      {
+         ct = AbcShape::CT_bounce;
+      }
+      else
+      {
+         MGlobal::displayWarning(val + " is not a valid cycleType value");
+      }
+   }
+   
+   if (argData.isFlagSet("rotationInterpolation"))
+   {
+      MString val;
+      status = argData.getFlagArgument("rotationInterpolation", 0, val);
+      
+      if (status == MS::kSuccess &&
+          (val == "none" ||
+           val == "euler" ||
+           val == "quaternion" ||
+           val == "quaternionSlerp" ||
+           val == "quaternionSquad"))
+      {
+         rotInterp = val;
+      }
+      else
+      {
+         MGlobal::displayWarning(val + " is not a valid rotationInterpolation value");
+      }
+   }
+   
+   status = argData.getCommandArgument(0, filename);
+   MStringArray result;
+   
+   if (status == MS::kSuccess)
+   {
+      MFileObject file;
+      file.setRawFullName(filename);
+      
+      if (!file.exists())
+      {
+         MGlobal::displayError("Invalid file path: " + filename);
+         status = MS::kFailure;
+      }
+      else
+      {
+         std::string abcPath = file.resolvedFullName().asChar();
+         
+         AlembicScene *scene = SceneCache::Ref(abcPath);
+         if (scene)
+         {
+            CreateTree visitor(abcPath, dm, createInstances, speed, offset, preserveStartFrame, ct);
+            scene->visit(AlembicNode::VisitDepthFirst, visitor);
+            
+            visitor.keyTransforms(rotInterp);
+            
+            if (parentDag.isValid())
+            {
+               MFnDagNode parentNode(parentDag);
+               
+               for (size_t i=0; i<scene->childCount(); ++i)
+               {
+                  MDagPath rootDag = visitor.getDag(scene->child(i)->path());
+                  if (rootDag.isValid())
+                  {
+                     MObject rootObj = rootDag.node();
+                     parentNode.addChild(rootObj);
+                     
+                     result.append(rootDag.fullPathName());
+                  }
+               }
+            }
+            
+            if (fitTimeRange || setToStartFrame)
+            {
+               double start, end;
+               
+               GetFrameRange visitor;
+               scene->visit(AlembicNode::VisitDepthFirst, visitor);
+               
+               if (visitor.getFrameRange(start, end))
+               {
+                  MTime startFrame(start, MTime::kSeconds);
+                  MTime endFrame(end, MTime::kSeconds);
+                  
+                  if (fitTimeRange)
+                  {
+                     MAnimControl::setAnimationStartEndTime(startFrame, endFrame);
+                     MAnimControl::setMinMaxTime(startFrame, endFrame);
+                  }
+                  if (setToStartFrame)
+                  {
+                     MAnimControl::setCurrentTime(startFrame);
+                  }
+               }
+            }
+            
+            if (result.length() == 0)
+            {
+               for (size_t i=0; i<scene->childCount(); ++i)
+               {
+                  MDagPath rootDag = visitor.getDag(scene->child(i)->path());
+                  if (rootDag.isValid())
+                  {
+                     result.append(rootDag.fullPathName());
+                  }
+               }
+            }
+            
+            SceneCache::Unref(scene);
+         }
+         else
+         {
+            MGlobal::displayError("Could not read scene from file: " + filename);
+            status = MS::kFailure;
+         }
+      }
+   }
+   
+   if (ns.length() > 0)
+   {
+      MNamespace::setCurrentNamespace(curNs);
+   }
+   
+   setResult(result);
+   
+   return status;
+}
+
