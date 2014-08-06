@@ -393,9 +393,19 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicPoints &node, AlembicNode 
 
 AlembicNode::VisitReturn SampleGeometry::enter(AlembicCurves &node, AlembicNode *)
 {
-   if (!hasBeenSampled(node) && node.sampleData(mTime))
+   bool updated = true;
+   
+   if (!hasBeenSampled(node) && node.sampleData(mTime, &updated))
    {
-      // ToDo
+      if (mSceneData)
+      {
+         CurvesData *data = mSceneData->curves(node);
+         if (data && (!data->isValid() || updated))
+         {
+            data->update(node);
+         }
+      }
+      
       setSampled(node);
    }
    
@@ -638,9 +648,33 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicCurves &node, AlembicNode *)
    }
    else
    {
-      #ifdef _DEBUG
-      std::cout << "No geometry data for curves yet (" << node.path() << ")" << std::endl;
-      #endif
+      if (mSceneData)
+      {
+         const CurvesData *data = mSceneData->curves(node);
+         if (data)
+         {
+            if (mAsPoints)
+            {
+               data->drawPoints(mPointWidth);
+            }
+            else
+            {
+               data->draw(mLineWidth);
+            }
+         }
+         else
+         {
+            #ifdef _DEBUG
+            std::cout << "No geometry data for " << node.path() << std::endl;
+            #endif
+         }
+      }
+      else
+      {
+         #ifdef _DEBUG
+         std::cout << "No scene geometry data at all" << std::endl;
+         #endif
+      }
    }
    
    return AlembicNode::ContinueVisit;

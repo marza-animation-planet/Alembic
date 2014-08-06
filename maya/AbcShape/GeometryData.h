@@ -87,8 +87,8 @@ public:
    inline void update(const AlembicMesh &mesh) { _update(mesh); }
    inline void update(const AlembicSubD &subd) { _update(subd); }
    
-   void draw(bool wireframe, float lineWidth=0.0) const;
-   void drawPoints(float pointWidth=0.0) const;
+   void draw(bool wireframe, float lineWidth=0.0f) const;
+   void drawPoints(float pointWidth=0.0f) const;
    
    bool isValid() const;
    void clear();
@@ -176,7 +176,7 @@ public:
    
    void update(const AlembicPoints &points);
    
-   void draw(float pointWidth=0.0) const;
+   void draw(float pointWidth=0.0f) const;
    
    bool isValid() const;
    void clear();
@@ -187,7 +187,32 @@ private:
    const Alembic::Abc::V3f *mPoints;
    std::vector<Alembic::Abc::V3f> mLocalPoints;
 };
-// PointsData
+
+class CurvesData
+{
+public:
+   
+   CurvesData();
+   ~CurvesData();
+   
+   void update(const AlembicCurves &curves);
+   
+   void drawPoints(float pointWidth=0.0f) const;
+   void draw(float lineWidth=0.0f) const;
+   
+   bool isValid() const;
+   void clear();
+   
+private:
+   
+   size_t mNumCurves;
+   const Alembic::Abc::int32_t *mNumPoints;
+   const Alembic::Abc::V3f *mPoints;
+   std::vector<Alembic::Abc::V3f> mLocalPoints;
+   bool mWrap;
+   size_t mNumVertices;
+};
+
 // CurvesData
 // NuPatchData
 
@@ -224,8 +249,15 @@ public:
       return data<PointsData>(node, mPointsData, mPointsIndices);
    }
    
-   //CurvesData& curves(const AlembicNode &node);
-   //const CurvesData& curves(const AlembicNode &node) const;
+   inline CurvesData* curves(const AlembicNode &node)
+   {
+      return data<CurvesData>(node, mCurvesData, mCurvesIndices, mFreeCurvesIndices);
+   }
+   
+   inline const CurvesData* curves(const AlembicNode &node) const
+   {
+      return data<CurvesData>(node, mCurvesData, mCurvesIndices);
+   }
    
    //NuPatchData& nupatch(const AlembicNode &node);
    //const NuPatchData& nupatch(const AlembicNode &node) const;
@@ -291,7 +323,7 @@ private:
    
    std::deque<MeshData> mMeshData;
    std::deque<PointsData> mPointsData;
-   //std::deque<CurvesData> mCurvesData;
+   std::deque<CurvesData> mCurvesData;
    //std::deque<NuPatchData> mNuPatchData;
    
    NodeIndexMap mMeshIndices;

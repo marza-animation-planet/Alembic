@@ -406,6 +406,193 @@ void PointsData::clear()
 
 // ---
 
+CurvesData::CurvesData()
+   : mNumCurves(0)
+   , mNumPoints(0)
+   , mPoints(0)
+   , mWrap(false)
+   , mNumVertices(0)
+{
+}
+
+CurvesData::~CurvesData()
+{
+   clear();
+}
+
+void CurvesData::update(const AlembicCurves &curves)
+{
+   const AlembicCurves::Sample &samp0 = curves.firstSample();
+   const AlembicCurves::Sample &samp1 = curves.secondSample();
+   
+   if (!samp0.valid(curves.typedObject()))
+   {
+      clear();
+      return;
+   }
+   
+   float t0 = float(samp0.dataTime);
+   float w0 = float(samp0.dataWeight);
+   float t1 = 0.0f;
+   float w1 = 0.0f;
+   
+   mNumCurves = samp0.data.getNumCurves();
+   
+   if (mNumCurves == 0)
+   {
+      clear();
+      return;
+   }
+   
+   mNumPoints = samp0.data.getCurvesNumVertices()->get();
+   mWrap = (samp0.data.getWrap() == Alembic::AbcGeom::kPeriodic);
+   
+   Alembic::Abc::P3fArraySamplePtr p0 = samp0.data.getPositions();
+   
+   mNumVertices = p0->size();
+   
+   if (samp1.dataWeight > 0.0)
+   {
+      bool interpolate = true;
+      
+      t1 = float(samp1.dataTime);
+      w1 = float(samp1.dataWeight);
+      
+      // Check for matching number of curves and vertices per curve
+      
+      if (samp1.data.getNumCurves() != mNumCurves)
+      {
+         interpolate = false;
+      }
+      else
+      {
+         Alembic::Abc::Int32ArraySamplePtr nv1 = samp1.data.getCurvesNumVertices();
+         
+         for (size_t i=0; i<mNumCurves; ++i)
+         {
+            if (mNumPoints[i] != (*nv1)[i])
+            {
+               interpolate = false;
+               break;
+            }
+         }
+      }
+      
+      if (!interpolate)
+      {
+         Alembic::Abc::V3fArraySamplePtr v0 = samp0.data.getVelocities();
+         
+         if (v0 && v0->size() == p0->size())
+         {
+            float dt = w1 * (t1 - t0);
+            
+            mLocalPoints.resize(mNumVertices);
+            
+            for (size_t i=0; i<mNumVertices; ++i)
+            {
+               mLocalPoints[i] = (*p0)[i] + dt * (*v0)[i];
+            }
+            
+            mPoints = &(mLocalPoints[0]);
+         }
+         else
+         {
+            mPoints = p0->get();
+            mLocalPoints.clear();
+         }
+      }
+      else
+      {
+         Alembic::Abc::P3fArraySamplePtr p1 = samp1.data.getPositions();
+         
+         if (p1 && p1->size() == p0->size())
+         {
+            mLocalPoints.resize(mNumVertices);
+            
+            for (size_t i=0; i<mNumVertices; ++i)
+            {
+               mLocalPoints[i] = w0 * (*p0)[i] + w1 * (*p1)[i];
+            }
+            
+            mPoints = &(mLocalPoints[0]);
+         }
+         else
+         {
+            mPoints = p0->get();
+            mLocalPoints.clear();
+         }
+      }
+   }
+   else
+   {
+      mPoints = p0->get();
+      mLocalPoints.clear();
+   }
+}
+
+void CurvesData::drawPoints(float pointWidth) const
+{
+   if (!isValid())
+   {
+      return;
+   }
+   
+   if (pointWidth > 0.0f)
+   {
+      glEnable(GL_POINT_SMOOTH);
+      glPointSize(pointWidth);
+   }
+   
+   glEnableClientState(GL_VERTEX_ARRAY);
+   glVertexPointer(3, GL_FLOAT, 0, (const GLvoid*) mPoints);
+   glDrawArrays(GL_POINTS, 0, (GLsizei) mNumVertices);
+   glDisableClientState(GL_VERTEX_ARRAY);
+}
+
+void CurvesData::draw(float lineWidth) const
+{
+   if (!isValid())
+   {
+      return;
+   }
+   
+   if (lineWidth > 0.0f)
+   {
+      glEnable(GL_LINE_SMOOTH);
+      glLineWidth(lineWidth);
+   }
+   
+   glEnableClientState(GL_VERTEX_ARRAY);
+   glVertexPointer(3, GL_FLOAT, 0, (const GLvoid*) mPoints);
+   
+   GLint p = 0;
+   for (size_t c=0; c<mNumCurves; ++c)
+   {
+      Alembic::Abc::int32_t nv = mNumPoints[c];
+      glDrawArrays((mWrap ? GL_LINE_LOOP : GL_LINE_STRIP), p, (GLsizei) nv);
+      p += nv;
+   }
+   
+   glDisableClientState(GL_VERTEX_ARRAY);
+}
+
+bool CurvesData::isValid() const
+{
+   return (mNumCurves > 0 && mNumPoints && mPoints);
+}
+
+void CurvesData::clear()
+{
+   mNumCurves = 0;
+   mNumPoints = 0;
+   mPoints = 0;
+   mLocalPoints.clear();
+   mWrap = false;
+   mNumVertices = 0;
+}
+
+// ---
+
 void DrawBox(const Alembic::Abc::Box3d &bounds, bool asPoints, float width)
 {
    if (bounds.isEmpty() || bounds.isInfinite())
@@ -567,6 +754,14 @@ void SceneGeometryData::remove(const AlembicNode &node)
       mFreePointsIndices.insert(it->second);
       mPointsIndices.erase(it);
    }
+   
+   it = mCurvesIndices.find(node.path());
+   if (it != mCurvesIndices.end())
+   {
+      mCurvesData[it->second].clear();
+      mFreeCurvesIndices.insert(it->second);
+      mCurvesIndices.erase(it);
+   }
 }
 
 void SceneGeometryData::clear()
@@ -583,4 +778,5 @@ void SceneGeometryData::clear()
    
    mMeshData.clear();
    mPointsData.clear();
+   mCurvesData.clear();
 }
