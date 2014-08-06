@@ -1,5 +1,5 @@
-#ifndef ALEMBICSHAPE_ALEMBICSCENE_H_
-#define ALEMBICSHAPE_ALEMBICSCENE_H_
+#ifndef SCENEHELPER_ALEMBICSCENE_H_
+#define SCENEHELPER_ALEMBICSCENE_H_
 
 #include <Alembic/AbcGeom/All.h>
 #include <boost/regex.hpp>
@@ -314,7 +314,7 @@ struct SchemaUtils<Alembic::AbcGeom::IXformSchema>
 // ---
 
 template <class IClass>
-struct SampleData
+struct SchemaSampleData
 {
    typedef typename IClass::schema_type ISchemaClass;
    typedef typename SchemaUtils<ISchemaClass>::ISampleClass ISampleClass;
@@ -343,6 +343,8 @@ struct SampleData
 };
 
 // Setup your include path so the right one is picked
+// This header should contain the declaration of a template class called SampleData
+//   whose template argument will be on of the Alembic::AbcGeom::I* class
 #include <AlembicNodeSampleData.h>
 
 // ---
