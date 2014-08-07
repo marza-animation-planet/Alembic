@@ -38,7 +38,7 @@ MSyntax AbcShapeImport::createSyntax()
    syntax.addFlag("-ci", "-createInstances", MSyntax::kNoArg);
    syntax.addFlag("-s", "-speed", MSyntax::kDouble);
    syntax.addFlag("-o", "-offset", MSyntax::kDouble);
-   syntax.addFlag("-psf", "-preserveStartFrame", MSyntax::kNoArg);
+   syntax.addFlag("-psf", "-preserveStartFrame", MSyntax::kBoolean);
    syntax.addFlag("-ct", "-cycleType", MSyntax::kString);
    syntax.addFlag("-ri", "-rotationInterpolation", MSyntax::kString);
    syntax.addFlag("-h", "-help", MSyntax::kNoArg);
@@ -46,7 +46,7 @@ MSyntax AbcShapeImport::createSyntax()
    syntax.addArg(MSyntax::kString);
    
    syntax.enableQuery(false);
-   syntax.enableEdit(false);
+   syntax.enableEdit(true);
    
    return syntax;
 }
@@ -305,17 +305,33 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
       bool inheritsXforms = sample.getInheritsXforms();
       pIT.setBool(inheritsXforms);
       
-      if (!schema.isConstant())
+      if (!schema.isConstant() && fabs(mSpeed) > 0.0001)
       {
          size_t numSamples = schema.getNumSamples();
          
          Alembic::AbcCoreAbstract::TimeSamplingPtr ts = schema.getTimeSampling();
+         
+         double invSpeed = 1.0 / mSpeed;
+         double secStart = ts->getSampleTime(0);
+         double secEnd = ts->getSampleTime(numSamples-1);
+         double secOffset = MTime(mOffset).as(MTime::kSeconds);
+         
+         double offset = secOffset;
+         if (mPreserveStartFrame)
+         {
+            offset += ts->getSampleTime(0) * (mSpeed - 1.0) * invSpeed;
+         }
          
          for (size_t i=0; i<numSamples; ++i)
          {
             Alembic::AbcCoreAbstract::index_t idx = i;
             
             double t = ts->getSampleTime(idx);
+            if (mCycleType == AbcShape::CT_reverse)
+            {
+               t = secEnd - (t - secStart);
+            }
+            t = offset + invSpeed * t;
             
             Alembic::AbcGeom::XformSample sample = schema.getValue(Alembic::Abc::ISampleSelector(idx));
             
@@ -325,6 +341,9 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
             mKeyframer.addTransformKey(xformObj, mmat);
             mKeyframer.addInheritsTransformKey(xformObj, sample.getInheritsXforms());
          }
+         
+         mKeyframer.addCurvesImportInfo(xformObj, "", mSpeed, secOffset, secStart, secEnd,
+                                        (mCycleType == AbcShape::CT_reverse), mPreserveStartFrame);
       }
       
       Alembic::Abc::ICompoundProperty props = node.object().getProperties();
@@ -345,23 +364,42 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
                prop.get(v);
                pVis.setBool(v != 0);
                   
-               if (!prop.isConstant())
+               if (!prop.isConstant() && fabs(mSpeed) > 0.0001)
                {
                   Alembic::AbcCoreAbstract::TimeSamplingPtr ts = prop.getTimeSampling();
                   
                   size_t numSamples = prop.getNumSamples();
+                  
+                  double invSpeed = 1.0 / mSpeed;
+                  double secStart = ts->getSampleTime(0);
+                  double secEnd = ts->getSampleTime(numSamples-1);
+                  double secOffset = MTime(mOffset).as(MTime::kSeconds);
+                  
+                  double offset = secOffset;
+                  if (mPreserveStartFrame)
+                  {
+                     offset += ts->getSampleTime(0) * (mSpeed - 1.0) * invSpeed;
+                  }
                   
                   for (size_t i=0; i<numSamples; ++i)
                   {
                      Alembic::AbcCoreAbstract::index_t idx = i;
                      
                      double t = ts->getSampleTime(idx);
+                     if (mCycleType == AbcShape::CT_reverse)
+                     {
+                        t = secEnd - (t - secStart);
+                     }
+                     t = offset + invSpeed * t;
                      
                      prop.get(v, Alembic::Abc::ISampleSelector(idx));
                      
                      mKeyframer.setCurrentTime(t);
                      mKeyframer.addVisibilityKey(xformObj, v != 0);
                   }
+                  
+                  mKeyframer.addCurvesImportInfo(xformObj, "visibility", mSpeed, secOffset, secStart, secEnd,
+                                                 (mCycleType == AbcShape::CT_reverse), mPreserveStartFrame);
                }
             }
             else if (Alembic::Abc::IBoolProperty::matches(*header))
@@ -374,23 +412,42 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
                prop.get(v);
                pVis.setBool(v);
                   
-               if (!prop.isConstant())
+               if (!prop.isConstant() && fabs(mSpeed) > 0.0001)
                {
                   Alembic::AbcCoreAbstract::TimeSamplingPtr ts = prop.getTimeSampling();
                   
                   size_t numSamples = prop.getNumSamples();
+                  
+                  double invSpeed = 1.0 / mSpeed;
+                  double secStart = ts->getSampleTime(0);
+                  double secEnd = ts->getSampleTime(numSamples-1);
+                  double secOffset = MTime(mOffset).as(MTime::kSeconds);
+                  
+                  double offset = secOffset;
+                  if (mPreserveStartFrame && mSpeed > 0.0001)
+                  {
+                     offset += ts->getSampleTime(0) * (mSpeed - 1.0) * invSpeed;
+                  }
                   
                   for (size_t i=0; i<numSamples; ++i)
                   {
                      Alembic::AbcCoreAbstract::index_t idx = i;
                      
                      double t = ts->getSampleTime(idx);
+                     if (mCycleType == AbcShape::CT_reverse)
+                     {
+                        t = secEnd - (t - secStart);
+                     }
+                     t = offset + invSpeed * t;
                      
                      prop.get(v, Alembic::Abc::ISampleSelector(idx));
                      
                      mKeyframer.setCurrentTime(t);
                      mKeyframer.addVisibilityKey(xformObj, v);
                   }
+                  
+                  mKeyframer.addCurvesImportInfo(xformObj, "visibility", mSpeed, secOffset, secStart, secEnd,
+                                                 (mCycleType == AbcShape::CT_reverse), mPreserveStartFrame);
                }
             }
          }
@@ -504,23 +561,21 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
    
    MArgParser argData(syntax(), args, &status);
    
-   MString filename("");
    MString mode("box");
-   MString parent("");
-   MString ns("");
-   MString rotInterp("quaternion");
-   MString curNs = MNamespace::currentNamespace();
+   
    AbcShape::DisplayMode dm = AbcShape::DM_box;
    AbcShape::CycleType ct = AbcShape::CT_hold;
    double speed = 1.0;
    double offset = 0.0;
+   bool preserveStartFrame = false;
    
-   MDagPath parentDag;
+   bool setSpeed = false;
+   bool setOffset = false;
+   bool setMode = false;
+   bool setCycle = false;
+   bool setPreserveStart = false;
    
-   bool fitTimeRange = argData.isFlagSet("fitTimeRange");
-   bool setToStartFrame = argData.isFlagSet("setToStartFrame");
-   bool createInstances = argData.isFlagSet("createInstances");
-   bool preserveStartFrame = argData.isFlagSet("preserveStartFrame");
+   argData.isFlagSet("preserveStartFrame");
    
    if (argData.isFlagSet("help"))
    {
@@ -550,31 +605,23 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       MGlobal::displayInfo("                               Set the current time to the start of the frame range.");
       MGlobal::displayInfo("-h / -help                   :");
       MGlobal::displayInfo("                               Display this help.");
+      MGlobal::displayInfo("");
+      MGlobal::displayInfo("Command also work in edit mode:");
+      MGlobal::displayInfo("  -mode, -speed, -offset, -preserveStartFrame, -cycleType flags are supported.");
+      MGlobal::displayInfo("  Acts on all AbcShape in selected node trees.");
    }
    
-   if (argData.isFlagSet("reparent"))
+   if (argData.isFlagSet("preserveStartFrame"))
    {
-      MSelectionList sl;
+      status = argData.getFlagArgument("preserveStartFrame", 0, preserveStartFrame);
       
-      status = argData.getFlagArgument("reparent", 0, parent);
-      
-      if (status != MS::kSuccess ||
-          sl.add(parent) != MS::kSuccess ||
-          sl.getDagPath(0, parentDag) != MS::kSuccess)
+      if (status != MS::kSuccess)
       {
-         MGlobal::displayWarning(parent + " is not a valid dag path");
+         MGlobal::displayWarning("Invalid preserveStartFrame flag argument");
       }
-   }
-   
-   if (argData.isFlagSet("namespace"))
-   {
-      status = argData.getFlagArgument("namespace", 0, ns);
-      
-      if (status != MS::kSuccess ||
-          (!MNamespace::namespaceExists(ns) && MNamespace::addNamespace(ns) != MS::kSuccess) ||
-          MNamespace::setCurrentNamespace(ns) != MS::kSuccess)
+      else
       {
-         MGlobal::displayWarning(ns + " is not a valid namespace");
+         setPreserveStart = true;
       }
    }
    
@@ -586,6 +633,10 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       {
          MGlobal::displayWarning("Invalid speed flag argument");
       }
+      else
+      {
+         setSpeed = true;
+      }
    }
    
    if (argData.isFlagSet("offset"))
@@ -596,6 +647,10 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       {
          MGlobal::displayWarning("Invalid offset flag argument");
       }
+      else
+      {
+         setOffset = true;
+      }
    }
    
    if (argData.isFlagSet("mode"))
@@ -605,18 +660,22 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       if (mode == "box")
       {
          dm = AbcShape::DM_box;
+         setMode = true;
       }
       else if (mode == "boxes")
       {
          dm = AbcShape::DM_boxes;
+         setMode = true;
       }
       else if (mode == "points")
       {
          dm = AbcShape::DM_points;
+         setMode = true;
       }
       else if (mode == "geometry")
       {
          dm = AbcShape::DM_geometry;
+         setMode = true;
       }
       else
       {
@@ -632,18 +691,22 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       if (val == "hold")
       {
          ct = AbcShape::CT_hold;
+         setCycle = true;
       }
       else if (val == "loop")
       {
          ct = AbcShape::CT_loop;
+         setCycle = true;
       }
       else if (val == "reverse")
       {
          ct = AbcShape::CT_reverse;
+         setCycle = true;
       }
       else if (val == "bounce")
       {
          ct = AbcShape::CT_bounce;
+         setCycle = true;
       }
       else
       {
@@ -651,120 +714,282 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       }
    }
    
-   if (argData.isFlagSet("rotationInterpolation"))
+   if (argData.isEdit())
    {
-      MString val;
-      status = argData.getFlagArgument("rotationInterpolation", 0, val);
+      MSelectionList oldSel;
+      MSelectionList newSel;
+      MSelectionList tmpSel;
       
-      if (status == MS::kSuccess &&
-          (val == "none" ||
-           val == "euler" ||
-           val == "quaternion" ||
-           val == "quaternionSlerp" ||
-           val == "quaternionSquad"))
-      {
-         rotInterp = val;
-      }
-      else
-      {
-         MGlobal::displayWarning(val + " is not a valid rotationInterpolation value");
-      }
-   }
-   
-   status = argData.getCommandArgument(0, filename);
-   MStringArray result;
-   
-   if (status == MS::kSuccess)
-   {
-      MFileObject file;
-      file.setRawFullName(filename);
+      MGlobal::getActiveSelectionList(oldSel);
       
-      if (!file.exists())
+      MGlobal::executeCommand("select -hi");
+      MGlobal::getActiveSelectionList(newSel);
+      
+      MDagPath path;
+      MFnDagNode node;
+      
+      // Keep a list of processed curves
+      bool processCurves = (setSpeed || setOffset || setCycle || setPreserveStart);
+      
+      std::set<std::string> processedCurves;
+      MStringArray connectedCurves;
+      
+      for (unsigned int i=0; i<newSel.length(); ++i)
       {
-         MGlobal::displayError("Invalid file path: " + filename);
-         status = MS::kFailure;
-      }
-      else
-      {
-         std::string abcPath = file.resolvedFullName().asChar();
-         
-         AlembicScene *scene = SceneCache::Ref(abcPath);
-         if (scene)
+         if (newSel.getDagPath(i, path) != MS::kSuccess)
          {
-            CreateTree visitor(abcPath, dm, createInstances, speed, offset, preserveStartFrame, ct);
-            scene->visit(AlembicNode::VisitDepthFirst, visitor);
-            
-            visitor.keyTransforms(rotInterp);
-            
-            if (parentDag.isValid())
+            continue;
+         }
+         
+         if (node.setObject(path) != MS::kSuccess)
+         {
+            continue;
+         }
+         
+         if (node.typeName() == "AbcShape")
+         {
+            if (setSpeed)
             {
-               MFnDagNode parentNode(parentDag);
-               
-               for (size_t i=0; i<scene->childCount(); ++i)
+               node.findPlug("speed").setDouble(speed);
+            }
+            if (setOffset)
+            {
+               node.findPlug("offset").setDouble(offset);
+            }
+            if (setMode)
+            {
+               node.findPlug("displayMode").setShort(short(dm));
+            }
+            if (setCycle)
+            {
+               node.findPlug("cycleType").setShort(short(ct));
+            }
+            if (setPreserveStart)
+            {
+               node.findPlug("preserveStartFrame").setBool(preserveStartFrame);
+            }
+         }
+         
+         if (processCurves)
+         {
+            MObject curveObj;
+            Keyframer keyframer;
+            
+            connectedCurves.clear();
+            MGlobal::executeCommand("listConnections -type animCurve -s 1 -d 0 \"" + path.fullPathName() + "\"", connectedCurves);
+            
+            MFnAnimCurve::InfinityType inf = MFnAnimCurve::kConstant;
+            bool reverse = false;
+            
+            if (setCycle)
+            {
+               switch (ct)
                {
-                  MDagPath rootDag = visitor.getDag(scene->child(i)->path());
-                  if (rootDag.isValid())
-                  {
-                     MObject rootObj = rootDag.node();
-                     parentNode.addChild(rootObj);
-                     
-                     result.append(rootDag.fullPathName());
-                  }
+               case AbcShape::CT_loop:
+                  inf = MFnAnimCurve::kCycle;
+                  break;
+               case AbcShape::CT_bounce:
+                  inf = MFnAnimCurve::kOscillate;
+                  break;
+               case AbcShape::CT_reverse:
+                  reverse = true;
+               default:
+                  break;
                }
             }
             
-            if (fitTimeRange || setToStartFrame)
+            for (unsigned int j=0; j<connectedCurves.length(); ++j)
             {
-               double start, end;
+               std::string curveName = connectedCurves[j].asChar();
                
-               GetFrameRange visitor;
-               scene->visit(AlembicNode::VisitDepthFirst, visitor);
+               if (processedCurves.find(curveName) != processedCurves.end())
+               {
+                  continue;
+               }
                
-               if (visitor.getFrameRange(start, end))
+               tmpSel.clear();
+               if (tmpSel.add(curveName.c_str()) != MS::kSuccess)
                {
-                  MTime startFrame(start, MTime::kSeconds);
-                  MTime endFrame(end, MTime::kSeconds);
-                  
-                  if (fitTimeRange)
-                  {
-                     MAnimControl::setAnimationStartEndTime(startFrame, endFrame);
-                     MAnimControl::setMinMaxTime(startFrame, endFrame);
-                  }
-                  if (setToStartFrame)
-                  {
-                     MAnimControl::setCurrentTime(startFrame);
-                  }
+                  continue;
                }
-            }
-            
-            if (result.length() == 0)
-            {
-               for (size_t i=0; i<scene->childCount(); ++i)
+               
+               if (tmpSel.getDependNode(0, curveObj) != MS::kSuccess)
                {
-                  MDagPath rootDag = visitor.getDag(scene->child(i)->path());
-                  if (rootDag.isValid())
-                  {
-                     result.append(rootDag.fullPathName());
-                  }
+                  continue;
                }
+               
+               #ifdef _DEBUG
+               std::cout << "[AbcShape] Re-timing curve \"" << curveName << "\"" << std::endl;
+               #endif
+               keyframer.retimeCurve(curveObj,
+                                     (setSpeed ? &speed : 0),
+                                     (setOffset ? &offset : 0),
+                                     (setCycle ? &reverse : 0),
+                                     (setPreserveStart ? &preserveStartFrame : 0),
+                                     (setCycle ? &inf : 0),
+                                     (setCycle ? &inf : 0));
+               
+               processedCurves.insert(curveName);
             }
-            
-            SceneCache::Unref(scene);
+         }
+      }
+      
+      MGlobal::setActiveSelectionList(oldSel);
+   }
+   else
+   {
+      MString filename("");
+      MString parent("");
+      MString ns("");
+      MString rotInterp("quaternion");
+      MString curNs = MNamespace::currentNamespace();
+      bool fitTimeRange = argData.isFlagSet("fitTimeRange");
+      bool setToStartFrame = argData.isFlagSet("setToStartFrame");
+      bool createInstances = argData.isFlagSet("createInstances");
+      
+      MDagPath parentDag;
+      
+      if (argData.isFlagSet("reparent"))
+      {
+         MSelectionList sl;
+         
+         status = argData.getFlagArgument("reparent", 0, parent);
+         
+         if (status != MS::kSuccess ||
+             sl.add(parent) != MS::kSuccess ||
+             sl.getDagPath(0, parentDag) != MS::kSuccess)
+         {
+            MGlobal::displayWarning(parent + " is not a valid dag path");
+         }
+      }
+      
+      if (argData.isFlagSet("namespace"))
+      {
+         status = argData.getFlagArgument("namespace", 0, ns);
+         
+         if (status != MS::kSuccess ||
+             (!MNamespace::namespaceExists(ns) && MNamespace::addNamespace(ns) != MS::kSuccess) ||
+             MNamespace::setCurrentNamespace(ns) != MS::kSuccess)
+         {
+            MGlobal::displayWarning(ns + " is not a valid namespace");
+         }
+      }
+      
+      if (argData.isFlagSet("rotationInterpolation"))
+      {
+         MString val;
+         status = argData.getFlagArgument("rotationInterpolation", 0, val);
+         
+         if (status == MS::kSuccess &&
+             (val == "none" ||
+              val == "euler" ||
+              val == "quaternion" ||
+              val == "quaternionSlerp" ||
+              val == "quaternionSquad"))
+         {
+            rotInterp = val;
          }
          else
          {
-            MGlobal::displayError("Could not read scene from file: " + filename);
-            status = MS::kFailure;
+            MGlobal::displayWarning(val + " is not a valid rotationInterpolation value");
          }
       }
+      
+      status = argData.getCommandArgument(0, filename);
+      MStringArray result;
+      
+      if (status == MS::kSuccess)
+      {
+         MFileObject file;
+         file.setRawFullName(filename);
+         
+         if (!file.exists())
+         {
+            MGlobal::displayError("Invalid file path: " + filename);
+            status = MS::kFailure;
+         }
+         else
+         {
+            std::string abcPath = file.resolvedFullName().asChar();
+            
+            AlembicScene *scene = SceneCache::Ref(abcPath);
+            if (scene)
+            {
+               CreateTree visitor(abcPath, dm, createInstances, speed, offset, preserveStartFrame, ct);
+               scene->visit(AlembicNode::VisitDepthFirst, visitor);
+               
+               visitor.keyTransforms(rotInterp);
+               
+               if (parentDag.isValid())
+               {
+                  MFnDagNode parentNode(parentDag);
+                  
+                  for (size_t i=0; i<scene->childCount(); ++i)
+                  {
+                     MDagPath rootDag = visitor.getDag(scene->child(i)->path());
+                     if (rootDag.isValid())
+                     {
+                        MObject rootObj = rootDag.node();
+                        parentNode.addChild(rootObj);
+                        
+                        result.append(rootDag.fullPathName());
+                     }
+                  }
+               }
+               
+               if (fitTimeRange || setToStartFrame)
+               {
+                  double start, end;
+                  
+                  GetFrameRange visitor;
+                  scene->visit(AlembicNode::VisitDepthFirst, visitor);
+                  
+                  if (visitor.getFrameRange(start, end))
+                  {
+                     MTime startFrame(start, MTime::kSeconds);
+                     MTime endFrame(end, MTime::kSeconds);
+                     
+                     if (fitTimeRange)
+                     {
+                        MAnimControl::setAnimationStartEndTime(startFrame, endFrame);
+                        MAnimControl::setMinMaxTime(startFrame, endFrame);
+                     }
+                     if (setToStartFrame)
+                     {
+                        MAnimControl::setCurrentTime(startFrame);
+                     }
+                  }
+               }
+               
+               if (result.length() == 0)
+               {
+                  for (size_t i=0; i<scene->childCount(); ++i)
+                  {
+                     MDagPath rootDag = visitor.getDag(scene->child(i)->path());
+                     if (rootDag.isValid())
+                     {
+                        result.append(rootDag.fullPathName());
+                     }
+                  }
+               }
+               
+               SceneCache::Unref(scene);
+            }
+            else
+            {
+               MGlobal::displayError("Could not read scene from file: " + filename);
+               status = MS::kFailure;
+            }
+         }
+      }
+      
+      if (ns.length() > 0)
+      {
+         MNamespace::setCurrentNamespace(curNs);
+      }
+      
+      setResult(result);
    }
-   
-   if (ns.length() > 0)
-   {
-      MNamespace::setCurrentNamespace(curNs);
-   }
-   
-   setResult(result);
    
    return status;
 }

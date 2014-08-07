@@ -12,6 +12,8 @@
 #include <maya/MPlugArray.h>
 #include <maya/MDGModifier.h>
 #include <maya/MSelectionList.h>
+#include <maya/MFnNumericAttribute.h>
+#include <maya/MAnimCurveChange.h>
 #include <cmath>
 
 const char * Keyframer::msTransformAttrNames[] =
@@ -90,8 +92,17 @@ Keyframer::CurveEntry& Keyframer::getOrCreateEntry(const MFnDependencyNode &dnod
       entry.second.attr = dnode.attribute(attrName);
       entry.second.type = type;
       entry.second.step = false;
+      entry.second.hasinfo = false;
+      entry.second.speed = 1.0;
+      entry.second.offset = 0.0;
+      entry.second.start = 0.0;
+      entry.second.end = 0.0;
+      entry.second.reverse = false;
+      entry.second.preserveStart = false;
 
       std::pair<CurveIterator, bool> rv = mCurves.insert(entry);
+      
+      mNodeCurves[entry.second.obj].append(curveName);
 
       it = rv.first;
    }
@@ -370,6 +381,66 @@ void Keyframer::fixCurvesTangents(MFnAnimCurve::AnimCurveType type)
    }
 }
 
+void Keyframer::addCurvesImportInfo(const MObject &node,
+                                    const MString &attr,
+                                    double speed,
+                                    double offset,
+                                    double start,
+                                    double end,
+                                    bool reverse,
+                                    bool preserveStart)
+{
+   MStatus stat;
+   
+   if (attr.length() == 0)
+   {
+      NodeCurvesIterator nit = mNodeCurves.find(node);
+      CurveIterator cit;
+      
+      if (nit != mNodeCurves.end())
+      {
+         for (unsigned int i=0; i<nit->second.length(); ++i)
+         {
+            cit = mCurves.find(nit->second[i]);
+            
+            if (cit == mCurves.end())
+            {
+               continue;
+            }
+            
+            CurveEntry &entry = cit->second;
+            
+            entry.hasinfo = true;
+            entry.speed = speed;
+            entry.offset = offset;
+            entry.start = start;
+            entry.end = end;
+            entry.reverse = reverse;
+            entry.preserveStart = preserveStart;
+         }
+      }
+   }
+   else
+   {
+      MFnDependencyNode dnode(node);
+      
+      MString curveName = dnode.name() + "_" + attr;
+      
+      CurveIterator it = mCurves.find(curveName);
+      
+      if (it != mCurves.end())
+      {
+         it->second.hasinfo = true;
+         it->second.speed = speed;
+         it->second.offset = offset;
+         it->second.start = start;
+         it->second.end = end;
+         it->second.reverse = reverse;
+         it->second.preserveStart = preserveStart;
+      }
+   }
+}
+
 void Keyframer::createCurves(MFnAnimCurve::InfinityType preInf,
                              MFnAnimCurve::InfinityType postInf)
 {
@@ -437,9 +508,238 @@ void Keyframer::createCurves(MFnAnimCurve::InfinityType preInf,
             curve.setPreInfinityType(preInf);
             curve.setPostInfinityType(postInf);
             curve.addKeys(&entry.times, &entry.values, tt, tt);
+            
+            if (entry.hasinfo)
+            {
+               MFnNumericAttribute nAttr;
+                  
+               MObject speedAttr = nAttr.create("abcimport_speed", "abcsp", MFnNumericData::kDouble, 0.0);
+               nAttr.setStorable(true);
+               nAttr.setWritable(true);
+               nAttr.setReadable(true);
+               nAttr.setKeyable(false);
+               nAttr.setHidden(true);
+               curve.addAttribute(speedAttr);
+               
+               MObject offsetAttr = nAttr.create("abcimport_offset", "abcof", MFnNumericData::kDouble, 0.0);
+               nAttr.setStorable(true);
+               nAttr.setWritable(true);
+               nAttr.setReadable(true);
+               nAttr.setKeyable(false);
+               nAttr.setHidden(true);
+               curve.addAttribute(offsetAttr);
+               
+               MObject startAttr = nAttr.create("abcimport_start", "abcst", MFnNumericData::kDouble, 0.0);
+               nAttr.setStorable(true);
+               nAttr.setWritable(true);
+               nAttr.setReadable(true);
+               nAttr.setKeyable(false);
+               nAttr.setHidden(true);
+               curve.addAttribute(startAttr);
+               
+               MObject endAttr = nAttr.create("abcimport_end", "abcen", MFnNumericData::kDouble, 0.0);
+               nAttr.setStorable(true);
+               nAttr.setWritable(true);
+               nAttr.setReadable(true);
+               nAttr.setKeyable(false);
+               nAttr.setHidden(true);
+               curve.addAttribute(endAttr);
+               
+               MObject reverseAttr = nAttr.create("abcimport_reverse", "abcre", MFnNumericData::kBoolean, 0.0);
+               nAttr.setStorable(true);
+               nAttr.setWritable(true);
+               nAttr.setReadable(true);
+               nAttr.setKeyable(false);
+               nAttr.setHidden(true);
+               curve.addAttribute(reverseAttr);
+               
+               MObject preserveStartAttr = nAttr.create("abcimport_preservestart", "abcps", MFnNumericData::kBoolean, 0.0);
+               nAttr.setStorable(true);
+               nAttr.setWritable(true);
+               nAttr.setReadable(true);
+               nAttr.setKeyable(false);
+               nAttr.setHidden(true);
+               curve.addAttribute(preserveStartAttr);
+               
+               curve.findPlug("abcimport_speed").setDouble(entry.speed);
+               curve.findPlug("abcimport_offset").setDouble(entry.offset);
+               curve.findPlug("abcimport_start").setDouble(entry.start);
+               curve.findPlug("abcimport_end").setDouble(entry.end);
+               curve.findPlug("abcimport_reverse").setBool(entry.reverse);
+               curve.findPlug("abcimport_preservestart").setBool(entry.preserveStart);
+            }
          }
       }
     
       ++it;
+   }
+}
+
+void Keyframer::retimeCurve(const MObject &curveObj,
+                            double *speed,
+                            double *offset,
+                            bool *reverse,
+                            bool *preserveStart,
+                            MFnAnimCurve::InfinityType *preInf,
+                            MFnAnimCurve::InfinityType *postInf) const
+{
+   MStatus stat;
+   
+   MFnAnimCurve curve(curveObj, &stat);
+   
+   if (stat != MS::kSuccess)
+   {
+      #ifdef _DEBUG
+      std::cout << "[AbcShape] Could not bind curve to re-time" << std::endl;
+      #endif
+      return;
+   }
+   
+   if (!curve.isTimeInput() || curve.numKeys() == 0)
+   {
+      #ifdef _DEBUG
+      std::cout << "[AbcShape] Not a time curve or no keys" << std::endl;
+      #endif
+      return;
+   }
+   
+   MPlug pSpeed = curve.findPlug("abcimport_speed");
+   if (pSpeed.isNull())
+   {
+      #ifdef _DEBUG
+      std::cout << "[AbcShape] Missing \"abcimport_speed\" attribute" << std::endl;
+      #endif
+      return;
+   }
+   double oldSpeed = pSpeed.asDouble();
+   double newSpeed = (speed ? *speed : oldSpeed);
+   if (fabs(oldSpeed) <= 0.0001 || fabs(newSpeed) <= 0.0001)
+   {
+      #ifdef _DEBUG
+      std::cout << "[AbcShape] Null speed found" << std::endl;
+      #endif
+      return;
+   }
+   double oldSpeedInv = 1.0 / oldSpeed;
+   double newSpeedInv = 1.0 / newSpeed;
+   
+   MPlug pOffset = curve.findPlug("abcimport_offset");
+   if (pOffset.isNull())
+   {
+      #ifdef _DEBUG
+      std::cout << "[AbcShape] Missing \"abcimport_offset\" attribute" << std::endl;
+      #endif
+      return;
+   }
+   double oldOffset = pOffset.asDouble();
+   double newOffset = (offset ? *offset : oldOffset);
+   
+   MPlug pStart = curve.findPlug("abcimport_start");
+   if (pStart.isNull())
+   {
+      #ifdef _DEBUG
+      std::cout << "[AbcShape] Missing \"abcimport_start\" attribute" << std::endl;
+      #endif
+      return;
+   }
+   double start = pStart.asDouble();
+   
+   MPlug pEnd = curve.findPlug("abcimport_end");
+   if (pEnd.isNull())
+   {
+      #ifdef _DEBUG
+      std::cout << "[AbcShape] Missing \"abcimport_end\" attribute" << std::endl;
+      #endif
+      return;
+   }
+   double end = pEnd.asDouble();
+   
+   MPlug pReverse = curve.findPlug("abcimport_reverse");
+   if (pReverse.isNull())
+   {
+      #ifdef _DEBUG
+      std::cout << "[AbcShape] Missing \"abcimport_reverse\" attribute" << std::endl;
+      #endif
+      return;
+   }
+   bool oldReverse = pReverse.asBool();
+   bool newReverse = (reverse ? *reverse : oldReverse);
+   
+   MPlug pPreserveStart = curve.findPlug("abcimport_preservestart");
+   if (pPreserveStart.isNull())
+   {
+      #ifdef _DEBUG
+      std::cout << "[AbcShape] Missing \"abcimport_preservestart\" attribute" << std::endl;
+      #endif
+      return;
+   }
+   bool oldPreserveStart = pPreserveStart.asBool();
+   bool newPreserveStart = (preserveStart ? *preserveStart : oldPreserveStart);
+   
+   double oldTotalOffset = oldOffset;
+   if (oldPreserveStart)
+   {
+      oldTotalOffset = start * (oldSpeed - 1.0) * oldSpeedInv;
+   }
+   
+   double newTotalOffset = newOffset;
+   if (newPreserveStart)
+   {
+      newTotalOffset = start * (newSpeed - 1.0) * newSpeedInv;
+   }
+   
+   MFnAnimCurve::TangentType tt = curve.outTangentType(0);
+   
+   unsigned int nkeys = curve.numKeys();
+   MTimeArray times(nkeys, MTime(0.0));
+   MDoubleArray values(nkeys, 0.0);
+   double t;
+   
+   // Support reverse cycle type?
+   
+   for (unsigned int i=0; i<nkeys; ++i)
+   {
+      t = curve.time(i).as(MTime::kSeconds);
+      
+      // invert old transform
+      t = oldSpeed * (t - oldTotalOffset);
+      if (oldReverse)
+      {
+         t = start - (t - end);
+      }
+      
+      // apply new transform
+      if (newReverse)
+      {
+         t = end - (t - start);
+      }
+      t = newTotalOffset + newSpeedInv * t;
+      
+      times[i] = MTime(t, MTime::kSeconds);
+      values[i] = curve.value(i);
+   }
+   
+   stat = curve.addKeys(&times, &values, tt, tt, false);
+   if (stat != MS::kSuccess)
+   {
+      #ifdef _DEBUG
+      std::cout << "[AbcShape] Failed to add keys" << std::endl;
+      #endif
+      return;
+   }
+   
+   pSpeed.setDouble(newSpeed);
+   pOffset.setDouble(newOffset);
+   pReverse.setBool(newReverse);
+   pPreserveStart.setBool(newPreserveStart);
+   
+   if (preInf)
+   {
+      curve.setPreInfinityType(*preInf);
+   }
+   
+   if (postInf)
+   {
+      curve.setPostInfinityType(*postInf);
    }
 }

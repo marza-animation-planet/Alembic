@@ -9,6 +9,8 @@
 #include <maya/MDoubleArray.h>
 #include <maya/MString.h>
 #include <maya/MMatrix.h>
+#include <maya/MObjectHandle.h>
+#include <maya/MStringArray.h>
 #include <map>
 #include <vector>
 #include <cstring>
@@ -30,9 +32,23 @@ public:
    void createCurves(MFnAnimCurve::InfinityType preInf = MFnAnimCurve::kConstant,
                      MFnAnimCurve::InfinityType postInf = MFnAnimCurve::kConstant);
    
+   void addCurvesImportInfo(const MObject &node, const MString &attr,
+                            double speed, double offset,
+                            double start, double end,
+                            bool reverse,
+                            bool preserveStart);
+   
    void setRotationCurvesInterpolation(const MString &interpType);
    void fixCurvesTangents();
    void fixCurvesTangents(MFnAnimCurve::AnimCurveType type);
+   
+   void retimeCurve(const MObject &curve,
+                    double *speed,
+                    double *offset,
+                    bool *reverse,
+                    bool *preserveStart,
+                    MFnAnimCurve::InfinityType *preInf,
+                    MFnAnimCurve::InfinityType *postInf) const;
  
 private:
 
@@ -47,6 +63,14 @@ private:
       bool step; // step type tangents
       MTimeArray times;
       MDoubleArray values;
+      
+      bool hasinfo;
+      double speed;
+      double offset;
+      double start;
+      double end;
+      bool preserveStart;
+      bool reverse;
    };
    
    struct MStringLessThan
@@ -54,6 +78,14 @@ private:
       inline bool operator()(const MString &s0, const MString &s1) const
       {
          return (strcmp(s0.asChar(), s1.asChar()) < 0);
+      }
+   };
+   
+   struct MObjectLessThan
+   {
+      inline bool operator()(const MObject &o0, const MObject &o1) const
+      {
+         return (MObjectHandle(o0).hashCode() < MObjectHandle(o1).hashCode());
       }
    };
  
@@ -66,8 +98,12 @@ private:
  
    typedef std::map<MString, CurveEntry, MStringLessThan> CurveMap;
    typedef CurveMap::iterator CurveIterator;
+   
+   typedef std::map<MObject, MStringArray, MObjectLessThan> NodeCurvesMap;
+   typedef NodeCurvesMap::iterator NodeCurvesIterator;
 
    CurveMap mCurves;
+   NodeCurvesMap mNodeCurves;
    MTime mTime;
 };
 
