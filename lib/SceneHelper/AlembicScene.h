@@ -2,7 +2,7 @@
 #define SCENEHELPER_ALEMBICSCENE_H_
 
 #include <Alembic/AbcGeom/All.h>
-#include <boost/regex.hpp>
+#include <regex.h>
 #include <vector>
 #include <map>
 #include <set>
@@ -125,6 +125,7 @@ public:
    void updateWorldMatrix();
    void updateChildBounds();
    
+   virtual void reset();
    void resetWorldMatrix();
    void resetChildBounds();
    
@@ -479,6 +480,12 @@ public:
       {
          return sampleData(mITypedObj.getSchema(), t, updated);
       }
+   }
+   
+   virtual void reset()
+   {
+      AlembicNode::reset();
+      initSamples();
    }
    
 protected:
@@ -885,8 +892,7 @@ private:
    
    Alembic::Abc::IArchive mArchive;
    bool mFiltered;
-   //MString mFilter;
-   boost::regex mFilter;
+   regex_t mFilter;
    std::set<AlembicNode*> mFilteredNodes;
 };
 

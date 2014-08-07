@@ -479,7 +479,7 @@ prjs = [
     "defs": defs,
     "incdirs": incdirs + ["examples/bin/SceneHelper", "lib/SceneHelper"],
     "libdirs": libdirs,
-    "libs": ["boost_regex"] + alembic_libs + ilmbase_libs + hdf5_libs + libs,
+    "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
     "srcs": glob.glob("examples/bin/SceneHelper/*.cpp") + glob.glob("lib/SceneHelper/*.cpp")
    }
 ]
@@ -528,7 +528,7 @@ if build_maya_plugins:
                  "defs": defs,
                  "incdirs": incdirs + ["maya/AbcShape", "lib/SceneHelper"],
                  "libdirs": libdirs,
-                 "libs": ["boost_regex"] + alembic_libs + ilmbase_libs + hdf5_libs + libs,
+                 "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
                  "srcs": glob.glob("maya/AbcShape/*.cpp") + glob.glob("lib/SceneHelper/*.cpp"),
                  "install": {"maya/scripts": glob.glob("maya/AbcShape/*.mel")},
                  "custom": [maya.Require, maya.Plugin]}])

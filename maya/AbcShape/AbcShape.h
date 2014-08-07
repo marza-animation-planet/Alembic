@@ -117,7 +117,8 @@ private:
     void syncInternals();
     void syncInternals(MDataBlock &block);
     
-    bool updateScene(const MString &filePath, const MString &objectExpression, double st, bool forceGeometrySampling=false);
+    void updateScene();
+    void updateObjects();
     bool updateFrameRange();
     void updateWorld();
     void updateSceneBounds();

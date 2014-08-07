@@ -592,16 +592,67 @@ double AbcShape::getSampleTime() const
    return computeRetime(sampleTime, mStartFrame * invFPS, mEndFrame * invFPS, mCycleType);
 }
 
+void AbcShape::updateScene()
+{
+   #ifdef _DEBUG
+   std::cout << "[AbcShape] Update scene" << std::endl;
+   #endif
+   SceneCache::Unref(mScene);
+   
+   mScene = SceneCache::Ref(mFilePath.asChar());
+   
+   if (mScene)
+   {
+      if (updateFrameRange())
+      {
+         // This will force instant refresh of AE values
+         // but won't trigger any update as mStartFrame and mEndFrame are unchanged
+         MPlug plug(thisMObject(), aStartFrame);
+         plug.setDouble(mStartFrame);
+         
+         plug.setAttribute(aEndFrame);
+         plug.setDouble(mEndFrame);
+      }
+      
+      updateObjects();
+   }
+   else
+   {
+      mNumShapes = 0;
+   }
+   
+   mGeometry.clear();
+}
+
+void AbcShape::updateObjects()
+{
+   #ifdef _DEBUG
+   std::cout << "[AbcShape] Update objects" << std::endl;
+   #endif
+   
+   mScene->setFilter(mObjectExpression.asChar());
+   
+   updateShapesCount();
+   
+   updateWorld();
+}
+
 void AbcShape::updateWorld()
 {
    #ifdef _DEBUG
    std::cout << "[AbcShape] Update world" << std::endl;
    #endif
    
-   WorldUpdate visitor(mSampleTime);
+   WorldUpdate visitor(mSampleTime, mIgnoreTransforms, mIgnoreInstances, mIgnoreVisibility);
    mScene->visit(AlembicNode::VisitDepthFirst, visitor);
    
    updateSceneBounds();
+   
+   // is that?
+   if (mDisplayMode >= DM_points)
+   {
+      updateGeometry();
+   }
 }
 
 void AbcShape::updateSceneBounds()
@@ -686,84 +737,6 @@ void AbcShape::printInfo(bool detailed) const
 void AbcShape::printSceneBounds() const
 {
    std::cout << "Scene " << mScene->selfBounds().min << " - " << mScene->selfBounds().max << std::endl;
-}
-
-bool AbcShape::updateScene(const MString &filePath, const MString &objectExpression, double t, bool forceGeometrySampling)
-{
-   bool updateObjectList = (mScene != 0 && (objectExpression != mObjectExpression));
-   bool timeChanged = (mScene != 0 && (fabs(t - mSampleTime) > 0.0001));
-   
-   if (mFilePath != filePath)
-   {
-      #ifdef _DEBUG
-      std::cout << "[AbcShape] File path changed: Rebuild scene" << std::endl;
-      #endif
-      SceneCache::Unref(mScene);
-      
-      mScene = SceneCache::Ref(filePath.asChar());
-      
-      if (mScene)
-      {
-         updateObjectList = true;
-         
-         if (updateFrameRange())
-         {
-            // This will force instant refresh of AE values
-            // but won't trigger any update as mStartFrame and mEndFrame are unchanged
-            MPlug plug(thisMObject(), aStartFrame);
-            plug.setDouble(mStartFrame);
-            
-            plug.setAttribute(aEndFrame);
-            plug.setDouble(mEndFrame);
-            
-            // update sample time
-            t = getSampleTime();
-            timeChanged = (fabs(t - mSampleTime) > 0.0001);
-         }
-      }
-      else
-      {
-         mNumShapes = 0;
-         updateObjectList = false;
-         timeChanged = false;
-         forceGeometrySampling = false;
-      }
-      
-      mGeometry.clear();
-   }
-   
-   if (updateObjectList)
-   {
-      #ifdef _DEBUG
-      if (objectExpression != mObjectExpression)
-      {
-         std::cout << "[AbcShape] Objects expression changed: Filter scene" << std::endl;
-      }
-      #endif
-      
-      mScene->setFilter(objectExpression.asChar());
-      
-      updateShapesCount();
-      
-      // we may have new shapes, force re-sample
-      timeChanged = true;
-   }
-   
-   mFilePath = filePath;
-   mObjectExpression = objectExpression;
-   mSampleTime = t;
-   
-   if (timeChanged)
-   {
-      updateWorld();
-   }
-      
-   if (mDisplayMode >= DM_points && (timeChanged || forceGeometrySampling))
-   {
-      updateGeometry();
-   }
-   
-   return true;
 }
 
 bool AbcShape::getInternalValueInContext(const MPlug &plug, MDataHandle &handle, MDGContext &ctx)
@@ -862,13 +835,6 @@ bool AbcShape::getInternalValueInContext(const MPlug &plug, MDataHandle &handle,
 bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &handle, MDGContext &ctx)
 {
    bool sampleTimeUpdate = false;
-   MTime t = mTime;
-   double s = mSpeed;
-   double o = mOffset;
-   double sf = mStartFrame;
-   double ef = mEndFrame;
-   CycleType c = mCycleType;
-   bool psf = mPreserveStartFrame;
    
    if (plug == aFilePath)
    {
@@ -877,45 +843,70 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       
       MString filePath = file.resolvedFullName();
       
-      return updateScene(filePath, mObjectExpression, mSampleTime);
+      if (filePath != mFilePath)
+      {
+         mFilePath = filePath;
+         updateScene();
+      }
+      
+      return true;
    }
    else if (plug == aObjectExpression)
    {
-      MString &objectExpression = handle.asString();
+      MString objectExpression = handle.asString();
       
-      return updateScene(mFilePath, objectExpression, mSampleTime);
+      if (objectExpression != mObjectExpression)
+      {
+         mObjectExpression = objectExpression;
+         if (mScene)
+         {
+            updateObjects();
+         }
+      }
+      
+      return true;
    }
    else if (plug == aIgnoreXforms)
    {
-      mIgnoreTransforms = handle.asBool();
+      bool ignoreTransforms = handle.asBool();
       
-      if (mScene)
+      if (ignoreTransforms != mIgnoreTransforms)
       {
-         updateSceneBounds();
+         mIgnoreTransforms = ignoreTransforms;
+         if (mScene)
+         {
+            updateWorld();
+         }
       }
       
       return true;
    }
    else if (plug == aIgnoreInstances)
    {
-      mIgnoreInstances = handle.asBool();
+      bool ignoreInstances = handle.asBool();
       
-      if (mScene)
+      if (ignoreInstances != mIgnoreInstances)
       {
-         updateSceneBounds();
-         updateShapesCount();
+         mIgnoreInstances = ignoreInstances;
+         if (mScene)
+         {
+            updateWorld();
+         }
       }
       
       return true;
    }
    else if (plug == aIgnoreVisibility)
    {
-      mIgnoreVisibility = handle.asBool();
+      bool ignoreVisibility = handle.asBool();
       
-      if (mScene)
+      if (ignoreVisibility != mIgnoreVisibility)
       {
-         updateSceneBounds();
-         updateShapesCount();
+         mIgnoreVisibility = ignoreVisibility;
+         if (mScene)
+         {
+            updateWorld();
+         }
       }
       
       return true;
@@ -923,16 +914,90 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
    else if (plug == aDisplayMode)
    {
       DisplayMode dm = (DisplayMode) handle.asShort();
-      bool needGeometryUpdate = (dm != mDisplayMode && (mDisplayMode <= DM_boxes && dm >= DM_points));
-      mDisplayMode = dm;
       
-      if (needGeometryUpdate)
+      if (dm != mDisplayMode)
       {
-         // Force fetch geometry
-         updateScene(mFilePath, mObjectExpression, mSampleTime, true);
+         bool updateGeo = (mDisplayMode <= DM_boxes && dm >= DM_points);
+         
+         mDisplayMode = dm;
+         
+         if (updateGeo && mScene)
+         {
+            updateGeometry();
+         }
       }
       
       return true;
+   }
+   else if (plug == aTime)
+   {
+      MTime t = handle.asTime();
+      
+      if (fabs(t.as(MTime::kSeconds) - mTime.as(MTime::kSeconds)) > 0.0001)
+      {
+         mTime = t;
+         sampleTimeUpdate = true;
+      }
+   }
+   else if (plug == aSpeed)
+   {
+      double speed = handle.asDouble();
+      
+      if (fabs(speed - mSpeed) > 0.0001)
+      {
+         mSpeed = speed;
+         sampleTimeUpdate = true;
+      }
+   }
+   else if (plug == aPreserveStartFrame)
+   {
+      bool psf = handle.asBool();
+      
+      if (psf != mPreserveStartFrame)
+      {
+         mPreserveStartFrame = psf;
+         sampleTimeUpdate = true;
+      }
+   }
+   else if (plug == aOffset)
+   {
+      double offset = handle.asDouble();
+      
+      if (fabs(offset - mOffset) > 0.0001)
+      {
+         mOffset = offset;
+         sampleTimeUpdate = true;
+      }
+   }
+   else if (plug == aCycleType)
+   {
+      CycleType c = (CycleType) handle.asShort();
+      
+      if (c != mCycleType)
+      {
+         mCycleType = c;
+         sampleTimeUpdate = true;
+      }
+   }
+   else if (plug == aStartFrame)
+   {
+      double sf = handle.asDouble();
+      
+      if (fabs(sf - mStartFrame) > 0.0001)
+      {
+         mStartFrame = sf;
+         sampleTimeUpdate = true;
+      }
+   }
+   else if (plug == aEndFrame)
+   {
+      double ef = handle.asDouble();
+      
+      if (fabs(ef - mEndFrame) > 0.0001)
+      {
+         mEndFrame = ef;
+         sampleTimeUpdate = true;
+      }
    }
    else if (plug == aLineWidth)
    {
@@ -954,41 +1019,6 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       mDrawLocators = handle.asBool();
       return true;
    }
-   else if (plug == aTime)
-   {
-      t = handle.asTime();
-      sampleTimeUpdate = (fabs(t.as(MTime::kSeconds) - mTime.as(MTime::kSeconds)) > 0.0001);
-   }
-   else if (plug == aSpeed)
-   {
-      s = handle.asDouble();
-      sampleTimeUpdate = (fabs(s - mSpeed) > 0.0001);
-   }
-   else if (plug == aPreserveStartFrame)
-   {
-      psf = handle.asBool();
-      sampleTimeUpdate = (psf != mPreserveStartFrame);
-   }
-   else if (plug == aOffset)
-   {
-      o = handle.asDouble();
-      sampleTimeUpdate = (fabs(o - mOffset) > 0.0001);
-   }
-   else if (plug == aCycleType)
-   {
-      c = (CycleType) handle.asShort();
-      sampleTimeUpdate = (c != mCycleType);
-   }
-   else if (plug == aStartFrame)
-   {
-      sf = handle.asDouble();
-      sampleTimeUpdate = (fabs(sf - mStartFrame) > 0.0001);
-   }
-   else if (plug == aEndFrame)
-   {
-      ef = handle.asDouble();
-      sampleTimeUpdate = (fabs(ef - mEndFrame) > 0.0001);
-   }
    else
    {
       return MPxNode::setInternalValueInContext(plug, handle, ctx);
@@ -996,22 +1026,20 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
    
    if (sampleTimeUpdate)
    {
-      mTime = t;
-      mSpeed = s;
-      mOffset = o;
-      mStartFrame = sf;
-      mEndFrame = ef;
-      mCycleType = c;
-      mPreserveStartFrame = psf;
-      
       double sampleTime = getSampleTime();
       
-      return updateScene(mFilePath, mObjectExpression, sampleTime);
+      if (fabs(mSampleTime - sampleTime) > 0.0001)
+      {
+         mSampleTime = sampleTime;
+         
+         if (mScene)
+         {
+            updateWorld();
+         }
+      }
    }
-   else
-   {
-      return true;
-   }
+   
+   return true;
 }
 
 void AbcShape::copyInternalData(MPxNode *source)
@@ -1040,24 +1068,7 @@ void AbcShape::copyInternalData(MPxNode *source)
       mDrawTransformBounds = node->mDrawTransformBounds;
       mDrawLocators = node->mDrawLocators;
       
-      // if mFilePath is identical, first referencing will avoid inadvertant destruction
-      AlembicScene *scn = SceneCache::Ref(node->mFilePath.asChar());
-      SceneCache::Unref(mScene);
-      mScene = scn;
-      
-      mGeometry.clear();
-      
-      if (mScene)
-      {
-         mScene->setFilter(mObjectExpression.asChar());
-         
-         updateWorld();
-         
-         if (mDisplayMode >= DM_points)
-         {
-            updateGeometry();
-         }
-      }
+      updateScene();
    }
    
 }

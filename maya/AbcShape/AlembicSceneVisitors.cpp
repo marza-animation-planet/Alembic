@@ -11,8 +11,14 @@
 #include <iostream>
 
 
-WorldUpdate::WorldUpdate(double t)
+WorldUpdate::WorldUpdate(double t,
+                         bool ignoreTransforms,
+                         bool ignoreInstances,
+                         bool ignoreVisibility)
    : mTime(t)
+   , mIgnoreTransforms(ignoreTransforms)
+   , mIgnoreInstances(ignoreInstances)
+   , mIgnoreVisibility(ignoreVisibility)
 {
 }
 
@@ -20,18 +26,16 @@ AlembicNode::VisitReturn WorldUpdate::enter(AlembicXform &node, AlembicNode *ins
 {
    bool updated = true;
    
-   bool locator = node.isLocator();
-   
-   if (node.sampleBounds(mTime, &updated))
+   if (node.isLocator())
    {
-      if (updated)
+      if (node.sampleBounds(mTime, &updated))
       {
-         AlembicXform::Sample &samp0 = node.firstSample();
-         AlembicXform::Sample &samp1 = node.secondSample();
-         
-         if (samp1.dataWeight > 0.0)
+         if (updated)
          {
-            if (locator)
+            AlembicXform::Sample &samp0 = node.firstSample();
+            AlembicXform::Sample &samp1 = node.secondSample();
+            
+            if (samp1.dataWeight > 0.0)
             {
                Alembic::Abc::V3d v0, v1;
                
@@ -47,48 +51,54 @@ AlembicNode::VisitReturn WorldUpdate::enter(AlembicXform &node, AlembicNode *ins
             }
             else
             {
-               if (samp0.data.getInheritsXforms() != samp1.data.getInheritsXforms())
-               {
-                  std::cout << node.path() << ": Animated inherits transform property found, use first sample value" << std::endl;
-                  node.setSelfMatrix(samp0.data.getMatrix());
-               }
-               else
-               {
-                  node.setSelfMatrix(samp0.dataWeight * samp0.data.getMatrix() +
-                                     samp1.dataWeight * samp1.data.getMatrix());
-               }
-            }
-         }
-         else
-         {
-            if (locator)
-            {
                node.setLocatorPosition(Alembic::Abc::V3d(samp0.locator[0], samp0.locator[1], samp0.locator[2]));
                node.setLocatorScale(Alembic::Abc::V3d(samp0.locator[3], samp0.locator[4], samp0.locator[5]));
             }
-            else
-            {
-               node.setSelfMatrix(samp0.data.getMatrix());
-            }
-         }
-         
-         if (!locator)
-         {
-            node.setInheritsTransform(samp0.data.getInheritsXforms());
          }
       }
-   }
-   else
-   {
-      if (locator)
+      else
       {
          node.setLocatorPosition(Alembic::Abc::V3d(0, 0, 0));
          node.setLocatorScale(Alembic::Abc::V3d(1, 1, 1));
       }
-      else
+   }
+   else
+   {
+      if (!mIgnoreTransforms)
       {
-         Alembic::Abc::M44d id;
-         node.setSelfMatrix(id);
+         if (node.sampleBounds(mTime, &updated))
+         {
+            if (updated)
+            {
+               AlembicXform::Sample &samp0 = node.firstSample();
+               AlembicXform::Sample &samp1 = node.secondSample();
+               
+               if (samp1.dataWeight > 0.0)
+               {
+                  if (samp0.data.getInheritsXforms() != samp1.data.getInheritsXforms())
+                  {
+                     std::cout << node.path() << ": Animated inherits transform property found, use first sample value" << std::endl;
+                     node.setSelfMatrix(samp0.data.getMatrix());
+                  }
+                  else
+                  {
+                     node.setSelfMatrix(samp0.dataWeight * samp0.data.getMatrix() +
+                                        samp1.dataWeight * samp1.data.getMatrix());
+                  }
+               }
+               else
+               {
+                  node.setSelfMatrix(samp0.data.getMatrix());
+               }
+                  
+               node.setInheritsTransform(samp0.data.getInheritsXforms());
+            }
+         }
+         else
+         {
+            Alembic::Abc::M44d id;
+            node.setSelfMatrix(id);
+         }
       }
    }
    
@@ -126,8 +136,15 @@ AlembicNode::VisitReturn WorldUpdate::enter(AlembicNode &node, AlembicNode *)
    
    if (node.isInstance())
    {
-      AlembicNode *m = node.master();
-      rv = m->enter(*this, &node);
+      if (!mIgnoreInstances)
+      {
+         AlembicNode *m = node.master();
+         rv = m->enter(*this, &node);
+      }
+      else
+      {
+         return AlembicNode::DontVisitChildren;
+      }
    }
    
    node.updateWorldMatrix();
@@ -137,7 +154,10 @@ AlembicNode::VisitReturn WorldUpdate::enter(AlembicNode &node, AlembicNode *)
    
 void WorldUpdate::leave(AlembicNode &node, AlembicNode *)
 {
-   node.updateChildBounds();
+   if (!node.isInstance() || !mIgnoreInstances)
+   {
+      node.updateChildBounds();
+   }
 }
 
 // ---

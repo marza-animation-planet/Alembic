@@ -334,6 +334,24 @@ bool AlembicNode::isVisible(bool inherited) const
    }
 }
 
+void AlembicNode::reset()
+{
+   Alembic::Abc::Box3d emptyBox;
+   Alembic::Abc::M44d identityMatrix;
+   Alembic::Abc::V3d zero(0, 0, 0);
+   Alembic::Abc::V3d one(1, 1, 1);
+   
+   setSelfBounds(emptyBox);
+   setSelfMatrix(identityMatrix);
+   setInheritsTransform(true);
+   setVisible(false);
+   setLocatorPosition(zero);
+   setLocatorScale(one);
+   
+   resetWorldMatrix();
+   resetChildBounds();
+}
+
 void AlembicNode::resetWorldMatrix()
 {
    mWorldMatrix.makeIdentity();
@@ -669,20 +687,24 @@ AlembicScene::~AlembicScene()
 
 void AlembicScene::setFilter(const std::string &expr)
 {
+   if (mFiltered)
+   {
+      regfree(&mFilter);
+   }
+   
    mFilteredNodes.clear();
    mFiltered = (expr.length() > 0);
    
    if (mFiltered)
    {
-      try
+      if (regcomp(&mFilter, expr.c_str(), REG_EXTENDED|REG_NOSUB) != 0)
       {
-         mFilter.assign(expr, boost::regex::perl);
-         filter(this);
-      }
-      catch (std::exception &e)
-      {
-         std::cout << "Invalid expression: \"" << expr << "\": " << e.what() << std::endl;
+         std::cout << "Invalid expression: \"" << expr << "\"" << std::endl;
          mFiltered = false;
+      }
+      else
+      {
+         filter(this);
       }
    }
 }
@@ -696,7 +718,7 @@ bool AlembicScene::filter(AlembicNode *node)
 {
    size_t numChildren = 0;
    
-   bool matched = boost::regex_search(node->path(), mFilter);
+   bool matched = (regexec(&mFilter, node->path().c_str(), 0, NULL, 0) == 0);
    
    for (Array::iterator it=node->beginChild(); it!=node->endChild(); ++it)
    {
@@ -708,7 +730,15 @@ bool AlembicScene::filter(AlembicNode *node)
    }
    
    // Even if result is 0, if any of the children was filtered successfully, keep this node
-   return (numChildren > 0 || matched);
+   if (numChildren > 0 || matched)
+   {
+      return true;
+   }
+   else
+   {
+      node->reset();
+      return false;
+   }
 }
 
 AlembicNode::Set::iterator AlembicScene::beginFiltered()

@@ -13,7 +13,10 @@ class WorldUpdate
 {
 public:
    
-   WorldUpdate(double t);
+   WorldUpdate(double t,
+               bool ignoreTransforms,
+               bool ignoreInstances,
+               bool ignoreVisibility);
    
    AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
@@ -36,6 +39,9 @@ private:
 private:
 
    double mTime;
+   bool mIgnoreTransforms;
+   bool mIgnoreInstances;
+   bool mIgnoreVisibility;
 };
 
 template <class T>
@@ -79,29 +85,32 @@ AlembicNode::VisitReturn WorldUpdate::anyEnter(AlembicNodeT<T> &node, AlembicNod
 {
    Alembic::Util::bool_t visible = true;
    
-   Alembic::Abc::ICompoundProperty props = node.object().getProperties();
-   
-   if (props.valid())
+   if (!mIgnoreVisibility)
    {
-      const Alembic::Abc::PropertyHeader *header = props.getPropertyHeader("visible");
+      Alembic::Abc::ICompoundProperty props = node.object().getProperties();
       
-      if (header)
+      if (props.valid())
       {
-         if (Alembic::Abc::ICharProperty::matches(*header))
+         const Alembic::Abc::PropertyHeader *header = props.getPropertyHeader("visible");
+         
+         if (header)
          {
-            Alembic::Abc::ICharProperty prop(props, "visible");
-            
-            Alembic::Util::int8_t v = 1;
-            
-            prop.get(v, Alembic::Abc::ISampleSelector(node.getSampleIndex(mTime, prop)));
-            
-            visible = (v != 0);
-         }
-         else if (Alembic::Abc::IBoolProperty::matches(*header))
-         {
-            Alembic::Abc::IBoolProperty prop(props, "visible");
-            
-            prop.get(visible, Alembic::Abc::ISampleSelector(node.getSampleIndex(mTime, prop)));
+            if (Alembic::Abc::ICharProperty::matches(*header))
+            {
+               Alembic::Abc::ICharProperty prop(props, "visible");
+               
+               Alembic::Util::int8_t v = 1;
+               
+               prop.get(v, Alembic::Abc::ISampleSelector(node.getSampleIndex(mTime, prop)));
+               
+               visible = (v != 0);
+            }
+            else if (Alembic::Abc::IBoolProperty::matches(*header))
+            {
+               Alembic::Abc::IBoolProperty prop(props, "visible");
+               
+               prop.get(visible, Alembic::Abc::ISampleSelector(node.getSampleIndex(mTime, prop)));
+            }
          }
       }
    }
