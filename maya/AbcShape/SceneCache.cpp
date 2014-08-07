@@ -29,6 +29,14 @@ SceneCache::~SceneCache()
    std::cout << "[AbcShape] Clear cached scene(s) (" << mScenes.size() << " remaining)" << std::endl;
    #endif
    
+   for (std::map<std::string, CacheEntry>::iterator it = mScenes.begin(); it != mScenes.end(); ++it)
+   {
+      if (it->second.master)
+      {
+         delete it->second.master;
+      }
+   }
+   
    mScenes.clear();
 }
 
@@ -36,7 +44,7 @@ std::string SceneCache::formatPath(const std::string &filepath)
 {
    std::string rv = filepath;
    
-#ifdef _WIN32
+   #ifdef _WIN32
    size_t n = rv.length();
    for (size_t i=0; i<n; ++i)
    {
@@ -49,7 +57,7 @@ std::string SceneCache::formatPath(const std::string &filepath)
          rv[i] = 'a' + (rv[i] - 'A');
       }
    }
-#endif
+   #endif
    
    return rv;
 }
@@ -65,10 +73,18 @@ AlembicScene* SceneCache::ref(const std::string &filepath)
    
    if (it != mScenes.end())
    {
-      it->second.refcount++;
-      rv = new AlembicScene(Alembic::Abc::IArchive(it->second.archive.getPtr(),
-                                                   Alembic::Abc::kWrapExisting,
-                                                   Alembic::Abc::ErrorHandler::kQuietNoopPolicy));
+      if (!it->second.master)
+      {
+         rv = NULL;
+      }
+      else
+      {
+         it->second.refcount++;
+         #ifdef _DEBUG
+         std::cout << "[AbcShape] Clone master scene" << std::endl;
+         #endif
+         rv = new AlembicScene(*(it->second.master));
+      }
    }
    else
    {
@@ -79,12 +95,14 @@ AlembicScene* SceneCache::ref(const std::string &filepath)
       if (archive.valid())
       {
          CacheEntry &ce = mScenes[path];
+         
          ce.archive = archive;
          ce.refcount = 1;
+         ce.master = new AlembicScene(Alembic::Abc::IArchive(ce.archive.getPtr(),
+                                                             Alembic::Abc::kWrapExisting,
+                                                             Alembic::Abc::ErrorHandler::kQuietNoopPolicy));
          
-         rv = new AlembicScene(Alembic::Abc::IArchive(ce.archive.getPtr(),
-                                                      Alembic::Abc::kWrapExisting,
-                                                      Alembic::Abc::ErrorHandler::kQuietNoopPolicy));
+         return ce.master;
       }
    }
    
@@ -115,16 +133,33 @@ bool SceneCache::unref(AlembicScene *scene)
    if (it != mScenes.end())
    {
       it->second.refcount--;
+      
+      bool isMasterScene = (scene == it->second.master);
+      
       if (it->second.refcount == 0)
       {
          #ifdef _DEBUG
          std::cout << "[AbcShape] Last scene referencing alembic archive \"" << it->second.archive.getName() << "\"" << std::endl;
          #endif
          
+         #ifdef _DEBUG
+         std::cout << "[AbcShape] Destroy master scene" << std::endl;
+         #endif
+         if (it->second.master)
+         {
+            delete it->second.master;
+         }
+         
          mScenes.erase(it);
       }
       
-      delete scene;
+      if (!isMasterScene)
+      {
+         #ifdef _DEBUG
+         std::cout << "[AbcShape] Destroy scene" << std::endl;
+         #endif
+         delete scene;
+      }
       
       rv = true;
    }

@@ -25,6 +25,38 @@ AlembicNode::AlembicNode()
    mLocatorScale.setValue(1, 1, 1);
 }
 
+AlembicNode::AlembicNode(const AlembicNode &rhs, AlembicNode *parent)
+   : mIObj(rhs.mIObj)
+   , mParent(parent)
+   , mMasterPath(rhs.mMasterPath)
+   , mMaster(0)
+   , mInstanceNumber(rhs.mInstanceNumber)
+   , mType(rhs.mType)
+   , mSelfBounds(rhs.mSelfBounds)
+   , mSelfMatrix(rhs.mSelfMatrix)
+   , mChildBounds(rhs.mChildBounds)
+   , mWorldMatrix(rhs.mWorldMatrix)
+   , mLocatorProp(rhs.mLocatorProp)
+   , mLocatorPosition(rhs.mLocatorPosition)
+   , mLocatorScale(rhs.mLocatorScale)
+   , mInheritsTransform(rhs.mInheritsTransform)
+   , mVisible(rhs.mVisible)
+{
+   size_t numChildren = rhs.childCount();
+   
+   mChildren.resize(numChildren);
+   
+   for (size_t i=0; i<numChildren; ++i)
+   {
+      AlembicNode *c = rhs.child(i)->clone(this);
+      if (c)
+      {
+         mChildren[i] = c;
+         mChildByName[c->name()] = c;
+      }
+   }
+}
+
 AlembicNode::AlembicNode(Alembic::Abc::IObject iObj, AlembicNode *parent)
    : mIObj(iObj)
    , mParent(parent)
@@ -92,6 +124,11 @@ AlembicNode::~AlembicNode()
    }
    
    mParent = 0;
+}
+
+AlembicNode* AlembicNode::clone(AlembicNode *parent) const
+{
+   return new AlembicNode(*this, parent);
 }
 
 AlembicNode::NodeType AlembicNode::type() const
@@ -676,13 +713,29 @@ AlembicNode* AlembicNode::Wrap(Alembic::Abc::IObject iObj, AlembicNode *iParent)
 // ---
 
 AlembicScene::AlembicScene(Alembic::Abc::IArchive iArch)
-   : AlembicNode(iArch.getTop()), mArchive(iArch), mFiltered(false)
+   : AlembicNode(iArch.getTop())
+   , mArchive(iArch)
+   , mFiltered(false)
 {
    resolveInstances(this);
 }
 
+AlembicScene::AlembicScene(const AlembicScene &rhs)
+   : AlembicNode(rhs)
+   , mArchive(rhs.mArchive)
+   , mFiltered(false)
+{
+   resolveInstances(this);
+   setFilter(rhs.mFilterStr);
+}
+
 AlembicScene::~AlembicScene()
 {
+}
+
+AlembicNode* AlembicScene::clone(AlembicNode *) const
+{
+   return new AlembicScene(*this);
 }
 
 void AlembicScene::setFilter(const std::string &expr)
@@ -693,6 +746,7 @@ void AlembicScene::setFilter(const std::string &expr)
    }
    
    mFilteredNodes.clear();
+   mFilterStr = "";
    mFiltered = (expr.length() > 0);
    
    if (mFiltered)
@@ -704,6 +758,7 @@ void AlembicScene::setFilter(const std::string &expr)
       }
       else
       {
+         mFilterStr = expr;
          filter(this);
       }
    }

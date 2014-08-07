@@ -58,12 +58,7 @@ public:
       
       if (shape->drawTransformBounds())
       {
-         const MMatrix vm = context.getMatrix(MHWRender::MDrawContext::kViewInverseMtx, &status);
-         if (status != MStatus::kSuccess)
-         {
-            return;
-         }
-         vm.get(viewMatrix.x);
+         view.get(viewMatrix.x);
       }
       
       glMatrixMode(GL_PROJECTION);
@@ -75,10 +70,10 @@ public:
       
       int style = context.getDisplayStyle();
       
-      DrawGeometry visitor(shape->sceneGeometry(),
-                           shape->ignoreTransforms(),
-                           shape->ignoreInstances(),
-                           shape->ignoreVisibility());
+      DrawScene visitor(shape->sceneGeometry(),
+                        shape->ignoreTransforms(),
+                        shape->ignoreInstances(),
+                        shape->ignoreVisibility());
       visitor.setPointWidth(shape->pointWidth());
       visitor.setLineWidth(shape->lineWidth());
       if (!ignoreCulling)

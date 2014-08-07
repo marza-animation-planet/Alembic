@@ -19,6 +19,7 @@ WorldUpdate::WorldUpdate(double t,
    , mIgnoreTransforms(ignoreTransforms)
    , mIgnoreInstances(ignoreInstances)
    , mIgnoreVisibility(ignoreVisibility)
+   , mNumShapes(0)
 {
 }
 
@@ -132,31 +133,52 @@ AlembicNode::VisitReturn WorldUpdate::enter(AlembicNuPatch &node, AlembicNode *i
 
 AlembicNode::VisitReturn WorldUpdate::enter(AlembicNode &node, AlembicNode *)
 {
-   AlembicNode::VisitReturn rv = AlembicNode::ContinueVisit;
-   
    if (node.isInstance())
    {
       if (!mIgnoreInstances)
       {
          AlembicNode *m = node.master();
-         rv = m->enter(*this, &node);
+         return m->enter(*this, &node);
       }
       else
       {
+         node.resetWorldMatrix();
+         node.resetChildBounds();
          return AlembicNode::DontVisitChildren;
       }
    }
-   
-   node.updateWorldMatrix();
-   
-   return rv;
+   else
+   {
+      return AlembicNode::ContinueVisit;
+   }
 }
-   
+
+void WorldUpdate::leave(AlembicXform &node, AlembicNode *)
+{
+   node.updateChildBounds();
+}
+
 void WorldUpdate::leave(AlembicNode &node, AlembicNode *)
 {
    if (!node.isInstance() || !mIgnoreInstances)
    {
       node.updateChildBounds();
+      
+      Alembic::Abc::Box3d bounds;
+      
+      if (!mIgnoreTransforms)
+      {
+         bounds = node.childBounds();
+      }
+      else if (!node.isInstance())
+      {
+         bounds = node.selfBounds();
+      }
+      
+      if (!bounds.isInfinite())
+      {
+         mBounds.extendBy(bounds);
+      }
    }
 }
 
@@ -247,7 +269,6 @@ AlembicNode::VisitReturn GetFrameRange::enter(AlembicNode &, AlembicNode *)
 void GetFrameRange::leave(AlembicNode &, AlembicNode *)
 {
 }
-
 
 bool GetFrameRange::getFrameRange(double &start, double &end) const
 {
@@ -461,10 +482,10 @@ void SampleGeometry::leave(AlembicNode &, AlembicNode *)
 
 // ---
 
-DrawGeometry::DrawGeometry(const SceneGeometryData *sceneData,
-                           bool ignoreTransforms,
-                           bool ignoreInstances,
-                           bool ignoreVisibility)
+DrawScene::DrawScene(const SceneGeometryData *sceneData,
+                     bool ignoreTransforms,
+                     bool ignoreInstances,
+                     bool ignoreVisibility)
    : mBounds(sceneData == 0)
    , mAsPoints(false)
    , mWireframe(false)
@@ -480,12 +501,12 @@ DrawGeometry::DrawGeometry(const SceneGeometryData *sceneData,
 {
 }
 
-bool DrawGeometry::isVisible(AlembicNode &node) const
+bool DrawScene::isVisible(AlembicNode &node) const
 {
    return (!mCheckVisibility || node.isVisible());
 }
 
-bool DrawGeometry::cull(AlembicNode &node)
+bool DrawScene::cull(AlembicNode &node)
 {
    if (!mCull)
    {
@@ -517,62 +538,17 @@ bool DrawGeometry::cull(AlembicNode &node)
    }
 }
 
-bool DrawGeometry::culled(AlembicNode &node) const
+bool DrawScene::culled(AlembicNode &node) const
 {
    return (mCulledNodes.find(&node) != mCulledNodes.end());
 }
 
-void DrawGeometry::setViewMatrix(const Alembic::Abc::M44d &view)
+void DrawScene::setWorldMatrix(const Alembic::Abc::M44d &world)
 {
-   mViewMatrixInv = view.inverse();
+   mWorldMatrix = world;
 }
 
-AlembicNode::VisitReturn DrawGeometry::enter(AlembicMesh &node, AlembicNode *)
-{
-   if (!isVisible(node))
-   {
-      return AlembicNode::DontVisitChildren;
-   }
-   
-   if (mBounds)
-   {
-      DrawBox(node.selfBounds(), mAsPoints, (mAsPoints ? mPointWidth : mLineWidth));
-   }
-   else
-   {
-      if (mSceneData)
-      {
-         const MeshData *data = mSceneData->mesh(node);
-         if (data)
-         {
-            if (mAsPoints)
-            {
-               data->drawPoints(mPointWidth);
-            }
-            else
-            {
-               data->draw(mWireframe, mLineWidth);
-            }
-         }
-         else
-         {
-            #ifdef _DEBUG
-            std::cout << "No geometry data for " << node.path() << std::endl;
-            #endif
-         }
-      }
-      else
-      {
-         #ifdef _DEBUG
-         std::cout << "No scene geometry data at all" << std::endl;
-         #endif
-      }
-   }
-   
-   return AlembicNode::ContinueVisit;
-}
-
-AlembicNode::VisitReturn DrawGeometry::enter(AlembicSubD &node, AlembicNode *)
+AlembicNode::VisitReturn DrawScene::enter(AlembicMesh &node, AlembicNode *)
 {
    if (!isVisible(node))
    {
@@ -617,7 +593,52 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicSubD &node, AlembicNode *)
    return AlembicNode::ContinueVisit;
 }
 
-AlembicNode::VisitReturn DrawGeometry::enter(AlembicPoints &node, AlembicNode *)
+AlembicNode::VisitReturn DrawScene::enter(AlembicSubD &node, AlembicNode *)
+{
+   if (!isVisible(node))
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   
+   if (mBounds)
+   {
+      DrawBox(node.selfBounds(), mAsPoints, (mAsPoints ? mPointWidth : mLineWidth));
+   }
+   else
+   {
+      if (mSceneData)
+      {
+         const MeshData *data = mSceneData->mesh(node);
+         if (data)
+         {
+            if (mAsPoints)
+            {
+               data->drawPoints(mPointWidth);
+            }
+            else
+            {
+               data->draw(mWireframe, mLineWidth);
+            }
+         }
+         else
+         {
+            #ifdef _DEBUG
+            std::cout << "No geometry data for " << node.path() << std::endl;
+            #endif
+         }
+      }
+      else
+      {
+         #ifdef _DEBUG
+         std::cout << "No scene geometry data at all" << std::endl;
+         #endif
+      }
+   }
+   
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn DrawScene::enter(AlembicPoints &node, AlembicNode *)
 {
    if (!isVisible(node))
    {
@@ -655,7 +676,7 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicPoints &node, AlembicNode *)
    return AlembicNode::ContinueVisit;
 }
 
-AlembicNode::VisitReturn DrawGeometry::enter(AlembicCurves &node, AlembicNode *)
+AlembicNode::VisitReturn DrawScene::enter(AlembicCurves &node, AlembicNode *)
 {
    if (!isVisible(node))
    {
@@ -700,7 +721,7 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicCurves &node, AlembicNode *)
    return AlembicNode::ContinueVisit;
 }
 
-AlembicNode::VisitReturn DrawGeometry::enter(AlembicNuPatch &node, AlembicNode *)
+AlembicNode::VisitReturn DrawScene::enter(AlembicNuPatch &node, AlembicNode *)
 {
    if (!isVisible(node))
    {
@@ -721,7 +742,7 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicNuPatch &node, AlembicNode *
    return AlembicNode::ContinueVisit;
 }
 
-AlembicNode::VisitReturn DrawGeometry::enter(AlembicXform &node, AlembicNode *instance)
+AlembicNode::VisitReturn DrawScene::enter(AlembicXform &node, AlembicNode *instance)
 {
    if (!isVisible(node))
    {
@@ -757,7 +778,7 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicXform &node, AlembicNode *in
       }
       
       glMatrixMode(GL_MODELVIEW);
-      glLoadMatrixd(mViewMatrixInv.getValue());
+      glLoadMatrixd(mWorldMatrix.getValue());
       
       glColor3d(0, 0, 0);
       if (!mNoTransforms)
@@ -800,7 +821,7 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicXform &node, AlembicNode *in
    return AlembicNode::ContinueVisit;
 }
 
-AlembicNode::VisitReturn DrawGeometry::enter(AlembicNode &node, AlembicNode *)
+AlembicNode::VisitReturn DrawScene::enter(AlembicNode &node, AlembicNode *)
 {
    if (!isVisible(node))
    {
@@ -823,7 +844,7 @@ AlembicNode::VisitReturn DrawGeometry::enter(AlembicNode &node, AlembicNode *)
    }
 }
  
-void DrawGeometry::leave(AlembicXform &node, AlembicNode *instance)
+void DrawScene::leave(AlembicXform &node, AlembicNode *instance)
 {
    if (isVisible(node) && !culled(instance ? *instance : node) && !node.isLocator() && !mNoTransforms)
    {
@@ -836,7 +857,7 @@ void DrawGeometry::leave(AlembicXform &node, AlembicNode *instance)
    }
 }
   
-void DrawGeometry::leave(AlembicNode &node, AlembicNode *)
+void DrawScene::leave(AlembicNode &node, AlembicNode *)
 {
    if (isVisible(node) && node.isInstance() && !mNoInstances)
    {

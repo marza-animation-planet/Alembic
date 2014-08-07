@@ -25,8 +25,12 @@ public:
    AlembicNode::VisitReturn enter(AlembicCurves &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicNuPatch &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0);
-      
+   
+   void leave(AlembicXform &node, AlembicNode *instance=0);
    void leave(AlembicNode &node, AlembicNode *instance=0);
+   
+   const Alembic::Abc::Box3d& bounds() const;
+   unsigned int numShapes() const;
    
 private:
    
@@ -42,7 +46,19 @@ private:
    bool mIgnoreTransforms;
    bool mIgnoreInstances;
    bool mIgnoreVisibility;
+   Alembic::Abc::Box3d mBounds;
+   unsigned int mNumShapes;
 };
+
+inline const Alembic::Abc::Box3d& WorldUpdate::bounds() const
+{
+   return mBounds;
+}
+
+inline unsigned int WorldUpdate::numShapes() const
+{
+   return mNumShapes;
+}
 
 template <class T>
 AlembicNode::VisitReturn WorldUpdate::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance)
@@ -120,6 +136,15 @@ AlembicNode::VisitReturn WorldUpdate::anyEnter(AlembicNodeT<T> &node, AlembicNod
    if (!instance)
    {
       node.updateWorldMatrix();
+   }
+   else
+   {
+      instance->updateWorldMatrix();
+   }
+   
+   if (node.type() != AlembicNode::TypeXform)
+   {
+      ++mNumShapes;
    }
    
    return AlembicNode::ContinueVisit;
@@ -341,14 +366,14 @@ private:
 
 // ---
 
-class DrawGeometry
+class DrawScene
 {
 public:
    
-   DrawGeometry(const SceneGeometryData *sceneData,
-                bool ignoreTransforms,
-                bool ignoreInstances,
-                bool ignoreVisibility);
+   DrawScene(const SceneGeometryData *sceneData,
+             bool ignoreTransforms,
+             bool ignoreInstances,
+             bool ignoreVisibility);
    
    AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
@@ -368,9 +393,9 @@ public:
    inline void setPointWidth(float w) { mPointWidth = w; }
    inline void doCull(const Frustum &f) { mCull = true; mFrustum = f; }
    inline void dontCull() { mCull = false; }
-   inline void drawTransformBounds(bool on, const Alembic::Abc::M44d &view) { mTransformBounds = on; setViewMatrix(view); }
+   inline void drawTransformBounds(bool on, const Alembic::Abc::M44d &world) { mTransformBounds = on; setWorldMatrix(world); }
    inline void drawLocators(bool on) { mLocators = on; }
-   void setViewMatrix(const Alembic::Abc::M44d &view);
+   void setWorldMatrix(const Alembic::Abc::M44d &world);
    
 private:
    
@@ -393,7 +418,7 @@ private:
    const SceneGeometryData *mSceneData;
    bool mTransformBounds;
    bool mLocators;
-   Alembic::Abc::M44d mViewMatrixInv;
+   Alembic::Abc::M44d mWorldMatrix;
    std::deque<Alembic::Abc::M44d> mMatrixStack;
    std::set<AlembicNode*> mCulledNodes;
 };

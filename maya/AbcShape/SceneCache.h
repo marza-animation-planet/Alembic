@@ -36,6 +36,7 @@ private:
    struct CacheEntry
    {
       Alembic::Abc::IArchive archive;
+      AlembicScene *master;
       int refcount;
    };
    

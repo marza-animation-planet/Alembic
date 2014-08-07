@@ -119,11 +119,17 @@ private:
     
     void updateScene();
     void updateObjects();
-    bool updateFrameRange();
     void updateWorld();
-    void updateSceneBounds();
-    void updateShapesCount();
     void updateGeometry();
+    
+    enum UpdateLevel
+    {
+        UL_none = 0,
+        UL_geometry,
+        UL_world,
+        UL_objects,
+        UL_scene
+    };
     
 private:
     
@@ -148,6 +154,7 @@ private:
     bool mPreserveStartFrame;
     bool mDrawTransformBounds;
     bool mDrawLocators;
+    int mUpdateLevel;
 };
 
 class AbcShapeUI : public MPxSurfaceShapeUI
@@ -185,7 +192,7 @@ public:
     // Compute frustum straight from OpenGL projection and modelview matrices
     bool computeFrustum(Frustum &frustum) const;
     
-    void getViewMatrix(M3dView &view, Alembic::Abc::M44d &viewMatrix) const;
+    void getWorldMatrix(M3dView &view, Alembic::Abc::M44d &worldMatrix) const;
 
 private:
     

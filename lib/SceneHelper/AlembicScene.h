@@ -61,6 +61,8 @@ public:
    AlembicNode(Alembic::Abc::IObject iObj, AlembicNode *parent=0);
    virtual ~AlembicNode();
    
+   virtual AlembicNode* clone(AlembicNode *parent=0) const;
+   
    bool isValid() const;
    
    NodeType type() const;
@@ -216,6 +218,8 @@ public:
    }
    
 protected:
+   
+   AlembicNode(const AlembicNode &rhs, AlembicNode *parent=0);
 
    void setType(NodeType nt);
    
@@ -394,6 +398,11 @@ public:
       resetSamplesData();
    }
    
+   virtual AlembicNode* clone(AlembicNode *parent=0) const
+   {
+      return new AlembicNodeT<IClass>(*this, parent);
+   }
+   
    inline IClass typedObject() const
    {
       return mITypedObj;
@@ -489,6 +498,12 @@ public:
    }
    
 protected:
+   
+   AlembicNodeT(const AlembicNodeT<IClass> &rhs, AlembicNode *iParent=0)
+      : AlembicNode(rhs, iParent), mITypedObj(rhs.mITypedObj)
+   {
+      initSamples();
+   }
    
    void initSamples()
    {
@@ -821,7 +836,12 @@ protected:
       if (mSample1.dataWeight > 0.0)
       {
          mSample1.get(mITypedObj, mSample1.dataIndex);
-         return mSample1.valid(mITypedObj);
+         bool rv = mSample1.valid(mITypedObj);
+         if (!rv)
+         {
+            resetSamplesData();
+         }
+         return rv;
       }
       else
       {
@@ -864,7 +884,10 @@ class AlembicScene : public AlembicNode
 public:
    
    AlembicScene(Alembic::Abc::IArchive iArch);
+   AlembicScene(const AlembicScene &rhs);
    virtual ~AlembicScene();
+   
+   virtual AlembicNode* clone(AlembicNode *parent=0) const;
    
    bool isFiltered(AlembicNode *node) const;
    void setFilter(const std::string &filter);
@@ -892,6 +915,7 @@ private:
    
    Alembic::Abc::IArchive mArchive;
    bool mFiltered;
+   std::string mFilterStr;
    regex_t mFilter;
    std::set<AlembicNode*> mFilteredNodes;
 };

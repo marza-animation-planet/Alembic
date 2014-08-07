@@ -337,6 +337,7 @@ AbcShape::AbcShape()
    , mPreserveStartFrame(false)
    , mDrawTransformBounds(false)
    , mDrawLocators(false)
+   , mUpdateLevel(AbcShape::UL_none)
 {
 }
 
@@ -449,18 +450,38 @@ void AbcShape::syncInternals(MDataBlock &block)
    block.inputValue(aIgnoreVisibility).asBool();
    block.inputValue(aDisplayMode).asShort();
    block.inputValue(aPreserveStartFrame).asBool();
+   
+   switch (mUpdateLevel)
+   {
+   case UL_scene:
+      updateScene();
+      break;
+   case UL_objects:
+      if (mScene) updateObjects();
+      break;
+   case UL_world:
+      if (mScene) updateWorld();
+      break;
+   case UL_geometry:
+      if (mScene) updateGeometry();
+      break;
+   default:
+      break;
+   }
+   
+   mUpdateLevel = UL_none;
 }
 
 MBoundingBox AbcShape::boundingBox() const
 {
    MBoundingBox bbox;
    
+   AbcShape *this2 = const_cast<AbcShape*>(this);
+      
+   this2->syncInternals();
+   
    if (mScene)
    {
-      AbcShape *this2 = const_cast<AbcShape*>(this);
-      
-      this2->syncInternals();
-      
       // Use self bounds here as those are taking ignore transform/instance flag into account
       Alembic::Abc::Box3d bounds = mScene->selfBounds();
       
@@ -595,23 +616,45 @@ double AbcShape::getSampleTime() const
 void AbcShape::updateScene()
 {
    #ifdef _DEBUG
-   std::cout << "[AbcShape] Update scene" << std::endl;
+   std::cout << "[AbcShape] Update scene: " << mFilePath << std::endl;
    #endif
    SceneCache::Unref(mScene);
+   
+   mGeometry.clear();
    
    mScene = SceneCache::Ref(mFilePath.asChar());
    
    if (mScene)
    {
-      if (updateFrameRange())
+      GetFrameRange visitor;
+      mScene->visit(AlembicNode::VisitDepthFirst, visitor);
+      
+      double start, end;
+      
+      if (visitor.getFrameRange(start, end))
       {
-         // This will force instant refresh of AE values
-         // but won't trigger any update as mStartFrame and mEndFrame are unchanged
-         MPlug plug(thisMObject(), aStartFrame);
-         plug.setDouble(mStartFrame);
+         double fps = getFPS();
+         start *= fps;
+         end *= fps;
          
-         plug.setAttribute(aEndFrame);
-         plug.setDouble(mEndFrame);
+         if (fabs(mStartFrame - start) > 0.0001 ||
+             fabs(mEndFrame - end) > 0.0001)
+         {
+            #ifdef _DEBUG
+            std::cout << "[AbcShape] Frame range: " << start << " - " << end << std::endl;
+            #endif
+            
+            mStartFrame = start;
+            mEndFrame = end;
+            
+            // This will force instant refresh of AE values
+            // but won't trigger any update as mStartFrame and mEndFrame are unchanged
+            MPlug plug(thisMObject(), aStartFrame);
+            plug.setDouble(mStartFrame);
+            
+            plug.setAttribute(aEndFrame);
+            plug.setDouble(mEndFrame);
+         }
       }
       
       updateObjects();
@@ -620,19 +663,15 @@ void AbcShape::updateScene()
    {
       mNumShapes = 0;
    }
-   
-   mGeometry.clear();
 }
 
 void AbcShape::updateObjects()
 {
    #ifdef _DEBUG
-   std::cout << "[AbcShape] Update objects" << std::endl;
+   std::cout << "[AbcShape] Filter objects: \"" << mObjectExpression << "\"" << std::endl;
    #endif
    
    mScene->setFilter(mObjectExpression.asChar());
-   
-   updateShapesCount();
    
    updateWorld();
 }
@@ -646,37 +685,23 @@ void AbcShape::updateWorld()
    WorldUpdate visitor(mSampleTime, mIgnoreTransforms, mIgnoreInstances, mIgnoreVisibility);
    mScene->visit(AlembicNode::VisitDepthFirst, visitor);
    
-   updateSceneBounds();
+   mNumShapes = visitor.numShapes();
    
-   // is that?
+   #ifdef _DEBUG
+   std::cout << "[AbcShape] " << mNumShapes << " shape(s) in scene" << std::endl;
+   #endif
+   
+   mScene->updateChildBounds();
+   mScene->setSelfBounds(visitor.bounds());
+   
+   #ifdef _DEBUG
+   std::cout << "[AbcShape] Scene bounds: " << visitor.bounds().min << " - " << visitor.bounds().max << std::endl;
+   #endif
+   
    if (mDisplayMode >= DM_points)
    {
       updateGeometry();
    }
-}
-
-void AbcShape::updateSceneBounds()
-{
-   #ifdef _DEBUG
-   std::cout << "[AbcShape] Update scene bounds" << std::endl;
-   #endif
-   
-   ComputeSceneBounds visitor(mIgnoreTransforms, mIgnoreInstances, mIgnoreVisibility);
-   mScene->visit(AlembicNode::VisitDepthFirst, visitor);
-   mScene->updateChildBounds();
-   // override scene self bounds to take into account the ignore transforms/instances/visibility flags
-   mScene->setSelfBounds(visitor.bounds());
-}
-
-void AbcShape::updateShapesCount()
-{
-   #ifdef _DEBUG
-   std::cout << "[AbcShape] Update shapes count" << std::endl;
-   #endif
-   
-   CountShapes visitor(mIgnoreInstances, mIgnoreVisibility);
-   mScene->visit(AlembicNode::VisitDepthFirst, visitor);
-   mNumShapes = visitor.count();
 }
 
 void AbcShape::updateGeometry()
@@ -687,40 +712,6 @@ void AbcShape::updateGeometry()
    
    SampleGeometry visitor(mSampleTime, &mGeometry);
    mScene->visit(AlembicNode::VisitDepthFirst, visitor);
-}
-
-bool AbcShape::updateFrameRange()
-{
-   #ifdef _DEBUG
-   std::cout << "[AbcShape] Update frame range" << std::endl;
-   #endif
-   
-   GetFrameRange visitor;
-   mScene->visit(AlembicNode::VisitDepthFirst, visitor);
-   
-   double start, end;
-   
-   if (visitor.getFrameRange(start, end))
-   {
-      double fps = getFPS();
-      start *= fps;
-      end *= fps;
-      
-      if (fabs(mStartFrame - start) > 0.0001 ||
-          fabs(mEndFrame - end) > 0.0001)
-      {
-         #ifdef _DEBUG
-         std::cout << "[AbcShape] Frame range: " << start << "-" << end << std::endl;
-         #endif
-         
-         mStartFrame = start;
-         mEndFrame = end;
-         
-         return true;
-      }
-   }
-   
-   return false;
 }
 
 void AbcShape::printInfo(bool detailed) const
@@ -846,7 +837,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       if (filePath != mFilePath)
       {
          mFilePath = filePath;
-         updateScene();
+         mUpdateLevel = UL_scene;
       }
       
       return true;
@@ -860,7 +851,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
          mObjectExpression = objectExpression;
          if (mScene)
          {
-            updateObjects();
+            mUpdateLevel = std::max<int>(mUpdateLevel, UL_objects);
          }
       }
       
@@ -875,7 +866,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
          mIgnoreTransforms = ignoreTransforms;
          if (mScene)
          {
-            updateWorld();
+            mUpdateLevel = std::max<int>(mUpdateLevel, UL_world);
          }
       }
       
@@ -890,7 +881,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
          mIgnoreInstances = ignoreInstances;
          if (mScene)
          {
-            updateWorld();
+            mUpdateLevel = std::max<int>(mUpdateLevel, UL_world);
          }
       }
       
@@ -905,7 +896,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
          mIgnoreVisibility = ignoreVisibility;
          if (mScene)
          {
-            updateWorld();
+            mUpdateLevel = std::max<int>(mUpdateLevel, UL_world);
          }
       }
       
@@ -923,7 +914,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
          
          if (updateGeo && mScene)
          {
-            updateGeometry();
+            mUpdateLevel = std::max<int>(mUpdateLevel, UL_geometry);
          }
       }
       
@@ -1034,7 +1025,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
          
          if (mScene)
          {
-            updateWorld();
+            mUpdateLevel = std::max<int>(mUpdateLevel, UL_world);
          }
       }
    }
@@ -1060,7 +1051,6 @@ void AbcShape::copyInternalData(MPxNode *source)
       mIgnoreInstances = node->mIgnoreInstances;
       mIgnoreTransforms = node->mIgnoreTransforms;
       mIgnoreVisibility = node->mIgnoreVisibility;
-      mNumShapes = node->mNumShapes;
       mLineWidth = node->mLineWidth;
       mPointWidth = node->mPointWidth;
       mDisplayMode = node->mDisplayMode;
@@ -1068,7 +1058,11 @@ void AbcShape::copyInternalData(MPxNode *source)
       mDrawTransformBounds = node->mDrawTransformBounds;
       mDrawLocators = node->mDrawLocators;
       
-      updateScene();
+      SceneCache::Unref(mScene);
+      mScene = 0;
+      mNumShapes = 0;
+      mGeometry.clear();
+      mUpdateLevel = UL_scene;
    }
    
 }
@@ -1293,12 +1287,12 @@ bool AbcShapeUI::computeFrustum(Frustum &frustum) const
    }
 }
 
-void AbcShapeUI::getViewMatrix(M3dView &view, Alembic::Abc::M44d &viewMatrix) const
+void AbcShapeUI::getWorldMatrix(M3dView &view, Alembic::Abc::M44d &worldMatrix) const
 {
-   MDagPath camera;
+   MMatrix modelViewMatrix;
    
-   view.getCamera(camera);
-   camera.inclusiveMatrix().get(viewMatrix.x);
+   view.modelViewMatrix(modelViewMatrix);
+   modelViewMatrix.get(worldMatrix.x);
 }
 
 bool AbcShapeUI::select(MSelectInfo &selectInfo,
@@ -1348,10 +1342,10 @@ bool AbcShapeUI::select(MSelectInfo &selectInfo,
    }
    else
    {
-      DrawGeometry visitor(shape->sceneGeometry(),
-                           shape->ignoreTransforms(),
-                           shape->ignoreInstances(),
-                           shape->ignoreVisibility());
+      DrawScene visitor(shape->sceneGeometry(),
+                        shape->ignoreTransforms(),
+                        shape->ignoreInstances(),
+                        shape->ignoreVisibility());
       
       // Use matrices staight from OpenGL as those will include the picking matrix so
       //   that more geometry can get culled
@@ -1517,7 +1511,7 @@ void AbcShapeUI::drawBox(AbcShape *shape, const MDrawRequest &, M3dView &view) c
    {
       Frustum frustum;
       
-      DrawGeometry visitor(NULL, shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
+      DrawScene visitor(NULL, shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
       visitor.drawAsPoints(false);
       visitor.drawLocators(shape->drawLocators());
       if (!shape->ignoreCulling() && computeFrustum(view, frustum))
@@ -1526,9 +1520,9 @@ void AbcShapeUI::drawBox(AbcShape *shape, const MDrawRequest &, M3dView &view) c
       }
       if (shape->drawTransformBounds())
       {
-         Alembic::Abc::M44d viewMatrix;
-         getViewMatrix(view, viewMatrix);
-         visitor.drawTransformBounds(true, viewMatrix);
+         Alembic::Abc::M44d worldMatrix;
+         getWorldMatrix(view, worldMatrix);
+         visitor.drawTransformBounds(true, worldMatrix);
       }
       
       shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
@@ -1555,7 +1549,7 @@ void AbcShapeUI::drawPoints(AbcShape *shape, const MDrawRequest &, M3dView &view
    {
       Frustum frustum;
    
-      DrawGeometry visitor(shape->sceneGeometry(), shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
+      DrawScene visitor(shape->sceneGeometry(), shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
       
       visitor.drawBounds(shape->displayMode() == AbcShape::DM_boxes);
       visitor.drawAsPoints(true);
@@ -1568,9 +1562,9 @@ void AbcShapeUI::drawPoints(AbcShape *shape, const MDrawRequest &, M3dView &view
       }
       if (shape->drawTransformBounds())
       {
-         Alembic::Abc::M44d viewMatrix;
-         getViewMatrix(view, viewMatrix);
-         visitor.drawTransformBounds(true, viewMatrix);
+         Alembic::Abc::M44d worldMatrix;
+         getWorldMatrix(view, worldMatrix);
+         visitor.drawTransformBounds(true, worldMatrix);
       }
       
       shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
@@ -1628,7 +1622,7 @@ void AbcShapeUI::drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dV
       glColor3f(defaultDiffuse.r, defaultDiffuse.g, defaultDiffuse.b);
    }
    
-   DrawGeometry visitor(shape->sceneGeometry(), shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
+   DrawScene visitor(shape->sceneGeometry(), shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
    visitor.drawWireframe(wireframe);
    visitor.setLineWidth(shape->lineWidth());
    visitor.setPointWidth(shape->pointWidth());
@@ -1643,9 +1637,9 @@ void AbcShapeUI::drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dV
       visitor.drawLocators(shape->drawLocators());
       if (shape->drawTransformBounds())
       {
-         Alembic::Abc::M44d viewMatrix;
-         getViewMatrix(view, viewMatrix);
-         visitor.drawTransformBounds(true, viewMatrix);
+         Alembic::Abc::M44d worldMatrix;
+         getWorldMatrix(view, worldMatrix);
+         visitor.drawTransformBounds(true, worldMatrix);
       }
    }
    
