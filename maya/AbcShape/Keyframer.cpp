@@ -575,23 +575,23 @@ void Keyframer::createCurves(MFnAnimCurve::InfinityType preInf,
    }
 }
 
-void Keyframer::retimeCurve(const MObject &curveObj,
+void Keyframer::beginRetime()
+{
+   mRetimedCurves.clear();
+   mRetimedCurveInterp.clear();
+}
+
+void Keyframer::retimeCurve(MFnAnimCurve &curve,
                             double *speed,
                             double *offset,
                             bool *reverse,
-                            bool *preserveStart,
-                            MFnAnimCurve::InfinityType *preInf,
-                            MFnAnimCurve::InfinityType *postInf) const
+                            bool *preserveStart)
 {
    MStatus stat;
    
-   MFnAnimCurve curve(curveObj, &stat);
-   
-   if (stat != MS::kSuccess)
+   if (!speed && !offset && !reverse && !preserveStart)
    {
-      #ifdef _DEBUG
-      std::cout << "[AbcShape] Could not bind curve to re-time" << std::endl;
-      #endif
+      // Nothing to do
       return;
    }
    
@@ -603,6 +603,33 @@ void Keyframer::retimeCurve(const MObject &curveObj,
       return;
    }
    
+   if (mRetimedCurves.find(curve.name()) != mRetimedCurves.end())
+   {
+      // Nothing to do
+      return;
+   }
+   
+   // Retrieve import state
+   MPlug pStart = curve.findPlug("abcimport_start");
+   if (pStart.isNull())
+   {
+      #ifdef _DEBUG
+      std::cout << "[AbcShape] Missing \"abcimport_start\" attribute" << std::endl;
+      #endif
+      return;
+   }
+   double start = pStart.asDouble();
+   
+   MPlug pEnd = curve.findPlug("abcimport_end");
+   if (pEnd.isNull())
+   {
+      #ifdef _DEBUG
+      std::cout << "[AbcShape] Missing \"abcimport_end\" attribute" << std::endl;
+      #endif
+      return;
+   }
+   double end = pEnd.asDouble();
+   
    MPlug pSpeed = curve.findPlug("abcimport_speed");
    if (pSpeed.isNull())
    {
@@ -613,6 +640,7 @@ void Keyframer::retimeCurve(const MObject &curveObj,
    }
    double oldSpeed = pSpeed.asDouble();
    double newSpeed = (speed ? *speed : oldSpeed);
+   
    if (fabs(oldSpeed) <= 0.0001 || fabs(newSpeed) <= 0.0001)
    {
       #ifdef _DEBUG
@@ -633,26 +661,6 @@ void Keyframer::retimeCurve(const MObject &curveObj,
    }
    double oldOffset = pOffset.asDouble();
    double newOffset = (offset ? *offset : oldOffset);
-   
-   MPlug pStart = curve.findPlug("abcimport_start");
-   if (pStart.isNull())
-   {
-      #ifdef _DEBUG
-      std::cout << "[AbcShape] Missing \"abcimport_start\" attribute" << std::endl;
-      #endif
-      return;
-   }
-   double start = pStart.asDouble();
-   
-   MPlug pEnd = curve.findPlug("abcimport_end");
-   if (pEnd.isNull())
-   {
-      #ifdef _DEBUG
-      std::cout << "[AbcShape] Missing \"abcimport_end\" attribute" << std::endl;
-      #endif
-      return;
-   }
-   double end = pEnd.asDouble();
    
    MPlug pReverse = curve.findPlug("abcimport_reverse");
    if (pReverse.isNull())
@@ -679,59 +687,95 @@ void Keyframer::retimeCurve(const MObject &curveObj,
    double oldTotalOffset = oldOffset;
    if (oldPreserveStart)
    {
-      oldTotalOffset = start * (oldSpeed - 1.0) * oldSpeedInv;
+      oldTotalOffset += start * (oldSpeed - 1.0) * oldSpeedInv;
    }
    
    double newTotalOffset = newOffset;
    if (newPreserveStart)
    {
-      newTotalOffset = start * (newSpeed - 1.0) * newSpeedInv;
+      newTotalOffset += start * (newSpeed - 1.0) * newSpeedInv;
    }
    
-   MFnAnimCurve::TangentType tt = curve.outTangentType(0);
-   
-   unsigned int nkeys = curve.numKeys();
-   MTimeArray times(nkeys, MTime(0.0));
-   MDoubleArray values(nkeys, 0.0);
-   double t;
-   
-   // Support reverse cycle type?
-   
-   for (unsigned int i=0; i<nkeys; ++i)
+   // Only update curve keys if really needed
+   if (fabs(newSpeed - oldSpeed) > 0.0001 ||
+       fabs(newTotalOffset - oldTotalOffset) > 0.0001 ||
+       newReverse != oldReverse)
    {
-      t = curve.time(i).as(MTime::kSeconds);
+      MFnAnimCurve::TangentType tt = curve.outTangentType(0);
+      unsigned int nkeys = curve.numKeys();
+      MTimeArray times(nkeys, MTime(0.0));
+      MDoubleArray values(nkeys, 0.0);
+      double t;
       
-      // invert old transform
-      t = oldSpeed * (t - oldTotalOffset);
-      if (oldReverse)
+      // Reset rotation curve interpolation type to "none"
+      if (curve.animCurveType() == MFnAnimCurve::kAnimCurveTA)
       {
-         t = start - (t - end);
+         MString interp;
+         MGlobal::executeCommand("rotationInterpolation -q " + curve.name(), interp);
+         if (interp != "none")
+         {
+            mRetimedCurveInterp[curve.name()] = interp;
+            MGlobal::executeCommand("rotationInterpolation -c none " + curve.name());
+         }
       }
       
-      // apply new transform
-      if (newReverse)
+      for (unsigned int i=0; i<nkeys; ++i)
       {
-         t = end - (t - start);
+         t = curve.time(i).as(MTime::kSeconds);
+         
+         // Invert old transform
+         t = oldSpeed * (t - oldTotalOffset);
+         if (oldReverse)
+         {
+            t = start - (t - end);
+         }
+         
+         // Apply new transform
+         if (newReverse)
+         {
+            t = end - (t - start);
+         }
+         t = newTotalOffset + newSpeedInv * t;
+         
+         times[i] = MTime(t, MTime::kSeconds);
+         values[i] = curve.value(i);
       }
-      t = newTotalOffset + newSpeedInv * t;
       
-      times[i] = MTime(t, MTime::kSeconds);
-      values[i] = curve.value(i);
-   }
-   
-   stat = curve.addKeys(&times, &values, tt, tt, false);
-   if (stat != MS::kSuccess)
-   {
-      #ifdef _DEBUG
-      std::cout << "[AbcShape] Failed to add keys" << std::endl;
-      #endif
-      return;
+      for (unsigned int i=0; i<nkeys; ++i)
+      {
+         curve.remove(nkeys-i-1);
+      }
+      
+      stat = curve.addKeys(&times, &values, tt, tt);
+      if (stat != MS::kSuccess)
+      {
+         #ifdef _DEBUG
+         std::cout << "[AbcShape] Failed to add keys" << std::endl;
+         #endif
+         return;
+      }
+      
+      mRetimedCurves.insert(curve.name());
    }
    
    pSpeed.setDouble(newSpeed);
    pOffset.setDouble(newOffset);
    pReverse.setBool(newReverse);
    pPreserveStart.setBool(newPreserveStart);
+}
+
+void Keyframer::adjustCurve(MFnAnimCurve &curve,
+                            MString *interpType,
+                            MFnAnimCurve::InfinityType *preInf,
+                            MFnAnimCurve::InfinityType *postInf)
+{
+   if (interpType)
+   {
+      if (curve.animCurveType() == MFnAnimCurve::kAnimCurveTA)
+      {
+         mRetimedCurveInterp[curve.name()] = *interpType;
+      }
+   }
    
    if (preInf)
    {
@@ -741,5 +785,21 @@ void Keyframer::retimeCurve(const MObject &curveObj,
    if (postInf)
    {
       curve.setPostInfinityType(*postInf);
+   }
+}
+
+void Keyframer::endRetime()
+{
+   // Restore rotation curves interpolation type
+   std::map<MString, MString, MStringLessThan>::iterator it = mRetimedCurveInterp.begin();
+   MString cmd;
+   
+   while (it != mRetimedCurveInterp.end())
+   {
+      cmd  = "if (`rotationInterpolation -q " + it->first + "` != \"" + it->second + "\") {";
+      cmd += " rotationInterpolation -c " + it->second + " " + it->first + "; ";
+      cmd += "}";
+      MGlobal::executeCommand(cmd);
+      ++it;
    }
 }

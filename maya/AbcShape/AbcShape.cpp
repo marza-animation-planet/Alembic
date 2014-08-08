@@ -646,6 +646,7 @@ void AbcShape::updateScene()
             
             mStartFrame = start;
             mEndFrame = end;
+            mSampleTime = getSampleTime();
             
             // This will force instant refresh of AE values
             // but won't trigger any update as mStartFrame and mEndFrame are unchanged

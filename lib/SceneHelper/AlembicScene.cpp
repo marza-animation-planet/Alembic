@@ -30,18 +30,26 @@ AlembicNode::AlembicNode(const AlembicNode &rhs, AlembicNode *parent)
    , mParent(parent)
    , mMasterPath(rhs.mMasterPath)
    , mMaster(0)
-   , mInstanceNumber(rhs.mInstanceNumber)
+   , mInstanceNumber(0)
    , mType(rhs.mType)
-   , mSelfBounds(rhs.mSelfBounds)
-   , mSelfMatrix(rhs.mSelfMatrix)
-   , mChildBounds(rhs.mChildBounds)
-   , mWorldMatrix(rhs.mWorldMatrix)
    , mLocatorProp(rhs.mLocatorProp)
-   , mLocatorPosition(rhs.mLocatorPosition)
-   , mLocatorScale(rhs.mLocatorScale)
-   , mInheritsTransform(rhs.mInheritsTransform)
-   , mVisible(rhs.mVisible)
+   , mInheritsTransform(true)
+   , mVisible(true)
 {
+   if (rhs.isLocator())
+   {
+      mSelfBounds.makeInfinite();
+   }
+   else
+   {
+      mSelfBounds.makeEmpty();
+   }
+   mChildBounds.makeEmpty();
+   mSelfMatrix.makeIdentity();
+   mWorldMatrix.makeIdentity();
+   mLocatorPosition.setValue(0, 0, 0);
+   mLocatorScale.setValue(1, 1, 1);
+   
    size_t numChildren = rhs.childCount();
    
    mChildren.resize(numChildren);

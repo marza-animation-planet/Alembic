@@ -12,6 +12,7 @@
 #include <maya/MObjectHandle.h>
 #include <maya/MStringArray.h>
 #include <map>
+#include <set>
 #include <vector>
 #include <cstring>
 
@@ -23,32 +24,32 @@ public:
    ~Keyframer();
 
    void setCurrentTime(double t, MTime::Unit unit=MTime::kSeconds);
-   
    void addInheritsTransformKey(const MObject &node, bool v);
    void addTransformKey(const MObject &node, const MMatrix &m);
    void addVisibilityKey(const MObject &node, bool v);
    void addAnyKey(const MObject &node, const MString &attr, int index, double val);
-   
-   void createCurves(MFnAnimCurve::InfinityType preInf = MFnAnimCurve::kConstant,
-                     MFnAnimCurve::InfinityType postInf = MFnAnimCurve::kConstant);
-   
    void addCurvesImportInfo(const MObject &node, const MString &attr,
                             double speed, double offset,
                             double start, double end,
                             bool reverse,
                             bool preserveStart);
-   
+   void createCurves(MFnAnimCurve::InfinityType preInf = MFnAnimCurve::kConstant,
+                     MFnAnimCurve::InfinityType postInf = MFnAnimCurve::kConstant);
    void setRotationCurvesInterpolation(const MString &interpType);
-   void fixCurvesTangents();
    void fixCurvesTangents(MFnAnimCurve::AnimCurveType type);
+   void fixCurvesTangents();
    
-   void retimeCurve(const MObject &curve,
+   void beginRetime();
+   void retimeCurve(MFnAnimCurve &curve,
                     double *speed,
                     double *offset,
                     bool *reverse,
-                    bool *preserveStart,
+                    bool *preserveStart);
+   void adjustCurve(MFnAnimCurve &curve,
+                    MString *interpType,
                     MFnAnimCurve::InfinityType *preInf,
-                    MFnAnimCurve::InfinityType *postInf) const;
+                    MFnAnimCurve::InfinityType *postInf);
+   void endRetime();
  
 private:
 
@@ -105,6 +106,9 @@ private:
    CurveMap mCurves;
    NodeCurvesMap mNodeCurves;
    MTime mTime;
+   
+   std::set<MString, MStringLessThan> mRetimedCurves;
+   std::map<MString, MString, MStringLessThan> mRetimedCurveInterp;
 };
 
 #endif

@@ -84,6 +84,8 @@ AlembicScene* SceneCache::ref(const std::string &filepath)
          std::cout << "[AbcShape] Clone master scene" << std::endl;
          #endif
          rv = new AlembicScene(*(it->second.master));
+         // Reset filter
+         rv->setFilter("");
       }
    }
    else
@@ -102,7 +104,7 @@ AlembicScene* SceneCache::ref(const std::string &filepath)
                                                              Alembic::Abc::kWrapExisting,
                                                              Alembic::Abc::ErrorHandler::kQuietNoopPolicy));
          
-         return ce.master;
+         rv = ce.master;
       }
    }
    

@@ -41,6 +41,7 @@ MSyntax AbcShapeImport::createSyntax()
    syntax.addFlag("-psf", "-preserveStartFrame", MSyntax::kBoolean);
    syntax.addFlag("-ct", "-cycleType", MSyntax::kString);
    syntax.addFlag("-ri", "-rotationInterpolation", MSyntax::kString);
+   syntax.addFlag("-ft", "-filterObjects", MSyntax::kString);
    syntax.addFlag("-h", "-help", MSyntax::kNoArg);
    
    syntax.addArg(MSyntax::kString);
@@ -314,7 +315,7 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
          double invSpeed = 1.0 / mSpeed;
          double secStart = ts->getSampleTime(0);
          double secEnd = ts->getSampleTime(numSamples-1);
-         double secOffset = MTime(mOffset).as(MTime::kSeconds);
+         double secOffset = MTime(mOffset, MTime::uiUnit()).as(MTime::kSeconds);
          
          double offset = secOffset;
          if (mPreserveStartFrame)
@@ -373,7 +374,7 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
                   double invSpeed = 1.0 / mSpeed;
                   double secStart = ts->getSampleTime(0);
                   double secEnd = ts->getSampleTime(numSamples-1);
-                  double secOffset = MTime(mOffset).as(MTime::kSeconds);
+                  double secOffset = MTime(mOffset, MTime::uiUnit()).as(MTime::kSeconds);
                   
                   double offset = secOffset;
                   if (mPreserveStartFrame)
@@ -421,7 +422,7 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
                   double invSpeed = 1.0 / mSpeed;
                   double secStart = ts->getSampleTime(0);
                   double secEnd = ts->getSampleTime(numSamples-1);
-                  double secOffset = MTime(mOffset).as(MTime::kSeconds);
+                  double secOffset = MTime(mOffset, MTime::uiUnit()).as(MTime::kSeconds);
                   
                   double offset = secOffset;
                   if (mPreserveStartFrame && mSpeed > 0.0001)
@@ -561,8 +562,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
    
    MArgParser argData(syntax(), args, &status);
    
-   MString mode("box");
-   
+   MString rotInterp("quaternion");
    AbcShape::DisplayMode dm = AbcShape::DM_box;
    AbcShape::CycleType ct = AbcShape::CT_hold;
    double speed = 1.0;
@@ -574,6 +574,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
    bool setMode = false;
    bool setCycle = false;
    bool setPreserveStart = false;
+   bool setInterp = false;
    
    argData.isFlagSet("preserveStartFrame");
    
@@ -590,8 +591,8 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       MGlobal::displayInfo("-s / -speed                  : double");
       MGlobal::displayInfo("                               AbcShape nodes speed (default to 1.0).");
       MGlobal::displayInfo("-o / -offset                 : double");
-      MGlobal::displayInfo("                               AbcShape nodes offset (default to 0.0).");
-      MGlobal::displayInfo("-psf / -preserveStartFrame   :");
+      MGlobal::displayInfo("                               AbcShape nodes offset in frames (default to 0.0).");
+      MGlobal::displayInfo("-psf / -preserveStartFrame   : bool");
       MGlobal::displayInfo("                               Preserve range start frame when using speed.");
       MGlobal::displayInfo("-ct / -cycleType             : string (hold|loop|reverse|bounce)");
       MGlobal::displayInfo("                               AbcShape nodes cycle type (default to hold).");
@@ -603,11 +604,13 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       MGlobal::displayInfo("                               Change Maya time slider to fit the range of input file.");
       MGlobal::displayInfo("-sts / -setToStartFrame      :");
       MGlobal::displayInfo("                               Set the current time to the start of the frame range.");
+      MGlobal::displayInfo("-ft / -filterObjects         : string");
+      MGlobal::displayInfo("                               Selective import cache objects whose name matches expression.");
       MGlobal::displayInfo("-h / -help                   :");
       MGlobal::displayInfo("                               Display this help.");
       MGlobal::displayInfo("");
       MGlobal::displayInfo("Command also work in edit mode:");
-      MGlobal::displayInfo("  -mode, -speed, -offset, -preserveStartFrame, -cycleType flags are supported.");
+      MGlobal::displayInfo("  -mode, -speed, -offset, -preserveStartFrame, -cycleType, -rotationInterpolation flags are supported.");
       MGlobal::displayInfo("  Acts on all AbcShape in selected node trees.");
    }
    
@@ -618,6 +621,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       if (status != MS::kSuccess)
       {
          MGlobal::displayWarning("Invalid preserveStartFrame flag argument");
+         preserveStartFrame = false;
       }
       else
       {
@@ -632,6 +636,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       if (status != MS::kSuccess)
       {
          MGlobal::displayWarning("Invalid speed flag argument");
+         speed = 1.0;
       }
       else
       {
@@ -646,6 +651,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       if (status != MS::kSuccess)
       {
          MGlobal::displayWarning("Invalid offset flag argument");
+         offset = 0.0;
       }
       else
       {
@@ -655,31 +661,39 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
    
    if (argData.isFlagSet("mode"))
    {
-      status = argData.getFlagArgument("mode", 0, mode);
+      MString val;
+      status = argData.getFlagArgument("mode", 0, val);
       
-      if (mode == "box")
+      if (status == MS::kSuccess)
       {
-         dm = AbcShape::DM_box;
-         setMode = true;
-      }
-      else if (mode == "boxes")
-      {
-         dm = AbcShape::DM_boxes;
-         setMode = true;
-      }
-      else if (mode == "points")
-      {
-         dm = AbcShape::DM_points;
-         setMode = true;
-      }
-      else if (mode == "geometry")
-      {
-         dm = AbcShape::DM_geometry;
-         setMode = true;
+         if (val == "box")
+         {
+            dm = AbcShape::DM_box;
+            setMode = true;
+         }
+         else if (val == "boxes")
+         {
+            dm = AbcShape::DM_boxes;
+            setMode = true;
+         }
+         else if (val == "points")
+         {
+            dm = AbcShape::DM_points;
+            setMode = true;
+         }
+         else if (val == "geometry")
+         {
+            dm = AbcShape::DM_geometry;
+            setMode = true;
+         }
+         else
+         {
+            MGlobal::displayWarning(val + " is not a valid mode");
+         }
       }
       else
       {
-         MGlobal::displayWarning(mode + " is not a valid mode");
+         MGlobal::displayWarning("Invalid mode flag argument");
       }
    }
    
@@ -688,29 +702,63 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       MString val;
       status = argData.getFlagArgument("cycleType", 0, val);
       
-      if (val == "hold")
+      if (status == MS::kSuccess)
       {
-         ct = AbcShape::CT_hold;
-         setCycle = true;
-      }
-      else if (val == "loop")
-      {
-         ct = AbcShape::CT_loop;
-         setCycle = true;
-      }
-      else if (val == "reverse")
-      {
-         ct = AbcShape::CT_reverse;
-         setCycle = true;
-      }
-      else if (val == "bounce")
-      {
-         ct = AbcShape::CT_bounce;
-         setCycle = true;
+         if (val == "hold")
+         {
+            ct = AbcShape::CT_hold;
+            setCycle = true;
+         }
+         else if (val == "loop")
+         {
+            ct = AbcShape::CT_loop;
+            setCycle = true;
+         }
+         else if (val == "reverse")
+         {
+            ct = AbcShape::CT_reverse;
+            setCycle = true;
+         }
+         else if (val == "bounce")
+         {
+            ct = AbcShape::CT_bounce;
+            setCycle = true;
+         }
+         else
+         {
+            MGlobal::displayWarning(val + " is not a valid cycleType value");
+         }
       }
       else
       {
-         MGlobal::displayWarning(val + " is not a valid cycleType value");
+         MGlobal::displayWarning("Invalid cycleTyle flag argument");
+      }
+   }
+   
+   if (argData.isFlagSet("rotationInterpolation"))
+   {
+      MString val;
+      status = argData.getFlagArgument("rotationInterpolation", 0, val);
+      
+      if (status == MS::kSuccess)
+      {
+         if (val == "none" ||
+             val == "euler" ||
+             val == "quaternion" ||
+             val == "quaternionSlerp" ||
+             val == "quaternionSquad")
+         {
+            rotInterp = val;
+            setInterp = true;
+         }
+         else
+         {
+            MGlobal::displayWarning(val + " is not a valid rotationInterpolation value");
+         }
+      }
+      else
+      {
+         MGlobal::displayWarning("Invalid rotationInterpolation flag argument");
       }
    }
    
@@ -729,10 +777,14 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       MFnDagNode node;
       
       // Keep a list of processed curves
-      bool processCurves = (setSpeed || setOffset || setCycle || setPreserveStart);
+      bool processCurves = (setSpeed || setOffset || setCycle || setPreserveStart || setInterp);
       
-      std::set<std::string> processedCurves;
+      Keyframer keyframer;
       MStringArray connectedCurves;
+      
+      double secOffset = MTime(offset, MTime::uiUnit()).as(MTime::kSeconds);
+      
+      keyframer.beginRetime();
       
       for (unsigned int i=0; i<newSel.length(); ++i)
       {
@@ -773,7 +825,6 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
          if (processCurves)
          {
             MObject curveObj;
-            Keyframer keyframer;
             
             connectedCurves.clear();
             MGlobal::executeCommand("listConnections -type animCurve -s 1 -d 0 \"" + path.fullPathName() + "\"", connectedCurves);
@@ -800,15 +851,8 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
             
             for (unsigned int j=0; j<connectedCurves.length(); ++j)
             {
-               std::string curveName = connectedCurves[j].asChar();
-               
-               if (processedCurves.find(curveName) != processedCurves.end())
-               {
-                  continue;
-               }
-               
                tmpSel.clear();
-               if (tmpSel.add(curveName.c_str()) != MS::kSuccess)
+               if (tmpSel.add(connectedCurves[j]) != MS::kSuccess)
                {
                   continue;
                }
@@ -818,80 +862,105 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
                   continue;
                }
                
-               #ifdef _DEBUG
-               std::cout << "[AbcShape] Re-timing curve \"" << curveName << "\"" << std::endl;
-               #endif
-               keyframer.retimeCurve(curveObj,
+               MFnAnimCurve curve(curveObj, &status);
+               if (status != MS::kSuccess)
+               {
+                  continue;
+               }
+               
+               keyframer.retimeCurve(curve,
                                      (setSpeed ? &speed : 0),
-                                     (setOffset ? &offset : 0),
+                                     (setOffset ? &secOffset : 0),
                                      (setCycle ? &reverse : 0),
-                                     (setPreserveStart ? &preserveStartFrame : 0),
+                                     (setPreserveStart ? &preserveStartFrame : 0));
+               
+               keyframer.adjustCurve(curve,
+                                     (setInterp ? &rotInterp : 0),
                                      (setCycle ? &inf : 0),
                                      (setCycle ? &inf : 0));
-               
-               processedCurves.insert(curveName);
             }
          }
       }
       
+      keyframer.endRetime();
+      
       MGlobal::setActiveSelectionList(oldSel);
+      
+      status = MS::kSuccess;
    }
    else
    {
       MString filename("");
-      MString parent("");
       MString ns("");
-      MString rotInterp("quaternion");
+      MString filter("");
       MString curNs = MNamespace::currentNamespace();
+      MDagPath parentDag;
+      
       bool fitTimeRange = argData.isFlagSet("fitTimeRange");
       bool setToStartFrame = argData.isFlagSet("setToStartFrame");
       bool createInstances = argData.isFlagSet("createInstances");
-      
-      MDagPath parentDag;
       
       if (argData.isFlagSet("reparent"))
       {
          MSelectionList sl;
          
-         status = argData.getFlagArgument("reparent", 0, parent);
+         MString val;
+         MDagPath dag;
+         status = argData.getFlagArgument("reparent", 0, val);
          
-         if (status != MS::kSuccess ||
-             sl.add(parent) != MS::kSuccess ||
-             sl.getDagPath(0, parentDag) != MS::kSuccess)
+         if (status == MS::kSuccess)
          {
-            MGlobal::displayWarning(parent + " is not a valid dag path");
+            if (sl.add(val) == MS::kSuccess && sl.getDagPath(0, dag) == MS::kSuccess)
+            {
+               parentDag = dag;
+            }
+            else
+            {
+               MGlobal::displayWarning(val + " is not a valid dag path");
+            }
+         }
+         else
+         {
+            MGlobal::displayWarning("Invalid reparent flag argument");
          }
       }
       
       if (argData.isFlagSet("namespace"))
       {
-         status = argData.getFlagArgument("namespace", 0, ns);
-         
-         if (status != MS::kSuccess ||
-             (!MNamespace::namespaceExists(ns) && MNamespace::addNamespace(ns) != MS::kSuccess) ||
-             MNamespace::setCurrentNamespace(ns) != MS::kSuccess)
-         {
-            MGlobal::displayWarning(ns + " is not a valid namespace");
-         }
-      }
-      
-      if (argData.isFlagSet("rotationInterpolation"))
-      {
          MString val;
-         status = argData.getFlagArgument("rotationInterpolation", 0, val);
+         status = argData.getFlagArgument("namespace", 0, val);
          
-         if (status == MS::kSuccess &&
-             (val == "none" ||
-              val == "euler" ||
-              val == "quaternion" ||
-              val == "quaternionSlerp" ||
-              val == "quaternionSquad"))
+         if (status == MS::kSuccess)
          {
-            rotInterp = val;
+            if ((!MNamespace::namespaceExists(val) &&
+                  MNamespace::addNamespace(val) != MS::kSuccess) ||
+                MNamespace::setCurrentNamespace(val) != MS::kSuccess)
+            {
+               MGlobal::displayWarning(val + " is not a valid namespace");
+            }
+            else
+            {
+               ns = val;
+            }
          }
          else
          {
-            MGlobal::displayWarning(val + " is not a valid rotationInterpolation value");
+            MGlobal::displayWarning("Invalid namespace flag argument");
+         }   
+      }
+      
+      if (argData.isFlagSet("filterObjects"))
+      {
+         MString val;
+         status = argData.getFlagArgument("filterObjects", 0, val);
+         
+         if (status == MS::kSuccess)
+         {
+            filter = val;
+         }
+         else
+         {
+            MGlobal::displayWarning("Invalid filterObjects flag argument");
          }
       }
       
@@ -915,6 +984,8 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
             AlembicScene *scene = SceneCache::Ref(abcPath);
             if (scene)
             {
+               scene->setFilter(filter.asChar());
+               
                CreateTree visitor(abcPath, dm, createInstances, speed, offset, preserveStartFrame, ct);
                scene->visit(AlembicNode::VisitDepthFirst, visitor);
                
