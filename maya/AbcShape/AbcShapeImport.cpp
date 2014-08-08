@@ -21,6 +21,12 @@
 #include <maya/MAngle.h>
 #include <maya/MQuaternion.h>
 #include <maya/MFileObject.h>
+#include <maya/MFnNumericAttribute.h>
+#include <maya/MFnTypedAttribute.h>
+#include <maya/MFnEnumAttribute.h>
+#include <maya/MFnMatrixAttribute.h>
+#include <maya/MFnUnitAttribute.h>
+#include <maya/MFnCompoundAttribute.h>
 #include "AbcShape.h"
 #include "SceneCache.h"
 #include "AlembicSceneVisitors.h"
@@ -59,6 +65,55 @@ void* AbcShapeImport::create()
 
 // ---
 
+template <typename T, int D, typename TT>
+struct NumericData
+{
+   static void Set(const T *value, MPlug &plug)
+   {
+   }
+};
+
+template <typename T, typename TT>
+struct NumericData<T, 1, TT>
+{
+   static void Set(const T *value, MPlug &plug)
+   {
+      plug.setValue(TT(value[0]));
+   }
+};
+
+template <typename T, typename TT>
+struct NumericData<T, 2, TT>
+{
+   static void Set(const T *value, MPlug &plug)
+   {
+      MFnNumericData data(plug.asMObject());
+      data.setData(TT(value[0]), TT(value[1]));
+   }
+};
+
+template <typename T, typename TT>
+struct NumericData<T, 3, TT>
+{
+   static void Set(const T *value, MPlug &plug)
+   {
+      MFnNumericData data(plug.asMObject());
+      data.setData(TT(value[0]), TT(value[1]), TT(value[2]));
+   }
+};
+
+template <typename T, typename TT>
+struct NumericData<T, 4, TT>
+{
+   static void Set(const T *value, MPlug &plug)
+   {
+      MFnNumericData data(plug.asMObject());
+      data.setData(TT(value[0]), TT(value[1]), TT(value[2]), TT(value[3]));
+   }
+};
+
+// ---
+
 class CreateTree
 {
 public:
@@ -93,6 +148,34 @@ private:
    bool hasDag(const std::string &path) const;
    bool addDag(const std::string &path, const MDagPath &dag);
    bool createDag(const char *dagType, AlembicNode *node);
+   
+   template <class T>
+   void addUserProps(AlembicNodeT<T> &node, AlembicNode *instance=0);
+   
+   bool createNumericAttribute(MFnDagNode &node, const std::string &name, MFnNumericData::Type type, bool array, MPlug &plug);
+   bool createPointAttribute(MFnDagNode &node, const std::string &name, bool array, MPlug &plug);
+   bool createColorAttribute(MFnDagNode &node, const std::string &name, bool alpha, bool array, MPlug &plug);
+   
+   bool checkNumericAttribute(const MPlug &plug, MFnNumericData::Type type, bool array);
+   bool checkPointAttribute(const MPlug &plug, bool array);
+   bool checkColorAttribute(const MPlug &plug, bool alpha, bool array);
+   
+   template <typename T, int D, typename TT>
+   void setNumericAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
+   template <typename T, int D, typename TT>
+   void setCompoundAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
+   
+   template <typename T, int D>
+   void keyAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
+   
+   template <typename T, int D, typename TT>
+   void setScalarUserProp(MFnDagNode &node, const std::string &name, MFnNumericData::Type type, Alembic::Abc::IScalarProperty prop);
+   template <typename T, int D>
+   void setPointUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
+   template <typename T, int D>
+   void setRGBUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
+   template <typename T, int D>
+   void setRGBAUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
    
 private:
    
@@ -238,7 +321,7 @@ AlembicNode::VisitReturn CreateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
    plug = dagNode.findPlug("displayMode");
    plug.setShort(short(mMode));
    
-   // add and key user attributes
+   addUserProps(node, instance);
    
    return AlembicNode::ContinueVisit;
 }
@@ -332,6 +415,7 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
             loc.get(posscl, Alembic::Abc::ISampleSelector(idx));
             
             mKeyframer.setCurrentTime(t);
+            
             mKeyframer.addAnyKey(locObj, "localPositionX", 0, posscl[0]);
             mKeyframer.addAnyKey(locObj, "localPositionY", 0, posscl[1]);
             mKeyframer.addAnyKey(locObj, "localPositionZ", 0, posscl[2]);
@@ -340,8 +424,14 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
             mKeyframer.addAnyKey(locObj, "localScaleZ", 0, posscl[5]);
          }
          
-         mKeyframer.addCurvesImportInfo(locObj, "", mSpeed, secOffset, secStart, secEnd,
-                                        (mCycleType == AbcShape::CT_reverse), mPreserveStartFrame);
+         bool rev = (mCycleType == AbcShape::CT_reverse);
+         
+         mKeyframer.addCurvesImportInfo(locObj, "localPositionX", mSpeed, secOffset, secStart, secEnd, rev, mPreserveStartFrame);
+         mKeyframer.addCurvesImportInfo(locObj, "localPositionY", mSpeed, secOffset, secStart, secEnd, rev, mPreserveStartFrame);
+         mKeyframer.addCurvesImportInfo(locObj, "localPositionZ", mSpeed, secOffset, secStart, secEnd, rev, mPreserveStartFrame);
+         mKeyframer.addCurvesImportInfo(locObj, "localScaleX", mSpeed, secOffset, secStart, secEnd, rev, mPreserveStartFrame);
+         mKeyframer.addCurvesImportInfo(locObj, "localScaleY", mSpeed, secOffset, secStart, secEnd, rev, mPreserveStartFrame);
+         mKeyframer.addCurvesImportInfo(locObj, "localScaleZ", mSpeed, secOffset, secStart, secEnd, rev, mPreserveStartFrame);
       }
    }
    else
@@ -518,7 +608,7 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
       }
    }
    
-   // add user attributes
+   addUserProps(node, instance);
    
    return AlembicNode::ContinueVisit;
 }
@@ -573,6 +663,573 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicNode &node, AlembicNode *)
    }
    
    return AlembicNode::ContinueVisit;
+}
+
+bool CreateTree::createPointAttribute(MFnDagNode &node, const std::string &name, bool array, MPlug &plug)
+{
+   MFnNumericAttribute nAttr;
+   MString aname(name.c_str());
+   
+   MObject attr = nAttr.createPoint(aname, aname);
+   nAttr.setReadable(true);
+   nAttr.setWritable(true);
+   nAttr.setStorable(true);
+   nAttr.setKeyable(true);
+   nAttr.setArray(array);
+   
+   if (node.addAttribute(attr) == MS::kSuccess)
+   {
+      plug = node.findPlug(aname);
+      return (!plug.isNull());
+   }
+   else
+   {
+      return false;
+   }
+}
+
+bool CreateTree::createColorAttribute(MFnDagNode &node, const std::string &name, bool alpha, bool array, MPlug &plug)
+{
+   MFnNumericAttribute nAttr;
+   MString aname(name.c_str());
+   
+   MObject attr;
+   
+   if (!alpha)
+   {
+      attr = nAttr.createColor(aname, aname);
+      nAttr.setReadable(true);
+      nAttr.setWritable(true);
+      nAttr.setStorable(true);
+      nAttr.setKeyable(true);
+      nAttr.setArray(array);
+   }
+   else
+   {
+      MFnCompoundAttribute cAttr;
+      
+      attr = cAttr.create(aname, aname);
+      cAttr.setReadable(true);
+      cAttr.setWritable(true);
+      cAttr.setStorable(true);
+      cAttr.setKeyable(true);
+      cAttr.setArray(array);
+      
+      MObject rattr = nAttr.create(aname+"R", aname+"R", MFnNumericData::kFloat, 0.0);
+      nAttr.setReadable(true);
+      nAttr.setWritable(true);
+      nAttr.setStorable(true);
+      nAttr.setKeyable(true);
+      cAttr.addChild(rattr);
+      
+      MObject gattr = nAttr.create(aname+"G", aname+"G", MFnNumericData::kFloat, 0.0);
+      nAttr.setReadable(true);
+      nAttr.setWritable(true);
+      nAttr.setStorable(true);
+      nAttr.setKeyable(true);
+      cAttr.addChild(gattr);
+      
+      MObject battr = nAttr.create(aname+"B", aname+"B", MFnNumericData::kFloat, 0.0);
+      nAttr.setReadable(true);
+      nAttr.setWritable(true);
+      nAttr.setStorable(true);
+      nAttr.setKeyable(true);
+      cAttr.addChild(battr);
+      
+      MObject aattr = nAttr.create(aname+"A", aname+"A", MFnNumericData::kFloat, 0.0);
+      nAttr.setReadable(true);
+      nAttr.setWritable(true);
+      nAttr.setStorable(true);
+      nAttr.setKeyable(true);
+      cAttr.addChild(aattr);
+   }
+   
+   if (node.addAttribute(attr) == MS::kSuccess)
+   {
+      plug = node.findPlug(aname);
+      return (!plug.isNull());
+   }
+   else
+   {
+      return false;
+   }
+}
+
+bool CreateTree::createNumericAttribute(MFnDagNode &node, const std::string &name, MFnNumericData::Type type, bool array, MPlug &plug)
+{
+   MFnNumericAttribute nAttr;
+   MString aname(name.c_str());
+   
+   MObject attr = nAttr.create(aname, aname, type, 0.0);
+   nAttr.setReadable(true);
+   nAttr.setWritable(true);
+   nAttr.setStorable(true);
+   nAttr.setKeyable(true);
+   nAttr.setArray(array);
+   
+   if (node.addAttribute(attr) == MS::kSuccess)
+   {
+      plug = node.findPlug(aname);
+      return (!plug.isNull());
+   }
+   else
+   {
+      return false;
+   }
+}
+
+bool CreateTree::checkPointAttribute(const MPlug &plug, bool array)
+{
+   if (plug.isArray() != array)
+   {
+      return false;
+   }
+   
+   MStatus stat;
+   
+   MFnNumericAttribute nAttr(plug.attribute(), &stat);
+   
+   if (stat != MS::kSuccess)
+   {
+      return false;
+   }
+   
+   return (nAttr.unitType() == MFnNumericData::k3Float);
+}
+
+bool CreateTree::checkColorAttribute(const MPlug &plug, bool alpha, bool array)
+{
+   if (plug.isArray() != array)
+   {
+      return false;
+   }
+   
+   MStatus stat;
+   
+   if (alpha)
+   {
+      MFnCompoundAttribute cAttr(plug.attribute(), &stat);
+      
+      if (stat != MS::kSuccess || cAttr.numChildren() != 4)
+      {
+         return false;
+      }
+      
+      for (int i=0; i<4; ++i)
+      {
+         MFnNumericAttribute nAttr(cAttr.child(i), &stat);
+         
+         if (stat != MS::kSuccess || nAttr.unitType() != MFnNumericData::kFloat)
+         {
+            return false;
+         }
+      }
+      
+      return true;
+   }
+   else
+   {
+      MFnNumericAttribute nAttr(plug.attribute(), &stat);
+   
+      if (stat != MS::kSuccess)
+      {
+         return false;
+      }
+      
+      return (nAttr.unitType() == MFnNumericData::k3Float);
+   }
+}
+
+bool CreateTree::checkNumericAttribute(const MPlug &plug, MFnNumericData::Type type, bool array)
+{
+   if (plug.isArray() != array)
+   {
+      return false;
+   }
+   
+   MStatus stat;
+   
+   MFnNumericAttribute nAttr(plug.attribute(), &stat);
+   
+   if (stat != MS::kSuccess)
+   {
+      return false;
+   }
+   
+   return (nAttr.unitType() == type);
+}
+
+template <typename T, int D>
+void CreateTree::keyAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
+{
+   if (!prop.isConstant() && fabs(mSpeed) > 0.0001)
+   {
+      MObject nodeObj = plug.node();
+      MString plugName = plug.partialName();
+      T val[D];
+      
+      size_t numSamples = prop.getNumSamples();
+         
+      Alembic::AbcCoreAbstract::TimeSamplingPtr ts = prop.getTimeSampling();
+      
+      double invSpeed = 1.0 / mSpeed;
+      double secStart = ts->getSampleTime(0);
+      double secEnd = ts->getSampleTime(numSamples-1);
+      double secOffset = MTime(mOffset, MTime::uiUnit()).as(MTime::kSeconds);
+      bool reverse = (mCycleType == AbcShape::CT_reverse);
+      
+      double offset = secOffset;
+      if (mPreserveStartFrame)
+      {
+         offset += secOffset * (mSpeed - 1.0) * invSpeed;
+      }
+      
+      for (size_t i=0; i<numSamples; ++i)
+      {
+         Alembic::AbcCoreAbstract::index_t idx = i;
+         
+         double t = ts->getSampleTime(idx);
+         if (reverse)
+         {
+            t = secEnd - (t - secStart);
+         }
+         t = offset + invSpeed * t;
+         
+         prop.get(val, Alembic::Abc::ISampleSelector(idx));
+         
+         mKeyframer.setCurrentTime(t);
+         for (int d=0; d<D; ++d)
+         {
+            mKeyframer.addAnyKey(nodeObj, plugName, d, val[d]);
+         }
+      }
+      
+      if (D > 1)
+      {
+         // compound case
+         for (int d=0; d<D; ++d)
+         {
+            mKeyframer.addCurvesImportInfo(nodeObj, plug.child(d).partialName(), mSpeed, secOffset, secStart, secEnd, reverse, mPreserveStartFrame);
+         }
+      }
+      else
+      {
+         mKeyframer.addCurvesImportInfo(nodeObj, plugName, mSpeed, secOffset, secStart, secEnd, reverse, mPreserveStartFrame);
+      }
+   }
+}
+
+template <typename T, int D, typename TT>
+void CreateTree::setNumericAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
+{
+   T val[D];
+   
+   prop.get(val);
+   
+   NumericData<T, D, TT>::Set(val, plug);
+   
+   keyAttribute<T, D>(prop, plug);
+}
+
+template <typename T, int D, typename TT>
+void CreateTree::setCompoundAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
+{
+   T val[D];
+   
+   prop.get(val);
+   
+   for (int d=0; d<D; ++d)
+   {
+      plug.child(d).setValue(TT(val[d]));
+   }
+   
+   keyAttribute<T, D>(prop, plug);
+}
+
+template <typename T, int D, typename TT>
+void CreateTree::setScalarUserProp(MFnDagNode &node, const std::string &name, MFnNumericData::Type type, Alembic::Abc::IScalarProperty prop)
+{
+   MPlug plug = node.findPlug(name.c_str());
+   
+   bool process = (plug.isNull() ? createNumericAttribute(node, name, type, false, plug)
+                                 : checkNumericAttribute(plug, type, false));
+   
+   if (process)
+   {
+      setNumericAttribute<T, D, TT>(prop, plug);
+   }
+}
+
+template <typename T, int D>
+void CreateTree::setPointUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
+{
+   MPlug plug = node.findPlug(name.c_str());
+   
+   bool process = (plug.isNull() ? createPointAttribute(node, name, false, plug)
+                                 : checkPointAttribute(plug, false));
+   
+   if (process)
+   {
+      setNumericAttribute<T, D, float>(prop, plug);
+   }
+}
+
+template <typename T, int D>
+void CreateTree::setRGBUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
+{
+   MPlug plug = node.findPlug(name.c_str());
+   
+   bool process = (plug.isNull() ? createColorAttribute(node, name, false, false, plug)
+                                 : checkColorAttribute(plug, false, false));
+   
+   if (process)
+   {
+      setNumericAttribute<T, D, float>(prop, plug);
+   }
+}
+
+template <typename T, int D>
+void CreateTree::setRGBAUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
+{
+   MPlug plug = node.findPlug(name.c_str());
+   
+   bool process = (plug.isNull() ? createColorAttribute(node, name, true, false, plug)
+                                 : checkColorAttribute(plug, true, false));
+   
+   if (process)
+   {
+      setCompoundAttribute<T, D, float>(prop, plug);
+   }
+}
+
+template <class T>
+void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
+{
+   Alembic::Abc::ICompoundProperty props = node.typedObject().getSchema().getUserProperties();
+   
+   if (!props.valid())
+   {
+      return;
+   }
+   
+   MDagPath dag = getDag(instance ? instance->path() : node.path());
+   
+   if (!dag.isValid())
+   {
+      return;
+   }
+   
+   MFnDagNode target(dag);
+   
+   size_t numProps = props.getNumProperties();
+   
+   MFnNumericAttribute nAttr;
+   MFnTypedAttribute tAttr;
+   MFnMatrixAttribute mAttr;
+   MFnEnumAttribute eAttr;
+   MFnUnitAttribute uAttr;
+   
+   for (size_t i=0; i<numProps; ++i)
+   {
+      const Alembic::Abc::PropertyHeader &header = props.getPropertyHeader(i);
+      const std::string &propName = header.getName();
+      
+      if (propName.empty())
+      {
+         continue;
+      }
+      
+      // filter?
+      
+      if (header.isScalar())
+      {
+         Alembic::Abc::IScalarProperty prop(props, propName);
+         
+         if (Alembic::Abc::IBoolProperty::matches(header))
+         {
+            setScalarUserProp<Alembic::Util::bool_t, 1, bool>(target, propName, MFnNumericData::kBoolean, prop);
+         }
+         else if (Alembic::Abc::IUcharProperty::matches(header))
+         {
+            setScalarUserProp<Alembic::Util::uint8_t, 1, char>(target, propName, MFnNumericData::kChar, prop);
+         }
+         else if (Alembic::Abc::ICharProperty::matches(header))
+         {
+            setScalarUserProp<Alembic::Util::int8_t, 1, char>(target, propName, MFnNumericData::kChar, prop);  
+         }
+         else if (Alembic::Abc::IUInt16Property::matches(header))
+         {
+            setScalarUserProp<Alembic::Util::uint16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);
+         }
+         else if (Alembic::Abc::IInt16Property::matches(header))
+         {
+            setScalarUserProp<Alembic::Util::int16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);  
+         }
+         else if (Alembic::Abc::IUInt32Property::matches(header))
+         {
+            setScalarUserProp<Alembic::Util::uint32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+         }
+         else if (Alembic::Abc::IInt32Property::matches(header))
+         {
+            setScalarUserProp<Alembic::Util::int32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);  
+         }
+         else if (Alembic::Abc::IUInt64Property::matches(header))
+         {
+            setScalarUserProp<Alembic::Util::uint64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+         }
+         else if (Alembic::Abc::IInt64Property::matches(header))
+         {
+            setScalarUserProp<Alembic::Util::int64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);  
+         }
+         else if (Alembic::Abc::IHalfProperty::matches(header))
+         {
+            setScalarUserProp<Alembic::Util::float16_t, 1, float>(target, propName, MFnNumericData::kFloat, prop);  
+         }
+         else if (Alembic::Abc::IFloatProperty::matches(header))
+         {
+            setScalarUserProp<float, 1, float>(target, propName, MFnNumericData::kFloat, prop);  
+         }
+         else if (Alembic::Abc::IDoubleProperty::matches(header))
+         {
+            setScalarUserProp<double, 1, double>(target, propName, MFnNumericData::kDouble, prop);  
+         }
+         else if (Alembic::Abc::IV2sProperty::matches(header))
+         {
+            setScalarUserProp<Alembic::Util::int16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
+         }
+         else if (Alembic::Abc::IV2iProperty::matches(header))
+         {
+            setScalarUserProp<Alembic::Util::int32_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+         }
+         else if (Alembic::Abc::IV2fProperty::matches(header))
+         {
+            setScalarUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
+         }
+         else if (Alembic::Abc::IV2dProperty::matches(header))
+         {
+            setScalarUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
+         }
+         else if (Alembic::Abc::IV3sProperty::matches(header))
+         {
+            setScalarUserProp<Alembic::Util::int16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
+         }
+         else if (Alembic::Abc::IV3iProperty::matches(header))
+         {
+            setScalarUserProp<Alembic::Util::int32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+         }
+         else if (Alembic::Abc::IV3fProperty::matches(header))
+         {
+            setPointUserProp<float, 3>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IV3dProperty::matches(header))
+         {
+            setPointUserProp<double, 3>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IP2sProperty::matches(header))
+         {
+            setScalarUserProp<Alembic::Util::int16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
+         }
+         else if (Alembic::Abc::IP2iProperty::matches(header))
+         {
+            setScalarUserProp<Alembic::Util::int32_t, 2, short>(target, propName, MFnNumericData::k2Long, prop);
+         }
+         else if (Alembic::Abc::IP2fProperty::matches(header))
+         {
+            setScalarUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
+         }
+         else if (Alembic::Abc::IP2dProperty::matches(header))
+         {
+            setScalarUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
+         }
+         else if (Alembic::Abc::IP3sProperty::matches(header))
+         {
+            setScalarUserProp<Alembic::Util::int16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
+         }
+         else if (Alembic::Abc::IP3iProperty::matches(header))
+         {
+            setScalarUserProp<Alembic::Util::int32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+         }
+         else if (Alembic::Abc::IP3fProperty::matches(header))
+         {
+            setPointUserProp<float, 3>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IP3dProperty::matches(header))
+         {
+            setPointUserProp<double, 3>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IN2fProperty::matches(header))
+         {
+            setScalarUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
+         }
+         else if (Alembic::Abc::IN2dProperty::matches(header))
+         {
+            setScalarUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
+         }
+         else if (Alembic::Abc::IN3fProperty::matches(header))
+         {
+            setPointUserProp<float, 3>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IN3dProperty::matches(header))
+         {
+            setPointUserProp<double, 3>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IC3hProperty::matches(header))
+         {
+            setRGBUserProp<Alembic::Util::float16_t, 3>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IC3fProperty::matches(header))
+         {
+            setRGBUserProp<float, 3>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IC3cProperty::matches(header))
+         {
+            // need value remapping [0, 255] -> [0, 1]
+            // who uses that anyway?
+         }
+         else if (Alembic::Abc::IC4hProperty::matches(header))
+         {
+            setRGBAUserProp<Alembic::Util::float16_t, 4>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IC4fProperty::matches(header))
+         {
+            setRGBAUserProp<float, 4>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IC4cProperty::matches(header))
+         {
+            // need value remapping [0, 255] -> [0, 1]
+            // who uses that anyway?
+         }
+         // Box2s
+         // Box2i
+         // Box2f
+         // Box2d
+         // Box3s
+         // Box3i
+         // Box3f
+         // Box3d
+         // M33f
+         // M33d
+         // M44f
+         // M44d
+         // Quatf
+         // Quatd
+         else if (Alembic::Abc::IStringProperty::matches(header))
+         {
+            // TODO
+         }
+         else if (Alembic::Abc::IWstringProperty::matches(header))
+         {
+            // Not supported
+         }
+      }
+      else if (header.isArray())
+      {
+         // ToDo
+         #ifdef _DEBUG
+         std::cout << "[AbcShape] Array attribute not yet supported" << std::endl;
+         #endif
+      }
+   }
 }
 
 void CreateTree::leave(AlembicNode &, AlembicNode *)
