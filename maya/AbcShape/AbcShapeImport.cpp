@@ -278,8 +278,71 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
       {
          return AlembicNode::StopVisit;
       }
-      // key locator attributes
-      // add and key user attributes
+      
+      Alembic::Abc::IScalarProperty loc = node.locatorProperty();
+      double posscl[6] = {0, 0, 0, 1, 1, 1};
+      
+      loc.get(posscl);
+      
+      MFnDagNode locNode(getDag(target->path()));
+      MObject locObj = locNode.object();
+      
+      MPlug pPx = locNode.findPlug("localePositionX");
+      MPlug pPy = locNode.findPlug("localPositionY");
+      MPlug pPz = locNode.findPlug("localPositionZ");
+      MPlug pSx = locNode.findPlug("localScaleX");
+      MPlug pSy = locNode.findPlug("localScaleY");
+      MPlug pSz = locNode.findPlug("localScaleZ");
+      
+      pPx.setDouble(posscl[0]);
+      pPy.setDouble(posscl[1]);
+      pPz.setDouble(posscl[2]);
+      pSx.setDouble(posscl[3]);
+      pSy.setDouble(posscl[4]);
+      pSz.setDouble(posscl[5]);
+      
+      if (!loc.isConstant() && fabs(mSpeed) > 0.0001)
+      {
+         size_t numSamples = loc.getNumSamples();
+         
+         Alembic::AbcCoreAbstract::TimeSamplingPtr ts = loc.getTimeSampling();
+         
+         double invSpeed = 1.0 / mSpeed;
+         double secStart = ts->getSampleTime(0);
+         double secEnd = ts->getSampleTime(numSamples-1);
+         double secOffset = MTime(mOffset, MTime::uiUnit()).as(MTime::kSeconds);
+         
+         double offset = secOffset;
+         if (mPreserveStartFrame)
+         {
+            offset += secOffset * (mSpeed - 1.0) * invSpeed;
+         }
+         
+         for (size_t i=0; i<numSamples; ++i)
+         {
+            Alembic::AbcCoreAbstract::index_t idx = i;
+            
+            double t = ts->getSampleTime(idx);
+            if (mCycleType == AbcShape::CT_reverse)
+            {
+               t = secEnd - (t - secStart);
+            }
+            t = offset + invSpeed * t;
+            
+            loc.get(posscl, Alembic::Abc::ISampleSelector(idx));
+            
+            mKeyframer.setCurrentTime(t);
+            mKeyframer.addAnyKey(locObj, "localPositionX", 0, posscl[0]);
+            mKeyframer.addAnyKey(locObj, "localPositionY", 0, posscl[1]);
+            mKeyframer.addAnyKey(locObj, "localPositionZ", 0, posscl[2]);
+            mKeyframer.addAnyKey(locObj, "localScaleX", 0, posscl[3]);
+            mKeyframer.addAnyKey(locObj, "localScaleY", 0, posscl[4]);
+            mKeyframer.addAnyKey(locObj, "localScaleZ", 0, posscl[5]);
+         }
+         
+         mKeyframer.addCurvesImportInfo(locObj, "", mSpeed, secOffset, secStart, secEnd,
+                                        (mCycleType == AbcShape::CT_reverse), mPreserveStartFrame);
+      }
    }
    else
    {
@@ -320,7 +383,7 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
          double offset = secOffset;
          if (mPreserveStartFrame)
          {
-            offset += ts->getSampleTime(0) * (mSpeed - 1.0) * invSpeed;
+            offset += secStart * (mSpeed - 1.0) * invSpeed;
          }
          
          for (size_t i=0; i<numSamples; ++i)
@@ -379,7 +442,7 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
                   double offset = secOffset;
                   if (mPreserveStartFrame)
                   {
-                     offset += ts->getSampleTime(0) * (mSpeed - 1.0) * invSpeed;
+                     offset += secStart * (mSpeed - 1.0) * invSpeed;
                   }
                   
                   for (size_t i=0; i<numSamples; ++i)
@@ -425,9 +488,9 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
                   double secOffset = MTime(mOffset, MTime::uiUnit()).as(MTime::kSeconds);
                   
                   double offset = secOffset;
-                  if (mPreserveStartFrame && mSpeed > 0.0001)
+                  if (mPreserveStartFrame)
                   {
-                     offset += ts->getSampleTime(0) * (mSpeed - 1.0) * invSpeed;
+                     offset += secStart * (mSpeed - 1.0) * invSpeed;
                   }
                   
                   for (size_t i=0; i<numSamples; ++i)
@@ -454,6 +517,8 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
          }
       }
    }
+   
+   // add user attributes
    
    return AlembicNode::ContinueVisit;
 }

@@ -108,8 +108,8 @@ public:
    const Alembic::Abc::IScalarProperty& locatorProperty() const;
    void setLocatorPosition(const Alembic::Abc::V3d &p);
    void setLocatorScale(const Alembic::Abc::V3d &s);
-   inline const Alembic::Abc::V3d& locatorPosition() const { return mLocatorPosition; }
-   inline const Alembic::Abc::V3d& locatorScale() const { return mLocatorScale; }
+   inline const Alembic::Abc::V3d& locatorPosition() const { return (mMaster ? mMaster->locatorPosition() : mLocatorPosition); }
+   inline const Alembic::Abc::V3d& locatorScale() const { return (mMaster ? mMaster->locatorScale() : mLocatorScale); }
 
    inline const Alembic::Abc::Box3d selfBounds() const { return (mMaster ? mMaster->selfBounds() : mSelfBounds); }
    inline const Alembic::Abc::M44d selfMatrix() const { return (mMaster ? mMaster->selfMatrix() : mSelfMatrix); }

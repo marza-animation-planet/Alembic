@@ -645,17 +645,24 @@ void AlembicNode::setType(AlembicNode::NodeType nt)
 
 bool AlembicNode::isLocator() const
 {
-   return (mType == TypeXform && mLocatorProp.valid());
+   if (mMaster)
+   {
+      return mMaster->isLocator();
+   }
+   else
+   {
+      return (mType == TypeXform && mLocatorProp.valid());
+   }
 }
 
 const Alembic::Abc::IScalarProperty& AlembicNode::locatorProperty() const
 {
-   return mLocatorProp;
+   return (mMaster ? mMaster->locatorProperty() : mLocatorProp);
 }
 
 void AlembicNode::setLocatorPosition(const Alembic::Abc::V3d &p)
 {
-   if (isLocator())
+   if (!isInstance() && isLocator())
    {
       mLocatorPosition = p;
    }
@@ -663,7 +670,7 @@ void AlembicNode::setLocatorPosition(const Alembic::Abc::V3d &p)
 
 void AlembicNode::setLocatorScale(const Alembic::Abc::V3d &s)
 {
-   if (isLocator())
+   if (!isInstance() && isLocator())
    {
       mLocatorScale = s;
    }
