@@ -178,7 +178,7 @@ private:
    void keyAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
    
    template <typename T, int D, typename TT>
-   void setScalarUserProp(MFnDagNode &node, const std::string &name, MFnNumericData::Type type, Alembic::Abc::IScalarProperty prop);
+   void setNumericUserProp(MFnDagNode &node, const std::string &name, MFnNumericData::Type type, Alembic::Abc::IScalarProperty prop);
    template <typename T, int D>
    void setPointUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
    template <typename T, int D>
@@ -1081,7 +1081,7 @@ void CreateTree::setStringAttribute(Alembic::Abc::IScalarProperty prop, MPlug &p
 }
 
 template <typename T, int D, typename TT>
-void CreateTree::setScalarUserProp(MFnDagNode &node, const std::string &name, MFnNumericData::Type type, Alembic::Abc::IScalarProperty prop)
+void CreateTree::setNumericUserProp(MFnDagNode &node, const std::string &name, MFnNumericData::Type type, Alembic::Abc::IScalarProperty prop)
 {
    MPlug plug = node.findPlug(name.c_str());
    
@@ -1202,75 +1202,75 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
          
          if (Alembic::Abc::IBoolProperty::matches(header))
          {
-            setScalarUserProp<Alembic::Util::bool_t, 1, bool>(target, propName, MFnNumericData::kBoolean, prop);
+            setNumericUserProp<Alembic::Util::bool_t, 1, bool>(target, propName, MFnNumericData::kBoolean, prop);
          }
          else if (Alembic::Abc::IUcharProperty::matches(header))
          {
-            setScalarUserProp<Alembic::Util::uint8_t, 1, char>(target, propName, MFnNumericData::kChar, prop);
+            setNumericUserProp<Alembic::Util::uint8_t, 1, char>(target, propName, MFnNumericData::kChar, prop);
          }
          else if (Alembic::Abc::ICharProperty::matches(header))
          {
-            setScalarUserProp<Alembic::Util::int8_t, 1, char>(target, propName, MFnNumericData::kChar, prop);  
+            setNumericUserProp<Alembic::Util::int8_t, 1, char>(target, propName, MFnNumericData::kChar, prop);  
          }
          else if (Alembic::Abc::IUInt16Property::matches(header))
          {
-            setScalarUserProp<Alembic::Util::uint16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);
+            setNumericUserProp<Alembic::Util::uint16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);
          }
          else if (Alembic::Abc::IInt16Property::matches(header))
          {
-            setScalarUserProp<Alembic::Util::int16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);  
+            setNumericUserProp<Alembic::Util::int16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);  
          }
          else if (Alembic::Abc::IUInt32Property::matches(header))
          {
-            setScalarUserProp<Alembic::Util::uint32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+            setNumericUserProp<Alembic::Util::uint32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
          }
          else if (Alembic::Abc::IInt32Property::matches(header))
          {
-            setScalarUserProp<Alembic::Util::int32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);  
+            setNumericUserProp<Alembic::Util::int32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);  
          }
          else if (Alembic::Abc::IUInt64Property::matches(header))
          {
-            setScalarUserProp<Alembic::Util::uint64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+            setNumericUserProp<Alembic::Util::uint64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
          }
          else if (Alembic::Abc::IInt64Property::matches(header))
          {
-            setScalarUserProp<Alembic::Util::int64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);  
+            setNumericUserProp<Alembic::Util::int64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);  
          }
          else if (Alembic::Abc::IHalfProperty::matches(header))
          {
-            setScalarUserProp<Alembic::Util::float16_t, 1, float>(target, propName, MFnNumericData::kFloat, prop);  
+            setNumericUserProp<Alembic::Util::float16_t, 1, float>(target, propName, MFnNumericData::kFloat, prop);  
          }
          else if (Alembic::Abc::IFloatProperty::matches(header))
          {
-            setScalarUserProp<float, 1, float>(target, propName, MFnNumericData::kFloat, prop);  
+            setNumericUserProp<float, 1, float>(target, propName, MFnNumericData::kFloat, prop);  
          }
          else if (Alembic::Abc::IDoubleProperty::matches(header))
          {
-            setScalarUserProp<double, 1, double>(target, propName, MFnNumericData::kDouble, prop);  
+            setNumericUserProp<double, 1, double>(target, propName, MFnNumericData::kDouble, prop);  
          }
          else if (Alembic::Abc::IV2sProperty::matches(header))
          {
-            setScalarUserProp<Alembic::Util::int16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
+            setNumericUserProp<Alembic::Util::int16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
          }
          else if (Alembic::Abc::IV2iProperty::matches(header))
          {
-            setScalarUserProp<Alembic::Util::int32_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+            setNumericUserProp<Alembic::Util::int32_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
          }
          else if (Alembic::Abc::IV2fProperty::matches(header))
          {
-            setScalarUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
+            setNumericUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
          }
          else if (Alembic::Abc::IV2dProperty::matches(header))
          {
-            setScalarUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
+            setNumericUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
          }
          else if (Alembic::Abc::IV3sProperty::matches(header))
          {
-            setScalarUserProp<Alembic::Util::int16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
+            setNumericUserProp<Alembic::Util::int16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
          }
          else if (Alembic::Abc::IV3iProperty::matches(header))
          {
-            setScalarUserProp<Alembic::Util::int32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+            setNumericUserProp<Alembic::Util::int32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
          }
          else if (Alembic::Abc::IV3fProperty::matches(header))
          {
@@ -1282,27 +1282,27 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
          }
          else if (Alembic::Abc::IP2sProperty::matches(header))
          {
-            setScalarUserProp<Alembic::Util::int16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
+            setNumericUserProp<Alembic::Util::int16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
          }
          else if (Alembic::Abc::IP2iProperty::matches(header))
          {
-            setScalarUserProp<Alembic::Util::int32_t, 2, short>(target, propName, MFnNumericData::k2Long, prop);
+            setNumericUserProp<Alembic::Util::int32_t, 2, short>(target, propName, MFnNumericData::k2Long, prop);
          }
          else if (Alembic::Abc::IP2fProperty::matches(header))
          {
-            setScalarUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
+            setNumericUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
          }
          else if (Alembic::Abc::IP2dProperty::matches(header))
          {
-            setScalarUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
+            setNumericUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
          }
          else if (Alembic::Abc::IP3sProperty::matches(header))
          {
-            setScalarUserProp<Alembic::Util::int16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
+            setNumericUserProp<Alembic::Util::int16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
          }
          else if (Alembic::Abc::IP3iProperty::matches(header))
          {
-            setScalarUserProp<Alembic::Util::int32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+            setNumericUserProp<Alembic::Util::int32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
          }
          else if (Alembic::Abc::IP3fProperty::matches(header))
          {
@@ -1314,11 +1314,11 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
          }
          else if (Alembic::Abc::IN2fProperty::matches(header))
          {
-            setScalarUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
+            setNumericUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
          }
          else if (Alembic::Abc::IN2dProperty::matches(header))
          {
-            setScalarUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
+            setNumericUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
          }
          else if (Alembic::Abc::IN3fProperty::matches(header))
          {
@@ -1346,11 +1346,11 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
          }
          else if (Alembic::Abc::IQuatfProperty::matches(header))
          {
-            setScalarUserProp<float, 4, double>(target, propName, MFnNumericData::k4Double, prop);
+            setNumericUserProp<float, 4, double>(target, propName, MFnNumericData::k4Double, prop);
          }
          else if (Alembic::Abc::IQuatdProperty::matches(header))
          {
-            setScalarUserProp<double, 4, double>(target, propName, MFnNumericData::k4Double, prop);
+            setNumericUserProp<double, 4, double>(target, propName, MFnNumericData::k4Double, prop);
          }
          else if (Alembic::Abc::IM44fProperty::matches(header))
          {
