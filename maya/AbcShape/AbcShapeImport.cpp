@@ -27,6 +27,8 @@
 #include <maya/MFnMatrixAttribute.h>
 #include <maya/MFnUnitAttribute.h>
 #include <maya/MFnCompoundAttribute.h>
+#include <maya/MFnMatrixData.h>
+#include <maya/MFnStringData.h>
 #include "AbcShape.h"
 #include "SceneCache.h"
 #include "AlembicSceneVisitors.h"
@@ -155,15 +157,22 @@ private:
    bool createNumericAttribute(MFnDagNode &node, const std::string &name, MFnNumericData::Type type, bool array, MPlug &plug);
    bool createPointAttribute(MFnDagNode &node, const std::string &name, bool array, MPlug &plug);
    bool createColorAttribute(MFnDagNode &node, const std::string &name, bool alpha, bool array, MPlug &plug);
+   bool createMatrixAttribute(MFnDagNode &node, const std::string &name, MFnMatrixAttribute::Type type, bool array, MPlug &plug);
+   bool createStringAttribute(MFnDagNode &node, const std::string &name, bool array, MPlug &plug);
    
    bool checkNumericAttribute(const MPlug &plug, MFnNumericData::Type type, bool array);
    bool checkPointAttribute(const MPlug &plug, bool array);
    bool checkColorAttribute(const MPlug &plug, bool alpha, bool array);
+   bool checkMatrixAttribute(const MPlug &plug, bool array);
+   bool checkStringAttribute(const MPlug &plug, bool array);
    
    template <typename T, int D, typename TT>
    void setNumericAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
    template <typename T, int D, typename TT>
    void setCompoundAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
+   template <typename T>
+   void setMatrixAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
+   void setStringAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
    
    template <typename T, int D>
    void keyAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
@@ -176,6 +185,9 @@ private:
    void setRGBUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
    template <typename T, int D>
    void setRGBAUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
+   template <typename T>
+   void setMatrixUserProp(MFnDagNode &node, const std::string &name, MFnMatrixAttribute::Type type, Alembic::Abc::IScalarProperty prop);
+   void setStringUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
    
 private:
    
@@ -778,6 +790,55 @@ bool CreateTree::createNumericAttribute(MFnDagNode &node, const std::string &nam
    }
 }
 
+bool CreateTree::createMatrixAttribute(MFnDagNode &node, const std::string &name, MFnMatrixAttribute::Type type, bool array, MPlug &plug)
+{
+   MFnMatrixAttribute mAttr;
+   MString aname(name.c_str());
+   
+   MObject attr = mAttr.create(aname, aname, type);
+   mAttr.setReadable(true);
+   mAttr.setWritable(true);
+   mAttr.setStorable(true);
+   mAttr.setKeyable(true);
+   mAttr.setArray(array);
+   
+   if (node.addAttribute(attr) == MS::kSuccess)
+   {
+      plug = node.findPlug(aname);
+      return (!plug.isNull());
+   }
+   else
+   {
+      return false;
+   }
+}
+
+bool CreateTree::createStringAttribute(MFnDagNode &node, const std::string &name, bool array, MPlug &plug)
+{
+   MFnTypedAttribute tAttr;
+   MString aname(name.c_str());
+   
+   MFnStringData defaultData;
+   MObject defaultObj = defaultData.create("");
+   
+   MObject attr = tAttr.create(aname, aname, MFnData::kString, defaultObj);
+   tAttr.setReadable(true);
+   tAttr.setWritable(true);
+   tAttr.setStorable(true);
+   tAttr.setKeyable(true);
+   tAttr.setArray(array);
+   
+   if (node.addAttribute(attr) == MS::kSuccess)
+   {
+      plug = node.findPlug(aname);
+      return (!plug.isNull());
+   }
+   else
+   {
+      return false;
+   }
+}
+
 bool CreateTree::checkPointAttribute(const MPlug &plug, bool array)
 {
    if (plug.isArray() != array)
@@ -857,6 +918,46 @@ bool CreateTree::checkNumericAttribute(const MPlug &plug, MFnNumericData::Type t
    }
    
    return (nAttr.unitType() == type);
+}
+
+bool CreateTree::checkMatrixAttribute(const MPlug &plug, bool array)
+{
+   if (plug.isArray() != array)
+   {
+      return false;
+   }
+   
+   MStatus stat;
+   
+   MFnMatrixAttribute mAttr(plug.attribute(), &stat);
+   
+   if (stat != MS::kSuccess)
+   {
+      //MFnTypedAttribute tAttr(plug.attribute(), &stat);
+      //return (stat == MS::kSuccess && tAttr.attrType() == MFnData::kMatrix);
+      return false;
+   }
+   
+   return true;
+}
+
+bool CreateTree::checkStringAttribute(const MPlug &plug, bool array)
+{
+   if (plug.isArray() != array)
+   {
+      return false;
+   }
+   
+   MStatus stat;
+   
+   MFnTypedAttribute tAttr(plug.attribute(), &stat);
+   
+   if (stat != MS::kSuccess)
+   {
+      return false;
+   }
+   
+   return (tAttr.attrType() == MFnData::kString);
 }
 
 template <typename T, int D>
@@ -946,6 +1047,39 @@ void CreateTree::setCompoundAttribute(Alembic::Abc::IScalarProperty prop, MPlug 
    keyAttribute<T, D>(prop, plug);
 }
 
+template <typename T>
+void CreateTree::setMatrixAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
+{
+   T val[16];
+   prop.get(val);
+   
+   MMatrix m;
+   for (int r=0, i=0; r<4; ++r)
+   {
+      for (int c=0; c<4; ++c, ++i)
+      {
+         m[r][c] = double(val[i]);
+      }
+   }
+   
+   MFnMatrixData data(plug.asMObject());
+   data.set(m);
+   
+   // key frames not supported
+}
+
+void CreateTree::setStringAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
+{
+   std::string val;
+   
+   prop.get(&val);
+   
+   MFnStringData data(plug.asMObject());
+   data.set(val.c_str());
+   
+   // key frames not supported
+}
+
 template <typename T, int D, typename TT>
 void CreateTree::setScalarUserProp(MFnDagNode &node, const std::string &name, MFnNumericData::Type type, Alembic::Abc::IScalarProperty prop)
 {
@@ -1002,6 +1136,33 @@ void CreateTree::setRGBAUserProp(MFnDagNode &node, const std::string &name, Alem
    }
 }
 
+template <typename T>
+void CreateTree::setMatrixUserProp(MFnDagNode &node, const std::string &name, MFnMatrixAttribute::Type type, Alembic::Abc::IScalarProperty prop)
+{
+   MPlug plug = node.findPlug(name.c_str());
+   
+   bool process = (plug.isNull() ? createMatrixAttribute(node, name, type, false, plug)
+                                 : checkMatrixAttribute(plug, false));
+   
+   if (process)
+   {
+      setMatrixAttribute<T>(prop, plug);
+   }
+}
+
+void CreateTree::setStringUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
+{
+   MPlug plug = node.findPlug(name.c_str());
+   
+   bool process = (plug.isNull() ? createStringAttribute(node, name, false, plug)
+                                 : checkStringAttribute(plug, false));
+   
+   if (process)
+   {
+      setStringAttribute(prop, plug);
+   }
+}
+
 template <class T>
 void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
 {
@@ -1022,12 +1183,6 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
    MFnDagNode target(dag);
    
    size_t numProps = props.getNumProperties();
-   
-   MFnNumericAttribute nAttr;
-   MFnTypedAttribute tAttr;
-   MFnMatrixAttribute mAttr;
-   MFnEnumAttribute eAttr;
-   MFnUnitAttribute uAttr;
    
    for (size_t i=0; i<numProps; ++i)
    {
@@ -1181,11 +1336,6 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
          {
             setRGBUserProp<float, 3>(target, propName, prop);
          }
-         else if (Alembic::Abc::IC3cProperty::matches(header))
-         {
-            // need value remapping [0, 255] -> [0, 1]
-            // who uses that anyway?
-         }
          else if (Alembic::Abc::IC4hProperty::matches(header))
          {
             setRGBAUserProp<Alembic::Util::float16_t, 4>(target, propName, prop);
@@ -1194,33 +1344,33 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
          {
             setRGBAUserProp<float, 4>(target, propName, prop);
          }
-         else if (Alembic::Abc::IC4cProperty::matches(header))
+         else if (Alembic::Abc::IQuatfProperty::matches(header))
          {
-            // need value remapping [0, 255] -> [0, 1]
-            // who uses that anyway?
+            setScalarUserProp<float, 4, double>(target, propName, MFnNumericData::k4Double, prop);
          }
-         // Box2s
-         // Box2i
-         // Box2f
-         // Box2d
-         // Box3s
-         // Box3i
-         // Box3f
-         // Box3d
-         // M33f
-         // M33d
-         // M44f
-         // M44d
-         // Quatf
-         // Quatd
+         else if (Alembic::Abc::IQuatdProperty::matches(header))
+         {
+            setScalarUserProp<double, 4, double>(target, propName, MFnNumericData::k4Double, prop);
+         }
+         else if (Alembic::Abc::IM44fProperty::matches(header))
+         {
+            setMatrixUserProp<float>(target, propName, MFnMatrixAttribute::kFloat, prop);
+         }
+         else if (Alembic::Abc::IM44dProperty::matches(header))
+         {
+            setMatrixUserProp<double>(target, propName, MFnMatrixAttribute::kDouble, prop);
+         }
          else if (Alembic::Abc::IStringProperty::matches(header))
          {
-            // TODO
+            setStringUserProp(target, propName, prop);
          }
-         else if (Alembic::Abc::IWstringProperty::matches(header))
-         {
-            // Not supported
-         }
+         // Ignored types:
+         //   Box2*
+         //   Box3*
+         //   M33*
+         //   C3c
+         //   C4c
+         //   Wstring
       }
       else if (header.isArray())
       {
