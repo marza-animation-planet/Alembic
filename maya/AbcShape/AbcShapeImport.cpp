@@ -370,7 +370,7 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
       MFnDagNode locNode(getDag(target->path()));
       MObject locObj = locNode.object();
       
-      MPlug pPx = locNode.findPlug("localePositionX");
+      MPlug pPx = locNode.findPlug("localPositionX");
       MPlug pPy = locNode.findPlug("localPositionY");
       MPlug pPz = locNode.findPlug("localPositionZ");
       MPlug pSx = locNode.findPlug("localScaleX");
