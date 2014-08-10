@@ -70,7 +70,7 @@ void* AbcShapeImport::create()
 template <typename T, int D, typename TT>
 struct NumericData
 {
-   static void Set(const T *value, MPlug &plug)
+   static void Set(const T* value, MPlug &plug)
    {
    }
 };
@@ -78,7 +78,7 @@ struct NumericData
 template <typename T, typename TT>
 struct NumericData<T, 1, TT>
 {
-   static void Set(const T *value, MPlug &plug)
+   static void Set(const T* value, MPlug &plug)
    {
       plug.setValue(TT(value[0]));
    }
@@ -87,7 +87,7 @@ struct NumericData<T, 1, TT>
 template <typename T, typename TT>
 struct NumericData<T, 2, TT>
 {
-   static void Set(const T *value, MPlug &plug)
+   static void Set(const T* value, MPlug &plug)
    {
       MFnNumericData data(plug.asMObject());
       data.setData(TT(value[0]), TT(value[1]));
@@ -97,7 +97,7 @@ struct NumericData<T, 2, TT>
 template <typename T, typename TT>
 struct NumericData<T, 3, TT>
 {
-   static void Set(const T *value, MPlug &plug)
+   static void Set(const T* value, MPlug &plug)
    {
       MFnNumericData data(plug.asMObject());
       data.setData(TT(value[0]), TT(value[1]), TT(value[2]));
@@ -107,7 +107,7 @@ struct NumericData<T, 3, TT>
 template <typename T, typename TT>
 struct NumericData<T, 4, TT>
 {
-   static void Set(const T *value, MPlug &plug)
+   static void Set(const T* value, MPlug &plug)
    {
       MFnNumericData data(plug.asMObject());
       data.setData(TT(value[0]), TT(value[1]), TT(value[2]), TT(value[3]));
@@ -174,6 +174,14 @@ private:
    void setMatrixAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
    void setStringAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
    
+   template <typename T, int D, typename TT>
+   void setNumericArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug);
+   template <typename T, int D, typename TT>
+   void setCompoundArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug);
+   template <typename T>
+   void setMatrixArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug);
+   void setStringArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug);
+   
    template <typename T, int D>
    void keyAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
    
@@ -182,12 +190,20 @@ private:
    template <typename T, int D>
    void setPointUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
    template <typename T, int D>
-   void setRGBUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
-   template <typename T, int D>
-   void setRGBAUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
+   void setColorUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
    template <typename T>
    void setMatrixUserProp(MFnDagNode &node, const std::string &name, MFnMatrixAttribute::Type type, Alembic::Abc::IScalarProperty prop);
    void setStringUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
+   
+   template <typename T, int D, typename TT>
+   void setNumericArrayUserProp(MFnDagNode &node, const std::string &name, MFnNumericData::Type type, Alembic::Abc::IArrayProperty prop);
+   template <typename T, int D>
+   void setPointArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop);
+   template <typename T, int D>
+   void setColorArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop);
+   template <typename T>
+   void setMatrixArrayUserProp(MFnDagNode &node, const std::string &name, MFnMatrixAttribute::Type type, Alembic::Abc::IArrayProperty prop);
+   void setStringArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop);
    
 private:
    
@@ -843,6 +859,7 @@ bool CreateTree::checkPointAttribute(const MPlug &plug, bool array)
 {
    if (plug.isArray() != array)
    {
+      // Note: MFnTypedAttribute kPointArray, kVectorArray
       return false;
    }
    
@@ -1033,6 +1050,21 @@ void CreateTree::setNumericAttribute(Alembic::Abc::IScalarProperty prop, MPlug &
 }
 
 template <typename T, int D, typename TT>
+void CreateTree::setNumericArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
+{
+   Alembic::AbcCoreAbstract::ArraySamplePtr samp;
+   prop.get(samp);
+   
+   const T *val = (const T*) samp->getData();
+   
+   for (size_t i=0; i<samp->size(); ++i, val+=D)
+   {
+      MPlug elem = plug.elementByLogicalIndex(i);
+      NumericData<T, D, TT>::Set(val, elem);
+   }
+}
+
+template <typename T, int D, typename TT>
 void CreateTree::setCompoundAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
 {
    T val[D];
@@ -1045,6 +1077,24 @@ void CreateTree::setCompoundAttribute(Alembic::Abc::IScalarProperty prop, MPlug 
    }
    
    keyAttribute<T, D>(prop, plug);
+}
+
+template <typename T, int D, typename TT>
+void CreateTree::setCompoundArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
+{
+   Alembic::AbcCoreAbstract::ArraySamplePtr samp;
+   prop.get(samp);
+   
+   const T *val = (const T*) samp->getData();
+   
+   for (size_t i=0; i<samp->size(); ++i, val+=D)
+   {
+      MPlug elem = plug.elementByLogicalIndex(i);
+      for (int d=0; d<D; ++d)
+      {
+         elem.child(d).setValue(TT(val[d]));
+      }
+   }
 }
 
 template <typename T>
@@ -1068,6 +1118,31 @@ void CreateTree::setMatrixAttribute(Alembic::Abc::IScalarProperty prop, MPlug &p
    // key frames not supported
 }
 
+template <typename T>
+void CreateTree::setMatrixArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
+{
+   Alembic::AbcCoreAbstract::ArraySamplePtr samp;
+   prop.get(samp);
+   
+   const T *val = (const T*) samp->getData();
+   
+   MMatrix m;
+   
+   for (size_t i=0; i<samp->size(); ++i, val+=16)
+   {
+      for (int r=0, j=0; r<4; ++r)
+      {
+         for (int c=0; c<4; ++c, ++i)
+         {
+            m[r][c] = double(val[j]);
+         }
+      }
+      
+      MFnMatrixData data(plug.elementByLogicalIndex(i).asMObject());
+      data.set(m);
+   }
+}
+
 void CreateTree::setStringAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
 {
    std::string val;
@@ -1078,6 +1153,20 @@ void CreateTree::setStringAttribute(Alembic::Abc::IScalarProperty prop, MPlug &p
    data.set(val.c_str());
    
    // key frames not supported
+}
+
+void CreateTree::setStringArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
+{
+   Alembic::AbcCoreAbstract::ArraySamplePtr samp;
+   prop.get(samp);
+   
+   const std::string *val = (const std::string*) samp->getData();
+   
+   for (size_t i=0; i<samp->size(); ++i)
+   {
+      MFnStringData data(plug.elementByLogicalIndex(i).asMObject());
+      data.set(val[i].c_str());
+   }
 }
 
 template <typename T, int D, typename TT>
@@ -1091,6 +1180,20 @@ void CreateTree::setNumericUserProp(MFnDagNode &node, const std::string &name, M
    if (process)
    {
       setNumericAttribute<T, D, TT>(prop, plug);
+   }
+}
+
+template <typename T, int D, typename TT>
+void CreateTree::setNumericArrayUserProp(MFnDagNode &node, const std::string &name, MFnNumericData::Type type, Alembic::Abc::IArrayProperty prop)
+{
+   MPlug plug = node.findPlug(name.c_str());
+   
+   bool process = (plug.isNull() ? createNumericAttribute(node, name, type, true, plug)
+                                 : checkNumericAttribute(plug, type, true));
+   
+   if (process)
+   {
+      setNumericArrayAttribute<T, D, TT>(prop, plug);
    }
 }
 
@@ -1109,12 +1212,28 @@ void CreateTree::setPointUserProp(MFnDagNode &node, const std::string &name, Ale
 }
 
 template <typename T, int D>
-void CreateTree::setRGBUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
+void CreateTree::setPointArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
 {
    MPlug plug = node.findPlug(name.c_str());
    
-   bool process = (plug.isNull() ? createColorAttribute(node, name, false, false, plug)
-                                 : checkColorAttribute(plug, false, false));
+   bool process = (plug.isNull() ? createPointAttribute(node, name, true, plug)
+                                 : checkPointAttribute(plug, true));
+   
+   if (process)
+   {
+      setNumericArrayAttribute<T, D, float>(prop, plug);
+   }
+}
+
+template <typename T, int D>
+void CreateTree::setColorUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
+{
+   MPlug plug = node.findPlug(name.c_str());
+   
+   bool alpha = (D == 4);
+   
+   bool process = (plug.isNull() ? createColorAttribute(node, name, alpha, false, plug)
+                                 : checkColorAttribute(plug, alpha, false));
    
    if (process)
    {
@@ -1123,16 +1242,18 @@ void CreateTree::setRGBUserProp(MFnDagNode &node, const std::string &name, Alemb
 }
 
 template <typename T, int D>
-void CreateTree::setRGBAUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
+void CreateTree::setColorArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
 {
    MPlug plug = node.findPlug(name.c_str());
    
-   bool process = (plug.isNull() ? createColorAttribute(node, name, true, false, plug)
-                                 : checkColorAttribute(plug, true, false));
+   bool alpha = (D == 4);
+   
+   bool process = (plug.isNull() ? createColorAttribute(node, name, alpha, true, plug)
+                                 : checkColorAttribute(plug, alpha, true));
    
    if (process)
    {
-      setCompoundAttribute<T, D, float>(prop, plug);
+      setNumericArrayAttribute<T, D, float>(prop, plug);
    }
 }
 
@@ -1150,6 +1271,20 @@ void CreateTree::setMatrixUserProp(MFnDagNode &node, const std::string &name, MF
    }
 }
 
+template <typename T>
+void CreateTree::setMatrixArrayUserProp(MFnDagNode &node, const std::string &name, MFnMatrixAttribute::Type type, Alembic::Abc::IArrayProperty prop)
+{
+   MPlug plug = node.findPlug(name.c_str());
+   
+   bool process = (plug.isNull() ? createMatrixAttribute(node, name, type, true, plug)
+                                 : checkMatrixAttribute(plug, true));
+   
+   if (process)
+   {
+      setMatrixArrayAttribute<T>(prop, plug);
+   }
+}
+
 void CreateTree::setStringUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
 {
    MPlug plug = node.findPlug(name.c_str());
@@ -1160,6 +1295,19 @@ void CreateTree::setStringUserProp(MFnDagNode &node, const std::string &name, Al
    if (process)
    {
       setStringAttribute(prop, plug);
+   }
+}
+
+void CreateTree::setStringArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
+{
+   MPlug plug = node.findPlug(name.c_str());
+   
+   bool process = (plug.isNull() ? createStringAttribute(node, name, true, plug)
+                                 : checkStringAttribute(plug, true));
+   
+   if (process)
+   {
+      setStringArrayAttribute(prop, plug);
    }
 }
 
@@ -1330,19 +1478,19 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
          }
          else if (Alembic::Abc::IC3hProperty::matches(header))
          {
-            setRGBUserProp<Alembic::Util::float16_t, 3>(target, propName, prop);
+            setColorUserProp<Alembic::Util::float16_t, 3>(target, propName, prop);
          }
          else if (Alembic::Abc::IC3fProperty::matches(header))
          {
-            setRGBUserProp<float, 3>(target, propName, prop);
+            setColorUserProp<float, 3>(target, propName, prop);
          }
          else if (Alembic::Abc::IC4hProperty::matches(header))
          {
-            setRGBAUserProp<Alembic::Util::float16_t, 4>(target, propName, prop);
+            setColorUserProp<Alembic::Util::float16_t, 4>(target, propName, prop);
          }
          else if (Alembic::Abc::IC4fProperty::matches(header))
          {
-            setRGBAUserProp<float, 4>(target, propName, prop);
+            setColorUserProp<float, 4>(target, propName, prop);
          }
          else if (Alembic::Abc::IQuatfProperty::matches(header))
          {
@@ -1374,10 +1522,172 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
       }
       else if (header.isArray())
       {
-         // ToDo
-         #ifdef _DEBUG
-         std::cout << "[AbcShape] Array attribute not yet supported" << std::endl;
-         #endif
+         Alembic::Abc::IArrayProperty prop(props, propName);
+         
+         if (Alembic::Abc::IBoolArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<Alembic::Util::bool_t, 1, bool>(target, propName, MFnNumericData::kBoolean, prop);
+         }
+         else if (Alembic::Abc::IUcharArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<Alembic::Util::uint8_t, 1, char>(target, propName, MFnNumericData::kChar, prop);
+         }
+         else if (Alembic::Abc::ICharArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<Alembic::Util::int8_t, 1, char>(target, propName, MFnNumericData::kChar, prop);  
+         }
+         else if (Alembic::Abc::IUInt16ArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<Alembic::Util::uint16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);
+         }
+         else if (Alembic::Abc::IInt16ArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<Alembic::Util::int16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);  
+         }
+         else if (Alembic::Abc::IUInt32ArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<Alembic::Util::uint32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+         }
+         else if (Alembic::Abc::IInt32ArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<Alembic::Util::int32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);  
+         }
+         else if (Alembic::Abc::IUInt64ArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<Alembic::Util::uint64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+         }
+         else if (Alembic::Abc::IInt64ArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<Alembic::Util::int64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);  
+         }
+         else if (Alembic::Abc::IHalfArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<Alembic::Util::float16_t, 1, float>(target, propName, MFnNumericData::kFloat, prop);  
+         }
+         else if (Alembic::Abc::IFloatArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<float, 1, float>(target, propName, MFnNumericData::kFloat, prop);  
+         }
+         else if (Alembic::Abc::IDoubleArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<double, 1, double>(target, propName, MFnNumericData::kDouble, prop);  
+         }
+         else if (Alembic::Abc::IV2sArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<Alembic::Util::int16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
+         }
+         else if (Alembic::Abc::IV2iArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<Alembic::Util::int32_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+         }
+         else if (Alembic::Abc::IV2fArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
+         }
+         else if (Alembic::Abc::IV2dArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
+         }
+         else if (Alembic::Abc::IV3sArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<Alembic::Util::int16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
+         }
+         else if (Alembic::Abc::IV3iArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<Alembic::Util::int32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+         }
+         else if (Alembic::Abc::IV3fArrayProperty::matches(header))
+         {
+            setPointArrayUserProp<float, 3>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IV3dArrayProperty::matches(header))
+         {
+            setPointArrayUserProp<double, 3>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IP2sArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<Alembic::Util::int16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
+         }
+         else if (Alembic::Abc::IP2iArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<Alembic::Util::int32_t, 2, short>(target, propName, MFnNumericData::k2Long, prop);
+         }
+         else if (Alembic::Abc::IP2fArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
+         }
+         else if (Alembic::Abc::IP2dArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
+         }
+         else if (Alembic::Abc::IP3sArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<Alembic::Util::int16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
+         }
+         else if (Alembic::Abc::IP3iArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<Alembic::Util::int32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+         }
+         else if (Alembic::Abc::IP3fArrayProperty::matches(header))
+         {
+            setPointArrayUserProp<float, 3>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IP3dArrayProperty::matches(header))
+         {
+            setPointArrayUserProp<double, 3>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IN2fArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
+         }
+         else if (Alembic::Abc::IN2dArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
+         }
+         else if (Alembic::Abc::IN3fArrayProperty::matches(header))
+         {
+            setPointArrayUserProp<float, 3>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IN3dArrayProperty::matches(header))
+         {
+            setPointArrayUserProp<double, 3>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IC3hArrayProperty::matches(header))
+         {
+            setColorArrayUserProp<Alembic::Util::float16_t, 3>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IC3fArrayProperty::matches(header))
+         {
+            setColorArrayUserProp<float, 3>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IC4hArrayProperty::matches(header))
+         {
+            setColorArrayUserProp<Alembic::Util::float16_t, 4>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IC4fArrayProperty::matches(header))
+         {
+            setColorArrayUserProp<float, 4>(target, propName, prop);
+         }
+         else if (Alembic::Abc::IQuatfArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<float, 4, double>(target, propName, MFnNumericData::k4Double, prop);
+         }
+         else if (Alembic::Abc::IQuatdArrayProperty::matches(header))
+         {
+            setNumericArrayUserProp<double, 4, double>(target, propName, MFnNumericData::k4Double, prop);
+         }
+         else if (Alembic::Abc::IM44fArrayProperty::matches(header))
+         {
+            setMatrixArrayUserProp<float>(target, propName, MFnMatrixAttribute::kFloat, prop);
+         }
+         else if (Alembic::Abc::IM44dArrayProperty::matches(header))
+         {
+            setMatrixArrayUserProp<double>(target, propName, MFnMatrixAttribute::kDouble, prop);
+         }
+         else if (Alembic::Abc::IStringArrayProperty::matches(header))
+         {
+            setStringArrayUserProp(target, propName, prop);
+         }
       }
    }
 }
