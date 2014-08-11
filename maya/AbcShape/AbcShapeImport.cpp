@@ -70,7 +70,7 @@ void* AbcShapeImport::create()
 template <typename T, int D, typename TT>
 struct NumericData
 {
-   static void Set(const T* value, MPlug &plug)
+   static void Set(MFnNumericData::Type type, const T* value, MPlug &plug)
    {
    }
 };
@@ -78,7 +78,7 @@ struct NumericData
 template <typename T, typename TT>
 struct NumericData<T, 1, TT>
 {
-   static void Set(const T* value, MPlug &plug)
+   static void Set(MFnNumericData::Type, const T* value, MPlug &plug)
    {
       plug.setValue(TT(value[0]));
    }
@@ -87,30 +87,36 @@ struct NumericData<T, 1, TT>
 template <typename T, typename TT>
 struct NumericData<T, 2, TT>
 {
-   static void Set(const T* value, MPlug &plug)
+   static void Set(MFnNumericData::Type type, const T* value, MPlug &plug)
    {
-      MFnNumericData data(plug.asMObject());
+      MFnNumericData data;
+      MObject oval = data.create(type);
       data.setData(TT(value[0]), TT(value[1]));
+      plug.setValue(oval);
    }
 };
 
 template <typename T, typename TT>
 struct NumericData<T, 3, TT>
 {
-   static void Set(const T* value, MPlug &plug)
+   static void Set(MFnNumericData::Type type, const T* value, MPlug &plug)
    {
-      MFnNumericData data(plug.asMObject());
+      MFnNumericData data;
+      MObject oval = data.create(type);
       data.setData(TT(value[0]), TT(value[1]), TT(value[2]));
+      plug.setValue(oval);
    }
 };
 
 template <typename T, typename TT>
 struct NumericData<T, 4, TT>
 {
-   static void Set(const T* value, MPlug &plug)
+   static void Set(MFnNumericData::Type type, const T* value, MPlug &plug)
    {
-      MFnNumericData data(plug.asMObject());
+      MFnNumericData data;
+      MObject oval = data.create(type);
       data.setData(TT(value[0]), TT(value[1]), TT(value[2]), TT(value[3]));
+      plug.setValue(oval);
    }
 };
 
@@ -167,7 +173,7 @@ private:
    bool checkStringAttribute(const MPlug &plug, bool array);
    
    template <typename T, int D, typename TT>
-   void setNumericAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
+   void setNumericAttribute(MFnNumericData::Type type, Alembic::Abc::IScalarProperty prop, MPlug &plug);
    template <typename T, int D, typename TT>
    void setCompoundAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
    template <typename T>
@@ -175,7 +181,15 @@ private:
    void setStringAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
    
    template <typename T, int D, typename TT>
-   void setNumericArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug);
+   void setNumericAttribute(MFnNumericData::Type type, Alembic::Abc::IArrayProperty prop, MPlug &plug);
+   template <typename T, int D, typename TT>
+   void setCompoundAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug);
+   template <typename T>
+   void setMatrixAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug);
+   void setStringAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug);
+   
+   template <typename T, int D, typename TT>
+   void setNumericArrayAttribute(MFnNumericData::Type type, Alembic::Abc::IArrayProperty prop, MPlug &plug);
    template <typename T, int D, typename TT>
    void setCompoundArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug);
    template <typename T>
@@ -764,7 +778,7 @@ bool CreateTree::createColorAttribute(MFnDagNode &node, const std::string &name,
       nAttr.setKeyable(true);
       cAttr.addChild(battr);
       
-      MObject aattr = nAttr.create(aname+"A", aname+"A", MFnNumericData::kFloat, 0.0);
+      MObject aattr = nAttr.create(aname+"A", aname+"A", MFnNumericData::kFloat, 1.0);
       nAttr.setReadable(true);
       nAttr.setWritable(true);
       nAttr.setStorable(true);
@@ -1038,19 +1052,30 @@ void CreateTree::keyAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
 }
 
 template <typename T, int D, typename TT>
-void CreateTree::setNumericAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
+void CreateTree::setNumericAttribute(MFnNumericData::Type type, Alembic::Abc::IScalarProperty prop, MPlug &plug)
 {
    T val[D];
    
    prop.get(val);
    
-   NumericData<T, D, TT>::Set(val, plug);
+   NumericData<T, D, TT>::Set(type, val, plug);
    
    keyAttribute<T, D>(prop, plug);
 }
 
 template <typename T, int D, typename TT>
-void CreateTree::setNumericArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
+void CreateTree::setNumericAttribute(MFnNumericData::Type type, Alembic::Abc::IArrayProperty prop, MPlug &plug)
+{
+   Alembic::AbcCoreAbstract::ArraySamplePtr samp;
+   prop.get(samp);
+   
+   const T *val = (const T*) samp->getData();
+   
+   NumericData<T, D, TT>::Set(type, val, plug);
+}
+
+template <typename T, int D, typename TT>
+void CreateTree::setNumericArrayAttribute(MFnNumericData::Type type, Alembic::Abc::IArrayProperty prop, MPlug &plug)
 {
    Alembic::AbcCoreAbstract::ArraySamplePtr samp;
    prop.get(samp);
@@ -1060,7 +1085,7 @@ void CreateTree::setNumericArrayAttribute(Alembic::Abc::IArrayProperty prop, MPl
    for (size_t i=0; i<samp->size(); ++i, val+=D)
    {
       MPlug elem = plug.elementByLogicalIndex(i);
-      NumericData<T, D, TT>::Set(val, elem);
+      NumericData<T, D, TT>::Set(type, val, elem);
    }
 }
 
@@ -1077,6 +1102,20 @@ void CreateTree::setCompoundAttribute(Alembic::Abc::IScalarProperty prop, MPlug 
    }
    
    keyAttribute<T, D>(prop, plug);
+}
+
+template <typename T, int D, typename TT>
+void CreateTree::setCompoundAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
+{
+   Alembic::AbcCoreAbstract::ArraySamplePtr samp;
+   prop.get(samp);
+   
+   const T *val = (const T*) samp->getData();
+   
+   for (int d=0; d<D; ++d)
+   {
+      plug.child(d).setValue(TT(val[d]));
+   }
 }
 
 template <typename T, int D, typename TT>
@@ -1112,8 +1151,33 @@ void CreateTree::setMatrixAttribute(Alembic::Abc::IScalarProperty prop, MPlug &p
       }
    }
    
-   MFnMatrixData data(plug.asMObject());
-   data.set(m);
+   MFnMatrixData data;
+   MObject oval = data.create(m);
+   plug.setValue(oval);
+   
+   // key frames not supported
+}
+
+template <typename T>
+void CreateTree::setMatrixAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
+{
+   Alembic::AbcCoreAbstract::ArraySamplePtr samp;
+   prop.get(samp);
+   
+   const T *val = (const T*) samp->getData();
+   
+   MMatrix m;
+   for (int r=0, i=0; r<4; ++r)
+   {
+      for (int c=0; c<4; ++c, ++i)
+      {
+         m[r][c] = double(val[i]);
+      }
+   }
+   
+   MFnMatrixData data;
+   MObject oval = data.create(m);
+   plug.setValue(oval);
    
    // key frames not supported
 }
@@ -1138,8 +1202,9 @@ void CreateTree::setMatrixArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlu
          }
       }
       
-      MFnMatrixData data(plug.elementByLogicalIndex(i).asMObject());
-      data.set(m);
+      MFnMatrixData data;
+      MObject oval = data.create(m);
+      plug.elementByLogicalIndex(i).setValue(oval);
    }
 }
 
@@ -1150,6 +1215,18 @@ void CreateTree::setStringAttribute(Alembic::Abc::IScalarProperty prop, MPlug &p
    prop.get(&val);
    
    plug.setString(val.c_str());
+   
+   // key frames not supported
+}
+
+void CreateTree::setStringAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
+{
+   Alembic::AbcCoreAbstract::ArraySamplePtr samp;
+   prop.get(samp);
+   
+   const std::string *val = (const std::string*) samp->getData();
+   
+   plug.setString(val[0].c_str());
    
    // key frames not supported
 }
@@ -1177,7 +1254,11 @@ void CreateTree::setNumericUserProp(MFnDagNode &node, const std::string &name, M
    
    if (process)
    {
-      setNumericAttribute<T, D, TT>(prop, plug);
+      setNumericAttribute<T, D, TT>(type, prop, plug);
+   }
+   else
+   {
+      MGlobal::displayWarning("[AbcShapeImport] Numeric attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1186,12 +1267,25 @@ void CreateTree::setNumericArrayUserProp(MFnDagNode &node, const std::string &na
 {
    MPlug plug = node.findPlug(name.c_str());
    
-   bool process = (plug.isNull() ? createNumericAttribute(node, name, type, true, plug)
-                                 : checkNumericAttribute(plug, type, true));
+   bool array = !prop.isScalarLike();
+   
+   bool process = (plug.isNull() ? createNumericAttribute(node, name, type, array, plug)
+                                 : checkNumericAttribute(plug, type, array));
    
    if (process)
    {
-      setNumericArrayAttribute<T, D, TT>(prop, plug);
+      if (array)
+      {
+         setNumericArrayAttribute<T, D, TT>(type, prop, plug);
+      }
+      else
+      {
+         setNumericAttribute<T, D, TT>(type, prop, plug);
+      }
+   }
+   else
+   {
+      MGlobal::displayWarning("[AbcShapeImport] Numeric array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1205,7 +1299,11 @@ void CreateTree::setPointUserProp(MFnDagNode &node, const std::string &name, Ale
    
    if (process)
    {
-      setNumericAttribute<T, D, float>(prop, plug);
+      setNumericAttribute<T, D, float>(MFnNumericData::k3Float, prop, plug);
+   }
+   else
+   {
+      MGlobal::displayWarning("[AbcShapeImport] Point attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1214,12 +1312,25 @@ void CreateTree::setPointArrayUserProp(MFnDagNode &node, const std::string &name
 {
    MPlug plug = node.findPlug(name.c_str());
    
-   bool process = (plug.isNull() ? createPointAttribute(node, name, true, plug)
-                                 : checkPointAttribute(plug, true));
+   bool array = !prop.isScalarLike();
+   
+   bool process = (plug.isNull() ? createPointAttribute(node, name, array, plug)
+                                 : checkPointAttribute(plug, array));
    
    if (process)
    {
-      setNumericArrayAttribute<T, D, float>(prop, plug);
+      if (array)
+      {
+         setNumericArrayAttribute<T, D, float>(MFnNumericData::k3Float, prop, plug);
+      }
+      else
+      {
+         setNumericAttribute<T, D, float>(MFnNumericData::k3Float, prop, plug);
+      }
+   }
+   else
+   {
+      MGlobal::displayWarning("[AbcShapeImport] Point array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1235,7 +1346,18 @@ void CreateTree::setColorUserProp(MFnDagNode &node, const std::string &name, Ale
    
    if (process)
    {
-      setNumericAttribute<T, D, float>(prop, plug);
+      if (!alpha)
+      {
+         setNumericAttribute<T, D, float>(MFnNumericData::k3Float, prop, plug);
+      }
+      else
+      {
+         setCompoundAttribute<T, D, float>(prop, plug);
+      }
+   }
+   else
+   {
+      MGlobal::displayWarning("[AbcShapeImport] Color attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1244,14 +1366,41 @@ void CreateTree::setColorArrayUserProp(MFnDagNode &node, const std::string &name
 {
    MPlug plug = node.findPlug(name.c_str());
    
+   bool array = !prop.isScalarLike();
+   
    bool alpha = (D == 4);
    
-   bool process = (plug.isNull() ? createColorAttribute(node, name, alpha, true, plug)
-                                 : checkColorAttribute(plug, alpha, true));
+   bool process = (plug.isNull() ? createColorAttribute(node, name, alpha, array, plug)
+                                 : checkColorAttribute(plug, alpha, array));
    
    if (process)
    {
-      setNumericArrayAttribute<T, D, float>(prop, plug);
+      if (array)
+      {
+         if (!alpha)
+         {
+            setNumericArrayAttribute<T, D, float>(MFnNumericData::k3Float, prop, plug);
+         }
+         else
+         {
+            setCompoundArrayAttribute<T, D, float>(prop, plug);
+         }
+      }
+      else
+      {
+         if (!alpha)
+         {
+            setNumericAttribute<T, D, float>(MFnNumericData::k3Float, prop, plug);
+         }
+         else
+         {
+            setCompoundAttribute<T, D, float>(prop, plug);
+         }
+      }
+   }
+   else
+   {
+      MGlobal::displayWarning("[AbcShapeImport] Color array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1267,6 +1416,10 @@ void CreateTree::setMatrixUserProp(MFnDagNode &node, const std::string &name, MF
    {
       setMatrixAttribute<T>(prop, plug);
    }
+   else
+   {
+      MGlobal::displayWarning("[AbcShapeImport] Matrix attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+   }
 }
 
 template <typename T>
@@ -1274,12 +1427,25 @@ void CreateTree::setMatrixArrayUserProp(MFnDagNode &node, const std::string &nam
 {
    MPlug plug = node.findPlug(name.c_str());
    
-   bool process = (plug.isNull() ? createMatrixAttribute(node, name, type, true, plug)
-                                 : checkMatrixAttribute(plug, true));
+   bool array = !prop.isScalarLike();
+   
+   bool process = (plug.isNull() ? createMatrixAttribute(node, name, type, array, plug)
+                                 : checkMatrixAttribute(plug, array));
    
    if (process)
    {
-      setMatrixArrayAttribute<T>(prop, plug);
+      if (array)
+      {
+         setMatrixArrayAttribute<T>(prop, plug);
+      }
+      else
+      {
+         setMatrixAttribute<T>(prop, plug);
+      }
+   }
+   else
+   {
+      MGlobal::displayWarning("[AbcShapeImport] Matrix array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1294,18 +1460,35 @@ void CreateTree::setStringUserProp(MFnDagNode &node, const std::string &name, Al
    {
       setStringAttribute(prop, plug);
    }
+   else
+   {
+      MGlobal::displayWarning("[AbcShapeImport] String attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+   }
 }
 
 void CreateTree::setStringArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
 {
    MPlug plug = node.findPlug(name.c_str());
    
-   bool process = (plug.isNull() ? createStringAttribute(node, name, true, plug)
-                                 : checkStringAttribute(plug, true));
+   bool array = !prop.isScalarLike();
+   
+   bool process = (plug.isNull() ? createStringAttribute(node, name, array, plug)
+                                 : checkStringAttribute(plug, array));
    
    if (process)
    {
-      setStringArrayAttribute(prop, plug);
+      if (array)
+      {
+         setStringArrayAttribute(prop, plug);
+      }
+      else
+      {
+         setStringAttribute(prop, plug);
+      }
+   }
+   else
+   {
+      MGlobal::displayWarning("[AbcShapeImport] String array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1342,350 +1525,671 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
       
       // filter?
       
-      if (header.isScalar())
+      const Alembic::AbcCoreAbstract::DataType &dataType = header.getDataType();
+      const Alembic::AbcCoreAbstract::MetaData &metaData = header.getMetaData();
+      std::string interpretation = metaData.get("interpretation");
+      
+      switch (dataType.getPod())
       {
-         Alembic::Abc::IScalarProperty prop(props, propName);
-         
-         if (Alembic::Abc::IBoolProperty::matches(header))
-         {
-            setNumericUserProp<Alembic::Util::bool_t, 1, bool>(target, propName, MFnNumericData::kBoolean, prop);
-         }
-         else if (Alembic::Abc::IUcharProperty::matches(header))
-         {
-            setNumericUserProp<Alembic::Util::uint8_t, 1, char>(target, propName, MFnNumericData::kChar, prop);
-         }
-         else if (Alembic::Abc::ICharProperty::matches(header))
-         {
-            setNumericUserProp<Alembic::Util::int8_t, 1, char>(target, propName, MFnNumericData::kChar, prop);  
-         }
-         else if (Alembic::Abc::IUInt16Property::matches(header))
-         {
-            setNumericUserProp<Alembic::Util::uint16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);
-         }
-         else if (Alembic::Abc::IInt16Property::matches(header))
-         {
-            setNumericUserProp<Alembic::Util::int16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);  
-         }
-         else if (Alembic::Abc::IUInt32Property::matches(header))
-         {
-            setNumericUserProp<Alembic::Util::uint32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
-         }
-         else if (Alembic::Abc::IInt32Property::matches(header))
-         {
-            setNumericUserProp<Alembic::Util::int32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);  
-         }
-         else if (Alembic::Abc::IUInt64Property::matches(header))
-         {
-            setNumericUserProp<Alembic::Util::uint64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
-         }
-         else if (Alembic::Abc::IInt64Property::matches(header))
-         {
-            setNumericUserProp<Alembic::Util::int64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);  
-         }
-         else if (Alembic::Abc::IHalfProperty::matches(header))
-         {
-            setNumericUserProp<Alembic::Util::float16_t, 1, float>(target, propName, MFnNumericData::kFloat, prop);  
-         }
-         else if (Alembic::Abc::IFloatProperty::matches(header))
-         {
-            setNumericUserProp<float, 1, float>(target, propName, MFnNumericData::kFloat, prop);  
-         }
-         else if (Alembic::Abc::IDoubleProperty::matches(header))
-         {
-            setNumericUserProp<double, 1, double>(target, propName, MFnNumericData::kDouble, prop);  
-         }
-         else if (Alembic::Abc::IV2sProperty::matches(header))
-         {
-            setNumericUserProp<Alembic::Util::int16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
-         }
-         else if (Alembic::Abc::IV2iProperty::matches(header))
-         {
-            setNumericUserProp<Alembic::Util::int32_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
-         }
-         else if (Alembic::Abc::IV2fProperty::matches(header))
-         {
-            setNumericUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
-         }
-         else if (Alembic::Abc::IV2dProperty::matches(header))
-         {
-            setNumericUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
-         }
-         else if (Alembic::Abc::IV3sProperty::matches(header))
-         {
-            setNumericUserProp<Alembic::Util::int16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
-         }
-         else if (Alembic::Abc::IV3iProperty::matches(header))
-         {
-            setNumericUserProp<Alembic::Util::int32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
-         }
-         else if (Alembic::Abc::IV3fProperty::matches(header))
-         {
-            setPointUserProp<float, 3>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IV3dProperty::matches(header))
-         {
-            setPointUserProp<double, 3>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IP2sProperty::matches(header))
-         {
-            setNumericUserProp<Alembic::Util::int16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
-         }
-         else if (Alembic::Abc::IP2iProperty::matches(header))
-         {
-            setNumericUserProp<Alembic::Util::int32_t, 2, short>(target, propName, MFnNumericData::k2Long, prop);
-         }
-         else if (Alembic::Abc::IP2fProperty::matches(header))
-         {
-            setNumericUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
-         }
-         else if (Alembic::Abc::IP2dProperty::matches(header))
-         {
-            setNumericUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
-         }
-         else if (Alembic::Abc::IP3sProperty::matches(header))
-         {
-            setNumericUserProp<Alembic::Util::int16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
-         }
-         else if (Alembic::Abc::IP3iProperty::matches(header))
-         {
-            setNumericUserProp<Alembic::Util::int32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
-         }
-         else if (Alembic::Abc::IP3fProperty::matches(header))
-         {
-            setPointUserProp<float, 3>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IP3dProperty::matches(header))
-         {
-            setPointUserProp<double, 3>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IN2fProperty::matches(header))
-         {
-            setNumericUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
-         }
-         else if (Alembic::Abc::IN2dProperty::matches(header))
-         {
-            setNumericUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
-         }
-         else if (Alembic::Abc::IN3fProperty::matches(header))
-         {
-            setPointUserProp<float, 3>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IN3dProperty::matches(header))
-         {
-            setPointUserProp<double, 3>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IC3hProperty::matches(header))
-         {
-            setColorUserProp<Alembic::Util::float16_t, 3>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IC3fProperty::matches(header))
-         {
-            setColorUserProp<float, 3>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IC4hProperty::matches(header))
-         {
-            setColorUserProp<Alembic::Util::float16_t, 4>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IC4fProperty::matches(header))
-         {
-            setColorUserProp<float, 4>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IQuatfProperty::matches(header))
-         {
-            setNumericUserProp<float, 4, double>(target, propName, MFnNumericData::k4Double, prop);
-         }
-         else if (Alembic::Abc::IQuatdProperty::matches(header))
-         {
-            setNumericUserProp<double, 4, double>(target, propName, MFnNumericData::k4Double, prop);
-         }
-         else if (Alembic::Abc::IM44fProperty::matches(header))
-         {
-            setMatrixUserProp<float>(target, propName, MFnMatrixAttribute::kFloat, prop);
-         }
-         else if (Alembic::Abc::IM44dProperty::matches(header))
-         {
-            setMatrixUserProp<double>(target, propName, MFnMatrixAttribute::kDouble, prop);
-         }
-         else if (Alembic::Abc::IStringProperty::matches(header))
-         {
-            setStringUserProp(target, propName, prop);
-         }
-         // Ignored types:
-         //   Box2*
-         //   Box3*
-         //   M33*
-         //   C3c
-         //   C4c
-         //   Wstring
-      }
-      else if (header.isArray())
-      {
-         Alembic::Abc::IArrayProperty prop(props, propName);
-         
-         if (Alembic::Abc::IBoolArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<Alembic::Util::bool_t, 1, bool>(target, propName, MFnNumericData::kBoolean, prop);
-         }
-         else if (Alembic::Abc::IUcharArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<Alembic::Util::uint8_t, 1, char>(target, propName, MFnNumericData::kChar, prop);
-         }
-         else if (Alembic::Abc::ICharArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<Alembic::Util::int8_t, 1, char>(target, propName, MFnNumericData::kChar, prop);  
-         }
-         else if (Alembic::Abc::IUInt16ArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<Alembic::Util::uint16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);
-         }
-         else if (Alembic::Abc::IInt16ArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<Alembic::Util::int16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);  
-         }
-         else if (Alembic::Abc::IUInt32ArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<Alembic::Util::uint32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
-         }
-         else if (Alembic::Abc::IInt32ArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<Alembic::Util::int32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);  
-         }
-         else if (Alembic::Abc::IUInt64ArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<Alembic::Util::uint64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
-         }
-         else if (Alembic::Abc::IInt64ArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<Alembic::Util::int64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);  
-         }
-         else if (Alembic::Abc::IHalfArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<Alembic::Util::float16_t, 1, float>(target, propName, MFnNumericData::kFloat, prop);  
-         }
-         else if (Alembic::Abc::IFloatArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<float, 1, float>(target, propName, MFnNumericData::kFloat, prop);  
-         }
-         else if (Alembic::Abc::IDoubleArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<double, 1, double>(target, propName, MFnNumericData::kDouble, prop);  
-         }
-         else if (Alembic::Abc::IV2sArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<Alembic::Util::int16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
-         }
-         else if (Alembic::Abc::IV2iArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<Alembic::Util::int32_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
-         }
-         else if (Alembic::Abc::IV2fArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
-         }
-         else if (Alembic::Abc::IV2dArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
-         }
-         else if (Alembic::Abc::IV3sArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<Alembic::Util::int16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
-         }
-         else if (Alembic::Abc::IV3iArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<Alembic::Util::int32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
-         }
-         else if (Alembic::Abc::IV3fArrayProperty::matches(header))
-         {
-            setPointArrayUserProp<float, 3>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IV3dArrayProperty::matches(header))
-         {
-            setPointArrayUserProp<double, 3>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IP2sArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<Alembic::Util::int16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
-         }
-         else if (Alembic::Abc::IP2iArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<Alembic::Util::int32_t, 2, short>(target, propName, MFnNumericData::k2Long, prop);
-         }
-         else if (Alembic::Abc::IP2fArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
-         }
-         else if (Alembic::Abc::IP2dArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
-         }
-         else if (Alembic::Abc::IP3sArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<Alembic::Util::int16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
-         }
-         else if (Alembic::Abc::IP3iArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<Alembic::Util::int32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
-         }
-         else if (Alembic::Abc::IP3fArrayProperty::matches(header))
-         {
-            setPointArrayUserProp<float, 3>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IP3dArrayProperty::matches(header))
-         {
-            setPointArrayUserProp<double, 3>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IN2fArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
-         }
-         else if (Alembic::Abc::IN2dArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
-         }
-         else if (Alembic::Abc::IN3fArrayProperty::matches(header))
-         {
-            setPointArrayUserProp<float, 3>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IN3dArrayProperty::matches(header))
-         {
-            setPointArrayUserProp<double, 3>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IC3hArrayProperty::matches(header))
-         {
-            setColorArrayUserProp<Alembic::Util::float16_t, 3>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IC3fArrayProperty::matches(header))
-         {
-            setColorArrayUserProp<float, 3>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IC4hArrayProperty::matches(header))
-         {
-            setColorArrayUserProp<Alembic::Util::float16_t, 4>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IC4fArrayProperty::matches(header))
-         {
-            setColorArrayUserProp<float, 4>(target, propName, prop);
-         }
-         else if (Alembic::Abc::IQuatfArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<float, 4, double>(target, propName, MFnNumericData::k4Double, prop);
-         }
-         else if (Alembic::Abc::IQuatdArrayProperty::matches(header))
-         {
-            setNumericArrayUserProp<double, 4, double>(target, propName, MFnNumericData::k4Double, prop);
-         }
-         else if (Alembic::Abc::IM44fArrayProperty::matches(header))
-         {
-            setMatrixArrayUserProp<float>(target, propName, MFnMatrixAttribute::kFloat, prop);
-         }
-         else if (Alembic::Abc::IM44dArrayProperty::matches(header))
-         {
-            setMatrixArrayUserProp<double>(target, propName, MFnMatrixAttribute::kDouble, prop);
-         }
-         else if (Alembic::Abc::IStringArrayProperty::matches(header))
-         {
-            setStringArrayUserProp(target, propName, prop);
-         }
+      case Alembic::Util::kBooleanPOD:
+         if (dataType.getExtent() == 1)
+         {
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::bool_t, 1, bool>(target, propName, MFnNumericData::kBoolean, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::bool_t, 1, bool>(target, propName, MFnNumericData::kBoolean, prop);
+            }
+         }
+         else
+         {
+            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+                                    Alembic::Util::PODName(dataType.getPod()));
+         }
+         break;
+      case Alembic::Util::kUint8POD:
+         if (dataType.getExtent() == 1)
+         {
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::uint8_t, 1, char>(target, propName, MFnNumericData::kByte, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::uint8_t, 1, char>(target, propName, MFnNumericData::kByte, prop);
+            }
+         }
+         else
+         {
+            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+                                    Alembic::Util::PODName(dataType.getPod()));
+         }
+         break;
+      case Alembic::Util::kInt8POD:
+         if (dataType.getExtent() == 1)
+         {
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::int8_t, 1, char>(target, propName, MFnNumericData::kByte, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::int8_t, 1, char>(target, propName, MFnNumericData::kByte, prop);
+            }
+         }
+         else
+         {
+            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+                                    Alembic::Util::PODName(dataType.getPod()));
+         }
+         break;
+      case Alembic::Util::kUint16POD:
+         switch (dataType.getExtent())
+         {
+         case 1:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::uint16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::uint16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);
+            }
+            break;
+         case 2:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::uint16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::uint16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
+            }
+            break;
+         case 3:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::uint16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::uint16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
+            }
+            break;
+         default:
+            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+                                    Alembic::Util::PODName(dataType.getPod()));
+         }
+         break;
+      case Alembic::Util::kInt16POD:
+         switch (dataType.getExtent())
+         {
+         case 1:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::int16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::int16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);
+            }
+            break;
+         case 2:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::int16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::int16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
+            }
+            break;
+         case 3:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::int16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::int16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
+            }
+            break;
+         default:
+            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+                                    Alembic::Util::PODName(dataType.getPod()));
+         }
+         break;
+      case Alembic::Util::kUint32POD:
+         switch (dataType.getExtent())
+         {
+         case 1:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::uint32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::uint32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+            }
+            break;
+         case 2:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::uint32_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::uint32_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+            }
+            break;
+         case 3:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::uint32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::uint32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+            }
+            break;
+         default:
+            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+                                    Alembic::Util::PODName(dataType.getPod()));
+         }
+         break;
+      case Alembic::Util::kInt32POD:
+         switch (dataType.getExtent())
+         {
+         case 1:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::int32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::int32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+            }
+            break;
+         case 2:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::int32_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::int32_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+            }
+            break;
+         case 3:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::int32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::int32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+            }
+            break;
+         default:
+            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+                                    Alembic::Util::PODName(dataType.getPod()));
+         }
+         break;
+      case Alembic::Util::kUint64POD:
+         switch (dataType.getExtent())
+         {
+         case 1:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::uint64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::uint64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+            }
+            break;
+         case 2:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::uint64_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::uint64_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+            }
+            break;
+         case 3:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::uint64_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::uint64_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+            }
+            break;
+         default:
+            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+                                    Alembic::Util::PODName(dataType.getPod()));
+         }
+         break;
+      case Alembic::Util::kInt64POD:
+         switch (dataType.getExtent())
+         {
+         case 1:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::int64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::int64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+            }
+            break;
+         case 2:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::int64_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::int64_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+            }
+            break;
+         case 3:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::int64_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::int64_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+            }
+            break;
+         default:
+            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+                                    Alembic::Util::PODName(dataType.getPod()));
+         }
+         break;
+      case Alembic::Util::kFloat16POD:
+         switch (dataType.getExtent())
+         {
+         case 1:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::float16_t, 1, float>(target, propName, MFnNumericData::kFloat, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::float16_t, 1, float>(target, propName, MFnNumericData::kFloat, prop);
+            }
+            break;
+         case 2:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<Alembic::Util::float16_t, 2, float>(target, propName, MFnNumericData::k2Float, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<Alembic::Util::float16_t, 2, float>(target, propName, MFnNumericData::k2Float, prop);
+            }
+            break;
+         case 3:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               if (interpretation == "vector" || interpretation == "normal" || interpretation == "normal")
+               {
+                  setPointUserProp<Alembic::Util::float16_t, 3>(target, propName, prop);
+               }
+               else if (interpretation == "rgb")
+               {
+                  setColorUserProp<Alembic::Util::float16_t, 3>(target, propName, prop);
+               }
+               else
+               {
+                  setNumericUserProp<Alembic::Util::float16_t, 3, float>(target, propName, MFnNumericData::k3Float, prop);
+               }
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               if (interpretation == "vector" || interpretation == "normal" || interpretation == "normal")
+               {
+                  setPointArrayUserProp<Alembic::Util::float16_t, 3>(target, propName, prop);
+               }
+               else if (interpretation == "rgb")
+               {
+                  setColorArrayUserProp<Alembic::Util::float16_t, 3>(target, propName, prop);
+               }
+               else
+               {
+                  setNumericArrayUserProp<Alembic::Util::float16_t, 3, float>(target, propName, MFnNumericData::k3Float, prop);
+               }
+            }
+            break;
+         case 4:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               if (interpretation == "rgba")
+               {
+                  setColorUserProp<Alembic::Util::float16_t, 4>(target, propName, prop);
+               }
+               else
+               {
+                  setNumericUserProp<Alembic::Util::float16_t, 4, double>(target, propName, MFnNumericData::k4Double, prop);
+               }
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               if (interpretation == "rgba")
+               {
+                  setColorArrayUserProp<Alembic::Util::float16_t, 4>(target, propName, prop);
+               }
+               else
+               {
+                  setNumericArrayUserProp<Alembic::Util::float16_t, 4, double>(target, propName, MFnNumericData::k4Double, prop);
+               }
+            }
+            break;
+         case 16:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setMatrixUserProp<Alembic::Util::float16_t>(target, propName, MFnMatrixAttribute::kFloat, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setMatrixArrayUserProp<Alembic::Util::float16_t>(target, propName, MFnMatrixAttribute::kFloat, prop);
+            }
+            break;
+         default:
+            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+                                    Alembic::Util::PODName(dataType.getPod()));
+         }
+         break;
+      case Alembic::Util::kFloat32POD:
+         switch (dataType.getExtent())
+         {
+         case 1:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<float, 1, float>(target, propName, MFnNumericData::kFloat, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<float, 1, float>(target, propName, MFnNumericData::kFloat, prop);
+            }
+            break;
+         case 2:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
+            }
+            break;
+         case 3:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               if (interpretation == "vector" || interpretation == "normal" || interpretation == "normal")
+               {
+                  setPointUserProp<float, 3>(target, propName, prop);
+               }
+               else if (interpretation == "rgb")
+               {
+                  setColorUserProp<float, 3>(target, propName, prop);
+               }
+               else
+               {
+                  setNumericUserProp<float, 3, float>(target, propName, MFnNumericData::k3Float, prop);
+               }
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               if (interpretation == "vector" || interpretation == "normal" || interpretation == "normal")
+               {
+                  setPointArrayUserProp<float, 3>(target, propName, prop);
+               }
+               else if (interpretation == "rgb")
+               {
+                  setColorArrayUserProp<float, 3>(target, propName, prop);
+               }
+               else
+               {
+                  setNumericArrayUserProp<float, 3, float>(target, propName, MFnNumericData::k3Float, prop);
+               }
+            }
+            break;
+         case 4:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               if (interpretation == "rgba")
+               {
+                  setColorUserProp<float, 4>(target, propName, prop);
+               }
+               else
+               {
+                  setNumericUserProp<float, 4, double>(target, propName, MFnNumericData::k4Double, prop);
+               }
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               if (interpretation == "rgba")
+               {
+                  setColorArrayUserProp<float, 4>(target, propName, prop);
+               }
+               else
+               {
+                  setNumericArrayUserProp<float, 4, double>(target, propName, MFnNumericData::k4Double, prop);
+               }
+            }
+            break;
+         case 16:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setMatrixUserProp<float>(target, propName, MFnMatrixAttribute::kFloat, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setMatrixArrayUserProp<float>(target, propName, MFnMatrixAttribute::kFloat, prop);
+            }
+            break;
+         default:
+            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+                                    Alembic::Util::PODName(dataType.getPod()));
+         }
+         break;
+      case Alembic::Util::kFloat64POD:
+         switch (dataType.getExtent())
+         {
+         case 1:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<double, 1, double>(target, propName, MFnNumericData::kDouble, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<double, 1, double>(target, propName, MFnNumericData::kDouble, prop);
+            }
+            break;
+         case 2:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setNumericUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setNumericArrayUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
+            }
+            break;
+         case 3:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               if (interpretation == "vector" || interpretation == "normal" || interpretation == "normal")
+               {
+                  setPointUserProp<double, 3>(target, propName, prop);
+               }
+               else if (interpretation == "rgb")
+               {
+                  setColorUserProp<double, 3>(target, propName, prop);
+               }
+               else
+               {
+                  setNumericUserProp<double, 3, double>(target, propName, MFnNumericData::k3Double, prop);
+               }
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               if (interpretation == "vector" || interpretation == "normal" || interpretation == "normal")
+               {
+                  setPointArrayUserProp<double, 3>(target, propName, prop);
+               }
+               else if (interpretation == "rgb")
+               {
+                  setColorArrayUserProp<double, 3>(target, propName, prop);
+               }
+               else
+               {
+                  setNumericArrayUserProp<double, 3, double>(target, propName, MFnNumericData::k3Double, prop);
+               }
+            }
+            break;
+         case 4:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               if (interpretation == "rgba")
+               {
+                  setColorUserProp<double, 4>(target, propName, prop);
+               }
+               else
+               {
+                  setNumericUserProp<double, 4, double>(target, propName, MFnNumericData::k4Double, prop);
+               }
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               if (interpretation == "rgba")
+               {
+                  setColorArrayUserProp<double, 4>(target, propName, prop);
+               }
+               else
+               {
+                  setNumericArrayUserProp<double, 4, double>(target, propName, MFnNumericData::k4Double, prop);
+               }
+            }
+            break;
+         case 16:
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setMatrixUserProp<double>(target, propName, MFnMatrixAttribute::kDouble, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setMatrixArrayUserProp<double>(target, propName, MFnMatrixAttribute::kDouble, prop);
+            }
+            break;
+         default:
+            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+                                    Alembic::Util::PODName(dataType.getPod()));
+         }
+         break;
+      case Alembic::Util::kStringPOD:
+         if (dataType.getExtent() == 1)
+         {
+            if (header.isScalar())
+            {
+               Alembic::Abc::IScalarProperty prop(props, propName);
+               setStringUserProp(target, propName, prop);
+            }
+            else
+            {
+               Alembic::Abc::IArrayProperty prop(props, propName);
+               setStringArrayUserProp(target, propName, prop);
+            }
+         }
+         else
+         {
+            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+                                    Alembic::Util::PODName(dataType.getPod()));
+         }
+         break;
+      default:
+         MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported user property type ") +
+                                 Alembic::Util::PODName(dataType.getPod()));
       }
    }
 }
