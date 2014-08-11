@@ -67,10 +67,46 @@ void* AbcShapeImport::create()
 
 // ---
 
+template <typename T, int D>
+struct NumericType
+{
+   enum
+   {
+      Value = MFnNumericData::kInvalid
+   };
+};
+template <> struct NumericType<bool, 1> { enum { Value = MFnNumericData::kBoolean }; };
+template <> struct NumericType<unsigned char, 1> { enum { Value = MFnNumericData::kByte }; };
+template <> struct NumericType<char, 1> { enum { Value = MFnNumericData::kChar }; };
+template <> struct NumericType<short, 1> { enum { Value = MFnNumericData::kShort }; };
+template <> struct NumericType<short, 2> { enum { Value = MFnNumericData::k2Short }; };
+template <> struct NumericType<short, 3> { enum { Value = MFnNumericData::k3Short }; };
+template <> struct NumericType<int, 1> { enum { Value = MFnNumericData::kLong }; };
+template <> struct NumericType<int, 2> { enum { Value = MFnNumericData::k2Long }; };
+template <> struct NumericType<int, 3> { enum { Value = MFnNumericData::k3Long }; };
+template <> struct NumericType<float, 1> { enum { Value = MFnNumericData::kFloat }; };
+template <> struct NumericType<float, 2> { enum { Value = MFnNumericData::k2Float }; };
+template <> struct NumericType<float, 3> { enum { Value = MFnNumericData::k3Float }; };
+template <> struct NumericType<double, 1> { enum { Value = MFnNumericData::kDouble }; };
+template <> struct NumericType<double, 2> { enum { Value = MFnNumericData::k2Double }; };
+template <> struct NumericType<double, 3> { enum { Value = MFnNumericData::k3Double }; };
+template <> struct NumericType<double, 4> { enum { Value = MFnNumericData::k4Double }; };
+
+template <typename T>
+struct MatrixType
+{
+   enum
+   {
+      Value = -1
+   };
+};
+template <> struct MatrixType<float> { enum { Value = MFnMatrixAttribute::kFloat }; };
+template <> struct MatrixType<double> { enum { Value = MFnMatrixAttribute::kDouble }; };
+
 template <typename T, int D, typename TT>
 struct NumericData
 {
-   static void Set(MFnNumericData::Type type, const T* value, MPlug &plug)
+   static void Set(const T* value, MPlug &plug)
    {
    }
 };
@@ -78,7 +114,7 @@ struct NumericData
 template <typename T, typename TT>
 struct NumericData<T, 1, TT>
 {
-   static void Set(MFnNumericData::Type, const T* value, MPlug &plug)
+   static void Set(const T* value, MPlug &plug)
    {
       plug.setValue(TT(value[0]));
    }
@@ -87,9 +123,10 @@ struct NumericData<T, 1, TT>
 template <typename T, typename TT>
 struct NumericData<T, 2, TT>
 {
-   static void Set(MFnNumericData::Type type, const T* value, MPlug &plug)
+   static void Set(const T* value, MPlug &plug)
    {
       MFnNumericData data;
+      MFnNumericData::Type type = (MFnNumericData::Type) NumericType<TT, 2>::Value;
       MObject oval = data.create(type);
       data.setData(TT(value[0]), TT(value[1]));
       plug.setValue(oval);
@@ -99,9 +136,10 @@ struct NumericData<T, 2, TT>
 template <typename T, typename TT>
 struct NumericData<T, 3, TT>
 {
-   static void Set(MFnNumericData::Type type, const T* value, MPlug &plug)
+   static void Set(const T* value, MPlug &plug)
    {
       MFnNumericData data;
+      MFnNumericData::Type type = (MFnNumericData::Type) NumericType<TT, 3>::Value;
       MObject oval = data.create(type);
       data.setData(TT(value[0]), TT(value[1]), TT(value[2]));
       plug.setValue(oval);
@@ -111,9 +149,10 @@ struct NumericData<T, 3, TT>
 template <typename T, typename TT>
 struct NumericData<T, 4, TT>
 {
-   static void Set(MFnNumericData::Type type, const T* value, MPlug &plug)
+   static void Set(const T* value, MPlug &plug)
    {
       MFnNumericData data;
+      MFnNumericData::Type type = (MFnNumericData::Type) NumericType<TT, 4>::Value;
       MObject oval = data.create(type);
       data.setData(TT(value[0]), TT(value[1]), TT(value[2]), TT(value[3]));
       plug.setValue(oval);
@@ -173,7 +212,7 @@ private:
    bool checkStringAttribute(const MPlug &plug, bool array);
    
    template <typename T, int D, typename TT>
-   void setNumericAttribute(MFnNumericData::Type type, Alembic::Abc::IScalarProperty prop, MPlug &plug);
+   void setNumericAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
    template <typename T, int D, typename TT>
    void setCompoundAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
    template <typename T>
@@ -181,7 +220,7 @@ private:
    void setStringAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
    
    template <typename T, int D, typename TT>
-   void setNumericAttribute(MFnNumericData::Type type, Alembic::Abc::IArrayProperty prop, MPlug &plug);
+   void setNumericAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug);
    template <typename T, int D, typename TT>
    void setCompoundAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug);
    template <typename T>
@@ -189,7 +228,7 @@ private:
    void setStringAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug);
    
    template <typename T, int D, typename TT>
-   void setNumericArrayAttribute(MFnNumericData::Type type, Alembic::Abc::IArrayProperty prop, MPlug &plug);
+   void setNumericArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug);
    template <typename T, int D, typename TT>
    void setCompoundArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug);
    template <typename T>
@@ -200,23 +239,23 @@ private:
    void keyAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
    
    template <typename T, int D, typename TT>
-   void setNumericUserProp(MFnDagNode &node, const std::string &name, MFnNumericData::Type type, Alembic::Abc::IScalarProperty prop);
+   void setNumericUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
    template <typename T, int D>
    void setPointUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
    template <typename T, int D>
    void setColorUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
    template <typename T>
-   void setMatrixUserProp(MFnDagNode &node, const std::string &name, MFnMatrixAttribute::Type type, Alembic::Abc::IScalarProperty prop);
+   void setMatrixUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
    void setStringUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
    
    template <typename T, int D, typename TT>
-   void setNumericArrayUserProp(MFnDagNode &node, const std::string &name, MFnNumericData::Type type, Alembic::Abc::IArrayProperty prop);
+   void setNumericArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop);
    template <typename T, int D>
    void setPointArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop);
    template <typename T, int D>
    void setColorArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop);
    template <typename T>
-   void setMatrixArrayUserProp(MFnDagNode &node, const std::string &name, MFnMatrixAttribute::Type type, Alembic::Abc::IArrayProperty prop);
+   void setMatrixArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop);
    void setStringArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop);
    
 private:
@@ -1052,30 +1091,30 @@ void CreateTree::keyAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
 }
 
 template <typename T, int D, typename TT>
-void CreateTree::setNumericAttribute(MFnNumericData::Type type, Alembic::Abc::IScalarProperty prop, MPlug &plug)
+void CreateTree::setNumericAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
 {
    T val[D];
    
    prop.get(val);
    
-   NumericData<T, D, TT>::Set(type, val, plug);
+   NumericData<T, D, TT>::Set(val, plug);
    
    keyAttribute<T, D>(prop, plug);
 }
 
 template <typename T, int D, typename TT>
-void CreateTree::setNumericAttribute(MFnNumericData::Type type, Alembic::Abc::IArrayProperty prop, MPlug &plug)
+void CreateTree::setNumericAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
 {
    Alembic::AbcCoreAbstract::ArraySamplePtr samp;
    prop.get(samp);
    
    const T *val = (const T*) samp->getData();
    
-   NumericData<T, D, TT>::Set(type, val, plug);
+   NumericData<T, D, TT>::Set(val, plug);
 }
 
 template <typename T, int D, typename TT>
-void CreateTree::setNumericArrayAttribute(MFnNumericData::Type type, Alembic::Abc::IArrayProperty prop, MPlug &plug)
+void CreateTree::setNumericArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
 {
    Alembic::AbcCoreAbstract::ArraySamplePtr samp;
    prop.get(samp);
@@ -1085,7 +1124,7 @@ void CreateTree::setNumericArrayAttribute(MFnNumericData::Type type, Alembic::Ab
    for (size_t i=0; i<samp->size(); ++i, val+=D)
    {
       MPlug elem = plug.elementByLogicalIndex(i);
-      NumericData<T, D, TT>::Set(type, val, elem);
+      NumericData<T, D, TT>::Set(val, elem);
    }
 }
 
@@ -1245,8 +1284,10 @@ void CreateTree::setStringArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlu
 }
 
 template <typename T, int D, typename TT>
-void CreateTree::setNumericUserProp(MFnDagNode &node, const std::string &name, MFnNumericData::Type type, Alembic::Abc::IScalarProperty prop)
+void CreateTree::setNumericUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
 {
+   MFnNumericData::Type type = (MFnNumericData::Type) NumericType<TT, D>::Value;
+   
    MPlug plug = node.findPlug(name.c_str());
    
    bool process = (plug.isNull() ? createNumericAttribute(node, name, type, false, plug)
@@ -1254,7 +1295,7 @@ void CreateTree::setNumericUserProp(MFnDagNode &node, const std::string &name, M
    
    if (process)
    {
-      setNumericAttribute<T, D, TT>(type, prop, plug);
+      setNumericAttribute<T, D, TT>(prop, plug);
    }
    else
    {
@@ -1263,8 +1304,10 @@ void CreateTree::setNumericUserProp(MFnDagNode &node, const std::string &name, M
 }
 
 template <typename T, int D, typename TT>
-void CreateTree::setNumericArrayUserProp(MFnDagNode &node, const std::string &name, MFnNumericData::Type type, Alembic::Abc::IArrayProperty prop)
+void CreateTree::setNumericArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
 {
+   MFnNumericData::Type type = (MFnNumericData::Type) NumericType<TT, D>::Value;
+   
    MPlug plug = node.findPlug(name.c_str());
    
    bool array = !prop.isScalarLike();
@@ -1276,11 +1319,11 @@ void CreateTree::setNumericArrayUserProp(MFnDagNode &node, const std::string &na
    {
       if (array)
       {
-         setNumericArrayAttribute<T, D, TT>(type, prop, plug);
+         setNumericArrayAttribute<T, D, TT>(prop, plug);
       }
       else
       {
-         setNumericAttribute<T, D, TT>(type, prop, plug);
+         setNumericAttribute<T, D, TT>(prop, plug);
       }
    }
    else
@@ -1299,7 +1342,7 @@ void CreateTree::setPointUserProp(MFnDagNode &node, const std::string &name, Ale
    
    if (process)
    {
-      setNumericAttribute<T, D, float>(MFnNumericData::k3Float, prop, plug);
+      setNumericAttribute<T, D, float>(prop, plug);
    }
    else
    {
@@ -1321,11 +1364,11 @@ void CreateTree::setPointArrayUserProp(MFnDagNode &node, const std::string &name
    {
       if (array)
       {
-         setNumericArrayAttribute<T, D, float>(MFnNumericData::k3Float, prop, plug);
+         setNumericArrayAttribute<T, D, float>(prop, plug);
       }
       else
       {
-         setNumericAttribute<T, D, float>(MFnNumericData::k3Float, prop, plug);
+         setNumericAttribute<T, D, float>(prop, plug);
       }
    }
    else
@@ -1348,7 +1391,7 @@ void CreateTree::setColorUserProp(MFnDagNode &node, const std::string &name, Ale
    {
       if (!alpha)
       {
-         setNumericAttribute<T, D, float>(MFnNumericData::k3Float, prop, plug);
+         setNumericAttribute<T, D, float>(prop, plug);
       }
       else
       {
@@ -1379,7 +1422,7 @@ void CreateTree::setColorArrayUserProp(MFnDagNode &node, const std::string &name
       {
          if (!alpha)
          {
-            setNumericArrayAttribute<T, D, float>(MFnNumericData::k3Float, prop, plug);
+            setNumericArrayAttribute<T, D, float>(prop, plug);
          }
          else
          {
@@ -1390,7 +1433,7 @@ void CreateTree::setColorArrayUserProp(MFnDagNode &node, const std::string &name
       {
          if (!alpha)
          {
-            setNumericAttribute<T, D, float>(MFnNumericData::k3Float, prop, plug);
+            setNumericAttribute<T, D, float>(prop, plug);
          }
          else
          {
@@ -1405,8 +1448,10 @@ void CreateTree::setColorArrayUserProp(MFnDagNode &node, const std::string &name
 }
 
 template <typename T>
-void CreateTree::setMatrixUserProp(MFnDagNode &node, const std::string &name, MFnMatrixAttribute::Type type, Alembic::Abc::IScalarProperty prop)
+void CreateTree::setMatrixUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
 {
+   MFnMatrixAttribute::Type type = (MFnMatrixAttribute::Type) MatrixType<T>::Value;
+   
    MPlug plug = node.findPlug(name.c_str());
    
    bool process = (plug.isNull() ? createMatrixAttribute(node, name, type, false, plug)
@@ -1423,8 +1468,10 @@ void CreateTree::setMatrixUserProp(MFnDagNode &node, const std::string &name, MF
 }
 
 template <typename T>
-void CreateTree::setMatrixArrayUserProp(MFnDagNode &node, const std::string &name, MFnMatrixAttribute::Type type, Alembic::Abc::IArrayProperty prop)
+void CreateTree::setMatrixArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
 {
+   MFnMatrixAttribute::Type type = (MFnMatrixAttribute::Type) MatrixType<T>::Value;
+   
    MPlug plug = node.findPlug(name.c_str());
    
    bool array = !prop.isScalarLike();
@@ -1537,12 +1584,12 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::bool_t, 1, bool>(target, propName, MFnNumericData::kBoolean, prop);
+               setNumericUserProp<Alembic::Util::bool_t, 1, bool>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::bool_t, 1, bool>(target, propName, MFnNumericData::kBoolean, prop);
+               setNumericArrayUserProp<Alembic::Util::bool_t, 1, bool>(target, propName, prop);
             }
          }
          else
@@ -1557,12 +1604,12 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::uint8_t, 1, char>(target, propName, MFnNumericData::kByte, prop);
+               setNumericUserProp<Alembic::Util::uint8_t, 1, unsigned char>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::uint8_t, 1, char>(target, propName, MFnNumericData::kByte, prop);
+               setNumericArrayUserProp<Alembic::Util::uint8_t, 1, unsigned char>(target, propName, prop);
             }
          }
          else
@@ -1577,12 +1624,12 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::int8_t, 1, char>(target, propName, MFnNumericData::kByte, prop);
+               setNumericUserProp<Alembic::Util::int8_t, 1, char>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::int8_t, 1, char>(target, propName, MFnNumericData::kByte, prop);
+               setNumericArrayUserProp<Alembic::Util::int8_t, 1, char>(target, propName, prop);
             }
          }
          else
@@ -1598,36 +1645,36 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::uint16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);
+               setNumericUserProp<Alembic::Util::uint16_t, 1, short>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::uint16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);
+               setNumericArrayUserProp<Alembic::Util::uint16_t, 1, short>(target, propName, prop);
             }
             break;
          case 2:
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::uint16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
+               setNumericUserProp<Alembic::Util::uint16_t, 2, short>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::uint16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
+               setNumericArrayUserProp<Alembic::Util::uint16_t, 2, short>(target, propName, prop);
             }
             break;
          case 3:
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::uint16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
+               setNumericUserProp<Alembic::Util::uint16_t, 3, short>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::uint16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
+               setNumericArrayUserProp<Alembic::Util::uint16_t, 3, short>(target, propName, prop);
             }
             break;
          default:
@@ -1642,36 +1689,36 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::int16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);
+               setNumericUserProp<Alembic::Util::int16_t, 1, short>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::int16_t, 1, short>(target, propName, MFnNumericData::kShort, prop);
+               setNumericArrayUserProp<Alembic::Util::int16_t, 1, short>(target, propName, prop);
             }
             break;
          case 2:
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::int16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
+               setNumericUserProp<Alembic::Util::int16_t, 2, short>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::int16_t, 2, short>(target, propName, MFnNumericData::k2Short, prop);
+               setNumericArrayUserProp<Alembic::Util::int16_t, 2, short>(target, propName, prop);
             }
             break;
          case 3:
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::int16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
+               setNumericUserProp<Alembic::Util::int16_t, 3, short>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::int16_t, 3, short>(target, propName, MFnNumericData::k3Short, prop);
+               setNumericArrayUserProp<Alembic::Util::int16_t, 3, short>(target, propName, prop);
             }
             break;
          default:
@@ -1686,36 +1733,36 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::uint32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+               setNumericUserProp<Alembic::Util::uint32_t, 1, int>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::uint32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+               setNumericArrayUserProp<Alembic::Util::uint32_t, 1, int>(target, propName, prop);
             }
             break;
          case 2:
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::uint32_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+               setNumericUserProp<Alembic::Util::uint32_t, 2, int>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::uint32_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+               setNumericArrayUserProp<Alembic::Util::uint32_t, 2, int>(target, propName, prop);
             }
             break;
          case 3:
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::uint32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+               setNumericUserProp<Alembic::Util::uint32_t, 3, int>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::uint32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+               setNumericArrayUserProp<Alembic::Util::uint32_t, 3, int>(target, propName, prop);
             }
             break;
          default:
@@ -1730,36 +1777,36 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::int32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+               setNumericUserProp<Alembic::Util::int32_t, 1, int>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::int32_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+               setNumericArrayUserProp<Alembic::Util::int32_t, 1, int>(target, propName, prop);
             }
             break;
          case 2:
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::int32_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+               setNumericUserProp<Alembic::Util::int32_t, 2, int>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::int32_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+               setNumericArrayUserProp<Alembic::Util::int32_t, 2, int>(target, propName, prop);
             }
             break;
          case 3:
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::int32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+               setNumericUserProp<Alembic::Util::int32_t, 3, int>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::int32_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+               setNumericArrayUserProp<Alembic::Util::int32_t, 3, int>(target, propName, prop);
             }
             break;
          default:
@@ -1774,36 +1821,36 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::uint64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+               setNumericUserProp<Alembic::Util::uint64_t, 1, int>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::uint64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+               setNumericArrayUserProp<Alembic::Util::uint64_t, 1, int>(target, propName, prop);
             }
             break;
          case 2:
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::uint64_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+               setNumericUserProp<Alembic::Util::uint64_t, 2, int>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::uint64_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+               setNumericArrayUserProp<Alembic::Util::uint64_t, 2, int>(target, propName, prop);
             }
             break;
          case 3:
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::uint64_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+               setNumericUserProp<Alembic::Util::uint64_t, 3, int>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::uint64_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+               setNumericArrayUserProp<Alembic::Util::uint64_t, 3, int>(target, propName, prop);
             }
             break;
          default:
@@ -1818,36 +1865,36 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::int64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+               setNumericUserProp<Alembic::Util::int64_t, 1, int>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::int64_t, 1, int>(target, propName, MFnNumericData::kLong, prop);
+               setNumericArrayUserProp<Alembic::Util::int64_t, 1, int>(target, propName, prop);
             }
             break;
          case 2:
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::int64_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+               setNumericUserProp<Alembic::Util::int64_t, 2, int>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::int64_t, 2, int>(target, propName, MFnNumericData::k2Long, prop);
+               setNumericArrayUserProp<Alembic::Util::int64_t, 2, int>(target, propName, prop);
             }
             break;
          case 3:
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::int64_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+               setNumericUserProp<Alembic::Util::int64_t, 3, int>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::int64_t, 3, int>(target, propName, MFnNumericData::k3Long, prop);
+               setNumericArrayUserProp<Alembic::Util::int64_t, 3, int>(target, propName, prop);
             }
             break;
          default:
@@ -1862,24 +1909,24 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::float16_t, 1, float>(target, propName, MFnNumericData::kFloat, prop);
+               setNumericUserProp<Alembic::Util::float16_t, 1, float>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::float16_t, 1, float>(target, propName, MFnNumericData::kFloat, prop);
+               setNumericArrayUserProp<Alembic::Util::float16_t, 1, float>(target, propName, prop);
             }
             break;
          case 2:
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<Alembic::Util::float16_t, 2, float>(target, propName, MFnNumericData::k2Float, prop);
+               setNumericUserProp<Alembic::Util::float16_t, 2, float>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<Alembic::Util::float16_t, 2, float>(target, propName, MFnNumericData::k2Float, prop);
+               setNumericArrayUserProp<Alembic::Util::float16_t, 2, float>(target, propName, prop);
             }
             break;
          case 3:
@@ -1896,7 +1943,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
                }
                else
                {
-                  setNumericUserProp<Alembic::Util::float16_t, 3, float>(target, propName, MFnNumericData::k3Float, prop);
+                  setNumericUserProp<Alembic::Util::float16_t, 3, float>(target, propName, prop);
                }
             }
             else
@@ -1912,7 +1959,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
                }
                else
                {
-                  setNumericArrayUserProp<Alembic::Util::float16_t, 3, float>(target, propName, MFnNumericData::k3Float, prop);
+                  setNumericArrayUserProp<Alembic::Util::float16_t, 3, float>(target, propName, prop);
                }
             }
             break;
@@ -1926,7 +1973,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
                }
                else
                {
-                  setNumericUserProp<Alembic::Util::float16_t, 4, double>(target, propName, MFnNumericData::k4Double, prop);
+                  setNumericUserProp<Alembic::Util::float16_t, 4, double>(target, propName, prop);
                }
             }
             else
@@ -1938,7 +1985,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
                }
                else
                {
-                  setNumericArrayUserProp<Alembic::Util::float16_t, 4, double>(target, propName, MFnNumericData::k4Double, prop);
+                  setNumericArrayUserProp<Alembic::Util::float16_t, 4, double>(target, propName, prop);
                }
             }
             break;
@@ -1946,12 +1993,12 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setMatrixUserProp<Alembic::Util::float16_t>(target, propName, MFnMatrixAttribute::kFloat, prop);
+               setMatrixUserProp<Alembic::Util::float16_t>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setMatrixArrayUserProp<Alembic::Util::float16_t>(target, propName, MFnMatrixAttribute::kFloat, prop);
+               setMatrixArrayUserProp<Alembic::Util::float16_t>(target, propName, prop);
             }
             break;
          default:
@@ -1966,24 +2013,24 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<float, 1, float>(target, propName, MFnNumericData::kFloat, prop);
+               setNumericUserProp<float, 1, float>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<float, 1, float>(target, propName, MFnNumericData::kFloat, prop);
+               setNumericArrayUserProp<float, 1, float>(target, propName, prop);
             }
             break;
          case 2:
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
+               setNumericUserProp<float, 2, float>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<float, 2, float>(target, propName, MFnNumericData::k2Float, prop);
+               setNumericArrayUserProp<float, 2, float>(target, propName, prop);
             }
             break;
          case 3:
@@ -2000,7 +2047,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
                }
                else
                {
-                  setNumericUserProp<float, 3, float>(target, propName, MFnNumericData::k3Float, prop);
+                  setNumericUserProp<float, 3, float>(target, propName, prop);
                }
             }
             else
@@ -2016,7 +2063,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
                }
                else
                {
-                  setNumericArrayUserProp<float, 3, float>(target, propName, MFnNumericData::k3Float, prop);
+                  setNumericArrayUserProp<float, 3, float>(target, propName, prop);
                }
             }
             break;
@@ -2030,7 +2077,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
                }
                else
                {
-                  setNumericUserProp<float, 4, double>(target, propName, MFnNumericData::k4Double, prop);
+                  setNumericUserProp<float, 4, double>(target, propName, prop);
                }
             }
             else
@@ -2042,7 +2089,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
                }
                else
                {
-                  setNumericArrayUserProp<float, 4, double>(target, propName, MFnNumericData::k4Double, prop);
+                  setNumericArrayUserProp<float, 4, double>(target, propName, prop);
                }
             }
             break;
@@ -2050,12 +2097,12 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setMatrixUserProp<float>(target, propName, MFnMatrixAttribute::kFloat, prop);
+               setMatrixUserProp<float>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setMatrixArrayUserProp<float>(target, propName, MFnMatrixAttribute::kFloat, prop);
+               setMatrixArrayUserProp<float>(target, propName, prop);
             }
             break;
          default:
@@ -2070,24 +2117,24 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<double, 1, double>(target, propName, MFnNumericData::kDouble, prop);
+               setNumericUserProp<double, 1, double>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<double, 1, double>(target, propName, MFnNumericData::kDouble, prop);
+               setNumericArrayUserProp<double, 1, double>(target, propName, prop);
             }
             break;
          case 2:
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setNumericUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
+               setNumericUserProp<double, 2, double>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setNumericArrayUserProp<double, 2, double>(target, propName, MFnNumericData::k2Double, prop);
+               setNumericArrayUserProp<double, 2, double>(target, propName, prop);
             }
             break;
          case 3:
@@ -2104,7 +2151,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
                }
                else
                {
-                  setNumericUserProp<double, 3, double>(target, propName, MFnNumericData::k3Double, prop);
+                  setNumericUserProp<double, 3, double>(target, propName, prop);
                }
             }
             else
@@ -2120,7 +2167,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
                }
                else
                {
-                  setNumericArrayUserProp<double, 3, double>(target, propName, MFnNumericData::k3Double, prop);
+                  setNumericArrayUserProp<double, 3, double>(target, propName, prop);
                }
             }
             break;
@@ -2134,7 +2181,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
                }
                else
                {
-                  setNumericUserProp<double, 4, double>(target, propName, MFnNumericData::k4Double, prop);
+                  setNumericUserProp<double, 4, double>(target, propName, prop);
                }
             }
             else
@@ -2146,7 +2193,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
                }
                else
                {
-                  setNumericArrayUserProp<double, 4, double>(target, propName, MFnNumericData::k4Double, prop);
+                  setNumericArrayUserProp<double, 4, double>(target, propName, prop);
                }
             }
             break;
@@ -2154,12 +2201,12 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             if (header.isScalar())
             {
                Alembic::Abc::IScalarProperty prop(props, propName);
-               setMatrixUserProp<double>(target, propName, MFnMatrixAttribute::kDouble, prop);
+               setMatrixUserProp<double>(target, propName, prop);
             }
             else
             {
                Alembic::Abc::IArrayProperty prop(props, propName);
-               setMatrixArrayUserProp<double>(target, propName, MFnMatrixAttribute::kDouble, prop);
+               setMatrixArrayUserProp<double>(target, propName, prop);
             }
             break;
          default:
