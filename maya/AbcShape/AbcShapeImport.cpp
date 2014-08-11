@@ -1149,8 +1149,7 @@ void CreateTree::setStringAttribute(Alembic::Abc::IScalarProperty prop, MPlug &p
    
    prop.get(&val);
    
-   MFnStringData data(plug.asMObject());
-   data.set(val.c_str());
+   plug.setString(val.c_str());
    
    // key frames not supported
 }
@@ -1164,8 +1163,7 @@ void CreateTree::setStringArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlu
    
    for (size_t i=0; i<samp->size(); ++i)
    {
-      MFnStringData data(plug.elementByLogicalIndex(i).asMObject());
-      data.set(val[i].c_str());
+      plug.elementByLogicalIndex(i).setString(val[i].c_str());
    }
 }
 
