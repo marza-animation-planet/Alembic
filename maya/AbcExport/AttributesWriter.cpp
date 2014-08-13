@@ -124,156 +124,324 @@ void createUserPropertyFromNumeric(MFnNumericData::Type iType,
     {
         case MFnNumericData::kBoolean:
         {
-            PlugAndObjScalar p;
-            p.plug = iPlug;
-            p.obj = iAttr;
-            Abc::OBoolProperty up(iParent, plugName, iTimeIndex);
-            p.prop = up;
-            oScalars.push_back(p);
+            if (iPlug.isArray())
+            {
+                PlugAndObjArray p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OBoolArrayProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oArrays.push_back(p);
+            }
+            else
+            {
+                PlugAndObjScalar p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OBoolProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oScalars.push_back(p);
+            }
         }
         break;
 
         case MFnNumericData::kByte:
         case MFnNumericData::kChar:
         {
-            PlugAndObjScalar p;
-            p.plug = iPlug;
-            p.obj = iAttr;
-            Abc::OCharProperty up(iParent, plugName, iTimeIndex);
-            p.prop = up;
-            oScalars.push_back(p);
+            if (iPlug.isArray())
+            {
+                PlugAndObjArray p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OCharArrayProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oArrays.push_back(p);
+            }
+            else
+            {
+                PlugAndObjScalar p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OCharProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oScalars.push_back(p);
+            }
         }
         break;
 
         case MFnNumericData::kShort:
         {
-            PlugAndObjScalar p;
-            p.plug = iPlug;
-            p.obj = iAttr;
-            Abc::OInt16Property up(iParent, plugName, iTimeIndex);
-            p.prop = up;
-            oScalars.push_back(p);
+            if (iPlug.isArray())
+            {
+                PlugAndObjArray p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OInt16ArrayProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oArrays.push_back(p);
+            }
+            else
+            {
+                PlugAndObjScalar p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OInt16Property up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oScalars.push_back(p);
+            }
         }
         break;
 
         case MFnNumericData::kInt:
         {
-            PlugAndObjScalar p;
-            p.plug = iPlug;
-            p.obj = iAttr;
-            Abc::OInt32Property up(iParent, plugName, iTimeIndex);
-            p.prop = up;
-            oScalars.push_back(p);
+            if (iPlug.isArray())
+            {
+                PlugAndObjArray p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OInt32ArrayProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oArrays.push_back(p);
+            }
+            else
+            {
+                PlugAndObjScalar p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OInt32Property up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oScalars.push_back(p);
+            }
         }
         break;
 
         case MFnNumericData::kFloat:
         {
-            PlugAndObjScalar p;
-            p.plug = iPlug;
-            p.obj = iAttr;
-            Abc::OFloatProperty up(iParent, plugName, iTimeIndex);
-            p.prop = up;
-            oScalars.push_back(p);
+            if (iPlug.isArray())
+            {
+                PlugAndObjArray p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OFloatArrayProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oArrays.push_back(p);
+            }
+            else
+            {
+                PlugAndObjScalar p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OFloatProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oScalars.push_back(p);
+            }
         }
         break;
 
         case MFnNumericData::kDouble:
         {
-            PlugAndObjScalar p;
-            p.plug = iPlug;
-            p.obj = iAttr;
-            Abc::ODoubleProperty up(iParent, plugName, iTimeIndex);
-            p.prop = up;
-            oScalars.push_back(p);
+            if (iPlug.isArray())
+            {
+                PlugAndObjArray p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::ODoubleArrayProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oArrays.push_back(p);
+            }
+            else
+            {
+                PlugAndObjScalar p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::ODoubleProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oScalars.push_back(p);
+            }
         }
         break;
 
         case MFnNumericData::k2Short:
         {
-            PlugAndObjScalar p;
-            p.plug = iPlug;
-            p.obj = iAttr;
-            Abc::OV2sProperty up(iParent, plugName, iTimeIndex);
-            p.prop = up;
-            oScalars.push_back(p);
+            if (iPlug.isArray())
+            {
+                PlugAndObjArray p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OV2sArrayProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oArrays.push_back(p);
+            }
+            else
+            {
+                PlugAndObjScalar p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OV2sProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oScalars.push_back(p);
+            }
         }
         break;
 
         case MFnNumericData::k3Short:
         {
-            PlugAndObjScalar p;
-            p.plug = iPlug;
-            p.obj = iAttr;
-            Abc::OV3sProperty up(iParent, plugName, iTimeIndex);
-            p.prop = up;
-            oScalars.push_back(p);
+            if (iPlug.isArray())
+            {
+                PlugAndObjArray p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OV3sArrayProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oArrays.push_back(p);
+            }
+            else
+            {
+                PlugAndObjScalar p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OV3sProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oScalars.push_back(p);
+            }
         }
         break;
 
         case MFnNumericData::k2Int:
         {
-            PlugAndObjScalar p;
-            p.plug = iPlug;
-            p.obj = iAttr;
-            Abc::OV2iProperty up(iParent, plugName, iTimeIndex);
-            p.prop = up;
-            oScalars.push_back(p);
+            if (iPlug.isArray())
+            {
+                PlugAndObjArray p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OV2iArrayProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oArrays.push_back(p);
+            }
+            else
+            {
+                PlugAndObjScalar p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OV2iProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oScalars.push_back(p);
+            }
         }
         break;
 
         case MFnNumericData::k3Int:
         {
-            PlugAndObjScalar p;
-            p.plug = iPlug;
-            p.obj = iAttr;
-            Abc::OV3iProperty up(iParent, plugName, iTimeIndex);
-            p.prop = up;
-            oScalars.push_back(p);
+            if (iPlug.isArray())
+            {
+                PlugAndObjArray p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OV3iArrayProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oArrays.push_back(p);
+            }
+            else
+            {
+                PlugAndObjScalar p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OV3iProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oScalars.push_back(p);
+            }
         }
         break;
 
         case MFnNumericData::k2Float:
         {
-            PlugAndObjScalar p;
-            p.plug = iPlug;
-            p.obj = iAttr;
-            Abc::OV2fProperty up(iParent, plugName, iTimeIndex);
-            p.prop = up;
-            oScalars.push_back(p);
+            if (iPlug.isArray())
+            {
+                PlugAndObjArray p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OV2fArrayProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oArrays.push_back(p);
+            }
+            else
+            {
+                PlugAndObjScalar p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OV2fProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oScalars.push_back(p);
+            }
         }
         break;
 
         case MFnNumericData::k3Float:
         {
-            PlugAndObjScalar p;
-            p.plug = iPlug;
-            p.obj = iAttr;
-            Abc::OV3fProperty up(iParent, plugName, iTimeIndex);
-            p.prop = up;
-            oScalars.push_back(p);
+            if (iPlug.isArray())
+            {
+                PlugAndObjArray p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OV3fArrayProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oArrays.push_back(p);
+            }
+            else
+            {
+                PlugAndObjScalar p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OV3fProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oScalars.push_back(p);
+            }
         }
         break;
 
         case MFnNumericData::k2Double:
         {
-            PlugAndObjScalar p;
-            p.plug = iPlug;
-            p.obj = iAttr;
-            Abc::OV2dProperty up(iParent, plugName, iTimeIndex);
-            p.prop = up;
-            oScalars.push_back(p);
+            if (iPlug.isArray())
+            {
+                PlugAndObjArray p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OV2dArrayProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oArrays.push_back(p);
+            }
+            else
+            {
+                PlugAndObjScalar p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OV2dProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oScalars.push_back(p);
+            }
         }
         break;
 
         case MFnNumericData::k3Double:
         {
-            PlugAndObjScalar p;
-            p.plug = iPlug;
-            p.obj = iAttr;
-            Abc::OV3dProperty up(iParent, plugName, iTimeIndex);
-            p.prop = up;
-            oScalars.push_back(p);
+            if (iPlug.isArray())
+            {
+                PlugAndObjArray p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OV3dArrayProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oArrays.push_back(p);
+            }
+            else
+            {
+                PlugAndObjScalar p;
+                p.plug = iPlug;
+                p.obj = iAttr;
+                Abc::OV3dProperty up(iParent, plugName, iTimeIndex);
+                p.prop = up;
+                oScalars.push_back(p);
+            }
         }
         break;
 
@@ -1089,10 +1257,20 @@ bool MFnTypedDataToSample(MFnData::Type iType,
 
         case MFnData::kString:
         {
-            std::vector< std::string > val(1);
-            val[0] = iPlug.asString().asChar();
+            std::vector< std::string > val(dimSize);
+            if (isArray)
+            {
+                for (size_t i=0; i<dimSize; ++i)
+                {
+                    val[i] = iPlug[i].asString().asChar();
+                }
+            }
+            else
+            {
+                val[0] = iPlug.asString().asChar();
+            }
             AbcA::ArraySample samp(&(val.front()), oProp.getDataType(),
-                Alembic::Util::Dimensions(1));
+                Alembic::Util::Dimensions(dimSize));
             oProp.set(samp);
         }
         break;
@@ -1194,20 +1372,36 @@ bool MFnTypedDataToSample(MFnData::Type iType,
 
         case MFnData::kMatrix:
         {
-            MFnMatrixData arr(iPlug.asMObject());
-            MMatrix mat = arr.matrix();
-            std::vector<double> val(16);
-
-            unsigned int i = 0;
-            for (unsigned int r = 0; r < 4; r++)
+            std::vector<double> val(16 * dimSize);
+            if (isArray)
             {
-                for (unsigned int c = 0; c < 4; c++, i++)
+                for (size_t i=0, j=0; i<dimSize; ++i)
                 {
-                    val[i] = mat[r][c];
+                    MFnMatrixData arr(iPlug[i].asMObject());
+                    MMatrix mat = arr.matrix();
+                    for (unsigned int r = 0; r < 4; r++)
+                    {
+                        for (unsigned int c = 0; c < 4; c++, j++)
+                        {
+                            val[j] = mat[r][c];
+                        }
+                    }
+                }
+            }
+            else
+            {
+                MFnMatrixData arr(iPlug.asMObject());
+                MMatrix mat = arr.matrix();
+                for (unsigned int r = 0, i = 0; r < 4; r++)
+                {
+                    for (unsigned int c = 0; c < 4; c++, i++)
+                    {
+                        val[i] = mat[r][c];
+                    }
                 }
             }
             AbcA::ArraySample samp(&(val.front()), oProp.getDataType(),
-                Alembic::Util::Dimensions(1));
+                Alembic::Util::Dimensions(dimSize));
             oProp.set(samp);
         }
         break;
@@ -1287,37 +1481,85 @@ bool attributeToArrayPropertyPair(const MObject& iAttr,
     }
     else if (iAttr.hasFn(MFn::kUnitAttribute))
     {
-        double val = iPlug.asDouble();
-        AbcA::ArraySample samp(&val, oProp.getDataType(),
-            Alembic::Util::Dimensions(1));
-        oProp.set(samp);
+        if (iPlug.isArray())
+        {
+            std::vector<double> vals(iPlug.numElements());
+            for (unsigned int i=0; i<iPlug.numElements(); ++i)
+            {
+                vals[i] = iPlug[i].asDouble();
+            }
+            AbcA::ArraySample samp(&(vals.front()), oProp.getDataType(),
+                Alembic::Util::Dimensions(vals.size()));
+            oProp.set(samp);
+        }
+        else
+        {
+            double val = iPlug.asDouble();
+            AbcA::ArraySample samp(&val, oProp.getDataType(),
+                Alembic::Util::Dimensions(1));
+            oProp.set(samp);
+        }
         return true;
     }
     else if (iAttr.hasFn(MFn::kEnumAttribute))
     {
-        Alembic::Util::int16_t val = iPlug.asShort();
-        AbcA::ArraySample samp(&val, oProp.getDataType(),
-            Alembic::Util::Dimensions(1));
-        oProp.set(samp);
+        if (iPlug.isArray())
+        {
+            std::vector<Alembic::Util::int16_t> vals(iPlug.numElements());
+            for (unsigned int i=0; i<iPlug.numElements(); ++i)
+            {
+                vals[i] = iPlug[i].asShort();
+            }
+            AbcA::ArraySample samp(&(vals.front()), oProp.getDataType(),
+                Alembic::Util::Dimensions(vals.size()));
+            oProp.set(samp);
+        }
+        else
+        {
+            Alembic::Util::int16_t val = iPlug.asShort();
+            AbcA::ArraySample samp(&val, oProp.getDataType(),
+                Alembic::Util::Dimensions(1));
+            oProp.set(samp);
+        }
         return true;
     }
     else if (iAttr.hasFn(MFn::kMatrixAttribute))
     {
-        MFnMatrixData arr(iPlug.asMObject());
-        MMatrix mat = arr.matrix();
-        double val[16];
-
-        unsigned int i = 0;
-        for (unsigned int r = 0; r < 4; r++)
+        if (iPlug.isArray())
         {
-            for (unsigned int c = 0; c < 4; c++, i++)
+            std::vector<double> vals(iPlug.numElements() * 16);
+            for (unsigned int i=0, j=0; i<iPlug.numElements(); ++i)
             {
-                val[i] = mat[r][c];
+                MFnMatrixData arr(iPlug[i].asMObject());
+                MMatrix mat = arr.matrix();
+                for (unsigned int r = 0; r < 4; r++)
+                {
+                    for (unsigned int c = 0; c < 4; c++, j++)
+                    {
+                        vals[j] = mat[r][c];
+                    }
+                }
             }
+            AbcA::ArraySample samp(&(vals.front()), oProp.getDataType(),
+                Alembic::Util::Dimensions(iPlug.numElements()));
+            oProp.set(samp);
         }
-        
-        AbcA::ArraySample samp(&val, oProp.getDataType(), Alembic::Util::Dimensions(1));
-        oProp.set(samp);
+        else
+        {
+            MFnMatrixData arr(iPlug.asMObject());
+            MMatrix mat = arr.matrix();
+            double val[16];
+            unsigned int i = 0;
+            for (unsigned int r = 0; r < 4; r++)
+            {
+                for (unsigned int c = 0; c < 4; c++, i++)
+                {
+                    val[i] = mat[r][c];
+                }
+            }
+            AbcA::ArraySample samp(&val, oProp.getDataType(), Alembic::Util::Dimensions(1));
+            oProp.set(samp);
+        }
         return true;
     }
 
@@ -1371,11 +1613,22 @@ void createUserPropertyFromMFnAttr(const MObject& iAttr,
         {
             case MFnData::kString:
             {
-                PlugAndObjScalar p;
-                p.plug = iPlug;
-                p.obj = iAttr;
-                p.prop = Abc::OStringProperty(iParent, plugName, iTimeIndex);
-                oScalars.push_back(p);
+                if (iPlug.isArray())
+                {
+                    PlugAndObjArray p;
+                    p.plug = iPlug;
+                    p.obj = iAttr;
+                    p.prop = Abc::OStringArrayProperty(iParent, plugName, iTimeIndex);
+                    oArrays.push_back(p);
+                }
+                else
+                {
+                    PlugAndObjScalar p;
+                    p.plug = iPlug;
+                    p.obj = iAttr;
+                    p.prop = Abc::OStringProperty(iParent, plugName, iTimeIndex);
+                    oScalars.push_back(p);
+                }
             }
             break;
 
@@ -1443,11 +1696,22 @@ void createUserPropertyFromMFnAttr(const MObject& iAttr,
 
             case MFnData::kMatrix:
             {
-                PlugAndObjScalar p;
-                p.plug = iPlug;
-                p.obj = iAttr;
-                p.prop = Abc::OM44dProperty(iParent, plugName, iTimeIndex);
-                oScalars.push_back(p);
+                if (iPlug.isArray())
+                {
+                    PlugAndObjArray p;
+                    p.plug = iPlug;
+                    p.obj = iAttr;
+                    p.prop = Abc::OM44dArrayProperty(iParent, plugName, iTimeIndex);
+                    oArrays.push_back(p);
+                }
+                else
+                {
+                    PlugAndObjScalar p;
+                    p.plug = iPlug;
+                    p.obj = iAttr;
+                    p.prop = Abc::OM44dProperty(iParent, plugName, iTimeIndex);
+                    oScalars.push_back(p);
+                }
             }
             break;
 
@@ -1472,27 +1736,60 @@ void createUserPropertyFromMFnAttr(const MObject& iAttr,
     }
     else if (iAttr.hasFn(MFn::kUnitAttribute))
     {
-        PlugAndObjScalar p;
-        p.plug = iPlug;
-        p.obj = iAttr;
-        p.prop = Abc::ODoubleProperty(iParent, plugName, iTimeIndex);
-        oScalars.push_back(p);
+        if (iPlug.isArray())
+        {
+            PlugAndObjArray p;
+            p.plug = iPlug;
+            p.obj = iAttr;
+            p.prop = Abc::ODoubleArrayProperty(iParent, plugName, iTimeIndex);
+            oArrays.push_back(p);
+        }
+        else
+        {
+            PlugAndObjScalar p;
+            p.plug = iPlug;
+            p.obj = iAttr;
+            p.prop = Abc::ODoubleProperty(iParent, plugName, iTimeIndex);
+            oScalars.push_back(p);
+        }
     }
     else if (iAttr.hasFn(MFn::kEnumAttribute))
     {
-        PlugAndObjScalar p;
-        p.plug = iPlug;
-        p.obj = iAttr;
-        p.prop = Abc::OInt16Property(iParent, plugName, iTimeIndex);
-        oScalars.push_back(p);
+        if (iPlug.isArray())
+        {
+            PlugAndObjArray p;
+            p.plug = iPlug;
+            p.obj = iAttr;
+            p.prop = Abc::OInt16ArrayProperty(iParent, plugName, iTimeIndex);
+            oArrays.push_back(p);
+        }
+        else
+        {
+            PlugAndObjScalar p;
+            p.plug = iPlug;
+            p.obj = iAttr;
+            p.prop = Abc::OInt16Property(iParent, plugName, iTimeIndex);
+            oScalars.push_back(p);
+        }
     }
     else if (iAttr.hasFn(MFn::kMatrixAttribute))
     {
-        PlugAndObjScalar p;
-        p.plug = iPlug;
-        p.obj = iAttr;
-        p.prop = Abc::OM44dProperty(iParent, plugName, iTimeIndex);
-        oScalars.push_back(p);
+        if (iPlug.isArray())
+        {
+            PlugAndObjArray p;
+            p.plug = iPlug;
+            p.obj = iAttr;
+            p.prop = Abc::OM44dArrayProperty(iParent, plugName, iTimeIndex);
+            oArrays.push_back(p);
+        }
+        else
+        {
+            PlugAndObjScalar p;
+            p.plug = iPlug;
+            p.obj = iAttr;
+            p.prop = Abc::OM44dProperty(iParent, plugName, iTimeIndex);
+            oScalars.push_back(p);
+        }
     }
 }
 
