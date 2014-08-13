@@ -378,13 +378,23 @@ void createUserPropertyFromNumeric(MFnNumericData::Type iType,
 
         case MFnNumericData::k3Float:
         {
+            MFnAttribute mfnAttr(iAttr);
+            
             if (iPlug.isArray())
             {
                 PlugAndObjArray p;
                 p.plug = iPlug;
                 p.obj = iAttr;
-                Abc::OV3fArrayProperty up(iParent, plugName, iTimeIndex);
-                p.prop = up;
+                if (mfnAttr.isUsedAsColor())
+                {
+                    Abc::OC3fArrayProperty up(iParent, plugName, iTimeIndex);
+                    p.prop = up;
+                }
+                else
+                {
+                    Abc::OV3fArrayProperty up(iParent, plugName, iTimeIndex);
+                    p.prop = up;
+                }
                 oArrays.push_back(p);
             }
             else
@@ -392,8 +402,16 @@ void createUserPropertyFromNumeric(MFnNumericData::Type iType,
                 PlugAndObjScalar p;
                 p.plug = iPlug;
                 p.obj = iAttr;
-                Abc::OV3fProperty up(iParent, plugName, iTimeIndex);
-                p.prop = up;
+                if (mfnAttr.isUsedAsColor())
+                {
+                    Abc::OC3fProperty up(iParent, plugName, iTimeIndex);
+                    p.prop = up;
+                }
+                else
+                {
+                    Abc::OV3fProperty up(iParent, plugName, iTimeIndex);
+                    p.prop = up;
+                }
                 oScalars.push_back(p);
             }
         }
