@@ -1246,6 +1246,24 @@ bool attributeToScalarPropertyPair(const MObject& iAttr,
         oProp.set(&val);
         return true;
     }
+    else if (iAttr.hasFn(MFn::kMatrixAttribute))
+    {
+        MFnMatrixData arr(iPlug.asMObject());
+        MMatrix mat = arr.matrix();
+        double val[16];
+
+        unsigned int i = 0;
+        for (unsigned int r = 0; r < 4; r++)
+        {
+            for (unsigned int c = 0; c < 4; c++, i++)
+            {
+                val[i] = mat[r][c];
+            }
+        }
+
+        oProp.set(&val);
+        return true;
+    }
 
     return false;
 }
@@ -1280,6 +1298,25 @@ bool attributeToArrayPropertyPair(const MObject& iAttr,
         Alembic::Util::int16_t val = iPlug.asShort();
         AbcA::ArraySample samp(&val, oProp.getDataType(),
             Alembic::Util::Dimensions(1));
+        oProp.set(samp);
+        return true;
+    }
+    else if (iAttr.hasFn(MFn::kMatrixAttribute))
+    {
+        MFnMatrixData arr(iPlug.asMObject());
+        MMatrix mat = arr.matrix();
+        double val[16];
+
+        unsigned int i = 0;
+        for (unsigned int r = 0; r < 4; r++)
+        {
+            for (unsigned int c = 0; c < 4; c++, i++)
+            {
+                val[i] = mat[r][c];
+            }
+        }
+        
+        AbcA::ArraySample samp(&val, oProp.getDataType(), Alembic::Util::Dimensions(1));
         oProp.set(samp);
         return true;
     }
@@ -1447,6 +1484,14 @@ void createUserPropertyFromMFnAttr(const MObject& iAttr,
         p.plug = iPlug;
         p.obj = iAttr;
         p.prop = Abc::OInt16Property(iParent, plugName, iTimeIndex);
+        oScalars.push_back(p);
+    }
+    else if (iAttr.hasFn(MFn::kMatrixAttribute))
+    {
+        PlugAndObjScalar p;
+        p.plug = iPlug;
+        p.obj = iAttr;
+        p.prop = Abc::OM44dProperty(iParent, plugName, iTimeIndex);
         oScalars.push_back(p);
     }
 }
@@ -1651,6 +1696,15 @@ void createGeomPropertyFromMFnAttr(const MObject& iAttr,
         p.obj = iAttr;
         AbcGeom::OInt16GeomParam gp(iParent, plugName, false, iScope, 1,
             iTimeIndex);
+        p.prop = gp.getValueProperty();
+        oArrayVec.push_back(p);
+    }
+    else if (iAttr.hasFn(MFn::kMatrixAttribute))
+    {
+        PlugAndObjArray p;
+        p.plug = iPlug;
+        p.obj = iAttr;
+        AbcGeom::OM44dGeomParam gp(iParent, plugName, false, iScope, 1, iTimeIndex);
         p.prop = gp.getValueProperty();
         oArrayVec.push_back(p);
     }
