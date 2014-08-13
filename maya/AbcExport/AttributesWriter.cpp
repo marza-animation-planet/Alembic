@@ -632,7 +632,7 @@ bool MFnNumericDataToSample(MFnNumericData::Type iType,
         case MFnNumericData::k2Double:
         {
             MFnNumericData numdFn(iPlug.asMObject());
-            numdFn.getData2Double(v2dVal[0], v3dVal[1]);
+            numdFn.getData2Double(v2dVal[0], v2dVal[1]);
 
             oProp.set(&v2dVal[0]);
         }
