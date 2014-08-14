@@ -1235,7 +1235,7 @@ void CreateTree::setMatrixArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlu
    {
       for (int r=0, j=0; r<4; ++r)
       {
-         for (int c=0; c<4; ++c, ++i)
+         for (int c=0; c<4; ++c, ++j)
          {
             m[r][c] = double(val[j]);
          }
