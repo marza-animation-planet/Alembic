@@ -236,7 +236,11 @@ private:
    void setStringArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug);
    
    template <typename T, int D>
-   void keyAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug);
+   void attributeSample(Alembic::Abc::IScalarProperty prop, Alembic::AbcCoreAbstract::index_t sampIdx, T *outVal);
+   template <typename T, int D>
+   void attributeSample(Alembic::Abc::IArrayProperty prop, Alembic::AbcCoreAbstract::index_t sampIdx, T *outVal);
+   template <typename T, int D, class Property>
+   void keyAttribute(Property prop, MPlug &plug);
    
    template <typename T, int D, typename TT>
    void setNumericUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
@@ -1031,7 +1035,21 @@ bool CreateTree::checkStringAttribute(const MPlug &plug, bool array)
 }
 
 template <typename T, int D>
-void CreateTree::keyAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
+void CreateTree::attributeSample(Alembic::Abc::IScalarProperty prop, Alembic::AbcCoreAbstract::index_t sampIdx, T *outVal)
+{
+   prop.get(outVal, Alembic::Abc::ISampleSelector(sampIdx));
+}
+
+template <typename T, int D>
+void CreateTree::attributeSample(Alembic::Abc::IArrayProperty prop, Alembic::AbcCoreAbstract::index_t sampIdx, T *outVal)
+{
+   Alembic::AbcCoreAbstract::ArraySamplePtr samp;
+   prop.get(samp, Alembic::Abc::ISampleSelector(sampIdx));
+   memcpy(outVal, samp->getData(), D * sizeof(T));
+}
+
+template <typename T, int D, class Property>
+void CreateTree::keyAttribute(Property prop, MPlug &plug)
 {
    if (!prop.isConstant() && fabs(mSpeed) > 0.0001)
    {
@@ -1066,7 +1084,7 @@ void CreateTree::keyAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
          }
          t = offset + invSpeed * t;
          
-         prop.get(val, Alembic::Abc::ISampleSelector(idx));
+         attributeSample<T, D>(prop, idx, val);
          
          mKeyframer.setCurrentTime(t);
          for (int d=0; d<D; ++d)
@@ -1111,6 +1129,8 @@ void CreateTree::setNumericAttribute(Alembic::Abc::IArrayProperty prop, MPlug &p
    const T *val = (const T*) samp->getData();
    
    NumericData<T, D, TT>::Set(val, plug);
+   
+   keyAttribute<T, D>(prop, plug);
 }
 
 template <typename T, int D, typename TT>
@@ -1155,6 +1175,8 @@ void CreateTree::setCompoundAttribute(Alembic::Abc::IArrayProperty prop, MPlug &
    {
       plug.child(d).setValue(TT(val[d]));
    }
+   
+   keyAttribute<T, D>(prop, plug);
 }
 
 template <typename T, int D, typename TT>
