@@ -40,9 +40,12 @@
 #include "PathUtil.h"
 #include "SampleUtil.h"
 #include "WriteGeo.h"
+#include "ArbGeomParams.h"
 
 #include <Alembic/AbcGeom/All.h>
 #include <Alembic/AbcCoreHDF5/All.h>
+
+#include <regex.h>
 
 
 namespace
@@ -51,10 +54,57 @@ namespace
 using namespace Alembic::AbcGeom;
 
 
+template <class MeshClass>
+void ProcessMeshFacesets( MeshClass &mesh, ProcArgs &args, regex_t *expr, AtNode *amesh )
+{
+    std::vector<std::string> faceSetNames;
+       
+    mesh.getSchema().getFaceSetNames( faceSetNames );
+    
+    if ( faceSetNames.size() > 0 )
+    {
+        ISampleSelector frameSelector( args.frame / args.fps );
+        
+        std::set<int> facesToKeep;
+        
+        for ( size_t i=0; i<faceSetNames.size(); ++i )
+        {
+            IFaceSet faceSet = mesh.getSchema().getFaceSet( faceSetNames[i] );
+            
+            if ( !expr || regexec( expr, faceSet.getFullName().c_str(), 0, NULL, 0 ) == 0 )
+            {
+                IFaceSetSchema::Sample faceSetSample = faceSet.getSchema().getValue( frameSelector );
+                Alembic::Abc::Int32ArraySamplePtr faces = faceSetSample.getFaces();
+                
+                facesToKeep.insert( faces->get(), faces->get() + faces->size() );
+            }
+        }
+        
+        if ( facesToKeep.size() > 0 )
+        {
+            AtArray *nsides = AiNodeGetArray( amesh, "nsides" );
+            
+            bool *faceVisArray = new bool[nsides->nelements];
+            
+            for ( unsigned int i=0; i<nsides->nelements; ++i )
+            {
+                faceVisArray[i] = ( facesToKeep.find( i ) != facesToKeep.end() );
+            }
+            
+            if ( AiNodeDeclare( amesh, "face_visibility", "uniform BOOL" ) )
+            {
+                AiNodeSetArray( amesh, "face_visibility", ArrayConvert( nsides->nelements, 1, AI_TYPE_BOOLEAN, faceVisArray ) );
+            }
+            
+            delete[] faceVisArray;
+        }
+    }
+}
+
 
 void WalkObject( IObject parent, const ObjectHeader &ohead, ProcArgs &args,
-             PathList::const_iterator I, PathList::const_iterator E,
-                    MatrixSampleMap * xformSamples)
+                 regex_t *expr,
+                 MatrixSampleMap * xformSamples)
 {
     //Accumulate transformation samples and pass along as an argument
     //to WalkObject
@@ -129,54 +179,38 @@ void WalkObject( IObject parent, const ObjectHeader &ohead, ProcArgs &args,
     }
     else if ( ISubD::matches( ohead ) )
     {
-        std::string faceSetName;
-        
         ISubD subd( parent, ohead.getName() );
         
-        //if we haven't reached the end of a specified -objectpath,
-        //check to see if the next token is a faceset name.
-        //If it is, send the name to ProcessSubD for addition of
-        //"face_visibility" tags for the non-matching faces
-        if ( I != E )
+        if ( !expr || regexec( expr, ohead.getFullName().c_str(), 0, NULL, 0 ) == 0 )
         {
-            if ( subd.getSchema().hasFaceSet( *I ) )
+            size_t nn = args.createdNodes.size();
+            
+            ProcessSubD( subd, args, xformSamples, "" );
+            
+            AtNode *amesh = ( args.createdNodes.size() == nn ? 0 : args.createdNodes.back() );
+            
+            if ( amesh && AiNodeIs( amesh, "polymesh" ) )
             {
-                faceSetName = *I;
+                ProcessMeshFacesets( subd, args, expr, amesh );
             }
-        }
-        
-        ProcessSubD( subd, args, xformSamples, faceSetName );
-        
-        //if we found a matching faceset, don't traverse below
-        if ( faceSetName.empty() )
-        {
-            nextParentObject = subd;
         }
     }
     else if ( IPolyMesh::matches( ohead ) )
     {
-        std::string faceSetName;
-        
         IPolyMesh polymesh( parent, ohead.getName() );
         
-        //if we haven't reached the end of a specified -objectpath,
-        //check to see if the next token is a faceset name.
-        //If it is, send the name to ProcessSubD for addition of
-        //"face_visibility" tags for the non-matching faces
-        if ( I != E )
+        if ( !expr || regexec( expr, ohead.getFullName().c_str(), 0, NULL, 0 ) == 0 )
         {
-            if ( polymesh.getSchema().hasFaceSet( *I ) )
+            size_t nn = args.createdNodes.size();
+            
+            ProcessPolyMesh( polymesh, args, xformSamples, "" );
+            
+            AtNode *amesh = ( args.createdNodes.size() == nn ? 0 : args.createdNodes.back() );
+            
+            if ( amesh && AiNodeIs( amesh, "polymesh" ) )
             {
-                faceSetName = *I;
+                ProcessMeshFacesets( polymesh, args, expr, amesh );
             }
-        }
-        
-        ProcessPolyMesh( polymesh, args, xformSamples, faceSetName );
-        
-        //if we found a matching faceset, don't traverse below
-        if ( faceSetName.empty() )
-        {
-            nextParentObject = polymesh;
         }
     }
     else if ( INuPatch::matches( ohead ) )
@@ -184,21 +218,30 @@ void WalkObject( IObject parent, const ObjectHeader &ohead, ProcArgs &args,
         INuPatch patch( parent, ohead.getName() );
         // TODO ProcessNuPatch( patch, args );
         
-        nextParentObject = patch;
+        if ( !expr || regexec( expr, ohead.getFullName().c_str(), 0, NULL, 0 ) == 0 )
+        {
+            nextParentObject = patch;
+        }
     }
     else if ( IPoints::matches( ohead ) )
     {
         IPoints points( parent, ohead.getName() );
         // TODO ProcessPoints( points, args );
         
-        nextParentObject = points;
+        if ( !expr || regexec( expr, ohead.getFullName().c_str(), 0, NULL, 0 ) == 0 )
+        {
+            nextParentObject = points;
+        }
     }
     else if ( ICurves::matches( ohead ) )
     {
         ICurves curves( parent, ohead.getName() );
         // TODO ProcessCurves( curves, args );
         
-        nextParentObject = curves;
+        if ( !expr || regexec( expr, ohead.getFullName().c_str(), 0, NULL, 0 ) == 0 )
+        {
+            nextParentObject = curves;
+        }
     }
     else if ( IFaceSet::matches( ohead ) )
     {
@@ -219,30 +262,11 @@ void WalkObject( IObject parent, const ObjectHeader &ohead, ProcArgs &args,
     {
         //std::cerr << nextParentObject.getFullName() << std::endl;
         
-        if ( I == E )
+        for ( size_t i=0; i<nextParentObject.getNumChildren(); ++i )
         {
-            for ( size_t i = 0; i < nextParentObject.getNumChildren() ; ++i )
-            {
-                WalkObject( nextParentObject,
-                            nextParentObject.getChildHeader( i ),
-                            args, I, E, xformSamples);
-            }
-        }
-        else
-        {
-            const ObjectHeader *nextChildHeader =
-                nextParentObject.getChildHeader( *I );
-            
-            if ( nextChildHeader != NULL )
-            {
-                WalkObject( nextParentObject, *nextChildHeader, args, I+1, E,
-                    xformSamples);
-            }
+            WalkObject( nextParentObject, nextParentObject.getChildHeader(i), args, expr, xformSamples );
         }
     }
-    
-    
-    
 }
 
 //-*************************************************************************
@@ -277,30 +301,25 @@ int ProcInit( struct AtNode *node, void **user_ptr )
 
     IObject root = archive.getTop();
 
-    PathList path;
-    TokenizePath( args->objectpath, path );
+    regex_t re;
+    bool filter = (args->objectpath.length() > 0);
+    
+    if (filter)
+    {
+        if (regcomp(&re, args->objectpath.c_str(), REG_EXTENDED|REG_NOSUB) != 0)
+        {
+            AiMsgWarning("[%s] Invalid object path expression: \"%s\"",
+                         PREFIX_NAME("AlembicArnoldProcedural"),
+                         args->objectpath.c_str());
+            filter = false;
+        }
+    }
 
     try
     {
-        if ( path.empty() ) //walk the entire scene
+        for ( size_t i = 0; i < root.getNumChildren(); ++i )
         {
-            for ( size_t i = 0; i < root.getNumChildren(); ++i )
-            {
-                WalkObject( root, root.getChildHeader(i), *args,
-                            path.end(), path.end(), 0 );
-            }
-        }
-        else //walk to a location + its children
-        {
-            PathList::const_iterator I = path.begin();
-
-            const ObjectHeader *nextChildHeader =
-                    root.getChildHeader( *I );
-            if ( nextChildHeader != NULL )
-            {
-                WalkObject( root, *nextChildHeader, *args, I+1,
-                        path.end(), 0);
-            }
+            WalkObject( root, root.getChildHeader(i), *args, (filter ? &re : 0), 0 );
         }
     }
     catch ( const std::exception &e )
@@ -313,6 +332,10 @@ int ProcInit( struct AtNode *node, void **user_ptr )
         std::cerr << "exception thrown\n";
     }
     
+    if (filter)
+    {
+        regfree(&re);
+    }
     
     return 1;
 }
