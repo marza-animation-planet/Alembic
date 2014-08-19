@@ -93,9 +93,12 @@ void ApplyTransformation( struct AtNode * node,
         sampleTimes.push_back( GetRelativeSampleTime(args, (*I).first) );
         
         
-        for (int i = 0; i < 16; i++)
+        for ( int r = 0; r < 4 ; ++r )
         {
-            mlist.push_back( (*I).second.getValue()[i] );
+            for ( int c = 0; c < 4; ++c )
+            {
+                mlist.push_back( I->second.x[r][c] );
+            }
         }
     }
     
