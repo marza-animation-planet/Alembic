@@ -351,15 +351,12 @@ struct AtNode* ProcGetNode(void *user_ptr, int i)
 
 
 
-extern "C"
+proc_loader
 {
-    int ProcLoader(AtProcVtable* api)
-    {
-        api->Init        = ProcInit;
-        api->Cleanup     = ProcCleanup;
-        api->NumNodes    = ProcNumNodes;
-        api->GetNode     = ProcGetNode;
-        strcpy(api->version, AI_VERSION);
-        return 1;
-    }
+    vtable->Init        = ProcInit;
+    vtable->Cleanup     = ProcCleanup;
+    vtable->NumNodes    = ProcNumNodes;
+    vtable->GetNode     = ProcGetNode;
+    strcpy(vtable->version, AI_VERSION);
+    return 1;
 }
