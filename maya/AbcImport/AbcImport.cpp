@@ -54,9 +54,9 @@
 namespace
 {
     MString usage(
-"                                                                           \n\
-AbcImport  [options] File                                                 \n\n\
-Options:                                                                    \n\
+"                                                                           \n"
+NAME_PREFIX "AbcImport  [options] File                                    \n\n"
+"Options:                                                                   \n\
 -rpr/ reparent      DagPath                                                 \n\
                     reparent the whole hierarchy under a node in the        \n\
                     current Maya scene                                      \n\
@@ -105,11 +105,11 @@ scene but doesn't exist in the archive, children of that node will be connected\
 the input regular expressions.                                              \n\
 -h  / help          Print this message                                      \n\
 -d  / debug         Turn on debug message printout                        \n\n\
-Example:                                                                    \n\
-AbcImport -h;                                                               \n\
-AbcImport -d -m open \"/tmp/test.abc\";                                     \n\
-AbcImport -ftr -ct \"/\" -crt -rm \"/mcp/test.abc\";                        \n\
-AbcImport -ct \"root1 root2 root3 ...\" \"/mcp/test.abc\";                  \n"
+Example:                                                                    \n"
+NAME_PREFIX "AbcImport -h;                                                  \n"
+NAME_PREFIX "AbcImport -d -m open \"/tmp/test.abc\";                        \n"
+NAME_PREFIX "AbcImport -ftr -ct \"/\" -crt -rm \"/mcp/test.abc\";           \n"
+NAME_PREFIX "AbcImport -ct \"root1 root2 root3 ...\" \"/mcp/test.abc\";     \n"
 );  // usage
 
 };

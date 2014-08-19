@@ -1,7 +1,7 @@
 #ifndef ABCSHAPE_SCENECACHE_H_
 #define ABCSHAPE_SCENECACHE_H_
 
-#include "AlembicScene.h"
+#include "common.h"
 
 #include <Alembic/AbcCoreFactory/All.h>
 

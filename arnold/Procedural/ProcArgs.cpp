@@ -155,7 +155,7 @@ ProcArgs::ProcArgs( const char * paramStr )
 
 void ProcArgs::usage()
 {
-    std::cerr << "AlembicArnoldProcedural usage:" << std::endl;
+    std::cerr << PREFIX_NAME("AlembicArnoldProcedural") << " usage:" << std::endl;
     std::cerr << std::endl;
     
     

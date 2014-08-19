@@ -1,7 +1,6 @@
 #include "AbcShape.h"
 #include "AlembicSceneVisitors.h"
 #include "SceneCache.h"
-#include "MathUtils.h"
 
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnEnumAttribute.h>
@@ -344,13 +343,13 @@ AbcShape::AbcShape()
 AbcShape::~AbcShape()
 {
    #ifdef _DEBUG
-   std::cout << "[AbcShape] Destructor called" << std::endl;
+   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Destructor called" << std::endl;
    #endif
    
    if (mScene && !SceneCache::Unref(mScene))
    {
       #ifdef _DEBUG
-      std::cout << "[AbcShape] Force delete scene" << std::endl;
+      std::cout << "[" << PREFIX_NAME("AbcShape") << "] Force delete scene" << std::endl;
       #endif
       
       delete mScene;
@@ -361,7 +360,7 @@ void AbcShape::postConstructor()
 {
    setRenderable(true);
    
-   AbcShape::CallbackID = MDGMessage::addNodeAddedCallback(AbcShape::createdCallback, "AbcShape");
+   AbcShape::CallbackID = MDGMessage::addNodeAddedCallback(AbcShape::createdCallback, PREFIX_NAME("AbcShape"));
 }
 
 bool AbcShape::ignoreCulling() const
@@ -517,7 +516,7 @@ double AbcShape::getFPS() const
 double AbcShape::computeAdjustedTime(const double inputTime, const double speed, const double timeOffset) const
 {
    #ifdef _DEBUG
-   std::cout << "[AbcShape] Adjust time: " << (inputTime * getFPS()) << " -> " << ((inputTime - timeOffset) * speed * getFPS()) << std::endl;
+   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Adjust time: " << (inputTime * getFPS()) << " -> " << ((inputTime - timeOffset) * speed * getFPS()) << std::endl;
    #endif
    
    return (inputTime - timeOffset) * speed;
@@ -595,7 +594,7 @@ double AbcShape::computeRetime(const double inputTime,
    }
 
    #ifdef _DEBUG
-   std::cout << "[AbcShape] Retime: " << (inputTime * getFPS()) << " -> " << (retime * getFPS()) << std::endl;
+   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Retime: " << (inputTime * getFPS()) << " -> " << (retime * getFPS()) << std::endl;
    #endif
    
    return retime;
@@ -616,7 +615,7 @@ double AbcShape::getSampleTime() const
 void AbcShape::updateScene()
 {
    #ifdef _DEBUG
-   std::cout << "[AbcShape] Update scene: " << mFilePath << std::endl;
+   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Update scene: " << mFilePath << std::endl;
    #endif
    SceneCache::Unref(mScene);
    
@@ -641,7 +640,7 @@ void AbcShape::updateScene()
              fabs(mEndFrame - end) > 0.0001)
          {
             #ifdef _DEBUG
-            std::cout << "[AbcShape] Frame range: " << start << " - " << end << std::endl;
+            std::cout << "[" << PREFIX_NAME("AbcShape") << "] Frame range: " << start << " - " << end << std::endl;
             #endif
             
             mStartFrame = start;
@@ -669,7 +668,7 @@ void AbcShape::updateScene()
 void AbcShape::updateObjects()
 {
    #ifdef _DEBUG
-   std::cout << "[AbcShape] Filter objects: \"" << mObjectExpression << "\"" << std::endl;
+   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Filter objects: \"" << mObjectExpression << "\"" << std::endl;
    #endif
    
    mScene->setFilter(mObjectExpression.asChar());
@@ -680,7 +679,7 @@ void AbcShape::updateObjects()
 void AbcShape::updateWorld()
 {
    #ifdef _DEBUG
-   std::cout << "[AbcShape] Update world" << std::endl;
+   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Update world" << std::endl;
    #endif
    
    WorldUpdate visitor(mSampleTime, mIgnoreTransforms, mIgnoreInstances, mIgnoreVisibility);
@@ -689,14 +688,14 @@ void AbcShape::updateWorld()
    mNumShapes = visitor.numShapes();
    
    #ifdef _DEBUG
-   std::cout << "[AbcShape] " << mNumShapes << " shape(s) in scene" << std::endl;
+   std::cout << "[" << PREFIX_NAME("AbcShape") << "] " << mNumShapes << " shape(s) in scene" << std::endl;
    #endif
    
    mScene->updateChildBounds();
    mScene->setSelfBounds(visitor.bounds());
    
    #ifdef _DEBUG
-   std::cout << "[AbcShape] Scene bounds: " << visitor.bounds().min << " - " << visitor.bounds().max << std::endl;
+   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Scene bounds: " << visitor.bounds().min << " - " << visitor.bounds().max << std::endl;
    #endif
    
    if (mDisplayMode >= DM_points)
@@ -708,7 +707,7 @@ void AbcShape::updateWorld()
 void AbcShape::updateGeometry()
 {
    #ifdef _DEBUG
-   std::cout << "[AbcShape] Update geometry" << std::endl;
+   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Update geometry" << std::endl;
    #endif
    
    SampleGeometry visitor(mSampleTime, &mGeometry);
@@ -728,7 +727,7 @@ void AbcShape::printInfo(bool detailed) const
 
 void AbcShape::printSceneBounds() const
 {
-   std::cout << "Scene " << mScene->selfBounds().min << " - " << mScene->selfBounds().max << std::endl;
+   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Scene " << mScene->selfBounds().min << " - " << mScene->selfBounds().max << std::endl;
 }
 
 bool AbcShape::getInternalValueInContext(const MPlug &plug, MDataHandle &handle, MDGContext &ctx)
@@ -1300,7 +1299,7 @@ bool AbcShapeUI::select(MSelectInfo &selectInfo,
                         MSelectionList &selectionList,
                         MPointArray &worldSpaceSelectPts) const
 {
-   MSelectionMask mask("AbcShape");
+   MSelectionMask mask(PREFIX_NAME("AbcShape"));
    if (!selectInfo.selectable(mask))
    {
       return false;

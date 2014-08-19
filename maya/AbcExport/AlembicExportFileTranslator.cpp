@@ -1,4 +1,5 @@
 #include "AlembicExportFileTranslator.h"
+#include "Foundation.h"
 
 #include <maya/MGlobal.h>
 #include <maya/MSelectionList.h>
@@ -34,7 +35,7 @@ MStatus AlembicExportFileTranslator::writer(
                                         const MString& optionsString,
                                         MPxFileTranslator::FileAccessMode mode)
 {
-    MString script = "AbcExport";
+    MString script = PREFIX_NAME("AbcExport");
     MString options;
     MString jobopts;
     MStringArray optlist;

@@ -26,7 +26,7 @@ SceneCache::SceneCache()
 SceneCache::~SceneCache()
 {
    #ifdef _DEBUG
-   std::cout << "[AbcShape] Clear cached scene(s) (" << mScenes.size() << " remaining)" << std::endl;
+   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Clear cached scene(s) (" << mScenes.size() << " remaining)" << std::endl;
    #endif
    
    for (std::map<std::string, CacheEntry>::iterator it = mScenes.begin(); it != mScenes.end(); ++it)
@@ -81,7 +81,7 @@ AlembicScene* SceneCache::ref(const std::string &filepath)
       {
          it->second.refcount++;
          #ifdef _DEBUG
-         std::cout << "[AbcShape] Clone master scene" << std::endl;
+         std::cout << "[" << PREFIX_NAME("AbcShape") << "] Clone master scene" << std::endl;
          #endif
          rv = new AlembicScene(*(it->second.master));
          // Reset filter
@@ -123,7 +123,7 @@ bool SceneCache::unref(AlembicScene *scene)
    bool rv = false;
    
    #ifdef _DEBUG
-   std::cout << "[AbcShape] Unreferencing scene" << std::endl;
+   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Unreferencing scene" << std::endl;
    #endif
    
    //mMutex.lock();
@@ -141,11 +141,11 @@ bool SceneCache::unref(AlembicScene *scene)
       if (it->second.refcount == 0)
       {
          #ifdef _DEBUG
-         std::cout << "[AbcShape] Last scene referencing alembic archive \"" << it->second.archive.getName() << "\"" << std::endl;
+         std::cout << "[" << PREFIX_NAME("AbcShape") << "] Last scene referencing alembic archive \"" << it->second.archive.getName() << "\"" << std::endl;
          #endif
          
          #ifdef _DEBUG
-         std::cout << "[AbcShape] Destroy master scene" << std::endl;
+         std::cout << "[" << PREFIX_NAME("AbcShape") << "] Destroy master scene" << std::endl;
          #endif
          if (it->second.master)
          {
@@ -158,7 +158,7 @@ bool SceneCache::unref(AlembicScene *scene)
       if (!isMasterScene)
       {
          #ifdef _DEBUG
-         std::cout << "[AbcShape] Destroy scene" << std::endl;
+         std::cout << "[" << PREFIX_NAME("AbcShape") << "] Destroy scene" << std::endl;
          #endif
          delete scene;
       }

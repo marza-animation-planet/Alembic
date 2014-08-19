@@ -99,7 +99,7 @@ MObject AlembicNode::mOutParticlesDataArrayAttr;
 namespace
 {
     MString UITemplateMELScriptStr(
-"global proc AEAlembicNodeTemplate( string $nodeName )\n"
+"global proc AE" NAME_PREFIX "AlembicNodeTemplate( string $nodeName )\n"
 "{\n"
 "editorTemplate -beginScrollLayout;\n"
 "editorTemplate -beginLayout \"Alembic Attributes\" -collapse 0;\n"

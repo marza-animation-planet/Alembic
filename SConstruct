@@ -306,6 +306,7 @@ def UpdateSettings(path, replace=True):
 
 excons_cache = os.path.abspath("excons.cache")
 nocache = GetArgument("no-cache", False, lambda x: int(x) != 0)
+nameprefix = GetArgument("name-prefix", "")
 
 UpdateSettings(excons_cache, replace=nocache)
 
@@ -484,12 +485,16 @@ prjs = [
    }
 ]
 
+plugin_defs = defs[:]
+if nameprefix:
+   plugin_defs.append("NAME_PREFIX=\"\\\"%s\\\"\"" % nameprefix)
+
 if build_arnold_plugins:
-   prjs.append({"name": "AlembicArnoldProcedural",
+   prjs.append({"name": "%sAlembicArnoldProcedural" % nameprefix,
                 "type": "dynamicmodule",
                 "ext": arnold.PluginExt(),
                 "prefix": "arnold",
-                "defs": defs,
+                "defs": plugin_defs,
                 "incdirs": incdirs + ["arnold/Procedural"],
                 "libdirs": libdirs,
                 "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
@@ -497,11 +502,25 @@ if build_arnold_plugins:
                 "custom": [arnold.Require]})
 
 if build_maya_plugins:
-   prjs.extend([{"name": "AbcImport",
+   def replace_in_mel(src, dst, srcStr, dstStr):
+      fdst = open(dst, "w")
+      fsrc = open(src, "r")
+      for line in fsrc.readlines():
+         fdst.write(line.replace(srcStr, dstStr))
+      fdst.close()
+      fsrc.close()
+   
+   AbcShapeName = "%sAbcShape" % nameprefix
+   AbcShapeMel = "maya/AbcShape/AE%sTemplate.mel" % AbcShapeName
+   
+   if not os.path.exists(AbcShapeMel):
+      replace_in_mel("maya/AbcShape/AETemplate.mel", AbcShapeMel, "<<NodeName>>", AbcShapeName)
+   
+   prjs.extend([{"name": "%sAbcImport" % nameprefix,
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins",
-                 "defs": defs,
+                 "defs": plugin_defs,
                  "incdirs": incdirs + ["maya/AbcImport"],
                  "libdirs": libdirs,
                  "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
@@ -509,11 +528,11 @@ if build_maya_plugins:
                  "install": {"maya/scripts": glob.glob("maya/AbcImport/*.mel")},
                  "custom": [maya.Require, maya.Plugin]
                 },
-                {"name": "AbcExport",
+                {"name": "%sAbcExport" % nameprefix,
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins",
-                 "defs": defs,
+                 "defs": plugin_defs,
                  "incdirs": incdirs + ["maya/AbcExport"],
                  "libdirs": libdirs,
                  "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
@@ -521,11 +540,11 @@ if build_maya_plugins:
                  "install": {"maya/scripts": glob.glob("maya/AbcExport/*.mel")},
                  "custom": [maya.Require, maya.Plugin]
                 },
-                {"name": "AbcShape",
+                {"name": "%sAbcShape" % nameprefix,
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins",
-                 "defs": defs,
+                 "defs": plugin_defs,
                  "incdirs": incdirs + ["maya/AbcShape", "lib/SceneHelper"],
                  "libdirs": libdirs,
                  "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,

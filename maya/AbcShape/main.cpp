@@ -4,14 +4,16 @@
 #include "AbcShapeImport.h"
 #include "VP2.h"
 
-
-
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
    const char * pluginVersion = "1.0";
-   MFnPlugin plugin(obj, "AbcShape", pluginVersion, "Any");
+   
+   MString nodeName = PREFIX_NAME("AbcShape");
+   MString commandName = PREFIX_NAME("AbcShapeImport");
+   
+   MFnPlugin plugin(obj, nodeName.asChar(), pluginVersion, "Any");
 
-   MStatus status = plugin.registerShape("AbcShape",
+   MStatus status = plugin.registerShape(nodeName,
                                          AbcShape::ID,
                                          AbcShape::creator,
                                          AbcShape::initialize,
@@ -19,7 +21,7 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
                                          &AbcShapeOverride::Classification);
    if (status != MS::kSuccess)
    {
-      status.perror("Failed to register shape 'AbcShape'");
+      status.perror("Failed to register shape '" + nodeName + "'");
       return status;
    }
    
@@ -29,15 +31,15 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
    
    if (status != MS::kSuccess)
    {
-      status.perror("Failed to register draw override for 'AbcShape'");
+      status.perror("Failed to register draw override for '" + nodeName + "'");
       return status;
    }
    
-   status = plugin.registerCommand("AbcShapeImport", AbcShapeImport::create, AbcShapeImport::createSyntax);
+   status = plugin.registerCommand(commandName, AbcShapeImport::create, AbcShapeImport::createSyntax);
    
    if (status != MS::kSuccess)
    {
-      status.perror("Failed to register command 'AbcShapeImport'");
+      status.perror("Failed to register command '" + commandName + "'");
       return status;
    }
    
@@ -48,26 +50,29 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
 {
    MFnPlugin plugin(obj);
 
+   MString nodeName = PREFIX_NAME("AbcShape");
+   MString commandName = PREFIX_NAME("AbcShapeImport");
+
    if (AbcShape::CallbackID != 0)
    {
       MDGMessage::removeCallback(AbcShape::CallbackID);
       AbcShape::CallbackID = 0;
    }
    
-   MStatus status = plugin.deregisterCommand("AbcShapeImport");
+   MStatus status = plugin.deregisterCommand(commandName);
    
    if (status != MS::kSuccess)
    {
-      status.perror("Failed to deregister command 'AbcShapeImport'");
+      status.perror("Failed to deregister command '" + commandName + "'");
       return status;
    }
 
    status = MHWRender::MDrawRegistry::deregisterDrawOverrideCreator(AbcShapeOverride::Classification,
-                                                                            AbcShapeOverride::Registrant);
+                                                                    AbcShapeOverride::Registrant);
    
    if (status != MS::kSuccess)
    {
-      status.perror("Failed to deregister draw override for 'AbcShape'");
+      status.perror("Failed to deregister draw override for '" + nodeName + "'");
       return status;
    }
    
@@ -75,7 +80,7 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
    
    if (status != MS::kSuccess)
    {
-      status.perror("Failed to deregister shape 'AbcShape'");
+      status.perror("Failed to deregister shape '" + nodeName + "'");
       return status;
    }
    

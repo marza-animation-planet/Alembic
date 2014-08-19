@@ -42,6 +42,14 @@
 #include <vector>
 
 
+#ifdef NAME_PREFIX
+#   define PREFIX_NAME(s) NAME_PREFIX s
+#else
+#   define PREFIX_NAME(s) s
+#   define NAME_PREFIX ""
+#endif
+
+
 //-*****************************************************************************
 struct ProcArgs
 {

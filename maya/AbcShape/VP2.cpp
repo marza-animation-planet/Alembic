@@ -1,6 +1,5 @@
 #include "VP2.h"
 #include "AbcShape.h"
-#include "MathUtils.h"
 #include "AlembicSceneVisitors.h"
 
 #include <maya/MHWGeometryUtilities.h>
@@ -388,8 +387,8 @@ void AbcShapeOverride::draw(const MHWRender::MDrawContext& context, const MUserD
 
 // ---
 
-MString AbcShapeOverride::Classification = "drawdb/geometry/AbcShape";
-MString AbcShapeOverride::Registrant = "AbcShapeDrawOverride";
+MString AbcShapeOverride::Classification = "drawdb/geometry/" + MString(PREFIX_NAME("AbcShape"));
+MString AbcShapeOverride::Registrant = PREFIX_NAME("AbcShapeDrawOverride");
 
 AbcShapeOverride::AbcShapeOverride(const MObject &obj)
    : MHWRender::MPxDrawOverride(obj, AbcShapeOverride::draw)

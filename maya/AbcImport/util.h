@@ -52,6 +52,15 @@
 #include <maya/MString.h>
 #include <maya/MFnDependencyNode.h>
 
+
+#ifdef NAME_PREFIX
+#   define PREFIX_NAME(s) NAME_PREFIX s
+#else
+#   define PREFIX_NAME(s) s
+#   define NAME_PREFIX ""
+#endif
+
+
 // Return the output connected shading groups from a shape object
 MObjectArray getOutConnectedSG( const MDagPath &shapeDPath );
 

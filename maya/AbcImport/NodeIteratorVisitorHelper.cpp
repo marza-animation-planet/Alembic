@@ -2935,7 +2935,7 @@ MString connectAttr(ArgData & iArgData)
     MDGModifier modifier;
     MPlug srcPlug, dstPlug;
 
-    MObject alembicNodeObj = modifier.createNode("AlembicNode", &status);
+    MObject alembicNodeObj = modifier.createNode(PREFIX_NAME("AlembicNode"), &status);
     MFnDependencyNode alembicNodeFn(alembicNodeObj, &status);
 
     AlembicNode *alembicNodePtr =
@@ -3055,7 +3055,7 @@ MString connectAttr(ArgData & iArgData)
             status = modifier.doIt();
             if (status != MS::kSuccess)
             {
-                MString theError("AlembicNode.outSubDMesh[");
+                MString theError(MString(PREFIX_NAME("AlembicNode")) + ".outSubDMesh[");
                 theError += i;
                 theError += "] --> ";
                 theError += mFn.name();

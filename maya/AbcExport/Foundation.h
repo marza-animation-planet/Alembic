@@ -131,6 +131,13 @@
 #include <assert.h>
 
 
+#ifdef NAME_PREFIX
+#  define PREFIX_NAME(s) NAME_PREFIX s
+#else
+#  define PREFIX_NAME(s) s
+#  define NAME_PREFIX ""
+#endif
+
 #define ABCEXPORT_VERSION "1.0"
 
 #endif  // _AbcExport_Foundation_h_

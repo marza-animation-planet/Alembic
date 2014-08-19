@@ -11,6 +11,7 @@
 #include <iostream>
 
 
+
 WorldUpdate::WorldUpdate(double t,
                          bool ignoreTransforms,
                          bool ignoreInstances,
@@ -528,7 +529,7 @@ bool DrawScene::cull(AlembicNode &node)
          #ifdef _DEBUG
          if (!bounds.isEmpty())
          {
-            std::cout << "[AbcShape] " << node.path() << " culled" << std::endl;
+            std::cout << "[" << PREFIX_NAME("AbcShape") << "] " << node.path() << " culled" << std::endl;
          }
          #endif
          mCulledNodes.insert(&node);

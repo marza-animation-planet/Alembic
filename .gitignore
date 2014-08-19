@@ -4,3 +4,4 @@ release
 debug
 *.dblite
 excons.cache
+maya/AbcShape/AE*Template.mel

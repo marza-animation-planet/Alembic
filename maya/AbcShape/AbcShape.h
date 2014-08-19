@@ -1,9 +1,7 @@
 #ifndef ABCSHAPE_ABCSHAPE_H_
 #define ABCSHAPE_ABCSHAPE_H_
 
-#include "AlembicScene.h"
-#include "GeometryData.h"
-#include "MathUtils.h"
+#include "common.h"
 
 #include <maya/MPxSurfaceShape.h>
 #include <maya/MPxSurfaceShapeUI.h>

@@ -1,4 +1,8 @@
 #include "AbcShapeImport.h"
+#include "AbcShape.h"
+#include "Keyframer.h"
+#include "SceneCache.h"
+#include "AlembicSceneVisitors.h"
 #include <maya/MArgList.h>
 #include <maya/MArgParser.h>
 #include <maya/MSelectionList.h>
@@ -29,10 +33,6 @@
 #include <maya/MFnCompoundAttribute.h>
 #include <maya/MFnMatrixData.h>
 #include <maya/MFnStringData.h>
-#include "AbcShape.h"
-#include "SceneCache.h"
-#include "AlembicSceneVisitors.h"
-#include "Keyframer.h"
 
 MSyntax AbcShapeImport::createSyntax()
 {
@@ -367,7 +367,7 @@ AlembicNode::VisitReturn CreateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
 {
    AlembicNode *target = (instance ? instance : &node);
    
-   if (!createDag("AbcShape", target))
+   if (!createDag(PREFIX_NAME("AbcShape"), target))
    {
       return AlembicNode::StopVisit;
    }
@@ -1321,7 +1321,7 @@ void CreateTree::setNumericUserProp(MFnDagNode &node, const std::string &name, A
    }
    else
    {
-      MGlobal::displayWarning("[AbcShapeImport] Numeric attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + "] Numeric attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1350,7 +1350,7 @@ void CreateTree::setNumericArrayUserProp(MFnDagNode &node, const std::string &na
    }
    else
    {
-      MGlobal::displayWarning("[AbcShapeImport] Numeric array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + "] Numeric array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1368,7 +1368,7 @@ void CreateTree::setPointUserProp(MFnDagNode &node, const std::string &name, Ale
    }
    else
    {
-      MGlobal::displayWarning("[AbcShapeImport] Point attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + "] Point attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1395,7 +1395,7 @@ void CreateTree::setPointArrayUserProp(MFnDagNode &node, const std::string &name
    }
    else
    {
-      MGlobal::displayWarning("[AbcShapeImport] Point array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + "] Point array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1422,7 +1422,7 @@ void CreateTree::setColorUserProp(MFnDagNode &node, const std::string &name, Ale
    }
    else
    {
-      MGlobal::displayWarning("[AbcShapeImport] Color attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + "] Color attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1465,7 +1465,7 @@ void CreateTree::setColorArrayUserProp(MFnDagNode &node, const std::string &name
    }
    else
    {
-      MGlobal::displayWarning("[AbcShapeImport] Color array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + "] Color array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1485,7 +1485,7 @@ void CreateTree::setMatrixUserProp(MFnDagNode &node, const std::string &name, Al
    }
    else
    {
-      MGlobal::displayWarning("[AbcShapeImport] Matrix attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + "] Matrix attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1514,7 +1514,7 @@ void CreateTree::setMatrixArrayUserProp(MFnDagNode &node, const std::string &nam
    }
    else
    {
-      MGlobal::displayWarning("[AbcShapeImport] Matrix array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + "] Matrix array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1531,7 +1531,7 @@ void CreateTree::setStringUserProp(MFnDagNode &node, const std::string &name, Al
    }
    else
    {
-      MGlobal::displayWarning("[AbcShapeImport] String attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + "] String attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1557,7 +1557,7 @@ void CreateTree::setStringArrayUserProp(MFnDagNode &node, const std::string &nam
    }
    else
    {
-      MGlobal::displayWarning("[AbcShapeImport] String array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + "] String array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1616,7 +1616,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
          }
          else
          {
-            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + MString("] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -1636,7 +1636,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
          }
          else
          {
-            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + MString("] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -1656,7 +1656,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
          }
          else
          {
-            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + MString("] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -1700,7 +1700,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             }
             break;
          default:
-            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + MString("] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -1744,7 +1744,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             }
             break;
          default:
-            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + MString("] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -1788,7 +1788,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             }
             break;
          default:
-            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + MString("] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -1832,7 +1832,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             }
             break;
          default:
-            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + MString("] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -1876,7 +1876,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             }
             break;
          default:
-            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + MString("] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -1920,7 +1920,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             }
             break;
          default:
-            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + MString("] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -2024,7 +2024,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             }
             break;
          default:
-            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + MString("] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -2128,7 +2128,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             }
             break;
          default:
-            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + MString("] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -2232,7 +2232,7 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             }
             break;
          default:
-            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + MString("] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -2252,12 +2252,12 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
          }
          else
          {
-            MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + MString("] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
       default:
-         MGlobal::displayWarning(MString("[AbcShapeImport] Unsupported user property type ") +
+         MGlobal::displayWarning("[" + MString(PREFIX_NAME("AbcShapeImport")) + MString("] Unsupported user property type ") +
                                  Alembic::Util::PODName(dataType.getPod()));
       }
    }
@@ -2333,22 +2333,22 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
    
    if (argData.isFlagSet("help"))
    {
-      MGlobal::displayInfo("AbcShapeImport [options] abc_file_path");
+      MGlobal::displayInfo(MString(PREFIX_NAME("AbcShapeImport")) + " [options] abc_file_path");
       MGlobal::displayInfo("Options:");
       MGlobal::displayInfo("-r / -reparent               : dagpath");
       MGlobal::displayInfo("                               Reparent the whole hierarchy under a node in the current Maya scene.");
       MGlobal::displayInfo("-n / -namespace              : string");
       MGlobal::displayInfo("                               Namespace to add nodes to (default to current namespace).");
       MGlobal::displayInfo("-m / -mode                   : string (box|boxes|points|geometry)");
-      MGlobal::displayInfo("                               AbcShape nodes display mode (default to box).");
+      MGlobal::displayInfo("                               " + MString(PREFIX_NAME("AbcShape")) + " nodes display mode (default to box).");
       MGlobal::displayInfo("-s / -speed                  : double");
-      MGlobal::displayInfo("                               AbcShape nodes speed (default to 1.0).");
+      MGlobal::displayInfo("                               " + MString(PREFIX_NAME("AbcShape")) + " nodes speed (default to 1.0).");
       MGlobal::displayInfo("-o / -offset                 : double");
-      MGlobal::displayInfo("                               AbcShape nodes offset in frames (default to 0.0).");
+      MGlobal::displayInfo("                               " + MString(PREFIX_NAME("AbcShape")) + " nodes offset in frames (default to 0.0).");
       MGlobal::displayInfo("-psf / -preserveStartFrame   : bool");
       MGlobal::displayInfo("                               Preserve range start frame when using speed.");
       MGlobal::displayInfo("-ct / -cycleType             : string (hold|loop|reverse|bounce)");
-      MGlobal::displayInfo("                               AbcShape nodes cycle type (default to hold).");
+      MGlobal::displayInfo("                               " + MString(PREFIX_NAME("AbcShape")) + " nodes cycle type (default to hold).");
       MGlobal::displayInfo("-ci / -createInstances       :");
       MGlobal::displayInfo("                               Create maya instances.");
       MGlobal::displayInfo("-ri / -rotationInterpolation : string (none|euler|quaternion|quaternionSlerp|quaternionSquad)");
@@ -2364,7 +2364,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       MGlobal::displayInfo("");
       MGlobal::displayInfo("Command also work in edit mode:");
       MGlobal::displayInfo("  -mode, -speed, -offset, -preserveStartFrame, -cycleType, -rotationInterpolation flags are supported.");
-      MGlobal::displayInfo("  Acts on all AbcShape in selected node trees.");
+      MGlobal::displayInfo("  Acts on all " + MString(PREFIX_NAME("AbcShape")) + " in selected node trees.");
    }
    
    if (argData.isFlagSet("preserveStartFrame"))
@@ -2551,7 +2551,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
             continue;
          }
          
-         if (node.typeName() == "AbcShape")
+         if (node.typeName() == PREFIX_NAME("AbcShape"))
          {
             if (setSpeed)
             {

@@ -1,5 +1,5 @@
 
-global proc AEAbcShapeSelectFile(string $attr)
+global proc AE<<NodeName>>SelectFile(string $attr)
 {
    string $result[] = `fileDialog2 -returnFilter 1
                                    -fileFilter "Alembic File (*.abc)"
@@ -17,29 +17,29 @@ global proc AEAbcShapeSelectFile(string $attr)
    }
 }
 
-global proc AEAbcShapeFileNew(string $attr)
+global proc AE<<NodeName>>FileNew(string $attr)
 {
    setUITemplate -pst attributeEditorTemplate;
    
    columnLayout -adj true;
       rowLayout -nc 3;
          text -label "File Path";
-         textField AEAbcShape_FilePathField;
-         symbolButton -image "navButtonBrowse.png" AEAbcShape_FilePathBtn;
+         textField AE<<NodeName>>_FilePathField;
+         symbolButton -image "navButtonBrowse.png" AE<<NodeName>>_FilePathBtn;
          setParent ..;
       setParent ..;
    setParent ..;
 
-   AEAbcShapeFileReplace($attr);
+   AE<<NodeName>>FileReplace($attr);
 }
 
-global proc AEAbcShapeFileReplace(string $attr)
+global proc AE<<NodeName>>FileReplace(string $attr)
 {
-   connectControl -fileName AEAbcShape_FilePathField $attr;
-   button -e -c ("AEAbcShapeSelectFile " + $attr) AEAbcShape_FilePathBtn;
+   connectControl -fileName AE<<NodeName>>_FilePathField $attr;
+   button -e -c ("AE<<NodeName>>SelectFile " + $attr) AE<<NodeName>>_FilePathBtn;
 }
 
-global proc AEAbcShapeTemplate(string $nodeName)
+global proc AE<<NodeName>>Template(string $nodeName)
 {
    editorTemplate -suppress "doubleSided";
    editorTemplate -suppress "opposite";
@@ -90,7 +90,7 @@ global proc AEAbcShapeTemplate(string $nodeName)
    editorTemplate -beginScrollLayout;
    
    editorTemplate -beginLayout "Alembic" -collapse 0;
-   editorTemplate -callCustom AEAbcShapeFileNew AEAbcShapeFileReplace "filePath";
+   editorTemplate -callCustom AE<<NodeName>>FileNew AE<<NodeName>>FileReplace "filePath";
    editorTemplate -label "Objects" -addControl "objectExpression";
    editorTemplate -addSeparator;
    editorTemplate -label "Display Mode" -addControl "displayMode";

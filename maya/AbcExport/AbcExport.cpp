@@ -1072,10 +1072,14 @@ catch (std::exception & e)
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
     MStatus status;
-    MFnPlugin plugin(obj, "Alembic", ABCEXPORT_VERSION, "Any");
+    
+    MString name = PREFIX_NAME("Alembic");
+    MString commandName = PREFIX_NAME("AbcExport");
+    
+    MFnPlugin plugin(obj, name.asChar(), ABCEXPORT_VERSION, "Any");
 
     status = plugin.registerCommand(
-        "AbcExport", AbcExport::creator,
+        commandName, AbcExport::creator,
         AbcExport::createSyntax );
 
     if (!status)
@@ -1083,7 +1087,7 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         status.perror("registerCommand");
     }
     
-    status = plugin.registerFileTranslator("Alembic Export",
+    status = plugin.registerFileTranslator(name + " Export",
                                 NULL,
                                 AlembicExportFileTranslator::creator,
                                 "alembicExportOptions",
@@ -1094,7 +1098,7 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
         status.perror("registerFileTranslator");
     }
 
-    MString info = "AbcExport v";
+    MString info = MString(PREFIX_NAME("AbcExport")) + " v";
     info += ABCEXPORT_VERSION;
     info += " using ";
     info += Alembic::Abc::GetLibraryVersion().c_str();
@@ -1108,13 +1112,16 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
     MStatus status;
     MFnPlugin plugin(obj);
 
-    status = plugin.deregisterFileTranslator("Alembic Export");
+    MString name = PREFIX_NAME("Alembic");
+    MString commandName = PREFIX_NAME("AbcExport");
+
+    status = plugin.deregisterFileTranslator(name + " Export");
     if (!status)
     {
         status.perror("deregisterFileTranslator");
     }
 
-    status = plugin.deregisterCommand("AbcExport");
+    status = plugin.deregisterCommand(commandName);
     if (!status)
     {
         status.perror("deregisterCommand");

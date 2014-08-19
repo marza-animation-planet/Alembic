@@ -1,9 +1,7 @@
 #ifndef ABCSHAPE_ALEMBICSCENEVISITORS_H_
 #define ABCSHAPE_ALEMBICSCENEVISITORS_H_
 
-#include "AlembicScene.h"
-#include "GeometryData.h"
-#include "MathUtils.h"
+#include "common.h"
 
 #include <set>
 #include <string>

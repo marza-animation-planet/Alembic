@@ -259,7 +259,7 @@ int ProcInit( struct AtNode *node, void **user_ptr )
     
     if (!AiCheckAPIVersion(AI_VERSION_ARCH, AI_VERSION_MAJOR, AI_VERSION_MINOR))
     {
-        std::cout << "AlembicArnoldProcedural compiled with arnold-"
+        std::cout << PREFIX_NAME("AlembicArnoldProcedural") << " compiled with arnold-"
                   << AI_VERSION
                   << " but is running with incompatible arnold-"
                   << AiGetVersion(NULL, NULL, NULL, NULL) << std::endl;

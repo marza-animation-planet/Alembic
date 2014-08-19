@@ -826,7 +826,7 @@ bool AbcWriteJob::eval(double iFrame)
 
         std::string appWriter = "Maya ";
         appWriter += MGlobal::mayaVersion().asChar();
-        appWriter += " AbcExport v";
+        appWriter += " " NAME_PREFIX "AbcExport v";
         appWriter += ABCEXPORT_VERSION;
 
         std::string userInfo = "Exported from: ";

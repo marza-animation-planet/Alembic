@@ -35,6 +35,7 @@
 //-*****************************************************************************
 
 #include "AlembicImportFileTranslator.h"
+#include "util.h"
 
 #include <maya/MGlobal.h>
 #include <maya/MSelectionList.h>
@@ -45,7 +46,7 @@ MStatus AlembicImportFileTranslator::reader(
                                         const MString& optionsString,
                                         MPxFileTranslator::FileAccessMode mode)
 {
-    MString script = "AbcImport";
+    MString script = PREFIX_NAME("AbcImport");
     MString options;
     MString impmode;
     MStringArray optlist;
