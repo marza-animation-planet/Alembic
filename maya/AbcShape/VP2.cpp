@@ -32,6 +32,13 @@ public:
       {
          return;
       }
+      
+      AlembicScene *scene = shape->scene();
+      
+      if (!scene)
+      {
+         return;
+      }
 
       const MMatrix view = context.getMatrix(MHWRender::MDrawContext::kWorldViewMtx, &status);
       if (status != MStatus::kSuccess)
@@ -94,7 +101,7 @@ public:
          
          if (shape->displayMode() == AbcShape::DM_box)
          {
-            DrawBox(shape->scene()->selfBounds(), false, shape->lineWidth());
+            DrawBox(scene->selfBounds(), false, shape->lineWidth());
          }
          else
          {
@@ -102,7 +109,7 @@ public:
             visitor.drawTransformBounds(shape->drawTransformBounds(), viewMatrix);
             visitor.drawLocators(shape->drawLocators());
             
-            shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
+            scene->visit(AlembicNode::VisitDepthFirst, visitor);
          }
       }
       else if (shape->displayMode() == AbcShape::DM_points)
@@ -116,7 +123,7 @@ public:
          visitor.drawTransformBounds(shape->drawTransformBounds(), viewMatrix);
          visitor.drawLocators(shape->drawLocators());
          
-         shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
+         scene->visit(AlembicNode::VisitDepthFirst, visitor);
       }
       else
       {
@@ -160,7 +167,7 @@ public:
                glColor3d(0, 0, 0);
             }
             
-            shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
+            scene->visit(AlembicNode::VisitDepthFirst, visitor);
             visitor.drawBounds(false);
             
             if (drawWireframe)
@@ -179,7 +186,7 @@ public:
             
             glColor3d(color.r, color.g, color.b);
             
-            shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
+            scene->visit(AlembicNode::VisitDepthFirst, visitor);
          }
       }
       
