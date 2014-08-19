@@ -1108,7 +1108,7 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
     MStatus status;
     MFnPlugin plugin(obj);
 
-    status = plugin.deregisterFileTranslator("Alembic");
+    status = plugin.deregisterFileTranslator("Alembic Export");
     if (!status)
     {
         status.perror("deregisterFileTranslator");
