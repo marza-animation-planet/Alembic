@@ -514,7 +514,7 @@ if build_maya_plugins:
    AbcShapeMel = "maya/AbcShape/AE%sTemplate.mel" % AbcShapeName
    
    if not os.path.exists(AbcShapeMel):
-      replace_in_mel("maya/AbcShape/AETemplate.mel", AbcShapeMel, "<<NodeName>>", AbcShapeName)
+      replace_in_mel("maya/AbcShape/AETemplate.mel.tpl", AbcShapeMel, "<<NodeName>>", AbcShapeName)
    
    prjs.extend([{"name": "%sAbcImport" % nameprefix,
                  "type": "dynamicmodule",
