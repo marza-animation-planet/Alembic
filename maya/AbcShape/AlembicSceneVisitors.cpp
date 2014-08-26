@@ -410,7 +410,7 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicMesh &node, AlembicNode *)
    bool updated = true;
    bool alreadySampled = hasBeenSampled(node);
    
-   if (!alreadySampled && node.sampleData(mTime, mTime, false, &updated))
+   if (!alreadySampled && node.sampleSchema(mTime, mTime, false, &updated))
    {
       TimeSampleList<Alembic::AbcGeom::IPolyMeshSchema> &samples = node.samples().schemaSamples;
       
@@ -463,7 +463,7 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicSubD &node, AlembicNode *)
    bool updated = true;
    bool alreadySampled = hasBeenSampled(node);
    
-   if (!alreadySampled && node.sampleData(mTime, mTime, false, &updated))
+   if (!alreadySampled && node.sampleSchema(mTime, mTime, false, &updated))
    {
       TimeSampleList<Alembic::AbcGeom::ISubDSchema> &samples = node.samples().schemaSamples;
       
@@ -516,7 +516,7 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicPoints &node, AlembicNode 
    bool updated = true;
    bool alreadySampled = hasBeenSampled(node);
    
-   if (!alreadySampled && node.sampleData(mTime, mTime, false, &updated))
+   if (!alreadySampled && node.sampleSchema(mTime, mTime, false, &updated))
    {
       TimeSampleList<Alembic::AbcGeom::IPointsSchema> &samples = node.samples().schemaSamples;
       
@@ -569,7 +569,7 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicCurves &node, AlembicNode 
    bool updated = true;
    bool alreadySampled = hasBeenSampled(node);
    
-   if (!alreadySampled && node.sampleData(mTime, mTime, false, &updated))
+   if (!alreadySampled && node.sampleSchema(mTime, mTime, false, &updated))
    {
       TimeSampleList<Alembic::AbcGeom::ICurvesSchema> &samples = node.samples().schemaSamples;
       

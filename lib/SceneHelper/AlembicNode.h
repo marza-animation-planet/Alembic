@@ -349,7 +349,23 @@ public:
    {
       if (type() == AlembicNode::TypeXform)
       {
-         return sample(mITypedObj.getSchema(), t0, t1, mSamples.schemaSamples, mergeSamples, resampled);
+         if (isLocator())
+         {
+            ILocatorProperty locatorProp = locatorProperty();
+            
+            if (locatorProp.valid())
+            {
+               return sample(locatorProp, t0, t1, mSamples.locatorSamples, mergeSamples, resampled);
+            }
+            else
+            {
+               return false;
+            }
+         }
+         else
+         {
+            return sampleSchema(t0, t1, mergeSamples, resampled);
+         }
       }
       else
       {
@@ -366,25 +382,9 @@ public:
       }
    }
    
-   bool sampleData(double t0, double t1, bool mergeSamples, bool *resampled=0)
+   bool sampleSchema(double t0, double t1, bool mergeSamples, bool *resampled=0)
    {
-      if (isLocator())
-      {
-         ILocatorProperty locatorProp = locatorProperty();
-         
-         if (locatorProp.valid())
-         {
-            return sample(locatorProp, t0, t1, mSamples.locatorSamples, mergeSamples, resampled);
-         }
-         else
-         {
-            return false;
-         }
-      }
-      else
-      {
-         return sample(mITypedObj.getSchema(), t0, t1, mSamples.schemaSamples, mergeSamples, resampled);
-      }
+      return sample(mITypedObj.getSchema(), t0, t1, mSamples.schemaSamples, mergeSamples, resampled);
    }
    
    virtual void reset()
