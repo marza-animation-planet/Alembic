@@ -95,51 +95,62 @@ public:
 
 private:
    
-   template <class IClass>
-   void _update(const AlembicNodeT<IClass> &node)
+   template <class IObject>
+   void _update(const AlembicNodeT<IObject> &node)
    {
-      const typename AlembicNodeT<IClass>::Sample &samp0 = node.firstSample();
-      const typename AlembicNodeT<IClass>::Sample &samp1 = node.secondSample();
+      const TimeSampleList<typename IObject::schema_type> &samples = node.samples().schemaSamples;
       
-      IClass iObj = node.typedObject();
+      typename TimeSampleList<typename IObject::schema_type>::ConstIterator samp0, samp1;
       
-      if (!samp0.valid(iObj))
+      if (samples.empty())
       {
          clear();
          return;
       }
       
-      bool varyingTopology = (iObj.getSchema().getTopologyVariance() == Alembic::AbcGeom::kHeterogeneousTopology);
+      samp0 = samples.begin();
       
-      Alembic::Abc::Int32ArraySamplePtr fc = samp0.data.getFaceCounts();
-      Alembic::Abc::Int32ArraySamplePtr fi = samp0.data.getFaceIndices();
-      Alembic::Abc::P3fArraySamplePtr p0 = samp0.data.getPositions();
+      if (!samp0->valid())
+      {
+         clear();
+         return;
+      }
+      
+      bool varyingTopology = (node.typedObject().getSchema().getTopologyVariance() == Alembic::AbcGeom::kHeterogeneousTopology);
+      
+      Alembic::Abc::Int32ArraySamplePtr fc = samp0->data().getFaceCounts();
+      Alembic::Abc::Int32ArraySamplePtr fi = samp0->data().getFaceIndices();
+      Alembic::Abc::P3fArraySamplePtr p0 = samp0->data().getPositions();
       Alembic::Abc::V3fArraySamplePtr v0;
       Alembic::Abc::P3fArraySamplePtr p1;
       
-      float t0 = float(samp0.dataTime);
-      float w0 = float(samp0.dataWeight);
+      float t0 = float(samp0->time());
+      float w0 = 1.0f;
       float t1 = 0.0f;
       float w1 = 0.0f;
       
-      if (samp1.dataWeight > 0.0)
+      if (samples.size() > 1)
       {
-         t1 = float(samp1.dataTime);
-         w1 = float(samp1.dataWeight);
+         samp1 = samples.end();
+         --samp1;
+         
+         t1 = float(samp1->time());
+         w1 = float(samples.lastEvaluationTime - samp0->time()) / (samp1->time() - samp0->time());
+         w0 = 1.0f - w1;
          
          if (varyingTopology)
          {
-            v0 = samp0.data.getVelocities();
+            v0 = samp0->data().getVelocities();
          }
          else
          {
-            if (samp1.valid(iObj))
+            if (samp1->valid())
             {
-               p1 = samp1.data.getPositions();
+               p1 = samp1->data().getPositions();
             }
          }
       }
-      
+            
       _update(varyingTopology, fc, fi, t0, w0, p0, v0, t1, w1, p1);
    }
    

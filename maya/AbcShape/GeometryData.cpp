@@ -297,23 +297,32 @@ PointsData::~PointsData()
 
 void PointsData::update(const AlembicPoints &node)
 {
-   const AlembicPoints::Sample &samp0 = node.firstSample();
-   const AlembicPoints::Sample &samp1 = node.secondSample();
+   const TimeSampleList<Alembic::AbcGeom::IPointsSchema> &samples = node.samples().schemaSamples;
    
-   if (!samp0.valid(node.typedObject()))
+   TimeSampleList<Alembic::AbcGeom::IPointsSchema>::ConstIterator samp0, samp1;
+   
+   if (samples.empty())
    {
       clear();
       return;
    }
    
-   float t0 = float(samp0.dataTime);
-   float w0 = float(samp0.dataWeight);
+   samp0 = samples.begin();
+   
+   if (!samp0->valid())
+   {
+      clear();
+      return;
+   }
+   
+   float t0 = float(samp0->time());
+   float w0 = 1.0f;
    float t1 = 0.0f;
    float w1 = 0.0f;
    
-   Alembic::Abc::P3fArraySamplePtr p0 = samp0.data.getPositions();
-   Alembic::Abc::V3fArraySamplePtr v0 = samp0.data.getVelocities();
-   Alembic::Abc::UInt64ArraySamplePtr id0 = samp0.data.getIds();
+   Alembic::Abc::P3fArraySamplePtr p0 = samp0->data().getPositions();
+   Alembic::Abc::V3fArraySamplePtr v0 = samp0->data().getVelocities();
+   Alembic::Abc::UInt64ArraySamplePtr id0 = samp0->data().getIds();
    
    mNumPoints = p0->size();
    
@@ -323,15 +332,20 @@ void PointsData::update(const AlembicPoints &node)
       return;
    }
    
-   if (samp1.dataWeight > 0.0)
+   //if (samp1.dataWeight > 0.0)
+   if (samples.size() > 1)
    {
+      samp1 = samples.end();
+      --samp1;
+      
+      t1 = float(samp1->time());
+      w1 = float(samples.lastEvaluationTime - samp0->time()) / (samp1->time() - samp0->time());
+      w0 = 1.0f - w1;
+      
       mLocalPoints.resize(mNumPoints);
       
-      t1 = float(samp1.dataTime);
-      w1 = float(samp1.dataWeight);
-      
-      Alembic::Abc::P3fArraySamplePtr p1 = samp1.data.getPositions();
-      Alembic::Abc::UInt64ArraySamplePtr id1 = samp1.data.getIds();
+      Alembic::Abc::P3fArraySamplePtr p1 = samp1->data().getPositions();
+      Alembic::Abc::UInt64ArraySamplePtr id1 = samp1->data().getIds();
       
       float dt = w1 * (t1 - t0);
       
@@ -422,21 +436,30 @@ CurvesData::~CurvesData()
 
 void CurvesData::update(const AlembicCurves &curves)
 {
-   const AlembicCurves::Sample &samp0 = curves.firstSample();
-   const AlembicCurves::Sample &samp1 = curves.secondSample();
+   const TimeSampleList<Alembic::AbcGeom::ICurvesSchema> &samples = curves.samples().schemaSamples;
    
-   if (!samp0.valid(curves.typedObject()))
+   TimeSampleList<Alembic::AbcGeom::ICurvesSchema>::ConstIterator samp0, samp1;
+   
+   if (samples.empty())
    {
       clear();
       return;
    }
    
-   float t0 = float(samp0.dataTime);
-   float w0 = float(samp0.dataWeight);
+   samp0 = samples.begin();
+   
+   if (!samp0->valid())
+   {
+      clear();
+      return;
+   }
+   
+   float t0 = float(samp0->time());
+   float w0 = 1.0f;
    float t1 = 0.0f;
    float w1 = 0.0f;
    
-   mNumCurves = samp0.data.getNumCurves();
+   mNumCurves = samp0->data().getNumCurves();
    
    if (mNumCurves == 0)
    {
@@ -444,29 +467,33 @@ void CurvesData::update(const AlembicCurves &curves)
       return;
    }
    
-   mNumPoints = samp0.data.getCurvesNumVertices()->get();
-   mWrap = (samp0.data.getWrap() == Alembic::AbcGeom::kPeriodic);
+   mNumPoints = samp0->data().getCurvesNumVertices()->get();
+   mWrap = (samp0->data().getWrap() == Alembic::AbcGeom::kPeriodic);
    
-   Alembic::Abc::P3fArraySamplePtr p0 = samp0.data.getPositions();
+   Alembic::Abc::P3fArraySamplePtr p0 = samp0->data().getPositions();
    
    mNumVertices = p0->size();
    
-   if (samp1.dataWeight > 0.0)
+   if (samples.size() > 1)
    {
       bool interpolate = true;
       
-      t1 = float(samp1.dataTime);
-      w1 = float(samp1.dataWeight);
+      samp1 = samples.end();
+      --samp1;
+      
+      t1 = float(samp1->time());
+      w1 = float(samples.lastEvaluationTime - samp0->time()) / (samp1->time() - samp0->time());
+      w0 = 1.0f - w1;
       
       // Check for matching number of curves and vertices per curve
       
-      if (samp1.data.getNumCurves() != mNumCurves)
+      if (samp1->data().getNumCurves() != mNumCurves)
       {
          interpolate = false;
       }
       else
       {
-         Alembic::Abc::Int32ArraySamplePtr nv1 = samp1.data.getCurvesNumVertices();
+         Alembic::Abc::Int32ArraySamplePtr nv1 = samp1->data().getCurvesNumVertices();
          
          for (size_t i=0; i<mNumCurves; ++i)
          {
@@ -480,7 +507,7 @@ void CurvesData::update(const AlembicCurves &curves)
       
       if (!interpolate)
       {
-         Alembic::Abc::V3fArraySamplePtr v0 = samp0.data.getVelocities();
+         Alembic::Abc::V3fArraySamplePtr v0 = samp0->data().getVelocities();
          
          if (v0 && v0->size() == p0->size())
          {
@@ -503,7 +530,7 @@ void CurvesData::update(const AlembicCurves &curves)
       }
       else
       {
-         Alembic::Abc::P3fArraySamplePtr p1 = samp1.data.getPositions();
+         Alembic::Abc::P3fArraySamplePtr p1 = samp1->data().getPositions();
          
          if (p1 && p1->size() == p0->size())
          {

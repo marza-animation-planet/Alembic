@@ -61,31 +61,45 @@ inline unsigned int WorldUpdate::numShapes() const
 template <class T>
 AlembicNode::VisitReturn WorldUpdate::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance)
 {
+   bool noData = true;
    bool updated = true;
    
-   if (node.sampleBounds(mTime, &updated))
+   TimeSampleList<Alembic::Abc::IBox3dProperty> &boundsSamples = node.samples().boundsSamples;
+   
+   if (node.sampleBounds(mTime, mTime, false, &updated))
    {
-      if (updated)
+      if (updated || fabs(boundsSamples.lastEvaluationTime - mTime) > 0.0001)
       {
-         typename AlembicNodeT<T>::Sample &samp0 = node.firstSample();
-         typename AlembicNodeT<T>::Sample &samp1 = node.secondSample();
+         TimeSampleList<Alembic::Abc::IBox3dProperty>::ConstIterator samp0, samp1;
+         double blend = 0.0;
          
-         if (samp1.boundsWeight > 0.0)
+         if (boundsSamples.getSamples(mTime, samp0, samp1, blend))
          {
+            if (blend > 0.0)
+            {
+               Alembic::Abc::Box3d b0 = samp0->data();
+               Alembic::Abc::Box3d b1 = samp1->data();
+               
+               node.setSelfBounds(Alembic::Abc::Box3d((1.0 - blend) * b0.min + blend * b1.min,
+                                                      (1.0 - blend) * b0.max + blend * b1.max));
+            }
+            else
+            {
+               node.setSelfBounds(samp0->data());
+            }
             
-            Alembic::Abc::Box3d b0 = samp0.bounds;
-            Alembic::Abc::Box3d b1 = samp1.bounds;
+            noData = false;
             
-            node.setSelfBounds(Alembic::Abc::Box3d(samp0.boundsWeight * b0.min + samp1.boundsWeight * b1.min,
-                                                   samp0.boundsWeight * b0.max + samp1.boundsWeight * b1.max));
-         }
-         else
-         {
-            node.setSelfBounds(samp0.bounds);
+            boundsSamples.lastEvaluationTime = mTime;
          }
       }
+      else
+      {
+         noData = false;
+      }
    }
-   else
+   
+   if (noData)
    {
       Alembic::Abc::Box3d box;
       node.setSelfBounds(box);

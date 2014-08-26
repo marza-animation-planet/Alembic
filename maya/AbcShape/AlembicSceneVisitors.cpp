@@ -26,39 +26,56 @@ WorldUpdate::WorldUpdate(double t,
 
 AlembicNode::VisitReturn WorldUpdate::enter(AlembicXform &node, AlembicNode *instance)
 {
+   bool noData = true;
    bool updated = true;
    
    if (node.isLocator())
    {
-      if (node.sampleBounds(mTime, &updated))
+      // sampleBounds utility function will sample locator property
+      
+      if (node.sampleBounds(mTime, mTime, false, &updated))
       {
-         if (updated)
+         TimeSampleList<ILocatorProperty> &locatorSamples = node.samples().locatorSamples;
+         
+         if (updated || fabs(locatorSamples.lastEvaluationTime - mTime) > 0.0001)
          {
-            AlembicXform::Sample &samp0 = node.firstSample();
-            AlembicXform::Sample &samp1 = node.secondSample();
+            TimeSampleList<ILocatorProperty>::ConstIterator samp0, samp1;
+            double blend = 0.0;
             
-            if (samp1.dataWeight > 0.0)
+            if (locatorSamples.getSamples(mTime, samp0, samp1, blend))
             {
-               Alembic::Abc::V3d v0, v1;
+               if (blend > 0.0)
+               {
+                  Alembic::Abc::V3d v0, v1;
+                  
+                  v0.setValue(samp0->data().T[0], samp0->data().T[1], samp0->data().T[2]);
+                  v1.setValue(samp1->data().T[0], samp1->data().T[1], samp1->data().T[2]);
+                  
+                  node.setLocatorPosition((1.0 - blend) * v0 + blend * v1);
+                  
+                  v0.setValue(samp0->data().S[0], samp0->data().S[1], samp0->data().S[2]);
+                  v1.setValue(samp1->data().S[0], samp1->data().S[1], samp1->data().S[2]);
+                  
+                  node.setLocatorScale((1.0 - blend) * v0 + blend * v1);
+               }
+               else
+               {
+                  node.setLocatorPosition(Alembic::Abc::V3d(samp0->data().T[0], samp0->data().T[1], samp0->data().T[2]));
+                  node.setLocatorScale(Alembic::Abc::V3d(samp0->data().S[0], samp0->data().S[1], samp0->data().S[2]));
+               }
                
-               v0.setValue(samp0.locator[0], samp0.locator[1], samp0.locator[2]);
-               v1.setValue(samp1.locator[0], samp1.locator[1], samp1.locator[2]);
+               locatorSamples.lastEvaluationTime = mTime;
                
-               node.setLocatorPosition(samp0.dataWeight * v0 + samp1.dataWeight * v1);
-               
-               v0.setValue(samp0.locator[3], samp0.locator[4], samp0.locator[5]);
-               v1.setValue(samp1.locator[3], samp1.locator[4], samp1.locator[5]);
-               
-               node.setLocatorScale(samp0.dataWeight * v0 + samp1.dataWeight * v1);
-            }
-            else
-            {
-               node.setLocatorPosition(Alembic::Abc::V3d(samp0.locator[0], samp0.locator[1], samp0.locator[2]));
-               node.setLocatorScale(Alembic::Abc::V3d(samp0.locator[3], samp0.locator[4], samp0.locator[5]));
+               noData = false;
             }
          }
+         else
+         {
+            noData = false;
+         }
       }
-      else
+      
+      if (noData)
       {
          node.setLocatorPosition(Alembic::Abc::V3d(0, 0, 0));
          node.setLocatorScale(Alembic::Abc::V3d(1, 1, 1));
@@ -68,38 +85,55 @@ AlembicNode::VisitReturn WorldUpdate::enter(AlembicXform &node, AlembicNode *ins
    {
       if (!mIgnoreTransforms)
       {
-         if (node.sampleBounds(mTime, &updated))
+         if (node.sampleBounds(mTime, mTime, false, &updated))
          {
-            if (updated)
+            TimeSampleList<Alembic::AbcGeom::IXformSchema> &xformSamples = node.samples().schemaSamples;
+            
+            if (updated || fabs(xformSamples.lastEvaluationTime - mTime) > 0.0001)
             {
-               AlembicXform::Sample &samp0 = node.firstSample();
-               AlembicXform::Sample &samp1 = node.secondSample();
+               TimeSampleList<Alembic::AbcGeom::IXformSchema>::ConstIterator samp0, samp1;
+               double blend = 0.0;
                
-               if (samp1.dataWeight > 0.0)
+               if (xformSamples.getSamples(mTime, samp0, samp1, blend))
                {
-                  if (samp0.data.getInheritsXforms() != samp1.data.getInheritsXforms())
+                  if (blend > 0.0)
                   {
-                     std::cout << node.path() << ": Animated inherits transform property found, use first sample value" << std::endl;
-                     node.setSelfMatrix(samp0.data.getMatrix());
+                     if (samp0->data().getInheritsXforms() != samp1->data().getInheritsXforms())
+                     {
+                        std::cout << node.path() << ": Animated inherits transform property found, use first sample value" << std::endl;
+                        
+                        node.setSelfMatrix(samp0->data().getMatrix());
+                     }
+                     else
+                     {
+                        node.setSelfMatrix((1.0 - blend) * samp0->data().getMatrix() +
+                                           blend * samp1->data().getMatrix());
+                     }
                   }
                   else
                   {
-                     node.setSelfMatrix(samp0.dataWeight * samp0.data.getMatrix() +
-                                        samp1.dataWeight * samp1.data.getMatrix());
+                     node.setSelfMatrix(samp0->data().getMatrix());
                   }
-               }
-               else
-               {
-                  node.setSelfMatrix(samp0.data.getMatrix());
-               }
+                     
+                  node.setInheritsTransform(samp0->data().getInheritsXforms());
                   
-               node.setInheritsTransform(samp0.data.getInheritsXforms());
+                  xformSamples.lastEvaluationTime = mTime;
+                  
+                  noData = false;
+               }
+            }
+            else
+            {
+               noData = false;
             }
          }
-         else
+         
+         if (noData)
          {
             Alembic::Abc::M44d id;
+            
             node.setSelfMatrix(id);
+            node.setInheritsTransform(true);
          }
       }
    }
@@ -372,20 +406,52 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicXform &, AlembicNode *)
 
 AlembicNode::VisitReturn SampleGeometry::enter(AlembicMesh &node, AlembicNode *)
 {
+   bool noData = true;
    bool updated = true;
+   bool alreadySampled = hasBeenSampled(node);
    
-   if (!hasBeenSampled(node) && node.sampleData(mTime, &updated))
+   if (!alreadySampled && node.sampleData(mTime, mTime, false, &updated))
+   {
+      TimeSampleList<Alembic::AbcGeom::IPolyMeshSchema> &samples = node.samples().schemaSamples;
+      
+      if (updated || fabs(samples.lastEvaluationTime - mTime) > 0.0001)
+      {
+         // set updated flag to force a MeshData::update even if current state is valid
+         updated = true;
+         
+         TimeSampleList<Alembic::AbcGeom::IPolyMeshSchema>::ConstIterator samp0, samp1;
+         double blend = 0.0;
+         
+         if (samples.getSamples(mTime, samp0, samp1, blend))
+         {
+            samples.lastEvaluationTime = mTime;
+            noData = false;
+            setSampled(node);
+         }
+      }
+      else
+      {
+         noData = false;
+         setSampled(node);
+      }
+   }
+   else
+   {
+      updated = false;
+      noData = !alreadySampled;
+   }
+   
+   if (!noData)
    {
       if (mSceneData)
       {
          MeshData *data = mSceneData->mesh(node);
+         
          if (data && (!data->isValid() || updated))
          {
             data->update(node);
          }
       }
-      
-      setSampled(node);
    }
    
    return AlembicNode::ContinueVisit;
@@ -393,20 +459,52 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicMesh &node, AlembicNode *)
 
 AlembicNode::VisitReturn SampleGeometry::enter(AlembicSubD &node, AlembicNode *)
 {
+   bool noData = true;
    bool updated = true;
+   bool alreadySampled = hasBeenSampled(node);
    
-   if (!hasBeenSampled(node) && node.sampleData(mTime, &updated))
+   if (!alreadySampled && node.sampleData(mTime, mTime, false, &updated))
+   {
+      TimeSampleList<Alembic::AbcGeom::ISubDSchema> &samples = node.samples().schemaSamples;
+      
+      if (updated || fabs(samples.lastEvaluationTime - mTime) > 0.0001)
+      {
+         // set updated flag to force a MeshData::update even if current state is valid
+         updated = true;
+         
+         TimeSampleList<Alembic::AbcGeom::ISubDSchema>::ConstIterator samp0, samp1;
+         double blend = 0.0;
+         
+         if (samples.getSamples(mTime, samp0, samp1, blend))
+         {
+            samples.lastEvaluationTime = mTime;
+            noData = false;
+            setSampled(node);
+         }
+      }
+      else
+      {
+         noData = false;
+         setSampled(node);
+      }
+   }
+   else
+   {
+      noData = !alreadySampled;
+      updated = false;
+   }
+   
+   if (!noData)
    {
       if (mSceneData)
       {
          MeshData *data = mSceneData->mesh(node);
+         
          if (data && (!data->isValid() || updated))
          {
             data->update(node);
          }
       }
-      
-      setSampled(node);
    }
    
    return AlembicNode::ContinueVisit;
@@ -414,20 +512,52 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicSubD &node, AlembicNode *)
 
 AlembicNode::VisitReturn SampleGeometry::enter(AlembicPoints &node, AlembicNode *)
 {
+   bool noData = true;
    bool updated = true;
+   bool alreadySampled = hasBeenSampled(node);
    
-   if (!hasBeenSampled(node) && node.sampleData(mTime, &updated))
+   if (!alreadySampled && node.sampleData(mTime, mTime, false, &updated))
+   {
+      TimeSampleList<Alembic::AbcGeom::IPointsSchema> &samples = node.samples().schemaSamples;
+      
+      if (updated || fabs(samples.lastEvaluationTime - mTime) > 0.0001)
+      {
+         // set updated flag to force a MeshData::update even if current state is valid
+         updated = true;
+         
+         TimeSampleList<Alembic::AbcGeom::IPointsSchema>::ConstIterator samp0, samp1;
+         double blend = 0.0;
+         
+         if (samples.getSamples(mTime, samp0, samp1, blend))
+         {
+            samples.lastEvaluationTime = mTime;
+            noData = false;
+            setSampled(node);
+         }
+      }
+      else
+      {
+         noData = false;
+         setSampled(node);
+      }
+   }
+   else
+   {
+      noData = !alreadySampled;
+      updated = false;
+   }
+   
+   if (!noData)
    {
       if (mSceneData)
       {
          PointsData *data = mSceneData->points(node);
+         
          if (data && (!data->isValid() || updated))
          {
             data->update(node);
          }
       }
-      
-      setSampled(node);
    }
    
    return AlembicNode::ContinueVisit;
@@ -435,20 +565,52 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicPoints &node, AlembicNode 
 
 AlembicNode::VisitReturn SampleGeometry::enter(AlembicCurves &node, AlembicNode *)
 {
+   bool noData = true;
    bool updated = true;
+   bool alreadySampled = hasBeenSampled(node);
    
-   if (!hasBeenSampled(node) && node.sampleData(mTime, &updated))
+   if (!alreadySampled && node.sampleData(mTime, mTime, false, &updated))
+   {
+      TimeSampleList<Alembic::AbcGeom::ICurvesSchema> &samples = node.samples().schemaSamples;
+      
+      if (updated || fabs(samples.lastEvaluationTime - mTime) > 0.0001)
+      {
+         // set updated flag to force a MeshData::update even if current state is valid
+         updated = true;
+         
+         TimeSampleList<Alembic::AbcGeom::ICurvesSchema>::ConstIterator samp0, samp1;
+         double blend = 0.0;
+         
+         if (samples.getSamples(mTime, samp0, samp1, blend))
+         {
+            samples.lastEvaluationTime = mTime;
+            noData = false;
+            setSampled(node);
+         }
+      }
+      else
+      {
+         noData = false;
+         setSampled(node);
+      }
+   }
+   else
+   {
+      noData = !alreadySampled;
+      updated = false;
+   }
+   
+   if (!noData)
    {
       if (mSceneData)
       {
          CurvesData *data = mSceneData->curves(node);
+         
          if (data && (!data->isValid() || updated))
          {
             data->update(node);
          }
       }
-      
-      setSampled(node);
    }
    
    return AlembicNode::ContinueVisit;
@@ -456,11 +618,7 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicCurves &node, AlembicNode 
 
 AlembicNode::VisitReturn SampleGeometry::enter(AlembicNuPatch &node, AlembicNode *)
 {
-   if (!hasBeenSampled(node) && node.sampleData(mTime))
-   {
-      // ToDo
-      setSampled(node);
-   }
+   // ToDo
    
    return AlembicNode::ContinueVisit;
 }
