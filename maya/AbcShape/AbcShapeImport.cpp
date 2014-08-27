@@ -1,7 +1,7 @@
 #include "AbcShapeImport.h"
 #include "AbcShape.h"
 #include "Keyframer.h"
-#include "SceneCache.h"
+#include "AlembicSceneCache.h"
 #include "AlembicSceneVisitors.h"
 #include <maya/MArgList.h>
 #include <maya/MArgParser.h>
@@ -2734,7 +2734,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
          {
             std::string abcPath = file.resolvedFullName().asChar();
             
-            AlembicScene *scene = SceneCache::Ref(abcPath);
+            AlembicScene *scene = AlembicSceneCache::Ref(abcPath);
             if (scene)
             {
                scene->setFilter(filter.asChar());
@@ -2797,7 +2797,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
                   }
                }
                
-               SceneCache::Unref(scene);
+               AlembicSceneCache::Unref(scene);
             }
             else
             {

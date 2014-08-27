@@ -1,16 +1,12 @@
-#ifndef ABCSHAPE_SCENECACHE_H_
-#define ABCSHAPE_SCENECACHE_H_
+#ifndef SCENEHELPER_ALEMBICSCENECACHE_H_
+#define SCENEHELPER_ALEMBICSCENECACHE_H_
 
-#include "common.h"
-
+#include "AlembicScene.h"
 #include <Alembic/AbcCoreFactory/All.h>
-
-//#include <maya/MMutexLock.h>
-
 #include <map>
 #include <string>
 
-class SceneCache
+class AlembicSceneCache
 {
 public:
    
@@ -19,16 +15,15 @@ public:
    
 private:
    
-   static SceneCache& Instance();
+   static AlembicSceneCache& Instance();
    
-   SceneCache();
-   ~SceneCache();
+   AlembicSceneCache();
+   ~AlembicSceneCache();
    
    std::string formatPath(const std::string &filepath);
    
    AlembicScene* ref(const std::string &filepath);
    bool unref(AlembicScene *scene);
-   
    
    
 private:
@@ -40,9 +35,7 @@ private:
       int refcount;
    };
    
-   //MMutexLock mMutex;
    std::map<std::string, CacheEntry> mScenes;
 };
-
 
 #endif

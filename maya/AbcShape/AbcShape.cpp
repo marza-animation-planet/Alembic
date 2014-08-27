@@ -1,6 +1,6 @@
 #include "AbcShape.h"
 #include "AlembicSceneVisitors.h"
-#include "SceneCache.h"
+#include "AlembicSceneCache.h"
 
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnEnumAttribute.h>
@@ -346,7 +346,7 @@ AbcShape::~AbcShape()
    std::cout << "[" << PREFIX_NAME("AbcShape") << "] Destructor called" << std::endl;
    #endif
    
-   if (mScene && !SceneCache::Unref(mScene))
+   if (mScene && !AlembicSceneCache::Unref(mScene))
    {
       #ifdef _DEBUG
       std::cout << "[" << PREFIX_NAME("AbcShape") << "] Force delete scene" << std::endl;
@@ -617,11 +617,11 @@ void AbcShape::updateScene()
    #ifdef _DEBUG
    std::cout << "[" << PREFIX_NAME("AbcShape") << "] Update scene: " << mFilePath << std::endl;
    #endif
-   SceneCache::Unref(mScene);
+   AlembicSceneCache::Unref(mScene);
    
    mGeometry.clear();
    
-   mScene = SceneCache::Ref(mFilePath.asChar());
+   mScene = AlembicSceneCache::Ref(mFilePath.asChar());
    
    if (mScene)
    {
@@ -1058,7 +1058,7 @@ void AbcShape::copyInternalData(MPxNode *source)
       mDrawTransformBounds = node->mDrawTransformBounds;
       mDrawLocators = node->mDrawLocators;
       
-      SceneCache::Unref(mScene);
+      AlembicSceneCache::Unref(mScene);
       mScene = 0;
       mNumShapes = 0;
       mGeometry.clear();
