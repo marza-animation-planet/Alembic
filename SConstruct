@@ -500,6 +500,16 @@ if build_arnold_plugins:
                 "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
                 "srcs": glob.glob("arnold/Procedural/*.cpp"),
                 "custom": [arnold.Require]})
+   prjs.append({"name": "abcproc",
+                "type": "dynamicmodule",
+                "ext": arnold.PluginExt(),
+                "prefix": "arnold",
+                "defs": defs,
+                "incdirs": incdirs + ["arnold/abcproc"] + ["lib/SceneHelper"],
+                "libdirs": libdirs,
+                "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
+                "srcs": glob.glob("arnold/abcproc/*.cpp") + glob.glob("lib/SceneHelper/*.cpp"),
+                "custom": [arnold.Require]})
 
 if build_maya_plugins:
    def replace_in_mel(src, dst, srcStr, dstStr):
