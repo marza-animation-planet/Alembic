@@ -480,7 +480,7 @@ prjs = [
     "defs": defs,
     "incdirs": incdirs + ["examples/bin/SceneHelper", "lib/SceneHelper"],
     "libdirs": libdirs,
-    "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
+    "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs + (["pthread"] if sys.platform != "win32" else []),
     "srcs": glob.glob("examples/bin/SceneHelper/*.cpp") + glob.glob("lib/SceneHelper/*.cpp")
    }
 ]

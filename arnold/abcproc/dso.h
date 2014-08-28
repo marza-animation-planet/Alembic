@@ -4,11 +4,8 @@
 #include <ai.h>
 #include <AlembicSceneCache.h>
 
-#ifdef NAME_PREFIX
-#   define PREFIX_NAME(s) NAME_PREFIX s
-#else
-#   define PREFIX_NAME(s) s
-#   define NAME_PREFIX ""
+#if AI_VERSION_ARCH_NUM > 4 || (AI_VERSION_ARCH_NUM == 4 && AI_VERSION_MAJOR_NUM >= 1)
+#  define ARNOLD_4_1_OR_ABOVE
 #endif
 
 enum CycleType
@@ -40,12 +37,6 @@ enum ProceduralMode
 extern const char* CycleTypeNames[];
 extern const char* AttributeFrameNames[];
 
-struct ShapeInfo
-{
-   std::string name;
-   int index;
-};
-
 struct Dso
 {
 public:
@@ -55,58 +46,235 @@ public:
    
    void readFromDataParam();
    void readFromUserParams();
-   void transferUserParams(AtNode *node);
+   
+   void transferUserParams(AtNode *dst);
+   void transferInstanceParams(AtNode *dst);
    
    
-   /*
-   void setRenderFrame(double rf, bool updateMotionSamples=true)
+   inline AtNode* procNode() const
    {
-      rf /= mCommonParams.fps;
-      double df = rf - mBaseTime;
-      if (updateMotionSamples)
-      {
-         for (size_t i=0; i<mTimeSamples.size(); ++i)
-         {
-            mTimeSamples[i] += d;
-         }
-      }
-   }
-
-   
-   inline setShapesInfo(const std::vector<ShapeInfo> infos)
-   {
-      mShapesInfo = infos;
-   }
-
-   inline size_t numShapes() const
-   {
-      return mShapesInfo.size();
+      return mProcNode;
    }
    
-   inline const ShapeInfo& shapeInfo(size_t i) const
+   inline AlembicScene* scene() const
    {
-      return mShapesInfo[i];
+      return mScene;
    }
-   */
    
-   /*
-   bool isInstance() const;
-   void setMasterNodeName(const std::string &name);
-   const std::string& getMasterNodeName() const;
-   */
+   inline AlembicScene* referenceScene() const
+   {
+      return mRefScene;
+   }
    
-   /*
-   size_t numGeneratedNodes() const;
-   void setGeneratedNodesCount(size_t n);
-   AtNode* getGeneratedNode(size_t idx) const;
-   void setGeneratedNode(size_t idx, AtNode *n);
-   */
-
-private:
+   // Common setup
    
-   std::string dataString() const;
+   inline bool verbose() const
+   {
+      return mCommonParams.verbose;
+   }
+   
+   inline ProceduralMode mode() const
+   {
+      return mMode;
+   }
+   
+   inline const std::string& filePath() const
+   {
+      return mCommonParams.filePath;
+   }
+   
+   inline bool hasReference() const
+   {
+      return (mCommonParams.referenceFilePath.length() > 0);
+   }
+   
+   inline const std::string& referenceFilePath() const
+   {
+      return mCommonParams.referenceFilePath;
+   }
+   
+   inline const std::string& objectPath() const
+   {
+      return mCommonParams.objectPath;
+   }
+   
+   inline const std::string& namePrefix() const
+   {
+      return mCommonParams.namePrefix;
+   }
+   
+   inline bool ignoreVisibility() const
+   {
+      return mCommonParams.ignoreVisibility;
+   }
+   
+   inline bool ignoreInstances() const
+   {
+      return mCommonParams.ignoreInstances;
+   }
+   
+   inline bool ignoreMotionBlur() const
+   {
+      return mCommonParams.ignoreMotionBlur;
+   }
+   
+   inline bool ignoreTransforms() const
+   {
+      return mCommonParams.ignoreTransforms;
+   }
+   
+   inline double renderTime() const
+   {
+      return mRenderTime;
+   }
+   
+   inline double attribsTime(AttributeFrame af) const;
+   
+   inline double fps() const
+   {
+      return mCommonParams.fps;
+   }
+   
+   inline size_t numMotionSamples() const
+   {
+      return mExpandedTimeSamples.size();
+   }
+   
+   inline double motionSampleTime(size_t i) const
+   {
+      return mExpandedTimeSamples[i];
+   }
+   
+   double computeTime(double frame) const;
+   
+   // Attributes
+   
+   inline AttributeFrame attribsFrame() const
+   {
+      return mSingleParams.attribsFrame;
+   }
+   
+   inline bool readObjectAttribs() const
+   {
+      return mSingleParams.readObjectAttribs;
+   }
+   
+   inline bool readPrimitiveAttribs() const
+   {
+      return mSingleParams.readPrimitiveAttribs;
+   }
+   
+   inline bool readPointAttribs() const
+   {
+      return mSingleParams.readPointAttribs;
+   }
+   
+   inline bool readVertexAttribs() const
+   {
+      return mSingleParams.readVertexAttribs;
+   }
+   
+   inline const std::set<std::string>& overrideAttribs() const
+   {
+      return mMultiParams.overrideAttribs;
+   }
+   
+   inline bool overrideAttrib(const std::string &name) const
+   {
+      return (mMode == PM_single || mMultiParams.overrideAttribs.find(name) != mMultiParams.overrideAttribs.end());
+   }
+   
+   inline bool blurAttrib(const std::string &name) const
+   {
+      return (mSingleParams.attribsToBlur.find(name) != mSingleParams.attribsToBlur.end());
+   }
    
    bool cleanAttribName(std::string &name) const;
+   
+   // Shapes
+   
+   inline size_t numShapes() const
+   {
+      return mNumShapes;
+   }
+   
+   std::string uniqueName(const std::string &name) const;
+   
+   // Mesh
+   
+   inline bool computeTangents() const
+   {
+      return mSingleParams.computeTangents;
+   }
+   
+   // Points/Curves
+   
+   inline double radiusMin() const
+   {
+      return mSingleParams.radiusMin;
+   }
+   
+   inline double radiusMax() const
+   {
+      return mSingleParams.radiusMax;
+   }
+   
+   inline double radiusScale() const
+   {
+      return mSingleParams.radiusScale;
+   }
+   
+   // Volume
+   
+   inline bool isVolume() const
+   {
+      return (mStepSize > 0.0f);
+   }
+   
+   inline float volumeStepSize() const
+   {
+      return mStepSize;
+   }
+   
+   // Instance tacking
+   
+   inline void setMasterNodeName(const std::string &name)
+   {
+      msMasterNodes[mShapeKey] = name;
+   }
+   
+   inline const std::string& masterNodeName() const
+   {
+      return msMasterNodes[mShapeKey];
+   }
+   
+   inline bool isInstance() const
+   {
+      return (msMasterNodes.find(mShapeKey) != msMasterNodes.end());
+   }
+   
+   inline int instanceNumber() const
+   {
+      return mInstanceNum;
+   }
+   
+   // Node tracking
+   
+   void setGeneratedNode(size_t idx, AtNode *node);
+   
+   inline size_t numGeneratedNodes() const
+   {
+      return mGeneratedNodes.size();
+   }
+   
+   inline AtNode* generatedNode(size_t idx) const
+   {
+      return (idx < mGeneratedNodes.size() ? mGeneratedNodes[idx] : 0);
+   }
+   
+   std::string dataString(const char *targetShape) const;
+
+private:
    
    void strip(std::string &s) const;
    void toLower(std::string &s) const;
@@ -116,7 +284,7 @@ private:
    
    void normalizeFilePath(std::string &path) const;
    
-   double computeTime(double frame) const;
+   void setGeneratedNodesCount(size_t n);
    
 private:
    
@@ -150,7 +318,7 @@ private:
       
       
       void reset();
-      std::string dataString() const;
+      std::string dataString(const char *targetShape) const;
    };
    
    struct MultiParameters
@@ -209,6 +377,8 @@ private:
    
    float mStepSize;
    
+   size_t mNumShapes;
+   
    std::string mShapeKey;
    int mInstanceNum;
    
@@ -217,8 +387,11 @@ private:
    double mShutterClose;
    int mShutterStep;
    
+   // on seconds
+   double mMotionStart;
+   double mMotionEnd;
+   
    std::vector<AtNode*> mGeneratedNodes;
-   std::vector<ShapeInfo> mShapeInfos;
    
    static std::map<std::string, std::string> msMasterNodes;
 };
