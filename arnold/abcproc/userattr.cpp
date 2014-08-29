@@ -155,12 +155,60 @@ struct TypeHelper<std::string, const char*>
    }
 };
 
+template <typename T>
+const T* GetPODPtr(const T &val)
+{
+   return &val;
+}
+
+template <typename T>
+const T* GetPODPtr(const Imath::Vec2<T> &v)
+{
+   return &(v.x);
+}
+
+template <typename T>
+const T* GetPODPtr(const Imath::Vec3<T> &v)
+{
+   return &(v.x);
+}
+
+template <typename T>
+const T* GetPODPtr(const Imath::Vec4<T> &v)
+{
+   return &(v.x);
+}
+
+template <typename T>
+const T* GetPODPtr(const Imath::Color3<T> &v)
+{
+   return &(v.x);
+}
+
+template <typename T>
+const T* GetPODPtr(const Imath::Color4<T> &v)
+{
+   return &(v.r);
+}
+
+template <typename T>
+const T* GetPODPtr(const Imath::Matrix33<T> &v)
+{
+   return &(v[0][0]);
+}
+
+template <typename T>
+const T* GetPODPtr(const Imath::Matrix44<T> &v)
+{
+   return &(v[0][0]);
+}
+
+
 template <typename SrcT, typename DstT, class ScalarProperty>
 bool ReadScalarProperty(ScalarProperty prop, UserAttribute &ua, double t, bool interpolate)
 {
    TimeSampleList<ScalarProperty> sampler; 
    typename TimeSampleList<ScalarProperty>::ConstIterator samp0, samp1;
-   typename ScalarProperty::value_type val0, val1;
    const SrcT *vals0, *vals1;
    DstT *output = 0;
    double blend = 0.0;
@@ -180,15 +228,11 @@ bool ReadScalarProperty(ScalarProperty prop, UserAttribute &ua, double t, bool i
    
    output = (DstT*) ua.data;
    
-   val0 = samp0->data();
-   // Not really no
-   vals0 = (SrcT*) &val0;
+   vals0 = GetPODPtr(samp0->data());
    
    if (blend > 0.0 && interpolate)
    {
-      val1 = samp0->data();
-      // Not really no
-      vals1 = (SrcT*) &val1;
+      vals1 = GetPODPtr(samp1->data());
       
       double a = 1.0 - blend;
       double b = blend;
@@ -247,11 +291,11 @@ bool ReadArrayProperty(ArrayProperty prop, UserAttribute &ua, double t, bool int
    
    output = (DstT*) ua.data;
    
-   vals0 = (SrcT *) samp0->data()->getData();
+   vals0 = (const SrcT *) samp0->data()->getData();
    
    if (blend > 0.0 && interpolate && count != samp1->data()->size())
    {
-      vals1 = (SrcT *) samp1->data()->getData();
+      vals1 = (const SrcT *) samp1->data()->getData();
       
       double a = 1.0 - blend;
       double b = blend;
@@ -302,11 +346,11 @@ bool ReadGeomParam(GeomParam param, UserAttribute &ua, double t, bool interpolat
    
    output = (DstT*) ua.data;
    
-   vals0 = (SrcT *) samp0->data().getVals()->getData();
+   vals0 = (const SrcT *) samp0->data().getVals()->getData();
    
    if (blend > 0.0 && interpolate && ua.dataCount != samp1->data().getVals()->size())
    {
-      vals1 = (SrcT *) samp1->data().getVals()->getData();
+      vals1 = (const SrcT *) samp1->data().getVals()->getData();
       
       double a = 1.0 - blend;
       double b = blend;
@@ -582,7 +626,7 @@ bool ReadUserAttribute(UserAttribute &ua,
       case 1:
          ua.arnoldType = AI_TYPE_FLOAT;
          ua.arnoldTypeStr = "FLOAT";
-         return _ReadUserAttribute<Alembic::Abc::Float32TPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
+         return _ReadUserAttribute<Alembic::Abc::Float64TPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
       case 2:
          ua.arnoldType = AI_TYPE_POINT2;
          ua.arnoldTypeStr = "POINT2";
