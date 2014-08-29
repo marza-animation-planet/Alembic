@@ -1,4 +1,5 @@
 #include "visitors.h"
+#include "userattr.h"
 
 // ---
 
@@ -453,48 +454,151 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
       node.sampleSchema(t, t, i>0);
    }
    
-   // Read attributes
+   Alembic::AbcGeom::IN3fGeomParam N = schema.getNormalsParam();
+   Alembic::AbcGeom::IV2fGeomParam UV = schema.getUVsParam();
+   std::map<std::string, Alembic::AbcGeom::IV2fGeomParam> extraUVs;
+   
+   // Collect attributes
    
    Alembic::Abc::ICompoundProperty userProps = schema.getUserProperties();
    Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
    
-   // use attribsFrame(), blurAttrib() [read more that 1 sample and interpolate or extrapolate (point typed attribs only)]
-   // don't forget ignoreMotionBlur() too
+   bool interpolateAttribs = (schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
+   double attribsTime = (interpolateAttribs ? mDso->attribsTime(mDso->attribsFrame()) : mDso->renderTime());
    
-   if (mDso->readObjectAttribs())
+   UserAttributes objectAttrs;
+   UserAttributes primitiveAttrs;
+   UserAttributes pointAttrs;
+   UserAttributes vertexAttrs;
+   
+   if (userProps.valid() && mDso->readObjectAttribs())
    {
-      // double t = mDso->attribsTime(mDso->attribsFrame());
-      // userProps + constant geomParams
-      //std::string attribName = ...;
-      //
-      //TimeSampleList<PropType> propSamples;
-      //propSamples.update(t, t, true);
-      //propSamples.getSamples(t, samp0, samp1, blend)
-      //if (blend > 0.0 && !mDso->ignoreMotionBlur() && mDso->blurAttrib(attribName))
-      //{  
-      //  interpolate if topology isn't chaning
-      //  extrapolate otherwise (only points can be)
-      //}
-      //else
-      //{
-      //  use samp0 only 
-      //}
+      for (size_t i=0; i<geomParams.getNumProperties(); ++i)
+      {
+         const Alembic::AbcCoreAbstract::PropertyHeader &header = userProps.getPropertyHeader(i);
+         
+         std::string name = header.getName();
+         mDso->cleanAttribName(name);
+         
+         UserAttribute ua;
+         
+         InitUserAttribute(ua);
+         
+         ua.arnoldCategory = AI_USERDEF_CONSTANT;
+         
+         if (ReadUserAttribute(ua, userProps, header, attribsTime, false, interpolateAttribs))
+         {
+            objectAttrs[name] = ua;
+         }
+         else
+         {
+            DestroyUserAttribute(ua);
+         }
+      }
    }
    
-   if (mDso->readPrimitiveAttribs())
+   if (geomParams.valid())
    {
-      // uniform geomParams
+      for (size_t i=0; i<geomParams.getNumProperties(); ++i)
+      {
+         const Alembic::AbcCoreAbstract::PropertyHeader &header = geomParams.getPropertyHeader(i);
+         
+         Alembic::AbcGeom::GeometryScope scope = Alembic::AbcGeom::GetGeometryScope(header.getMetaData());
+         
+         if (scope == Alembic::AbcGeom::kFacevaryingScope &&
+             Alembic::AbcGeom::IV3fGeomParam::matches(header) &&
+             Alembic::AbcGeom::isUV(header))
+         {
+            extraUVs[header.getName()] = Alembic::AbcGeom::IV2fGeomParam(geomParams, header.getName());
+         }
+         else
+         {
+            UserAttributes *attrs = 0;
+            
+            std::string name = header.getName();
+            mDso->cleanAttribName(name);
+            
+            UserAttribute ua;
+               
+            InitUserAttribute(ua);
+            
+            switch (scope)
+            {
+            case Alembic::AbcGeom::kFacevaryingScope:
+            case Alembic::AbcGeom::kVertexScope:
+               if (mDso->readVertexAttribs())
+               {
+                  ua.arnoldCategory = AI_USERDEF_INDEXED;
+                  attrs = &vertexAttrs;
+               }
+               break;
+            case Alembic::AbcGeom::kVaryingScope:
+               if (mDso->readPointAttribs())
+               {
+                  ua.arnoldCategory = AI_USERDEF_VARYING;
+                  attrs = &pointAttrs;
+               }
+               break;
+            case Alembic::AbcGeom::kUniformScope:
+               if (mDso->readPrimitiveAttribs())
+               {
+                  ua.arnoldCategory = AI_USERDEF_UNIFORM;
+                  attrs = &primitiveAttrs;
+               }
+               break;
+            case Alembic::AbcGeom::kConstantScope:
+               if (mDso->readObjectAttribs())
+               {
+                  ua.arnoldCategory = AI_USERDEF_CONSTANT;
+                  attrs = &objectAttrs;
+               }
+               break;
+            default:
+               continue;
+            }
+            
+            if (attrs)
+            {
+               if (ReadUserAttribute(ua, geomParams, header, attribsTime, true, interpolateAttribs))
+               {
+                  (*attrs)[name] = ua;
+               }
+               else
+               {
+                  DestroyUserAttribute(ua);
+               }
+            }
+         }
+      }
    }
    
-   if (mDso->readPointAttribs())
+   // Additional vector attributes
+   
+   bool computeTangents = mDso->computeTangents();
+   
+   bool subd = false;
+   bool smoothing = false;
+   
+   const AtUserParamEntry *pe;
+   
+   pe = AiNodeLookUpUserParameter(mDso->procNode(), "subdiv_type");
+   if (pe)
    {
-      // varying geomParams
+      subd = (AiNodeGetInt(mDso->procNode(), "subdiv_type") > 0);
    }
    
-   if (mDso->readVertexAttribs())
+   if (!subd)
    {
-      // face-varying geomParams
+      pe = AiNodeLookUpUserParameter(mDso->procNode(), "smoothing");
+      if (pe)
+      {
+         smoothing = AiNodeGetBool(mDso->procNode(), "smoothing");
+      }
    }
+   
+   bool readNormals = (!subd && !smoothing);
+   
+   // ---
    
    if (meshSamples.size() == 0)
    {
@@ -506,24 +610,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
    
    mNode = AiNode("polymesh");
    AiNodeSetStr(mNode, "name", name.c_str());
-   
-   // Least required parameters
-   // 'nsides'
-   // 'vlist' (mblur ok)
-   // 'vidxs'
-   
-   // Normals: (only if both subd and smoothing are off)
-   // 'nlist' (mblur ok)
-   // 'nidxs'
-   
-   // UVs:
-   // not part of the base schema
-   
-   //if (mDso->computeTangents())
-   //{
-   //  force read normals, if none, compute them
-   //}
-   
+      
    if (meshSamples.size() == 1)
    {
       samp0 = meshSamples.begin();
@@ -557,6 +644,11 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
       AiNodeSetArray(mNode, "nsides", nsides);
       AiNodeSetArray(mNode, "vlist", vlist);
       AiNodeSetArray(mNode, "vidxs", vidxs);
+      
+      if (readNormals && N.valid())
+      {
+         // ToDo
+      }
    }
    else
    {
@@ -567,8 +659,37 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
       
       for (size_t i=0; i<mDso->numMotionSamples(); ++i)
       {
+         if (readNormals && N.valid())
+         {
+            // ToDo
+         }
       }
    }
+   
+   // For all reamaining data, no motion blur
+   
+   if (UV.valid())
+   {
+      if (computeTangents)
+      {
+         // be sure to sample render time normals if preset or compute normals if needed
+      }
+   }
+   
+   for (std::map<std::string, Alembic::AbcGeom::IV2fGeomParam>::iterator uvit=extraUVs.begin(); uvit!=extraUVs.end(); ++uvit)
+   {
+      if (computeTangents)
+      {
+         // be sure to sample render time normals if preset or compute normals if needed
+      }
+   }
+   
+   SetUserAttributes(mNode, objectAttrs);
+   SetUserAttributes(mNode, primitiveAttrs);
+   SetUserAttributes(mNode, pointAttrs);
+   SetUserAttributes(mNode, vertexAttrs);
+   
+   // if we have velocity in schema should also output it
          
    return AlembicNode::ContinueVisit;
 }
