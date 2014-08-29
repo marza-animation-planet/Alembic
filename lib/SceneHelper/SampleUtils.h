@@ -71,7 +71,7 @@ struct SampleUtils<Alembic::AbcGeom::ITypedArrayProperty<Traits> >
    typedef Alembic::AbcGeom::ITypedArrayProperty<Traits> AlembicType;
    typedef typename AlembicType::sample_ptr_type SampleType;
    
-   static bool IsValid(const SampleType &samp) { return samp.valid(); }
+   static bool IsValid(const SampleType &samp) { return samp->valid(); }
    
    static bool IsConstant(const AlembicType &owner) { return owner.isConstant(); }
    
@@ -81,7 +81,7 @@ struct SampleUtils<Alembic::AbcGeom::ITypedArrayProperty<Traits> >
       owner.get(out, selector);
    }
    
-   static void Reset(SampleType &samp) { samp.reset(); }
+   static void Reset(SampleType &samp) { samp->reset(); }
 };
 
 template <class Traits>
@@ -97,8 +97,14 @@ struct SampleUtils<Alembic::AbcGeom::ITypedGeomParam<Traits> >
    static void Get(const AlembicType &owner, SampleType &out,
                   const Alembic::Abc::ISampleSelector &selector = Alembic::Abc::ISampleSelector())
    {
-      // getIndexed?
-      owner.getExpanded(out, selector);
+      if (owner.isIndexed())
+      {
+         owner.getIndexed(out, selector);
+      }
+      else
+      {
+         owner.getExpanded(out, selector);
+      }
    }
    
    static void Reset(SampleType &samp) { samp.reset(); }
