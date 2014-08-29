@@ -1,9 +1,9 @@
 #include "AlembicSceneCache.h"
 
 
-AlembicScene* AlembicSceneCache::Ref(const std::string &filepath)
+AlembicScene* AlembicSceneCache::Ref(const std::string &filepath, bool persistent)
 {
-   return Instance().ref(filepath);
+   return Instance().ref(filepath, persistent);
 }
 
 bool AlembicSceneCache::Unref(AlembicScene *scene)
@@ -62,7 +62,7 @@ std::string AlembicSceneCache::formatPath(const std::string &filepath)
    return rv;
 }
 
-AlembicScene* AlembicSceneCache::ref(const std::string &filepath)
+AlembicScene* AlembicSceneCache::ref(const std::string &filepath, bool persistent)
 {
    std::string path = formatPath(filepath);
    AlembicScene *rv = 0;
@@ -78,6 +78,7 @@ AlembicScene* AlembicSceneCache::ref(const std::string &filepath)
       else
       {
          it->second.refcount++;
+         it->second.persistent = it->second.persistent || persistent;
          #ifdef _DEBUG
          std::cout << "[AlembicSceneCache] Clone master scene" << std::endl;
          #endif
@@ -98,6 +99,7 @@ AlembicScene* AlembicSceneCache::ref(const std::string &filepath)
          
          ce.archive = archive;
          ce.refcount = 1;
+         ce.persistent = persistent;
          ce.master = new AlembicScene(Alembic::Abc::IArchive(ce.archive.getPtr(),
                                                              Alembic::Abc::kWrapExisting,
                                                              Alembic::Abc::ErrorHandler::kQuietNoopPolicy));
@@ -132,21 +134,28 @@ bool AlembicSceneCache::unref(AlembicScene *scene)
       
       bool isMasterScene = (scene == it->second.master);
       
-      if (it->second.refcount == 0)
+      if (it->second.refcount <= 0)
       {
          #ifdef _DEBUG
          std::cout << "[AlembicSceneCache] Last scene referencing alembic archive \"" << it->second.archive.getName() << "\"" << std::endl;
          #endif
          
-         #ifdef _DEBUG
-         std::cout << "[AlembicSceneCache] Destroy master scene" << std::endl;
-         #endif
-         if (it->second.master)
+         if (!it->second.persistent)
          {
-            delete it->second.master;
+            #ifdef _DEBUG
+            std::cout << "[AlembicSceneCache] Destroy master scene" << std::endl;
+            #endif
+            if (it->second.master)
+            {
+               delete it->second.master;
+            }
+            
+            mScenes.erase(it);
          }
-         
-         mScenes.erase(it);
+         else
+         {
+            it->second.refcount = 0;
+         }
       }
       
       if (!isMasterScene)

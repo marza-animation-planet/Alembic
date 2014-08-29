@@ -10,7 +10,7 @@ class AlembicSceneCache
 {
 public:
    
-   static AlembicScene* Ref(const std::string &filepath);
+   static AlembicScene* Ref(const std::string &filepath, bool persistent=false);
    static bool Unref(AlembicScene *scene);
    
 private:
@@ -22,7 +22,7 @@ private:
    
    std::string formatPath(const std::string &filepath);
    
-   AlembicScene* ref(const std::string &filepath);
+   AlembicScene* ref(const std::string &filepath, bool persistent=false);
    bool unref(AlembicScene *scene);
    
    
@@ -32,6 +32,7 @@ private:
    {
       Alembic::Abc::IArchive archive;
       AlembicScene *master;
+      bool persistent;
       int refcount;
    };
    
