@@ -170,7 +170,6 @@ void Dso::SingleParameters::reset()
    readPointAttribs = false;
    readVertexAttribs = false;
    attribsFrame = AF_render;
-   attribsToBlur.clear();
    attribPreficesToRemove.clear();
    
    computeTangents = false;
@@ -203,16 +202,6 @@ std::string Dso::SingleParameters::dataString() const
    if (attribsFrame >= AF_render && attribsFrame < AF_MAX)
    {
       oss << " -attribsframe " << AttributeFrameNames[attribsFrame];
-   }
-   if (attribsToBlur.size() > 0)
-   {
-      oss << " -blurattribs";
-      std::set<std::string>::const_iterator it = attribsToBlur.begin();
-      while (it != attribsToBlur.end())
-      {
-         oss << " " << *it;
-         ++it;
-      }
    }
    if (attribPreficesToRemove.size() > 0)
    {
@@ -1247,16 +1236,6 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
          }
       }
    }
-   else if (args[i] == "-blurattribs")
-   {
-      ++i;
-      while (i < args.size() && !isFlag(args[i]))
-      {
-         mSingleParams.attribsToBlur.insert(args[i]);
-         ++i;
-      }
-      --i;
-   }
    else if (args[i] == "-removeattribprefices")
    {
       ++i;
@@ -1789,57 +1768,6 @@ void Dso::readFromUserParams()
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an int or string value", pname);
          }
       }
-      else if (param == "blurattribs")
-      {
-         mSingleParams.attribsToBlur.clear();
-         
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            std::string names = AiNodeGetStr(mProcNode, pname);
-            std::string name;
-            
-            size_t p0 = 0;
-            size_t p1 = names.find(' ', p0);
-            
-            while (p1 != std::string::npos)
-            {
-               name = names.substr(p0, p1-p0);
-               strip(name);
-               
-               if (name.length() > 0)
-               {
-                  mSingleParams.attribsToBlur.insert(name);
-               }
-               
-               p0 = p1 + 1;
-               p1 = names.find(' ', p0);
-            }
-            
-            name = names.substr(p0);
-            strip(name);
-            
-            if (name.length() > 0)
-            {
-               mSingleParams.attribsToBlur.insert(name);
-            }
-         }
-         else if (AiUserParamGetType(p) == AI_TYPE_ARRAY && AiUserParamGetArrayType(p) == AI_TYPE_STRING)
-         {
-            AtArray *names = AiNodeGetArray(mProcNode, pname);
-            
-            if (names)
-            {
-               for (unsigned int i=0; i<names->nelements; ++i)
-               {
-                  mSingleParams.attribsToBlur.insert(AiArrayGetStr(names, i));
-               }
-            }
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
-         }
-      }
       else if (param == "removeattribprefices")
       {
          mSingleParams.attribPreficesToRemove.clear();
@@ -2039,7 +1967,7 @@ void Dso::transferUserParams(AtNode *dst)
          }
          continue;
       }
-      else if (!strncmp(pname, "abc_", 4))
+      else if (!strncmp(pname, "abc_", 4) || !strcmp(pname, "_proc_generator"))
       {
          if (verbose())
          {

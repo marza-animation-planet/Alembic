@@ -184,11 +184,6 @@ public:
       return (mMode == PM_single || mMultiParams.overrideAttribs.find(name) != mMultiParams.overrideAttribs.end());
    }
    
-   inline bool blurAttrib(const std::string &name) const
-   {
-      return (mSingleParams.attribsToBlur.find(name) != mSingleParams.attribsToBlur.end());
-   }
-   
    bool cleanAttribName(std::string &name) const;
    
    // Shapes
@@ -338,7 +333,6 @@ private:
       bool readPointAttribs;
       bool readVertexAttribs;
       AttributeFrame attribsFrame;
-      std::set<std::string> attribsToBlur;
       std::set<std::string> attribPreficesToRemove;
             
       // mesh
