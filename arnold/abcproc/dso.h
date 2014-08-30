@@ -128,7 +128,7 @@ public:
       return mRenderTime;
    }
    
-   inline double attribsTime(AttributeFrame af) const;
+   double attribsTime(AttributeFrame af) const;
    
    inline double fps() const
    {
