@@ -702,7 +702,7 @@ void _NodeSet(AtNode *, const char *, T *)
 }
 
 template <int ArnoldType, typename T>
-void _ArraySet(AtArray *, unsigned int, T *)
+void _ArraySet(AtArray *, unsigned int, T *, unsigned int *)
 {
 }
 
@@ -792,147 +792,304 @@ void _NodeSet<AI_TYPE_STRING, const char*>(AtNode *node, const char *name, const
 
 
 template <>
-void _ArraySet<AI_TYPE_BOOLEAN, bool>(AtArray *ary, unsigned int count, bool *vals)
+void _ArraySet<AI_TYPE_BOOLEAN, bool>(AtArray *ary, unsigned int count, bool *vals, unsigned int *idxs)
 {
-   for (unsigned int i=0; i<count; ++i)
+   if (idxs)
    {
-      AiArraySetBool(ary, i, vals[i]);
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetBool(ary, i, vals[idxs[i]]);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetBool(ary, i, vals[i]);
+      }
    }
 }
 
 template <>
-void _ArraySet<AI_TYPE_BYTE, AtByte>(AtArray *ary, unsigned int count, AtByte *vals)
+void _ArraySet<AI_TYPE_BYTE, AtByte>(AtArray *ary, unsigned int count, AtByte *vals, unsigned int *idxs)
 {
-   for (unsigned int i=0; i<count; ++i)
+   if (idxs)
    {
-      AiArraySetByte(ary, i, vals[i]);
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetByte(ary, i, vals[idxs[i]]);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetByte(ary, i, vals[i]);
+      }
    }
 }
 
 template <>
-void _ArraySet<AI_TYPE_INT, int>(AtArray *ary, unsigned int count, int *vals)
+void _ArraySet<AI_TYPE_INT, int>(AtArray *ary, unsigned int count, int *vals, unsigned int *idxs)
 {
-   for (unsigned int i=0; i<count; ++i)
+   if (idxs)
    {
-      AiArraySetInt(ary, i, vals[i]);
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetInt(ary, i, vals[idxs[i]]);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetInt(ary, i, vals[i]);
+      }
    }
 }
 
 template <>
-void _ArraySet<AI_TYPE_UINT, unsigned int>(AtArray *ary, unsigned int count, unsigned int *vals)
+void _ArraySet<AI_TYPE_UINT, unsigned int>(AtArray *ary, unsigned int count, unsigned int *vals, unsigned int *idxs)
 {
-   for (unsigned int i=0; i<count; ++i)
+   if (idxs)
    {
-      AiArraySetUInt(ary, i, vals[i]);
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetUInt(ary, i, vals[idxs[i]]);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetUInt(ary, i, vals[i]);
+      }
    }
 }
 
 template <>
-void _ArraySet<AI_TYPE_FLOAT, float>(AtArray *ary, unsigned int count, float *vals)
+void _ArraySet<AI_TYPE_FLOAT, float>(AtArray *ary, unsigned int count, float *vals, unsigned int *idxs)
 {
-   for (unsigned int i=0; i<count; ++i)
+   if (idxs)
    {
-      AiArraySetFlt(ary, i, vals[i]);
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetFlt(ary, i, vals[idxs[i]]);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetFlt(ary, i, vals[i]);
+      }
    }
 }
 
 template <>
-void _ArraySet<AI_TYPE_POINT2, float>(AtArray *ary, unsigned int count, float *vals)
+void _ArraySet<AI_TYPE_POINT2, float>(AtArray *ary, unsigned int count, float *vals, unsigned int *idxs)
 {
    AtPoint2 pnt;
-   for (unsigned int i=0, j=0; i<count; ++i, j+=2)
+   if (idxs)
    {
-      pnt.x = vals[j+0];
-      pnt.y = vals[j+1];
-      AiArraySetPnt2(ary, i, pnt);
+      for (unsigned int i=0, j=0; i<count; ++i)
+      {
+         j = idxs[i] * 2;
+         pnt.x = vals[j+0];
+         pnt.y = vals[j+1];
+         AiArraySetPnt2(ary, i, pnt);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0, j=0; i<count; ++i, j+=2)
+      {
+         pnt.x = vals[j+0];
+         pnt.y = vals[j+1];
+         AiArraySetPnt2(ary, i, pnt);
+      }
    }
 }
 
 template <>
-void _ArraySet<AI_TYPE_POINT, float>(AtArray *ary, unsigned int count, float *vals)
+void _ArraySet<AI_TYPE_POINT, float>(AtArray *ary, unsigned int count, float *vals, unsigned int *idxs)
 {
    AtPoint pnt;
-   for (unsigned int i=0, j=0; i<count; ++i, j+=3)
+   if (idxs)
    {
-      pnt.x = vals[j+0];
-      pnt.y = vals[j+1];
-      pnt.z = vals[j+2];
-      AiArraySetPnt(ary, i, pnt);
+      for (unsigned int i=0, j=0; i<count; ++i)
+      {
+         j = idxs[i] * 3;
+         pnt.x = vals[j+0];
+         pnt.y = vals[j+1];
+         pnt.z = vals[j+2];
+         AiArraySetPnt(ary, i, pnt);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0, j=0; i<count; ++i, j+=3)
+      {
+         pnt.x = vals[j+0];
+         pnt.y = vals[j+1];
+         pnt.z = vals[j+2];
+         AiArraySetPnt(ary, i, pnt);
+      }
    }
 }
 
 template <>
-void _ArraySet<AI_TYPE_VECTOR, float>(AtArray *ary, unsigned int count, float *vals)
+void _ArraySet<AI_TYPE_VECTOR, float>(AtArray *ary, unsigned int count, float *vals, unsigned int *idxs)
 {
    AtVector vec;
-   for (unsigned int i=0, j=0; i<count; ++i, j+=3)
+   if (idxs)
    {
-      vec.x = vals[j+0];
-      vec.y = vals[j+1];
-      vec.z = vals[j+2];
-      AiArraySetVec(ary, i, vec);
+      for (unsigned int i=0, j=0; i<count; ++i)
+      {
+         j = idxs[i] * 3;
+         vec.x = vals[j+0];
+         vec.y = vals[j+1];
+         vec.z = vals[j+2];
+         AiArraySetVec(ary, i, vec);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0, j=0; i<count; ++i, j+=3)
+      {
+         vec.x = vals[j+0];
+         vec.y = vals[j+1];
+         vec.z = vals[j+2];
+         AiArraySetVec(ary, i, vec);
+      }
    }
 }
 
 template <>
-void _ArraySet<AI_TYPE_RGB, float>(AtArray *ary, unsigned int count, float *vals)
+void _ArraySet<AI_TYPE_RGB, float>(AtArray *ary, unsigned int count, float *vals, unsigned int *idxs)
 {
    AtRGB col;
-   for (unsigned int i=0, j=0; i<count; ++i, j+=3)
+   if (idxs)
    {
-      col.r = vals[j+0];
-      col.g = vals[j+1];
-      col.b = vals[j+2];
-      AiArraySetRGB(ary, i, col);
+      for (unsigned int i=0, j=0; i<count; ++i)
+      {
+         j = idxs[i] * 3;
+         col.r = vals[j+0];
+         col.g = vals[j+1];
+         col.b = vals[j+2];
+         AiArraySetRGB(ary, i, col);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0, j=0; i<count; ++i, j+=3)
+      {
+         col.r = vals[j+0];
+         col.g = vals[j+1];
+         col.b = vals[j+2];
+         AiArraySetRGB(ary, i, col);
+      }
    }
 }
 
 template <>
-void _ArraySet<AI_TYPE_RGBA, float>(AtArray *ary, unsigned int count, float *vals)
+void _ArraySet<AI_TYPE_RGBA, float>(AtArray *ary, unsigned int count, float *vals, unsigned int *idxs)
 {
    AtRGBA col;
-   for (unsigned int i=0, j=0; i<count; ++i, j+=4)
+   if (idxs)
    {
-      col.r = vals[j+0];
-      col.g = vals[j+1];
-      col.b = vals[j+2];
-      col.a = vals[j+3];
-      AiArraySetRGBA(ary, i, col);
+      for (unsigned int i=0, j=0; i<count; ++i)
+      {
+         j = idxs[i] * 4;
+         col.r = vals[j+0];
+         col.g = vals[j+1];
+         col.b = vals[j+2];
+         col.a = vals[j+3];
+         AiArraySetRGBA(ary, i, col);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0, j=0; i<count; ++i, j+=4)
+      {
+         col.r = vals[j+0];
+         col.g = vals[j+1];
+         col.b = vals[j+2];
+         col.a = vals[j+3];
+         AiArraySetRGBA(ary, i, col);
+      }
    }
 }
 
 template <>
-void _ArraySet<AI_TYPE_MATRIX, float>(AtArray *ary, unsigned int count, float *vals)
+void _ArraySet<AI_TYPE_MATRIX, float>(AtArray *ary, unsigned int count, float *vals, unsigned int *idxs)
 {
    AtMatrix mat;
-   for (unsigned int i=0, j=0; i<count; ++i, j+=16)
+   if (idxs)
    {
-      mat[0][0] = vals[j+0];
-      mat[0][1] = vals[j+1];
-      mat[0][2] = vals[j+2];
-      mat[0][3] = vals[j+3];
-      mat[1][0] = vals[j+4];
-      mat[1][1] = vals[j+5];
-      mat[1][2] = vals[j+6];
-      mat[1][3] = vals[j+7];
-      mat[2][0] = vals[j+8];
-      mat[2][1] = vals[j+9];
-      mat[2][2] = vals[j+10];
-      mat[2][3] = vals[j+11];
-      mat[3][0] = vals[j+12];
-      mat[3][1] = vals[j+13];
-      mat[3][2] = vals[j+14];
-      mat[3][3] = vals[j+15];
-      AiArraySetMtx(ary, i, mat);
+      for (unsigned int i=0, j=0; i<count; ++i)
+      {
+         j = idxs[i] * 16;
+         mat[0][0] = vals[j+0];
+         mat[0][1] = vals[j+1];
+         mat[0][2] = vals[j+2];
+         mat[0][3] = vals[j+3];
+         mat[1][0] = vals[j+4];
+         mat[1][1] = vals[j+5];
+         mat[1][2] = vals[j+6];
+         mat[1][3] = vals[j+7];
+         mat[2][0] = vals[j+8];
+         mat[2][1] = vals[j+9];
+         mat[2][2] = vals[j+10];
+         mat[2][3] = vals[j+11];
+         mat[3][0] = vals[j+12];
+         mat[3][1] = vals[j+13];
+         mat[3][2] = vals[j+14];
+         mat[3][3] = vals[j+15];
+         AiArraySetMtx(ary, i, mat);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0, j=0; i<count; ++i, j+=16)
+      {
+         mat[0][0] = vals[j+0];
+         mat[0][1] = vals[j+1];
+         mat[0][2] = vals[j+2];
+         mat[0][3] = vals[j+3];
+         mat[1][0] = vals[j+4];
+         mat[1][1] = vals[j+5];
+         mat[1][2] = vals[j+6];
+         mat[1][3] = vals[j+7];
+         mat[2][0] = vals[j+8];
+         mat[2][1] = vals[j+9];
+         mat[2][2] = vals[j+10];
+         mat[2][3] = vals[j+11];
+         mat[3][0] = vals[j+12];
+         mat[3][1] = vals[j+13];
+         mat[3][2] = vals[j+14];
+         mat[3][3] = vals[j+15];
+         AiArraySetMtx(ary, i, mat);
+      }
    }
 }
 
 template <>
-void _ArraySet<AI_TYPE_STRING, const char*>(AtArray *ary, unsigned int count, const char* *vals)
+void _ArraySet<AI_TYPE_STRING, const char*>(AtArray *ary, unsigned int count, const char* *vals, unsigned int *idxs)
 {
-   for (unsigned int i=0; i<count; ++i)
+   if (idxs)
    {
-      AiArraySetStr(ary, i, vals[i]);
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetStr(ary, i, vals[idxs[i]]);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetStr(ary, i, vals[i]);
+      }
    }
 }
 
@@ -941,23 +1098,52 @@ template <int ArnoldType, typename T>
 void _SetUserAttribute(AtNode *node, const std::string &valName, const std::string &idxName, UserAttribute &ua)
 {
    T *vals = (T*) ua.data;
-   unsigned int *idxs = (idxName.length() > 0 ? ua.indices : 0);
    
-   if (ua.dataCount >= 1 || idxs)
+   if (ua.dataCount >= 1 || ua.indices)
    {
-      AtArray *valAry = AiArrayAllocate(ua.dataCount, 1, ArnoldType);
-      
-      _ArraySet<ArnoldType, T>(valAry, ua.dataCount, vals);
-      
-      AiNodeSetArray(node, valName.c_str(), valAry);
-      
-      if (idxs)
+      if (idxName.length() > 0)
       {
+         // AI_USERDEF_INDEXED case
+         AtArray *valAry = AiArrayAllocate(ua.dataCount, 1, ArnoldType);
+         
+         _ArraySet<ArnoldType, T>(valAry, ua.dataCount, vals, 0);
+         
+         AiNodeSetArray(node, valName.c_str(), valAry);
+         
+         if (!ua.indices)
+         {
+            ua.indicesCount = ua.dataCount;
+            ua.indices = (unsigned int*) AiMalloc(ua.indicesCount * sizeof(unsigned int));
+            for (unsigned int i=0; i<ua.indicesCount; ++i)
+            {
+               ua.indices[i] = i;
+            }
+         }
+         
          AtArray *idxAry = AiArrayAllocate(ua.indicesCount, 1, AI_TYPE_UINT);
          
-         _ArraySet<AI_TYPE_UINT, unsigned int>(idxAry, ua.indicesCount, idxs);
+         _ArraySet<AI_TYPE_UINT, unsigned int>(idxAry, ua.indicesCount, ua.indices, 0);
          
          AiNodeSetArray(node, idxName.c_str(), idxAry);
+      }
+      else
+      {
+         if (ua.indices)
+         {
+            AtArray *valAry = AiArrayAllocate(ua.indicesCount, 1, ArnoldType);
+            
+            _ArraySet<ArnoldType, T>(valAry, ua.indicesCount, vals, ua.indices);
+            
+            AiNodeSetArray(node, valName.c_str(), valAry);
+         }
+         else
+         {
+            AtArray *valAry = AiArrayAllocate(ua.dataCount, 1, ArnoldType);
+            
+            _ArraySet<ArnoldType, T>(valAry, ua.dataCount, vals, 0);
+            
+            AiNodeSetArray(node, valName.c_str(), valAry);
+         }
       }
    }
    else
