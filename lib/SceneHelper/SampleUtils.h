@@ -395,9 +395,19 @@ public:
          return (_it == rhs._it);
       }
       
+      inline bool operator==(const MapConstIt &it) const
+      {
+         return (_it == it);
+      }
+      
       inline bool operator!=(const ConstIterator &rhs) const
       {
          return (_it != rhs._it);
+      }
+      
+      inline bool operator!=(const MapConstIt &it) const
+      {
+         return (_it != it);
       }
       
       inline ConstIterator& operator++()
