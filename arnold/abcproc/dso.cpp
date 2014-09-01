@@ -316,6 +316,16 @@ Dso::Dso(AtNode *node)
             mCommonParams.startFrame *= mCommonParams.fps;
             mCommonParams.endFrame *= mCommonParams.fps;
          }
+         else
+         {
+            mCommonParams.startFrame = mCommonParams.frame;
+            mCommonParams.endFrame = mCommonParams.frame;
+         }
+         
+         if (mCommonParams.verbose)
+         {
+            AiMsgInfo("[abcproc]   %f - %f", mCommonParams.startFrame, mCommonParams.endFrame);
+         }
       }
       
       mRenderTime = computeTime(mCommonParams.frame);
