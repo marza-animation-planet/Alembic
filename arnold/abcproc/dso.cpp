@@ -290,11 +290,11 @@ Dso::Dso(AtNode *node)
    {
       ScopeLock _lock;
       
-      mScene = AlembicSceneCache::Ref(mCommonParams.filePath);
+      mScene = AlembicSceneCache::Ref(mCommonParams.filePath, true);
    
       if (mCommonParams.referenceFilePath.length() > 0)
       {
-         mRefScene = AlembicSceneCache::Ref(mCommonParams.referenceFilePath);
+         mRefScene = AlembicSceneCache::Ref(mCommonParams.referenceFilePath, true);
       }
    }
    
