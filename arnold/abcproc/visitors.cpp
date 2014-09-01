@@ -353,7 +353,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicXform &node, AlembicNode 
       
       if (mDso->verbose())
       {
-         AiMsgInfo("[abcproc] %lu xform sample(s) for \"%s\"", matrices.size(), node.path().c_str());
+         AiMsgInfo("[abcproc] %lu xform samples for \"%s\"", matrices.size(), node.path().c_str());
       }
    }
    
@@ -439,140 +439,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
 {
    Alembic::AbcGeom::IPolyMeshSchema schema = node.typedObject().getSchema();
    
-   TimeSampleList<Alembic::AbcGeom::IPolyMeshSchema>::Iterator samp0, samp1;
-   TimeSampleList<Alembic::AbcGeom::IPolyMeshSchema> &meshSamples = node.samples().schemaSamples;
-   
-   for (size_t i=0; i<mDso->numMotionSamples(); ++i)
-   {
-      double t = mDso->motionSampleTime(i);
-      
-      if (mDso->verbose())
-      {
-         AiMsgInfo("[abcproc] Sample xform \"%s\" at t=%lf", node.path().c_str(), t);
-      }
-      
-      node.sampleSchema(t, t, i>0);
-   }
-   
-   Alembic::AbcGeom::IN3fGeomParam N = schema.getNormalsParam();
-   Alembic::AbcGeom::IV2fGeomParam UV = schema.getUVsParam();
-   std::map<std::string, Alembic::AbcGeom::IV2fGeomParam> extraUVs;
-   
-   // Collect attributes
-   
-   Alembic::Abc::ICompoundProperty userProps = schema.getUserProperties();
-   Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
-   
-   bool interpolateAttribs = (schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
-   double attribsTime = (interpolateAttribs ? mDso->attribsTime(mDso->attribsFrame()) : mDso->renderTime());
-   
-   UserAttributes objectAttrs;
-   UserAttributes primitiveAttrs;
-   UserAttributes pointAttrs;
-   UserAttributes vertexAttrs;
-   
-   if (userProps.valid() && mDso->readObjectAttribs())
-   {
-      for (size_t i=0; i<geomParams.getNumProperties(); ++i)
-      {
-         const Alembic::AbcCoreAbstract::PropertyHeader &header = userProps.getPropertyHeader(i);
-         
-         std::string name = header.getName();
-         mDso->cleanAttribName(name);
-         
-         UserAttribute ua;
-         
-         InitUserAttribute(ua);
-         
-         ua.arnoldCategory = AI_USERDEF_CONSTANT;
-         
-         if (ReadUserAttribute(ua, userProps, header, attribsTime, false, interpolateAttribs))
-         {
-            objectAttrs[name] = ua;
-         }
-         else
-         {
-            DestroyUserAttribute(ua);
-         }
-      }
-   }
-   
-   if (geomParams.valid())
-   {
-      for (size_t i=0; i<geomParams.getNumProperties(); ++i)
-      {
-         const Alembic::AbcCoreAbstract::PropertyHeader &header = geomParams.getPropertyHeader(i);
-         
-         Alembic::AbcGeom::GeometryScope scope = Alembic::AbcGeom::GetGeometryScope(header.getMetaData());
-         
-         if (scope == Alembic::AbcGeom::kFacevaryingScope &&
-             Alembic::AbcGeom::IV3fGeomParam::matches(header) &&
-             Alembic::AbcGeom::isUV(header))
-         {
-            extraUVs[header.getName()] = Alembic::AbcGeom::IV2fGeomParam(geomParams, header.getName());
-         }
-         else
-         {
-            UserAttributes *attrs = 0;
-            
-            std::string name = header.getName();
-            mDso->cleanAttribName(name);
-            
-            UserAttribute ua;
-               
-            InitUserAttribute(ua);
-            
-            switch (scope)
-            {
-            case Alembic::AbcGeom::kFacevaryingScope:
-            case Alembic::AbcGeom::kVertexScope:
-               if (mDso->readVertexAttribs())
-               {
-                  ua.arnoldCategory = AI_USERDEF_INDEXED;
-                  attrs = &vertexAttrs;
-               }
-               break;
-            case Alembic::AbcGeom::kVaryingScope:
-               if (mDso->readPointAttribs())
-               {
-                  ua.arnoldCategory = AI_USERDEF_VARYING;
-                  attrs = &pointAttrs;
-               }
-               break;
-            case Alembic::AbcGeom::kUniformScope:
-               if (mDso->readPrimitiveAttribs())
-               {
-                  ua.arnoldCategory = AI_USERDEF_UNIFORM;
-                  attrs = &primitiveAttrs;
-               }
-               break;
-            case Alembic::AbcGeom::kConstantScope:
-               if (mDso->readObjectAttribs())
-               {
-                  ua.arnoldCategory = AI_USERDEF_CONSTANT;
-                  attrs = &objectAttrs;
-               }
-               break;
-            default:
-               continue;
-            }
-            
-            if (attrs)
-            {
-               if (ReadUserAttribute(ua, geomParams, header, attribsTime, true, interpolateAttribs))
-               {
-                  (*attrs)[name] = ua;
-               }
-               else
-               {
-                  DestroyUserAttribute(ua);
-               }
-            }
-         }
-      }
-   }
-   
-   // Additional vector attributes
+   // Normal/Tangents setup
    
    bool computeTangents = mDso->computeTangents();
    
@@ -597,6 +464,191 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
    }
    
    bool readNormals = (!subd && !smoothing);
+   if (mDso->verbose())
+   {
+      AiMsgInfo("[abcproc] Read normals data if available");
+   }
+   
+   TimeSampleList<Alembic::AbcGeom::IPolyMeshSchema>::ConstIterator samp0, samp1;
+   TimeSampleList<Alembic::AbcGeom::IPolyMeshSchema> &meshSamples = node.samples().schemaSamples;
+   TimeSampleList<Alembic::AbcGeom::IN3fGeomParam> Nsamples;
+   
+   Alembic::AbcGeom::IN3fGeomParam N = schema.getNormalsParam();
+   
+   for (size_t i=0; i<mDso->numMotionSamples(); ++i)
+   {
+      double t = mDso->motionSampleTime(i);
+      
+      if (mDso->verbose())
+      {
+         AiMsgInfo("[abcproc] Sample mesh \"%s\" at t=%lf", node.path().c_str(), t);
+      }
+      
+      node.sampleSchema(t, t, i>0);
+      
+      if (readNormals && N.valid())
+      {
+         Nsamples.update(N, t, t, i>0);
+      }
+   }
+   
+   if (mDso->verbose())
+   {
+      AiMsgInfo("[abcproc] Read %lu mesh samples, %lu normal samples", meshSamples.size(), Nsamples.size());
+   }
+   
+   std::map<std::string, Alembic::AbcGeom::IV2fGeomParam> UVs;
+   if (schema.getUVsParam().valid())
+   {
+      UVs[""] = schema.getUVsParam();
+   }
+   
+   // Collect attributes
+   
+   Alembic::Abc::ICompoundProperty userProps = schema.getUserProperties();
+   Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
+   
+   bool varyingTopology = (schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
+   bool interpolateAttribs = !varyingTopology;
+   double attribsTime = (interpolateAttribs ? mDso->attribsTime(mDso->attribsFrame()) : mDso->renderTime());
+   
+   UserAttributes objectAttrs;
+   UserAttributes primitiveAttrs;
+   UserAttributes pointAttrs;
+   UserAttributes vertexAttrs;
+   
+   if (userProps.valid() && mDso->readObjectAttribs())
+   {
+      for (size_t i=0; i<geomParams.getNumProperties(); ++i)
+      {
+         const Alembic::AbcCoreAbstract::PropertyHeader &header = userProps.getPropertyHeader(i);
+         
+         std::string name = header.getName();
+         mDso->cleanAttribName(name);
+         
+         UserAttribute ua;
+         
+         InitUserAttribute(ua);
+         
+         ua.arnoldCategory = AI_USERDEF_CONSTANT;
+         
+         if (ReadUserAttribute(ua, userProps, header, attribsTime, false, interpolateAttribs))
+         {
+            if (mDso->verbose())
+            {
+               AiMsgInfo("[abcproc] Read \"%s\" object attribute as \"%s\"", header.getName().c_str(), name.c_str());
+            }
+            objectAttrs[name] = ua;
+         }
+         else
+         {
+            DestroyUserAttribute(ua);
+         }
+      }
+   }
+   
+   if (geomParams.valid())
+   {
+      std::set<std::string> specialPointNames;
+      
+      specialPointNames.insert("acceleration");
+      specialPointNames.insert("accel");
+      specialPointNames.insert("a");
+      specialPointNames.insert("velocity");
+      specialPointNames.insert("v");
+      
+      for (size_t i=0; i<geomParams.getNumProperties(); ++i)
+      {
+         const Alembic::AbcCoreAbstract::PropertyHeader &header = geomParams.getPropertyHeader(i);
+         
+         Alembic::AbcGeom::GeometryScope scope = Alembic::AbcGeom::GetGeometryScope(header.getMetaData());
+         
+         if (scope == Alembic::AbcGeom::kFacevaryingScope &&
+             Alembic::AbcGeom::IV3fGeomParam::matches(header) &&
+             Alembic::AbcGeom::isUV(header))
+         {
+            UVs[header.getName()] = Alembic::AbcGeom::IV2fGeomParam(geomParams, header.getName());
+         }
+         else
+         {
+            UserAttributes *attrs = 0;
+            
+            std::string name = header.getName();
+            mDso->cleanAttribName(name);
+            
+            UserAttribute ua;
+               
+            InitUserAttribute(ua);
+            
+            switch (scope)
+            {
+            case Alembic::AbcGeom::kFacevaryingScope:
+            case Alembic::AbcGeom::kVertexScope:
+               if (mDso->readVertexAttribs())
+               {
+                  ua.arnoldCategory = AI_USERDEF_INDEXED;
+                  attrs = &vertexAttrs;
+                  if (mDso->verbose())
+                  {
+                     AiMsgInfo("[abcproc] Read \"%s\" vertex attribute as \"%s\"", header.getName().c_str(), name.c_str());
+                  }
+               }
+               break;
+            case Alembic::AbcGeom::kVaryingScope:
+               if (mDso->readPointAttribs() || specialPointNames.find(name) != specialPointNames.end())
+               {
+                  ua.arnoldCategory = AI_USERDEF_VARYING;
+                  attrs = &pointAttrs;
+                  if (mDso->verbose())
+                  {
+                     AiMsgInfo("[abcproc] Read \"%s\" point attribute as \"%s\"", header.getName().c_str(), name.c_str());
+                  }
+               }
+               break;
+            case Alembic::AbcGeom::kUniformScope:
+               if (mDso->readPrimitiveAttribs())
+               {
+                  ua.arnoldCategory = AI_USERDEF_UNIFORM;
+                  attrs = &primitiveAttrs;
+                  if (mDso->verbose())
+                  {
+                     AiMsgInfo("[abcproc] Read \"%s\" primitive attribute as \"%s\"", header.getName().c_str(), name.c_str());
+                  }
+               }
+               break;
+            case Alembic::AbcGeom::kConstantScope:
+               if (mDso->readObjectAttribs())
+               {
+                  ua.arnoldCategory = AI_USERDEF_CONSTANT;
+                  attrs = &objectAttrs;
+                  if (mDso->verbose())
+                  {
+                     AiMsgInfo("[abcproc] Read \"%s\" object attribute as \"%s\"", header.getName().c_str(), name.c_str());
+                  }
+               }
+               break;
+            default:
+               continue;
+            }
+            
+            if (attrs)
+            {
+               if (ReadUserAttribute(ua, geomParams, header, attribsTime, true, interpolateAttribs))
+               {
+                  (*attrs)[name] = ua;
+               }
+               else
+               {
+                  if (mDso->verbose())
+                  {
+                     AiMsgWarning("[abcproc] Failed");
+                  }
+                  DestroyUserAttribute(ua);
+               }
+            }
+         }
+      }
+   }
    
    // ---
    
@@ -645,42 +697,833 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
       AiNodeSetArray(mNode, "vlist", vlist);
       AiNodeSetArray(mNode, "vidxs", vidxs);
       
-      if (readNormals && N.valid())
+      if (mDso->verbose())
       {
-         // ToDo
+         AiMsgInfo("[abcproc] Read %lu faces", FC->size());
+         AiMsgInfo("[abcproc] Read %lu points", P->size());
+         AiMsgInfo("[abcproc] Read %lu vertices", FI->size());
       }
    }
    else
    {
-      // we have velocities in schema, but no acceleration
+      // At this point we know have more that 1 mesh sample
       
-      // check for changing topology first
-      // if not just do simple interpolation
-      
-      for (size_t i=0; i<mDso->numMotionSamples(); ++i)
+      if (varyingTopology)
       {
-         if (readNormals && N.valid())
+         double blend = 0.0;
+         
+         meshSamples.getSamples(mDso->renderTime(), samp0, samp1, blend);
+         
+         Alembic::Abc::P3fArraySamplePtr P = samp0->data().getPositions();
+         Alembic::Abc::Int32ArraySamplePtr FC = samp0->data().getFaceCounts();
+         Alembic::Abc::Int32ArraySamplePtr FI = samp0->data().getFaceIndices();
+      
+         size_t numPoints = P->size();
+         
+         // Get velocity
+         const float *vel = 0;
+         if (samp0->data().getVelocities())
          {
-            // ToDo
+            vel = (const float*) samp0->data().getVelocities()->getData();
          }
+         else
+         {
+            UserAttributes::iterator it = pointAttrs.find("velocity");
+            
+            if (it == pointAttrs.end() || it->second.arnoldType != AI_TYPE_VECTOR || it->second.dataCount != numPoints)
+            {
+               it = pointAttrs.find("v");
+               if (it != pointAttrs.end() && (it->second.arnoldType != AI_TYPE_VECTOR || it->second.dataCount != numPoints))
+               {
+                  it = pointAttrs.end();
+               }
+            }
+            
+            if (it != pointAttrs.end())
+            {
+               vel = (const float*) it->second.data;
+            }
+         }
+         
+         // Get acceleration
+         const float *acc = 0;
+         if (vel)
+         {
+            UserAttributes::iterator it = pointAttrs.find("acceleration");
+            
+            if (it == pointAttrs.end() || it->second.arnoldType != AI_TYPE_VECTOR || it->second.dataCount != numPoints)
+            {
+               it = pointAttrs.find("accel");
+               if (it == pointAttrs.end() || it->second.arnoldType != AI_TYPE_VECTOR || it->second.dataCount != numPoints)
+               {
+                  it = pointAttrs.find("a");
+                  if (it != pointAttrs.end() && (it->second.arnoldType != AI_TYPE_VECTOR || it->second.dataCount != numPoints))
+                  {
+                     it = pointAttrs.end();
+                  }
+               }
+            }
+            
+            if (it != pointAttrs.end())
+            {
+               acc = (const float*) it->second.data;
+            }
+         }
+         
+         // Build arnold data
+         
+         AtArray *nsides = AiArrayAllocate(FC->size(), 1, AI_TYPE_UINT);
+         AtArray *vidxs = AiArrayAllocate(FI->size(), 1, AI_TYPE_UINT);
+         AtArray *vlist = 0;
+         
+         for (size_t i=0, j=0; i<FC->size(); ++i)
+         {
+            size_t nv = (*FC)[i];
+            AiArraySetUInt(nsides, i, (*FC)[i]);
+            for (size_t k=0; k<nv; ++k, ++j)
+            {
+               AiArraySetUInt(vidxs, j, (*FI)[j]);
+            }
+         }
+         
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Read %lu faces", FC->size());
+            AiMsgInfo("[abcproc] Read %lu points", P->size());
+            AiMsgInfo("[abcproc] Read %lu vertices", FI->size());
+            
+            if (vel)
+            {
+               AiMsgInfo("[abcproc] Use velocities");
+               if (acc)
+               {
+                  AiMsgInfo("[abcproc] Use accelerations");
+               }
+            }
+         }
+         
+         if (!vel)
+         {
+            vlist = AiArrayAllocate(P->size(), 1, AI_TYPE_POINT);
+            
+            for (size_t i=0; i<P->size(); ++i)
+            {
+               Alembic::Abc::V3f _p = P->get()[i];
+               AtPoint p = {_p.x, _p.y, _p.z};
+               
+               AiArraySetPnt(vlist, i, p);
+            }
+         }
+         else
+         {
+            vlist = AiArrayAllocate(P->size(), mDso->numMotionSamples(), AI_TYPE_POINT);
+            
+            for (size_t i=0, j=0; i<mDso->numMotionSamples(); ++i)
+            {
+               double dt = mDso->motionSampleTime(i) - mDso->renderTime();
+               
+               if (acc)
+               {
+                  const float *vvel = vel;
+                  const float *vacc = acc;
+                  for (size_t k=0; k<P->size(); ++k, vvel+=3, vacc+=3)
+                  {
+                     Alembic::Abc::V3f _p = P->get()[k];
+                     
+                     AtPoint p = {_p.x + dt * (vvel[0] + 0.5 * dt * vacc[0]),
+                                  _p.y + dt * (vvel[1] + 0.5 * dt * vacc[1]),
+                                  _p.z + dt * (vvel[2] + 0.5 * dt * vacc[2])};
+                     
+                     AiArraySetPnt(vlist, j+k, p);
+                  }
+               }
+               else
+               {
+                  const float *vvel = vel;
+                  for (size_t k=0; k<P->size(); ++k, vvel+=3)
+                  {
+                     Alembic::Abc::V3f _p = P->get()[k];
+                     
+                     AtPoint p = {_p.x + dt * vvel[0],
+                                  _p.y + dt * vvel[1],
+                                  _p.z + dt * vvel[2]};
+                     
+                     AiArraySetPnt(vlist, j+k, p);
+                  }
+               }
+               
+               j += numPoints;
+            }
+         }
+         
+         AiNodeSetArray(mNode, "nsides", nsides);
+         AiNodeSetArray(mNode, "vlist", vlist);
+         AiNodeSetArray(mNode, "vidxs", vidxs);
+      }
+      else
+      {
+         AtArray *vlist = 0;
+         AtArray *vidxs = 0;
+         AtArray *nsides = 0;
+         
+         AtPoint pnt;
+         
+         for (size_t i=0, j=0; i<mDso->numMotionSamples(); ++i)
+         {
+            double blend = 0.0;
+            double t = mDso->motionSampleTime(i);
+            
+            if (mDso->verbose())
+            {
+               AiMsgInfo("[abcproc] Read position samples [t=%lf]", t);
+            }
+            
+            meshSamples.getSamples(t, samp0, samp1, blend);
+            
+            Alembic::Abc::P3fArraySamplePtr P0 = samp0->data().getPositions();
+            
+            if (!nsides)
+            {
+               Alembic::Abc::Int32ArraySamplePtr FC = samp0->data().getFaceCounts();
+               Alembic::Abc::Int32ArraySamplePtr FI = samp0->data().getFaceIndices();
+               
+               nsides = AiArrayAllocate(FC->size(), 1, AI_TYPE_UINT);
+               vidxs = AiArrayAllocate(FI->size(), 1, AI_TYPE_UINT);
+               
+               for (size_t k=0, l=0; k<FC->size(); ++k)
+               {
+                  size_t nv = (*FC)[k];
+                  AiArraySetUInt(nsides, k, nv);
+                  for (size_t m=0; m<nv; ++m, ++l)
+                  {
+                     AiArraySetUInt(vidxs, l, (*FI)[l]);
+                  }
+               }
+               
+               if (mDso->verbose())
+               {
+                  AiMsgInfo("[abcproc] Read %lu faces", FC->size());
+                  AiMsgInfo("[abcproc] Read %lu vertices", FI->size());
+               }
+            }
+            
+            if (!vlist)
+            {
+               vlist = AiArrayAllocate(P0->size(), mDso->numMotionSamples(), AI_TYPE_POINT);
+            }
+            
+            if (blend > 0.0)
+            {
+               Alembic::Abc::P3fArraySamplePtr P1 = samp1->data().getPositions();
+               
+               if (mDso->verbose())
+               {
+                  AiMsgInfo("[abcproc] Read %lu points / %lu points [interpolate]", P0->size(), P1->size());
+               }
+               
+               double a = 1.0 - blend;
+               
+               for (size_t k=0; k<P0->size(); ++k)
+               {
+                  pnt.x = a * P0->get()[k].x + blend * P1->get()[k].x;
+                  pnt.y = a * P0->get()[k].y + blend * P1->get()[k].y;
+                  pnt.z = a * P0->get()[k].z + blend * P1->get()[k].z;
+                  
+                  AiArraySetPnt(vlist, j+k, pnt);
+               }
+            }
+            else
+            {
+               if (mDso->verbose())
+               {
+                  AiMsgInfo("[abcproc] Read %lu points", P0->size());
+               }
+               
+               for (size_t k=0; k<P0->size(); ++k)
+               {
+                  pnt.x = P0->get()[k].x;
+                  pnt.y = P0->get()[k].y;
+                  pnt.z = P0->get()[k].z;
+                  
+                  AiArraySetPnt(vlist, j+k, pnt);
+               }
+            }
+            
+            j += P0->size();
+         }
+      }
+   }
+   
+   if (Nsamples.size() > 0)
+   {
+      TimeSampleList<Alembic::AbcGeom::IN3fGeomParam>::ConstIterator n0, n1;
+      double blend = 0.0;
+      AtArray *nlist = 0;
+      AtArray *nidxs = 0;
+      AtVector vec;
+      
+      if (varyingTopology || Nsamples.size() == 1)
+      {
+         // Only output one sample
+         
+         Nsamples.getSamples(mDso->renderTime(), n0, n1, blend);
+         
+         Alembic::Abc::N3fArraySamplePtr vals = n0->data().getVals();
+         
+         nlist = AiArrayAllocate(vals->size(), 1, AI_TYPE_VECTOR);
+         for (size_t i=0; i<vals->size(); ++i)
+         {
+            vec.x = vals->get()[i].x;
+            vec.y = vals->get()[i].y;
+            vec.z = vals->get()[i].z;
+            
+            AiArraySetVec(nlist, i, vec);
+         }
+         
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Read %lu normals", vals->size());
+         }
+         
+         if (n0->data().isIndexed())
+         {
+            Alembic::Abc::UInt32ArraySamplePtr idxs = n0->data().getIndices();
+            
+            nidxs = AiArrayAllocate(idxs->size(), 1, AI_TYPE_UINT);
+            for (size_t i=0; i<idxs->size(); ++i)
+            {
+               AiArraySetUInt(nidxs, i, idxs->get()[i]);
+            }
+            
+            if (mDso->verbose())
+            {
+               AiMsgInfo("[abcproc] Read %lu normal indices", idxs->size());
+            }
+         }
+         else
+         {
+            nidxs = AiArrayAllocate(vals->size(), 1, AI_TYPE_UINT);
+            for (size_t i=0; i<vals->size(); ++i)
+            {
+               AiArraySetUInt(nidxs, i, i);
+            }
+         }
+      }
+      else
+      {
+         size_t numNormals = 0;
+         
+         for (size_t i=0, j=0; i<mDso->numMotionSamples(); ++i)
+         {
+            double t = mDso->motionSampleTime(i);
+            
+            if (mDso->verbose())
+            {
+               AiMsgInfo("[abcproc] Read normal samples [t=%lf]", t);
+            }
+            
+            Nsamples.getSamples(t, n0, n1, blend);
+            
+            if (blend > 0.0)
+            {
+               Alembic::Abc::N3fArraySamplePtr vals0 = n0->data().getVals();
+               Alembic::Abc::N3fArraySamplePtr vals1 = n1->data().getVals();
+               
+               if (mDso->verbose())
+               {
+                  AiMsgInfo("[abcproc] Read %lu normals / %lu normals [interpolate]", vals0->size(), vals1->size());
+               }
+               
+               double a = 1.0 - blend;
+               
+               if (n0->data().isIndexed())
+               {
+                  Alembic::Abc::UInt32ArraySamplePtr idxs0 = n0->data().getIndices();
+                  
+                  if (mDso->verbose())
+                  {
+                     AiMsgInfo("[abcproc] Read %lu normal indices", idxs0->size());
+                  }
+                  
+                  if (n1->data().isIndexed())
+                  {
+                     Alembic::Abc::UInt32ArraySamplePtr idxs1 = n1->data().getIndices();
+                     
+                     if (mDso->verbose())
+                     {
+                        AiMsgInfo("[abcproc] Read %lu normal indices", idxs0->size());
+                     }
+                     
+                     if (idxs1->size() != idxs0->size() || (numNormals > 0 && idxs0->size() != numNormals))
+                     {
+                        if (nidxs) AiArrayDestroy(nidxs);
+                        if (nlist) AiArrayDestroy(nlist);
+                        nidxs = 0;
+                        nlist = 0;
+                        AiMsgWarning("[abcproc] Ignore normals: non uniform samples");
+                        break;
+                     }
+                     
+                     numNormals = idxs0->size();
+                     
+                     if (!nlist)
+                     {
+                        nlist = AiArrayAllocate(numNormals, mDso->numMotionSamples(), AI_TYPE_VECTOR);
+                     }
+                     
+                     for (size_t k=0; k<numNormals; ++k)
+                     {
+                        Alembic::Abc::N3f val0 = vals0->get()[idxs0->get()[k]];
+                        Alembic::Abc::N3f val1 = vals1->get()[idxs1->get()[k]];
+                        
+                        vec.x = a * val0.x + blend * val1.x;
+                        vec.y = a * val0.y + blend * val1.y;
+                        vec.z = a * val0.z + blend * val1.z;
+                        
+                        AiArraySetVec(nlist, j+k, vec);
+                     }
+                  }
+                  else
+                  {
+                     if (vals1->size() != idxs0->size() || (numNormals > 0 && idxs0->size() != numNormals))
+                     {
+                        if (nidxs) AiArrayDestroy(nidxs);
+                        if (nlist) AiArrayDestroy(nlist);
+                        nidxs = 0;
+                        nlist = 0;
+                        AiMsgWarning("[abcproc] Ignore normals: non uniform samples");
+                        break;
+                     }
+                     
+                     numNormals = idxs0->size();
+                     
+                     if (!nlist)
+                     {
+                        nlist = AiArrayAllocate(numNormals, mDso->numMotionSamples(), AI_TYPE_VECTOR);
+                     }
+                     
+                     for (size_t k=0; k<numNormals; ++k)
+                     {
+                        Alembic::Abc::N3f val0 = vals0->get()[idxs0->get()[k]];
+                        Alembic::Abc::N3f val1 = vals1->get()[k];
+                        
+                        vec.x = a * val0.x + blend * val1.x;
+                        vec.y = a * val0.y + blend * val1.y;
+                        vec.z = a * val0.z + blend * val1.z;
+                        
+                        AiArraySetVec(nlist, j+k, vec);
+                     }
+                  }
+               }
+               else
+               {
+                  if (n1->data().isIndexed())
+                  {
+                     Alembic::Abc::UInt32ArraySamplePtr idxs1 = n1->data().getIndices();
+                     
+                     if (mDso->verbose())
+                     {
+                        AiMsgInfo("[abcproc] Read %lu normal indices", idxs1->size());
+                     }
+                     
+                     if (idxs1->size() != vals0->size() || (numNormals > 0 && vals0->size() != numNormals))
+                     {
+                        if (nidxs) AiArrayDestroy(nidxs);
+                        if (nlist) AiArrayDestroy(nlist);
+                        nidxs = 0;
+                        nlist = 0;
+                        AiMsgWarning("[abcproc] Ignore normals: non uniform samples");
+                        break;
+                     }
+                     
+                     numNormals = vals0->size();
+                     
+                     if (!nlist)
+                     {
+                        nlist = AiArrayAllocate(numNormals, mDso->numMotionSamples(), AI_TYPE_VECTOR);
+                     }
+                     
+                     for (size_t k=0; k<numNormals; ++k)
+                     {
+                        Alembic::Abc::N3f val0 = vals0->get()[k];
+                        Alembic::Abc::N3f val1 = vals1->get()[idxs1->get()[k]];
+                        
+                        vec.x = a * val0.x + blend * val1.x;
+                        vec.y = a * val0.y + blend * val1.y;
+                        vec.z = a * val0.z + blend * val1.z;
+                        
+                        AiArraySetVec(nlist, j+k, vec);
+                     }
+                  }
+                  else
+                  {
+                     if (vals1->size() != vals0->size() || (numNormals > 0 && vals0->size() != numNormals))
+                     {
+                        if (nidxs) AiArrayDestroy(nidxs);
+                        if (nlist) AiArrayDestroy(nlist);
+                        nidxs = 0;
+                        nlist = 0;
+                        AiMsgWarning("[abcproc] Ignore normals: non uniform samples");
+                        break;
+                     }
+                     
+                     numNormals = vals0->size();
+                     
+                     if (!nlist)
+                     {
+                        nlist = AiArrayAllocate(numNormals, mDso->numMotionSamples(), AI_TYPE_VECTOR);
+                     }
+                     
+                     for (size_t k=0; k<numNormals; ++k)
+                     {
+                        Alembic::Abc::N3f val0 = vals0->get()[k];
+                        Alembic::Abc::N3f val1 = vals1->get()[k];
+                        
+                        vec.x = a * val0.x + blend * val1.x;
+                        vec.y = a * val0.y + blend * val1.y;
+                        vec.z = a * val0.z + blend * val1.z;
+                        
+                        AiArraySetVec(nlist, j+k, vec);
+                     }
+                  }
+               }
+            }
+            else
+            {
+               Alembic::Abc::N3fArraySamplePtr vals = n0->data().getVals();
+               
+               if (mDso->verbose())
+               {
+                  AiMsgInfo("[abcproc] Read %lu normals", vals->size());
+               }
+            
+               if (n0->data().isIndexed())
+               {
+                  Alembic::Abc::UInt32ArraySamplePtr idxs = n0->data().getIndices();
+                  
+                  if (mDso->verbose())
+                  {
+                     AiMsgInfo("[abcproc] Read %lu normal indices", idxs->size());
+                  }
+                  
+                  if (numNormals > 0 && idxs->size() != numNormals)
+                  {
+                     AiArrayDestroy(nidxs);
+                     AiArrayDestroy(nlist);
+                     nidxs = 0;
+                     nlist = 0;
+                     AiMsgWarning("[abcproc] Ignore normals: non uniform samples");
+                     break;
+                  }
+                  
+                  numNormals = idxs->size();
+                  
+                  if (!nlist)
+                  {
+                     nlist = AiArrayAllocate(numNormals, mDso->numMotionSamples(), AI_TYPE_VECTOR);
+                  }
+                  
+                  for (size_t k=0; k<idxs->size(); ++k)
+                  {
+                     vec.x = vals->get()[idxs->get()[k]].x;
+                     vec.y = vals->get()[idxs->get()[k]].y;
+                     vec.z = vals->get()[idxs->get()[k]].z;
+                     AiArraySetVec(nlist, j+k, vec);
+                  }
+               }
+               else
+               {
+                  if (numNormals > 0 && vals->size() != numNormals)
+                  {
+                     AiArrayDestroy(nidxs);
+                     if (nlist) AiArrayDestroy(nlist);
+                     nidxs = 0;
+                     nlist = 0;
+                     AiMsgWarning("[abcproc] Ignore normals: non uniform samples");
+                     break;
+                  }
+                  
+                  numNormals = vals->size();
+                  
+                  if (!nlist)
+                  {
+                     nlist = AiArrayAllocate(numNormals, mDso->numMotionSamples(), AI_TYPE_VECTOR);
+                  }
+                  
+                  for (size_t k=0; k<vals->size(); ++k)
+                  {
+                     vec.x = vals->get()[k].x;
+                     vec.y = vals->get()[k].y;
+                     vec.z = vals->get()[k].z;
+                     AiArraySetVec(nlist, j+k, vec);
+                  }
+               }
+            }
+            
+            if (!nidxs)
+            {
+               nidxs = AiArrayAllocate(numNormals, 1, AI_TYPE_UINT);
+               for (size_t k=0; k<numNormals; ++k)
+               {
+                  AiArraySetUInt(nidxs, k, k);
+               }
+            }
+            
+            j += numNormals;
+         }
+      }
+      
+      if (nlist && nidxs)
+      {
+         AiNodeSetArray(mNode, "nlist", nlist);
+         AiNodeSetArray(mNode, "nidxs", nidxs);
+      }
+      else
+      {
+         AiMsgWarning("[abcproc] Ignore normals: No valid data");
       }
    }
    
    // For all reamaining data, no motion blur
    
-   if (UV.valid())
+   for (std::map<std::string, Alembic::AbcGeom::IV2fGeomParam>::iterator uvit=UVs.begin(); uvit!=UVs.end(); ++uvit)
    {
-      if (computeTangents)
+      TimeSampleList<Alembic::AbcGeom::IV2fGeomParam> sampler;
+      TimeSampleList<Alembic::AbcGeom::IV2fGeomParam>::ConstIterator uv0, uv1;
+      
+      if (uvit->first == "uv")
       {
-         // be sure to sample render time normals if preset or compute normals if needed
+         AiMsgWarning("[abcproc] \"uv\" is a reserved UV set name");
+         continue;
       }
-   }
-   
-   for (std::map<std::string, Alembic::AbcGeom::IV2fGeomParam>::iterator uvit=extraUVs.begin(); uvit!=extraUVs.end(); ++uvit)
-   {
-      if (computeTangents)
+      
+      if (mDso->verbose())
       {
-         // be sure to sample render time normals if preset or compute normals if needed
+         AiMsgInfo("[abcproc] Sample \"%s\" uvs", uvit->first.length() > 0 ? uvit->first.c_str() : "uv");
+      }
+      
+      if (sampler.update(uvit->second, mDso->renderTime(), mDso->renderTime(), true))
+      {
+         double blend = 0.0;
+         AtPoint2 pnt2;
+         
+         AtArray *uvlist = 0;
+         AtArray *uvidxs = 0;
+         
+         if (sampler.getSamples(mDso->renderTime(), uv0, uv1, blend))
+         {
+            if (blend > 0.0 && !varyingTopology)
+            {
+               double a = 1.0 - blend;
+               
+               Alembic::Abc::V2fArraySamplePtr vals0 = uv0->data().getVals();
+               Alembic::Abc::V2fArraySamplePtr vals1 = uv1->data().getVals();
+               
+               if (mDso->verbose())
+               {
+                  AiMsgInfo("[abcproc] Read %lu uvs / %lu uvs [interpolate]", vals0->size(), vals1->size());
+               }
+               
+               if (uv0->data().isIndexed())
+               {
+                  Alembic::Abc::UInt32ArraySamplePtr idxs0 = uv0->data().getIndices();
+                  
+                  if (mDso->verbose())
+                  {
+                     AiMsgInfo("[abcproc] Read %lu uv indices", idxs0->size());
+                  }
+                  
+                  if (!uv1->data().isIndexed())
+                  {
+                     // I don't think this should happend
+                     if (vals1->size() != idxs0->size())
+                     {
+                        AiMsgWarning("[abcproc] Ignore UVs: samples topology don't match");
+                     }
+                     else
+                     {
+                        uvlist = AiArrayAllocate(idxs0->size(), 1, AI_TYPE_POINT2);
+                        uvidxs = AiArrayAllocate(idxs0->size(), 1, AI_TYPE_UINT);
+                        
+                        for (size_t i=0; i<idxs0->size(); ++i)
+                        {
+                           Alembic::Abc::V2f val0 = vals0->get()[idxs0->get()[i]];
+                           Alembic::Abc::V2f val1 = vals1->get()[i];
+                           
+                           pnt2.x = a * val0.x + blend * val1.x;
+                           pnt2.y = a * val0.y + blend * val1.y;
+                           
+                           AiArraySetPnt2(uvlist, i, pnt2);
+                           AiArraySetUInt(uvidxs, i, i);
+                        }
+                     }
+                  }
+                  else
+                  {
+                     Alembic::Abc::UInt32ArraySamplePtr idxs1 = uv1->data().getIndices();
+                     
+                     if (mDso->verbose())
+                     {
+                        AiMsgInfo("[abcproc] Read %lu uv indices", idxs1->size());
+                     }
+                     
+                     if (idxs0->size() != idxs1->size())
+                     {
+                        AiMsgWarning("[abcproc] Ignore UVs: samples topology don't match");
+                     }
+                     else
+                     {
+                        uvlist = AiArrayAllocate(idxs0->size(), 1, AI_TYPE_POINT2);
+                        uvidxs = AiArrayAllocate(idxs0->size(), 1, AI_TYPE_UINT);
+                        
+                        for (size_t i=0; i<idxs0->size(); ++i)
+                        {
+                           Alembic::Abc::V2f val0 = vals0->get()[idxs0->get()[i]];
+                           Alembic::Abc::V2f val1 = vals1->get()[idxs1->get()[i]];
+                           
+                           pnt2.x = a * val0.x + blend * val1.x;
+                           pnt2.y = a * val0.y + blend * val1.y;
+                           
+                           AiArraySetPnt2(uvlist, i, pnt2);
+                           AiArraySetUInt(uvidxs, i, i);
+                        }
+                     }
+                  }
+               }
+               else
+               {
+                  if (uv1->data().isIndexed())
+                  {
+                     Alembic::Abc::UInt32ArraySamplePtr idxs1 = uv1->data().getIndices();
+                     
+                     if (mDso->verbose())
+                     {
+                        AiMsgInfo("[abcproc] Read %lu uv indices", idxs1->size());
+                     }
+                     
+                     if (idxs1->size() != vals0->size())
+                     {
+                        AiMsgWarning("[abcproc] Ignore UVs: samples topology don't match");
+                     }
+                     else
+                     {
+                        uvlist = AiArrayAllocate(vals0->size(), 1, AI_TYPE_POINT2);
+                        uvidxs = AiArrayAllocate(vals0->size(), 1, AI_TYPE_UINT);
+                        
+                        for (size_t i=0; i<vals0->size(); ++i)
+                        {
+                           Alembic::Abc::V2f val0 = vals0->get()[i];
+                           Alembic::Abc::V2f val1 = vals1->get()[idxs1->get()[i]];
+                           
+                           pnt2.x = a * val0.x + blend * val1.x;
+                           pnt2.y = a * val0.y + blend * val1.y;
+                           
+                           AiArraySetPnt2(uvlist, i, pnt2);
+                           AiArraySetUInt(uvidxs, i, i);
+                        }
+                     }
+                  }
+                  else
+                  {
+                     if (vals0->size() != vals1->size())
+                     {
+                        AiMsgWarning("[abcproc] Ignore UVs: samples topology don't match");
+                     }
+                     else
+                     {
+                        uvlist = AiArrayAllocate(vals0->size(), 1, AI_TYPE_POINT2);
+                        uvidxs = AiArrayAllocate(vals0->size(), 1, AI_TYPE_UINT);
+                        
+                        for (size_t i=0; i<vals0->size(); ++i)
+                        {
+                           Alembic::Abc::V2f val0 = vals0->get()[i];
+                           Alembic::Abc::V2f val1 = vals1->get()[i];
+                           
+                           pnt2.x = a * val0.x + blend * val1.x;
+                           pnt2.y = a * val0.y + blend * val1.y;
+                           
+                           AiArraySetPnt2(uvlist, i, pnt2);
+                           AiArraySetUInt(uvidxs, i, i);
+                        }
+                     }
+                  }
+               }
+            }
+            else
+            {
+               Alembic::Abc::V2fArraySamplePtr vals0 = uv0->data().getVals();
+               
+               if (mDso->verbose())
+               {
+                  AiMsgInfo("[abcproc] Read %lu uvs", vals0->size());
+               }
+               
+               if (uv0->data().isIndexed())
+               {
+                  Alembic::Abc::UInt32ArraySamplePtr idxs0 = uv0->data().getIndices();
+                  
+                  if (mDso->verbose())
+                  {
+                     AiMsgInfo("[abcproc] Read %lu uv indices", idxs0->size());
+                  }
+                  
+                  uvlist = AiArrayAllocate(vals0->size(), 1, AI_TYPE_POINT2);
+                  uvidxs = AiArrayAllocate(idxs0->size(), 1, AI_TYPE_UINT);
+                  
+                  for (size_t i=0; i<vals0->size(); ++i)
+                  {
+                     pnt2.x = vals0->get()[i].x;
+                     pnt2.y = vals0->get()[i].y;
+                     AiArraySetPnt2(uvlist, i, pnt2);
+                  }
+                  
+                  for (size_t i=0; i<idxs0->size(); ++i)
+                  {
+                     AiArraySetUInt(uvidxs, i, idxs0->get()[i]);
+                  }
+               }
+               else
+               {
+                  uvlist = AiArrayAllocate(vals0->size(), 1, AI_TYPE_POINT2);
+                  uvidxs = AiArrayAllocate(vals0->size(), 1, AI_TYPE_UINT);
+                  
+                  for (size_t i=0; i<vals0->size(); ++i)
+                  {
+                     pnt2.x = vals0->get()[i].x;
+                     pnt2.y = vals0->get()[i].y;
+                     AiArraySetPnt2(uvlist, i, pnt2);
+                     AiArraySetUInt(uvidxs, i, i);
+                  }
+               }
+            }
+         }
+         
+         if (uvlist && uvidxs)
+         {
+            if (uvit->first.length() > 0)
+            {
+               std::string iname = uvit->first + "idxs";
+               
+               AiNodeDeclare(mNode, uvit->first.c_str(), "indexed POINT2");
+               AiNodeSetArray(mNode, uvit->first.c_str(), uvlist);
+               AiNodeSetArray(mNode, iname.c_str(), uvidxs);
+            }
+            else
+            {
+               AiNodeSetArray(mNode, "uvlist", uvlist);
+               AiNodeSetArray(mNode, "uvidxs", uvidxs);
+            }
+            
+            if (computeTangents)
+            {
+               // be sure to sample render time normals if preset or compute normals if needed
+               AiMsgWarning("[abcproc] computeTangents: Not yet implemented");
+            }
+         }
+      }
+      else
+      {
+         AiMsgWarning("[abcproc] Failed to output \"%s\" uvs", uvit->first.length() > 0 ? uvit->first.c_str() : "uv");
       }
    }
    
@@ -689,7 +1532,10 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
    SetUserAttributes(mNode, pointAttrs);
    SetUserAttributes(mNode, vertexAttrs);
    
-   // if we have velocity in schema should also output it
+   DestroyUserAttributes(objectAttrs);
+   DestroyUserAttributes(primitiveAttrs);
+   DestroyUserAttributes(pointAttrs);
+   DestroyUserAttributes(vertexAttrs);
          
    return AlembicNode::ContinueVisit;
 }
