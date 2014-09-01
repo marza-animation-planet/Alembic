@@ -56,6 +56,8 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
 {
    std::ostringstream oss;
    
+   oss << std::fixed << std::setprecision(6);
+   
    if (filePath.length() > 0)
    {
       oss << " -filename " << filePath;
@@ -143,6 +145,8 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
 std::string Dso::CommonParameters::shapeKey() const
 {
    std::ostringstream oss;
+   
+   oss << std::fixed << std::setprecision(6);
    
    if (filePath.length() > 0)
    {
@@ -244,6 +248,8 @@ void Dso::SingleParameters::reset()
 std::string Dso::SingleParameters::dataString() const
 {
    std::ostringstream oss;
+   
+   oss << std::fixed << std::setprecision(6);
    
    if (readObjectAttribs)
    {
