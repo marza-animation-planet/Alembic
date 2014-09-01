@@ -172,8 +172,6 @@ void Dso::SingleParameters::reset()
    attribsFrame = AF_render;
    attribPreficesToRemove.clear();
    
-   computeTangents = false;
-   
    radiusMin = 0.0f;
    radiusMax = 1000000.0f;
    radiusScale = 1.0f;
@@ -212,10 +210,6 @@ std::string Dso::SingleParameters::dataString() const
          oss << " " << *it;
          ++it;
       }
-   }
-   if (computeTangents)
-   {
-      oss << " -computetangents";
    }
    oss << " -radiusmin " << radiusMin;
    oss << " -radiusmax " << radiusMax;
@@ -1256,10 +1250,6 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       }
       --i;
    }
-   else if (args[i] == "-computetangents")
-   {
-      mSingleParams.computeTangents = true;
-   }
    else if (args[i] == "-radiusmin")
    {
       ++i;
@@ -1827,17 +1817,6 @@ void Dso::readFromUserParams()
          else
          {
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
-         }
-      }
-      else if (param == "computetangents")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mSingleParams.computeTangents = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
          }
       }
       else if (param == "radiusmin")

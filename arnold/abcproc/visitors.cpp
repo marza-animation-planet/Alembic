@@ -441,8 +441,6 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
    
    bool varyingTopology = (schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
    
-   bool computeTangents = mDso->computeTangents();
-   
    bool subd = false;
    bool smoothing = false;
    
@@ -1545,12 +1543,6 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
             {
                AiNodeSetArray(mNode, "uvlist", uvlist);
                AiNodeSetArray(mNode, "uvidxs", uvidxs);
-            }
-            
-            if (computeTangents)
-            {
-               // be sure to sample render time normals if preset or compute normals if needed
-               AiMsgWarning("[abcproc] computeTangents: Not yet implemented");
             }
          }
       }

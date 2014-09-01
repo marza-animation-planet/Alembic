@@ -195,13 +195,6 @@ public:
    
    std::string uniqueName(const std::string &name) const;
    
-   // Mesh
-   
-   inline bool computeTangents() const
-   {
-      return mSingleParams.computeTangents;
-   }
-   
    // Points/Curves
    
    inline double radiusMin() const
@@ -334,9 +327,6 @@ private:
       bool readVertexAttribs;
       AttributeFrame attribsFrame;
       std::set<std::string> attribPreficesToRemove;
-            
-      // mesh
-      bool computeTangents;
       
       // particles/curves
       float radiusMin;
