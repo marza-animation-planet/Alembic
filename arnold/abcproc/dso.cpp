@@ -1967,11 +1967,19 @@ void Dso::transferUserParams(AtNode *dst)
          }
          continue;
       }
-      else if (!strncmp(pname, "abc_", 4) || !strcmp(pname, "_proc_generator"))
+      else if (!strncmp(pname, "abc_", 4))
       {
          if (verbose())
          {
             AiMsgInfo("[abcproc]   Skip DSO parmeter \"%s\"", pname+4);
+         }
+         continue;
+      }
+      else if (!strcmp(pname, "_proc_generator"))
+      {
+         if (verbose())
+         {
+            AiMsgInfo("[abcproc]   Skip DSO parmeter \"%s\"", pname);
          }
          continue;
       }
