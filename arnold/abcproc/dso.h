@@ -236,9 +236,22 @@ public:
       return msMasterNodes[mShapeKey];
    }
    
-   inline bool isInstance() const
+   inline bool isInstance(std::string *masterNodeName=0) const
    {
-      return (msMasterNodes.find(mShapeKey) != msMasterNodes.end());
+      std::map<std::string, std::string>::const_iterator it = msMasterNodes.find(mShapeKey);
+      
+      if (it != msMasterNodes.end())
+      {
+         if (masterNodeName)
+         {
+            *masterNodeName = it->second;
+         }
+         return true;
+      }
+      else
+      {
+         return false;
+      }
    }
    
    inline int instanceNumber() const
@@ -274,6 +287,8 @@ private:
    
    void setGeneratedNodesCount(size_t n);
    
+   std::string shapeKey() const;
+   
 private:
    
    struct CommonParameters
@@ -307,6 +322,7 @@ private:
       
       void reset();
       std::string dataString(const char *targetShape) const;
+      std::string shapeKey() const;
    };
    
    struct MultiParameters
@@ -336,6 +352,7 @@ private:
       
       void reset();
       std::string dataString() const;
+      std::string shapeKey() const;
    };
    
    // ---

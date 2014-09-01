@@ -140,6 +140,70 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    return oss.str();
 }
 
+std::string Dso::CommonParameters::shapeKey() const
+{
+   std::ostringstream oss;
+   
+   if (filePath.length() > 0)
+   {
+      oss << " -filename " << filePath;
+   }
+   if (referenceFilePath.length() > 0)
+   {
+      oss << " -referencefilename " << referenceFilePath;
+   }
+   if (objectPath.length() > 0)
+   {
+      oss << " -objectpath " << objectPath;
+   }
+   oss << " -frame " << frame;
+   if (startFrame < endFrame)
+   {
+      oss << " -startframe " << startFrame << " -endframe " << endFrame;
+   }
+   if (relativeSamples)
+   {
+      oss << " -relativesamples";
+   }
+   if (samples.size() > 0)
+   {
+      oss << " -samples";
+      for (size_t i=0; i<samples.size(); ++i)
+      {
+         oss << " " << samples[i];
+      }
+   }
+   if (cycle >= CT_hold && cycle < CT_MAX)
+   {
+      oss << " -cycle " << CycleTypeNames[cycle];
+   }
+   oss << " -speed " << speed;
+   oss << " -offset " << offset;
+   oss << " -fps " << fps;
+   if (preserveStartFrame)
+   {
+      oss << " -preservestartframe";
+   }
+   if (ignoreMotionBlur)
+   {
+      oss << " -ignoremotionblur";
+   }
+   if (samplesExpandIterations > 0)
+   {
+      oss << " -samplesexpanditerations " << samplesExpandIterations;
+      if (optimizeSamples)
+      {
+         oss << " -optimizesamples";
+      }
+   }
+   else
+   {
+      oss << " -samplesexpanditerations 0";
+   }
+   
+   return oss.str();
+}
+
 void Dso::MultiParameters::reset()
 {
    overrideAttribs.clear();
@@ -216,6 +280,11 @@ std::string Dso::SingleParameters::dataString() const
    oss << " -radiusscale " << radiusScale;
    
    return oss.str();
+}
+
+std::string Dso::SingleParameters::shapeKey() const
+{
+   return dataString();
 }
    
 // ---
@@ -518,13 +587,7 @@ Dso::Dso(AtNode *node)
       }
       
       // Compute shape key
-      // Note: mRenderTime encompass frame/startframe/endframe/cycle/speed/offset/preservestartframe info
-      char tmp[64];
-      sprintf(tmp, "@%f", mRenderTime);
-      mShapeKey = mCommonParams.filePath + "|" +
-                  mCommonParams.referenceFilePath + "|" +
-                  mCommonParams.objectPath +
-                  tmp;
+      mShapeKey = shapeKey();
       
       if (mCommonParams.verbose)
       {
@@ -616,6 +679,11 @@ std::string Dso::dataString(const char *targetShape) const
    {
       return rv;
    }
+}
+
+std::string Dso::shapeKey() const
+{
+   return mCommonParams.shapeKey() + ":" + mSingleParams.shapeKey();
 }
 
 void Dso::setGeneratedNodesCount(size_t n)

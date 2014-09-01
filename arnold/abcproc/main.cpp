@@ -24,9 +24,7 @@ int ProcNumNodes(void *user_ptr)
 
 AtNode* ProcGetNode(void *user_ptr, int i)
 {
-   // Can this be called from different threads with same procedural?
-   // => should not no
-   // ~? 
+   // This function won't get call for the same procedural node from difference threads
    
    AiMsgDebug("[abcproc] ProcGetNode [thread %p]", AiThreadSelf());
    Dso *dso = (Dso*) user_ptr;
@@ -53,19 +51,46 @@ AtNode* ProcGetNode(void *user_ptr, int i)
       else
       {
          AtNode *output = 0;
+         std::string masterNodeName;
          
-         // Access to Dso::msMasterNodes is not thread safe
          GlobalLock::Acquire();
+         bool isInstance = dso->isInstance(&masterNodeName);
+         GlobalLock::Release();
          
-         if (dso->isInstance())
+         if (!isInstance)
          {
-            GlobalLock::Release();
+            MakeShape visitor(dso);
+            dso->scene()->visit(AlembicNode::VisitFilteredFlat, visitor);
             
-            // if (dso->ignoreInstances())
-            // {
-            // }
+            output = visitor.node();
             
-            AtNode *master = AiNodeLookUpByName(dso->masterNodeName().c_str());
+            if (output)
+            {
+               dso->transferUserParams(output);
+               
+               GlobalLock::Acquire();
+               
+               if (dso->isInstance(&masterNodeName))
+               {
+                  GlobalLock::Release();
+                  
+                  AiMsgWarning("[abcproc] Master node created in another thread. Destroy read data.");
+                  AiNodeDestroy(output);
+                  isInstance = true;
+               }
+               else
+               {
+                  dso->setMasterNodeName(AiNodeGetName(output));
+                  
+                  GlobalLock::Release();
+               }
+            }
+         }
+         
+         if (isInstance)
+         {
+            AtNode *master = AiNodeLookUpByName(masterNodeName.c_str());
+            
             if (master)
             {
                if (dso->verbose())
@@ -90,24 +115,6 @@ AtNode* ProcGetNode(void *user_ptr, int i)
             {
                AiMsgWarning("[abcproc] Master node not expanded");
             }
-         }
-         else
-         {
-            // Not yet generated, are there any instances of that node at all anyway?
-            // Should check in order to release lock sooner...
-            
-            MakeShape visitor(dso);
-            dso->scene()->visit(AlembicNode::VisitFilteredFlat, visitor);
-            
-            output = visitor.node();
-            
-            if (output)
-            {
-               dso->transferUserParams(output);
-               dso->setMasterNodeName(AiNodeGetName(output));
-            }
-            
-            GlobalLock::Release();
          }
          
          dso->setGeneratedNode(0, output);
