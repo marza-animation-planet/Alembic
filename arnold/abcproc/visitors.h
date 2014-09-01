@@ -221,7 +221,7 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
       AlembicNode *targetNode = (instance ? instance : &node);
       
       // Format name 'a la maya'
-      std::string targetNode = targetNode->formatPartialPath(mDso->namePrefix().c_str(), AlembicNode::LocalPrefix, '|');
+      std::string targetName = targetNode->formatPartialPath(mDso->namePrefix().c_str(), AlembicNode::LocalPrefix, '|');
       std::string name = mDso->uniqueName(targetName);
       
       if (mDso->verbose())
