@@ -439,7 +439,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
 {
    Alembic::AbcGeom::IPolyMeshSchema schema = node.typedObject().getSchema();
    
-   // Normal/Tangents setup
+   bool varyingTopology = (schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
    
    bool computeTangents = mDso->computeTangents();
    
@@ -464,6 +464,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
    }
    
    bool readNormals = (!subd && !smoothing);
+   
    if (mDso->verbose())
    {
       AiMsgInfo("[abcproc] Read normals data if available");
@@ -471,31 +472,9 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
    
    TimeSampleList<Alembic::AbcGeom::IPolyMeshSchema>::ConstIterator samp0, samp1;
    TimeSampleList<Alembic::AbcGeom::IPolyMeshSchema> &meshSamples = node.samples().schemaSamples;
+   
    TimeSampleList<Alembic::AbcGeom::IN3fGeomParam> Nsamples;
-   
    Alembic::AbcGeom::IN3fGeomParam N = schema.getNormalsParam();
-   
-   for (size_t i=0; i<mDso->numMotionSamples(); ++i)
-   {
-      double t = mDso->motionSampleTime(i);
-      
-      if (mDso->verbose())
-      {
-         AiMsgInfo("[abcproc] Sample mesh \"%s\" at t=%lf", node.path().c_str(), t);
-      }
-      
-      node.sampleSchema(t, t, i>0);
-      
-      if (readNormals && N.valid())
-      {
-         Nsamples.update(N, t, t, i>0);
-      }
-   }
-   
-   if (mDso->verbose())
-   {
-      AiMsgInfo("[abcproc] Read %lu mesh samples, %lu normal samples", meshSamples.size(), Nsamples.size());
-   }
    
    std::map<std::string, Alembic::AbcGeom::IV2fGeomParam> UVs;
    if (schema.getUVsParam().valid())
@@ -503,14 +482,56 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
       UVs[""] = schema.getUVsParam();
    }
    
+   if (varyingTopology)
+   {
+      node.sampleSchema(mDso->renderTime(), mDso->renderTime(), false);
+      
+      if (readNormals && N.valid())
+      {
+         Nsamples.update(N, mDso->renderTime(), mDso->renderTime(), false);
+      }
+   }
+   else
+   {
+      for (size_t i=0; i<mDso->numMotionSamples(); ++i)
+      {
+         double t = mDso->motionSampleTime(i);
+      
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Sample mesh \"%s\" at t=%lf", node.path().c_str(), t);
+         }
+      
+         node.sampleSchema(t, t, i>0);
+      
+         if (readNormals && N.valid())
+         {
+            Nsamples.update(N, t, t, i>0);
+         }
+      }
+   }
+   
+   if (mDso->verbose())
+   {
+      AiMsgInfo("[abcproc] Read %lu mesh samples", meshSamples.size());
+      if (readNormals)
+      {
+         AiMsgInfo("[abcproc] Read %lu normal samples", Nsamples.size());
+      }
+   }
+   
+   if (meshSamples.size() == 0)
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   
    // Collect attributes
    
    Alembic::Abc::ICompoundProperty userProps = schema.getUserProperties();
    Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
    
-   bool varyingTopology = (schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
+   double attribsTime = (varyingTopology ? mDso->renderTime() : mDso->attribsTime(mDso->attribsFrame()));
    bool interpolateAttribs = !varyingTopology;
-   double attribsTime = (interpolateAttribs ? mDso->attribsTime(mDso->attribsFrame()) : mDso->renderTime());
    
    UserAttributes objectAttrs;
    UserAttributes primitiveAttrs;
@@ -650,13 +671,6 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
       }
    }
    
-   // ---
-   
-   if (meshSamples.size() == 0)
-   {
-      return AlembicNode::DontVisitChildren;
-   }
-   
    std::string baseName = node.formatPartialPath(mDso->namePrefix().c_str(), AlembicNode::LocalPrefix, '|');
    std::string name = mDso->uniqueName(baseName);
    
@@ -706,8 +720,6 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
    }
    else
    {
-      // At this point we know have more that 1 mesh sample
-      
       if (varyingTopology)
       {
          double blend = 0.0;
@@ -770,11 +782,10 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
             }
          }
          
-         // Build arnold data
-         
          AtArray *nsides = AiArrayAllocate(FC->size(), 1, AI_TYPE_UINT);
          AtArray *vidxs = AiArrayAllocate(FI->size(), 1, AI_TYPE_UINT);
          AtArray *vlist = 0;
+         AtPoint pnt;
          
          for (size_t i=0, j=0; i<FC->size(); ++i)
          {
@@ -794,10 +805,10 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
             
             if (vel)
             {
-               AiMsgInfo("[abcproc] Use velocities");
+               AiMsgInfo("[abcproc] Use velocity to compute sample positions");
                if (acc)
                {
-                  AiMsgInfo("[abcproc] Use accelerations");
+                  AiMsgInfo("[abcproc] Use velocity & acceleration to compute sample positions");
                }
             }
          }
@@ -808,10 +819,13 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
             
             for (size_t i=0; i<P->size(); ++i)
             {
-               Alembic::Abc::V3f _p = P->get()[i];
-               AtPoint p = {_p.x, _p.y, _p.z};
+               Alembic::Abc::V3f p = P->get()[i];
                
-               AiArraySetPnt(vlist, i, p);
+               pnt.x = p.x;
+               pnt.y = p.y;
+               pnt.z = p.z;
+               
+               AiArraySetPnt(vlist, i, pnt);
             }
          }
          else
@@ -828,13 +842,13 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                   const float *vacc = acc;
                   for (size_t k=0; k<P->size(); ++k, vvel+=3, vacc+=3)
                   {
-                     Alembic::Abc::V3f _p = P->get()[k];
+                     Alembic::Abc::V3f p = P->get()[k];
                      
-                     AtPoint p = {_p.x + dt * (vvel[0] + 0.5 * dt * vacc[0]),
-                                  _p.y + dt * (vvel[1] + 0.5 * dt * vacc[1]),
-                                  _p.z + dt * (vvel[2] + 0.5 * dt * vacc[2])};
+                     pnt.x = p.x + dt * (vvel[0] + 0.5 * dt * vacc[0]);
+                     pnt.y = p.y + dt * (vvel[1] + 0.5 * dt * vacc[1]);
+                     pnt.z = p.z + dt * (vvel[2] + 0.5 * dt * vacc[2]);
                      
-                     AiArraySetPnt(vlist, j+k, p);
+                     AiArraySetPnt(vlist, j+k, pnt);
                   }
                }
                else
@@ -842,13 +856,13 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                   const float *vvel = vel;
                   for (size_t k=0; k<P->size(); ++k, vvel+=3)
                   {
-                     Alembic::Abc::V3f _p = P->get()[k];
+                     Alembic::Abc::V3f p = P->get()[k];
                      
-                     AtPoint p = {_p.x + dt * vvel[0],
-                                  _p.y + dt * vvel[1],
-                                  _p.z + dt * vvel[2]};
+                     pnt.x = p.x + dt * vvel[0];
+                     pnt.y = p.y + dt * vvel[1];
+                     pnt.z = p.z + dt * vvel[2];
                      
-                     AiArraySetPnt(vlist, j+k, p);
+                     AiArraySetPnt(vlist, j+k, pnt);
                   }
                }
                
@@ -925,9 +939,12 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                
                for (size_t k=0; k<P0->size(); ++k)
                {
-                  pnt.x = a * P0->get()[k].x + blend * P1->get()[k].x;
-                  pnt.y = a * P0->get()[k].y + blend * P1->get()[k].y;
-                  pnt.z = a * P0->get()[k].z + blend * P1->get()[k].z;
+                  Alembic::Abc::V3f p0 = P0->get()[k];
+                  Alembic::Abc::V3f p1 = P1->get()[k];
+                  
+                  pnt.x = a * p0.x + blend * p1.x;
+                  pnt.y = a * p0.y + blend * p1.y;
+                  pnt.z = a * p0.z + blend * p1.z;
                   
                   AiArraySetPnt(vlist, j+k, pnt);
                }
@@ -941,9 +958,11 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                
                for (size_t k=0; k<P0->size(); ++k)
                {
-                  pnt.x = P0->get()[k].x;
-                  pnt.y = P0->get()[k].y;
-                  pnt.z = P0->get()[k].z;
+                  Alembic::Abc::V3f p = P0->get()[k];
+                  
+                  pnt.x = p.x;
+                  pnt.y = p.y;
+                  pnt.z = p.z;
                   
                   AiArraySetPnt(vlist, j+k, pnt);
                }
@@ -973,9 +992,11 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
          nlist = AiArrayAllocate(vals->size(), 1, AI_TYPE_VECTOR);
          for (size_t i=0; i<vals->size(); ++i)
          {
-            vec.x = vals->get()[i].x;
-            vec.y = vals->get()[i].y;
-            vec.z = vals->get()[i].z;
+            Alembic::Abc::N3f val = vals->get()[i];
+            
+            vec.x = val.x;
+            vec.y = val.y;
+            vec.z = val.z;
             
             AiArraySetVec(nlist, i, vec);
          }
@@ -1225,9 +1246,12 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                   
                   for (size_t k=0; k<idxs->size(); ++k)
                   {
-                     vec.x = vals->get()[idxs->get()[k]].x;
-                     vec.y = vals->get()[idxs->get()[k]].y;
-                     vec.z = vals->get()[idxs->get()[k]].z;
+                     Alembic::Abc::N3f val = vals->get()[idxs->get()[k]];
+                     
+                     vec.x = val.x;
+                     vec.y = val.y;
+                     vec.z = val.z;
+                     
                      AiArraySetVec(nlist, j+k, vec);
                   }
                }
@@ -1252,9 +1276,12 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                   
                   for (size_t k=0; k<vals->size(); ++k)
                   {
-                     vec.x = vals->get()[k].x;
-                     vec.y = vals->get()[k].y;
-                     vec.z = vals->get()[k].z;
+                     Alembic::Abc::N3f val = vals->get()[k];
+                     
+                     vec.x = val.x;
+                     vec.y = val.y;
+                     vec.z = val.z;
+                     
                      AiArraySetVec(nlist, j+k, vec);
                   }
                }
@@ -1451,46 +1478,52 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
             }
             else
             {
-               Alembic::Abc::V2fArraySamplePtr vals0 = uv0->data().getVals();
+               Alembic::Abc::V2fArraySamplePtr vals = uv0->data().getVals();
                
                if (mDso->verbose())
                {
-                  AiMsgInfo("[abcproc] Read %lu uvs", vals0->size());
+                  AiMsgInfo("[abcproc] Read %lu uvs", vals->size());
                }
                
                if (uv0->data().isIndexed())
                {
-                  Alembic::Abc::UInt32ArraySamplePtr idxs0 = uv0->data().getIndices();
+                  Alembic::Abc::UInt32ArraySamplePtr idxs = uv0->data().getIndices();
                   
                   if (mDso->verbose())
                   {
-                     AiMsgInfo("[abcproc] Read %lu uv indices", idxs0->size());
+                     AiMsgInfo("[abcproc] Read %lu uv indices", idxs->size());
                   }
                   
-                  uvlist = AiArrayAllocate(vals0->size(), 1, AI_TYPE_POINT2);
-                  uvidxs = AiArrayAllocate(idxs0->size(), 1, AI_TYPE_UINT);
+                  uvlist = AiArrayAllocate(vals->size(), 1, AI_TYPE_POINT2);
+                  uvidxs = AiArrayAllocate(idxs->size(), 1, AI_TYPE_UINT);
                   
-                  for (size_t i=0; i<vals0->size(); ++i)
+                  for (size_t i=0; i<vals->size(); ++i)
                   {
-                     pnt2.x = vals0->get()[i].x;
-                     pnt2.y = vals0->get()[i].y;
+                     Alembic::Abc::V2f val = vals->get()[i];
+                     
+                     pnt2.x = val.x;
+                     pnt2.y = val.y;
+                     
                      AiArraySetPnt2(uvlist, i, pnt2);
                   }
                   
-                  for (size_t i=0; i<idxs0->size(); ++i)
+                  for (size_t i=0; i<idxs->size(); ++i)
                   {
-                     AiArraySetUInt(uvidxs, i, idxs0->get()[i]);
+                     AiArraySetUInt(uvidxs, i, idxs->get()[i]);
                   }
                }
                else
                {
-                  uvlist = AiArrayAllocate(vals0->size(), 1, AI_TYPE_POINT2);
-                  uvidxs = AiArrayAllocate(vals0->size(), 1, AI_TYPE_UINT);
+                  uvlist = AiArrayAllocate(vals->size(), 1, AI_TYPE_POINT2);
+                  uvidxs = AiArrayAllocate(vals->size(), 1, AI_TYPE_UINT);
                   
-                  for (size_t i=0; i<vals0->size(); ++i)
+                  for (size_t i=0; i<vals->size(); ++i)
                   {
-                     pnt2.x = vals0->get()[i].x;
-                     pnt2.y = vals0->get()[i].y;
+                     Alembic::Abc::V2f val = vals->get()[i];
+                     
+                     pnt2.x = val.x;
+                     pnt2.y = val.y;
+                     
                      AiArraySetPnt2(uvlist, i, pnt2);
                      AiArraySetUInt(uvidxs, i, i);
                   }
