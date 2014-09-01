@@ -78,7 +78,11 @@ AlembicScene* AlembicSceneCache::ref(const std::string &filepath, bool persisten
       else
       {
          it->second.refcount++;
-         it->second.persistent = it->second.persistent || persistent;
+         //it->second.persistent = it->second.persistent || persistent;
+         if (it->second.type != Alembic::AbcCoreFactory::IFactory::kHDF5)
+         {
+            it->second.persistent = persistent;
+         }
          #ifdef _DEBUG
          std::cout << "[AlembicSceneCache] Clone master scene" << std::endl;
          #endif
@@ -90,16 +94,20 @@ AlembicScene* AlembicSceneCache::ref(const std::string &filepath, bool persisten
    else
    {
       Alembic::AbcCoreFactory::IFactory factory;
+      Alembic::AbcCoreFactory::IFactory::CoreType coreType;
+      
       factory.setPolicy(Alembic::Abc::ErrorHandler::kQuietNoopPolicy);
-      Alembic::Abc::IArchive archive = factory.getArchive(path);
+      Alembic::Abc::IArchive archive = factory.getArchive(path, coreType);
       
       if (archive.valid())
       {
          CacheEntry &ce = mScenes[path];
          
          ce.archive = archive;
+         ce.type = coreType;
          ce.refcount = 1;
-         ce.persistent = persistent;
+         // encountered issues keeping HDF5 achives around in arnold procedural
+         ce.persistent = (ce.type != Alembic::AbcCoreFactory::IFactory::kHDF5 ? persistent : false);
          ce.master = new AlembicScene(Alembic::Abc::IArchive(ce.archive.getPtr(),
                                                              Alembic::Abc::kWrapExisting,
                                                              Alembic::Abc::ErrorHandler::kQuietNoopPolicy));
