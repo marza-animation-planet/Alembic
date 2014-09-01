@@ -1179,20 +1179,12 @@ void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua)
    {
       decl = "indexed " + ua.arnoldTypeStr;
       idxsName = valsName + "idxs";
-      valsName += "list"; // doesn't have to be
    }
-   
-   // For face-varying attributes, should I lookup for the suffixed name or the original one?
    
    const AtUserParamEntry *pe = AiNodeLookUpUserParameter(node, name);
-   if (!pe && idxsName.length() > 0)
-   {
-      pe = AiNodeLookUpUserParameter(node, valsName.c_str());
-   }
    
    if (pe == 0)
    {
-      // To declare, we have to use the name without any suffix
       AiNodeDeclare(node, name, decl.c_str());
    }
    else
