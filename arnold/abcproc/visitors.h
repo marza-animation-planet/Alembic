@@ -144,7 +144,7 @@ private:
 };
 
 template <class T>
-AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, AlembicNode *)
+AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance)
 {
    Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
    
@@ -218,9 +218,11 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
          }
       }
       
+      AlembicNode *targetNode = (instance ? instance : &node);
+      
       // Format name 'a la maya'
-      std::string baseName = node.formatPartialPath(mDso->namePrefix().c_str(), AlembicNode::LocalPrefix, '|');
-      std::string name = mDso->uniqueName(baseName);
+      std::string targetNode = targetNode->formatPartialPath(mDso->namePrefix().c_str(), AlembicNode::LocalPrefix, '|');
+      std::string name = mDso->uniqueName(targetName);
       
       if (mDso->verbose())
       {
@@ -232,7 +234,7 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
       AtNode *proc = AiNode("procedural");
       AiNodeSetStr(proc, "name", name.c_str());
       AiNodeSetStr(proc, "dso", AiNodeGetStr(mDso->procNode(), "dso"));
-      AiNodeSetStr(proc, "data", mDso->dataString(node.path().c_str()).c_str());
+      AiNodeSetStr(proc, "data", mDso->dataString(targetNode->path().c_str()).c_str());
       AiNodeSetBool(proc, "load_at_init", false);
       AiNodeSetPnt(proc, "min", box.min.x, box.min.y, box.min.z);
       AiNodeSetPnt(proc, "max", box.max.x, box.max.y, box.max.z);
