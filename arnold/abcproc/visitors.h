@@ -220,6 +220,25 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
          }
       }
       
+      const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mDso->procNode(), "disp_padding");
+      if (pe && mDso->overrideAttrib("disp_padding"))
+      {
+         float padding = AiNodeGetFlt(mDso->procNode(), "disp_padding");
+         
+         if (padding > 0.0f && mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] \"disp_padding\" attribute found on procedural, pad bounds by %f", padding);
+         }
+         
+         box.min.x -= padding;
+         box.min.y -= padding;
+         box.min.z -= padding;
+         
+         box.max.x += padding;
+         box.max.y += padding;
+         box.max.z += padding;
+      }
+      
       AlembicNode *targetNode = (instance ? instance : &node);
       
       // Format name 'a la maya'
