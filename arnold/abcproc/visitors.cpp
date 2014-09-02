@@ -439,6 +439,71 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
 {
    Alembic::AbcGeom::IPolyMeshSchema schema = node.typedObject().getSchema();
    
+   if (mDso->isVolume())
+   {
+      // Bounds padding?
+      
+      Alembic::Abc::IBox3dProperty boundsProp = schema.getSelfBoundsProperty();
+      
+      if (!boundsProp.valid())
+      {
+         mNode = 0;
+         return AlembicNode::DontVisitChildren;
+      }
+      
+      mNode = AiNode("box");
+      
+      AiNodeSetFlt(mNode, "step_size", mDso->volumeStepSize());
+      
+      TimeSampleList<Alembic::Abc::IBox3dProperty> boundsSamples;
+      TimeSampleList<Alembic::Abc::IBox3dProperty>::ConstIterator b0, b1;
+      
+      Alembic::Abc::Box3d box;
+      box.makeEmpty();
+      
+      for (unsigned int i=0; i<mDso->numMotionSamples(); ++i)
+      {
+         double t = mDso->motionSampleTime(i);
+         
+         if (boundsSamples.update(boundsProp, t, t, i>0))
+         {
+            double b = 0.0;
+            
+            if (boundsSamples.getSamples(t, b0, b1, b))
+            {
+               if (b > 0.0)
+               {
+                  double a = 1.0 - b;
+                  
+                  Alembic::Abc::V3d bmin = a * b0->data().min + b * b1->data().min;
+                  Alembic::Abc::V3d bmax = a * b0->data().max + b * b1->data().max;
+                  
+                  box.extendBy(Alembic::Abc::Box3d(bmin, bmax));
+               }
+               else
+               {
+                  box.extendBy(b0->data());
+               }
+            }
+         }
+      }
+      
+      AiNodeSetPnt(mNode, "min", box.min.x, box.min.y, box.min.z);
+      AiNodeSetPnt(mNode, "max", box.max.x, box.max.y, box.max.z);
+      
+      AtArray *shaders = AiNodeGetArray(mDso->procNode(), "shader");
+      if (shaders && shaders->nelements > 0)
+      {
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Force volume shader");
+         }
+         AiNodeSetArray(mNode, "shader", AiArrayCopy(shaders));
+      }
+      
+      return AlembicNode::ContinueVisit;
+   }
+   
    bool varyingTopology = (schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
    
    bool subd = false;
