@@ -240,6 +240,8 @@ void Dso::SingleParameters::reset()
    attribsFrame = AF_render;
    attribPreficesToRemove.clear();
    
+   computeTangents.clear();
+   
    radiusMin = 0.0f;
    radiusMax = 1000000.0f;
    radiusScale = 1.0f;
@@ -276,6 +278,16 @@ std::string Dso::SingleParameters::dataString() const
       oss << " -removeattribprefices";
       std::set<std::string>::const_iterator it = attribPreficesToRemove.begin();
       while (it != attribPreficesToRemove.end())
+      {
+         oss << " " << *it;
+         ++it;
+      }
+   }
+   if (computeTangents.size() > 0)
+   {
+      oss << " -computetangents";
+      std::set<std::string>::const_iterator it = computeTangents.begin();
+      while (it != computeTangents.end())
       {
          oss << " " << *it;
          ++it;
@@ -1327,6 +1339,16 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       }
       --i;
    }
+   else if (args[i] == "-computetangents")
+   {
+      ++i;
+      while (i < args.size() && !isFlag(args[i]))
+      {
+         mSingleParams.computeTangents.insert(args[i]);
+         ++i;
+      }
+      --i;
+   }
    else if (args[i] == "-radiusmin")
    {
       ++i;
@@ -1888,6 +1910,57 @@ void Dso::readFromUserParams()
                for (unsigned int i=0; i<prefices->nelements; ++i)
                {
                   mSingleParams.attribPreficesToRemove.insert(AiArrayGetStr(prefices, i));
+               }
+            }
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
+         }
+      }
+      else if (param == "computetangents")
+      {
+         mSingleParams.computeTangents.clear();
+         
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            std::string uvnames = AiNodeGetStr(mProcNode, pname);
+            std::string uvname;
+            
+            size_t p0 = 0;
+            size_t p1 = uvnames.find(' ', p0);
+            
+            while (p1 != std::string::npos)
+            {
+               uvname = uvnames.substr(p0, p1-p0);
+               strip(uvname);
+               
+               if (uvname.length() > 0)
+               {
+                  mSingleParams.computeTangents.insert(uvname);
+               }
+               
+               p0 = p1 + 1;
+               p1 = uvnames.find(' ', p0);
+            }
+            
+            uvname = uvnames.substr(p0);
+            strip(uvname);
+            
+            if (uvname.length() > 0)
+            {
+               mSingleParams.computeTangents.insert(uvname);
+            }
+         }
+         else if (AiUserParamGetType(p) == AI_TYPE_ARRAY && AiUserParamGetArrayType(p) == AI_TYPE_STRING)
+         {
+            AtArray *uvnames = AiNodeGetArray(mProcNode, pname);
+            
+            if (uvnames)
+            {
+               for (unsigned int i=0; i<uvnames->nelements; ++i)
+               {
+                  mSingleParams.computeTangents.insert(AiArrayGetStr(uvnames, i));
                }
             }
          }

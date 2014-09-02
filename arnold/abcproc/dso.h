@@ -202,6 +202,11 @@ public:
       return mReverseWinding;
    }
    
+   inline bool computeTangents(const std::string &uvname) const
+   {
+      return (mSingleParams.computeTangents.find(uvname) != mSingleParams.computeTangents.end());
+   }
+   
    // Points/Curves
    
    inline double radiusMin() const
@@ -350,6 +355,9 @@ private:
       bool readVertexAttribs;
       AttributeFrame attribsFrame;
       std::set<std::string> attribPreficesToRemove;
+      
+      // mesh
+      std::set<std::string> computeTangents;
       
       // particles/curves
       float radiusMin;

@@ -1498,6 +1498,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
    // For all reamaining data, no motion blur
    
    // Set mesh UVs
+   Alembic::Abc::N3f *normals = 0;
    
    for (std::map<std::string, Alembic::AbcGeom::IV2fGeomParam>::iterator uvit=UVs.begin(); uvit!=UVs.end(); ++uvit)
    {
@@ -1716,6 +1717,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
          
          if (uvlist && uvidxs)
          {
+            bool computeTangents = false;
+            
             if (uvit->first.length() > 0)
             {
                std::string iname = uvit->first + "idxs";
@@ -1723,11 +1726,229 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                AiNodeDeclare(mNode, uvit->first.c_str(), "indexed POINT2");
                AiNodeSetArray(mNode, uvit->first.c_str(), uvlist);
                AiNodeSetArray(mNode, iname.c_str(), uvidxs);
+               
+               computeTangents = mDso->computeTangents(uvit->first);
             }
             else
             {
                AiNodeSetArray(mNode, "uvlist", uvlist);
                AiNodeSetArray(mNode, "uvidxs", uvidxs);
+               
+               computeTangents = mDso->computeTangents("uv");
+            }
+            
+            if (computeTangents)
+            {
+               std::string Tname = "T" + uvit->first;
+               std::string Bname = "B" + uvit->first;
+               
+               bool hasT = (pointAttrs.find(Tname) != pointAttrs.end());
+               bool hasB = (pointAttrs.find(Bname) != pointAttrs.end());
+               
+               if (hasT && hasB)
+               {
+                  AiMsgWarning("[abcproc] Skip tangents generation for uv set \"%s\"", uvit->first.c_str());
+                  continue;
+               }
+               
+               if (!normals)
+               {
+                  // Compute per-point normals
+                  
+                  if (mDso->verbose())
+                  {
+                     AiMsgInfo("[abcproc] Compute smooth point normals");
+                  }
+                  
+                  normals = new Alembic::Abc::N3f[vlist->nelements];
+                  
+                  meshSamples.getSamples(mDso->renderTime(), samp0, samp1, blend);
+                  
+                  Alembic::Abc::P3fArraySamplePtr P0 = samp0->data().getPositions();
+                  Alembic::Abc::P3fArraySamplePtr P1;
+                  
+                  float a = 1.0f;
+                  float b = 0.0f;
+                  
+                  if (blend > 0.0 && !varyingTopology)
+                  {
+                     P1 = samp1->data().getPositions();
+                     b = float(blend);
+                     a = 1.0f - b;
+                  }
+                  
+                  for (unsigned int f=0, vi=0; f<polygonCount; ++f)
+                  {
+                     unsigned int nfv = polygonVertexCount[f];
+                     
+                     for (unsigned int fv=2; fv<nfv; ++fv)
+                     {
+                        Alembic::Abc::V3f fN, e0, e1;
+                        
+                        unsigned int v0 = vertexPointIndices[vi];
+                        unsigned int v1 = vertexPointIndices[vi+fv-1];
+                        unsigned int v2 = vertexPointIndices[vi+fv];
+                        
+                        if (P1)
+                        {
+                           Alembic::Abc::V3f p0, p1, p2;
+                           
+                           p0 = a * P0->get()[v0] - b * P1->get()[v0];
+                           p1 = a * P0->get()[v1] - b * P1->get()[v1];
+                           p2 = a * P0->get()[v2] - b * P1->get()[v2];
+                           
+                           e0 = p1 - p0;
+                           e1 = p2 - p0;
+                        }
+                        else
+                        {
+                           e0 = P0->get()[v1] - P0->get()[v0];
+                           e1 = P0->get()[v2] - P0->get()[v0];
+                        }
+                        
+                        e0.normalize();
+                        e1.normalize();
+                        
+                        fN = (mDso->reverseWinding() ? e0.cross(e1) : e1.cross(e0));
+                        fN.normalize();
+                        
+                        normals[v0] += fN;
+                        normals[v1] += fN;
+                        normals[v2] += fN;
+                     }
+                     
+                     vi += nfv;
+                  }
+                  
+                  for (unsigned int i=0; i<vlist->nelements; ++i)
+                  {
+                     normals[i].normalize();
+                  }
+               }
+               
+               // Build tangents and binormals
+               size_t bytesize = 3 * vlist->nelements * sizeof(float);
+               float *T = (float*) AiMalloc(bytesize);
+               float *B = (float*) AiMalloc(bytesize);
+               memset(T, 0, bytesize);
+               memset(B, 0, bytesize);
+               
+               for (unsigned int f=0, v=0; f<polygonCount; ++f)
+               {
+                  unsigned int nfv = polygonVertexCount[f];
+                  
+                  for (unsigned int fv=2; fv<nfv; ++fv)
+                  {
+                     unsigned int iv1 = vertexPointIndices[v];
+                     unsigned int iv2 = vertexPointIndices[v+fv-1];
+                     unsigned int iv3 = vertexPointIndices[v+fv];
+                     
+                     AtPoint v1 = AiArrayGetPnt(vlist, iv1);
+                     AtPoint v2 = AiArrayGetPnt(vlist, iv2);
+                     AtPoint v3 = AiArrayGetPnt(vlist, iv3);
+                     
+                     AtPoint2 uv1 = AiArrayGetPnt2(uvlist, AiArrayGetUInt(uvidxs, v));
+                     AtPoint2 uv2 = AiArrayGetPnt2(uvlist, AiArrayGetUInt(uvidxs, v+fv-1));
+                     AtPoint2 uv3 = AiArrayGetPnt2(uvlist, AiArrayGetUInt(uvidxs, v+fv));
+                     
+                     float s1 = uv2.x - uv1.x;
+                     float t1 = uv2.y - uv1.y;
+                     
+                     float s2 = uv3.x - uv1.x;
+                     float t2 = uv3.y - uv1.y;
+                     
+                     float x1 = v2.x - v1.x;
+                     float y1 = v2.y - v1.y;
+                     float z1 = v2.z - v1.z;
+                     
+                     float x2 = v3.x - v1.x;
+                     float y2 = v3.y - v1.y;
+                     float z2 = v3.z - v1.z;
+                     
+                     float r = (s1 * t2 - s2 * t1);
+                     
+                     if (fabs(r) > 0.0001)
+                     {
+                        r = 1.0f / r;
+                        
+                        unsigned int idxs[3] = {3*iv1, 3*iv2, 3*iv3};
+                        
+                        float t[3] = {r * (t2 * x1 - t1 * x2),
+                                      r * (t2 * y1 - t1 * y2),
+                                      r * (t2 * z1 - t1 * z2)};
+                        
+                        float b[3] = {r * (s1 * x2 - s2 * x1),
+                                      r * (s1 * y2 - s2 * y1),
+                                      r * (s1 * z2 - s2 * z1)};
+                        
+                        for (int i=0; i<3; ++i)
+                        {
+                           for (int j=0; j<3; ++j)
+                           {
+                              T[idxs[i]+j] += t[j];
+                              B[idxs[i]+j] += b[j];
+                           }
+                        }
+                     }
+                  }
+                  
+                  v += nfv;
+               }
+               
+               for (unsigned int v=0, off=0; v<vlist->nelements; ++v, off+=3)
+               {
+                  Alembic::Abc::V3f n = normals[v];
+                  Alembic::Abc::V3f t(T[off], T[off+1], T[off+2]);
+                  Alembic::Abc::V3f b(B[off], B[off+1], B[off+2]);
+                  
+                  t.normalize();
+                  t = (t - n * t.dot(n)).normalize();
+                  
+                  b.normalize();
+                  b = (b - n * b.dot(n) - t * b.dot(t)).normalize();
+                  
+                  T[off] = t.x;
+                  T[off+1] = t.y;
+                  T[off+2] = t.z;
+                  
+                  B[off] = b.x;
+                  B[off+1] = b.y;
+                  B[off+2] = b.z;
+               }
+               
+               if (hasT)
+               {
+                  AiMsgWarning("[abcproc] Point user attribute \"%s\" already exists", Tname.c_str());
+               }
+               else
+               {
+                  UserAttribute &Tattr = pointAttrs[Tname];
+                  Tattr.arnoldCategory = AI_USERDEF_VARYING;
+                  Tattr.arnoldType = AI_TYPE_VECTOR;
+                  Tattr.arnoldTypeStr = "VECTOR";
+                  Tattr.dataDim = 3;
+                  Tattr.dataCount = vlist->nelements;
+                  Tattr.data = T;
+                  Tattr.indicesCount = 0;
+                  Tattr.indices = 0;
+               }
+               
+               if (hasB)
+               {
+                  AiMsgWarning("[abcproc] Point user attribute \"%s\" already exists", Bname.c_str());
+               }
+               else
+               {
+                  UserAttribute &Battr = pointAttrs[Bname];
+                  Battr.arnoldCategory = AI_USERDEF_VARYING;
+                  Battr.arnoldType = AI_TYPE_VECTOR;
+                  Battr.arnoldTypeStr = "VECTOR";
+                  Battr.dataDim = 3;
+                  Battr.dataCount = vlist->nelements;
+                  Battr.data = B;
+                  Battr.indicesCount = 0;
+                  Battr.indices = 0;
+               }
             }
          }
       }
@@ -1752,6 +1973,11 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
    delete[] polygonVertexCount;
    delete[] vertexPointIndices;
    delete[] arnoldVertexIndex;
+   
+   if (normals)
+   {
+      delete[] normals;
+   }
    
    return AlembicNode::ContinueVisit;
 }
