@@ -1747,8 +1747,28 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                
                if (hasT && hasB)
                {
-                  AiMsgWarning("[abcproc] Skip tangents generation for uv set \"%s\"", uvit->first.c_str());
+                  AiMsgWarning("[abcproc] Skip tangents generation for uv set \"%s\": attributes exists", uvit->first.c_str());
                   continue;
+               }
+               
+               if (!meshSamples.getSamples(mDso->renderTime(), samp0, samp1, blend))
+               {
+                  AiMsgWarning("[abcproc] Skip tangents generation for uv set \"%s\": could not sample positions", uvit->first.c_str());
+                  continue;
+               }
+               
+               Alembic::Abc::P3fArraySamplePtr P0 = samp0->data().getPositions();
+               Alembic::Abc::P3fArraySamplePtr P1;
+               Alembic::Abc::V3f p0, p1, p2;
+               
+               float a = 1.0f;
+               float b = 0.0f;
+               
+               if (blend > 0.0 && !varyingTopology)
+               {
+                  P1 = samp1->data().getPositions();
+                  b = float(blend);
+                  a = 1.0f - b;
                }
                
                if (!normals)
@@ -1760,55 +1780,51 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                      AiMsgInfo("[abcproc] Compute smooth point normals");
                   }
                   
-                  normals = new Alembic::Abc::N3f[vlist->nelements];
+                  normals = new Alembic::Abc::N3f[pointCount];
                   
-                  meshSamples.getSamples(mDso->renderTime(), samp0, samp1, blend);
-                  
-                  Alembic::Abc::P3fArraySamplePtr P0 = samp0->data().getPositions();
-                  Alembic::Abc::P3fArraySamplePtr P1;
-                  
-                  float a = 1.0f;
-                  float b = 0.0f;
-                  
-                  if (blend > 0.0 && !varyingTopology)
-                  {
-                     P1 = samp1->data().getPositions();
-                     b = float(blend);
-                     a = 1.0f - b;
-                  }
+                  Alembic::Abc::V3f fN, e0, e1;
                   
                   for (unsigned int f=0, vi=0; f<polygonCount; ++f)
                   {
                      unsigned int nfv = polygonVertexCount[f];
                      
+                     if (vi >= vertexCount)
+                        AiMsgError("[abcproc] Polygon %u: Invalid vertex offset %u", f, vi);
+                     
                      for (unsigned int fv=2; fv<nfv; ++fv)
                      {
-                        Alembic::Abc::V3f fN, e0, e1;
-                        
                         unsigned int v0 = vertexPointIndices[vi];
                         unsigned int v1 = vertexPointIndices[vi+fv-1];
                         unsigned int v2 = vertexPointIndices[vi+fv];
                         
+                        if (v0 >= pointCount)
+                           AiMsgError("[abcproc] Polygon %u, Triangle %u: Invalid vertex index %u", f, fv-2, v0);
+                        if (v1 >= pointCount)
+                           AiMsgError("[abcproc] Polygon %u, Triangle %u: Invalid vertex index %u", f, fv-2, v1);
+                        if (v2 >= pointCount)
+                           AiMsgError("[abcproc] Polygon %u, Triangle %u: Invalid vertex index %u", f, fv-2, v2);
+                        
                         if (P1)
                         {
-                           Alembic::Abc::V3f p0, p1, p2;
-                           
-                           p0 = a * P0->get()[v0] - b * P1->get()[v0];
-                           p1 = a * P0->get()[v1] - b * P1->get()[v1];
-                           p2 = a * P0->get()[v2] - b * P1->get()[v2];
+                           p0 = a * P0->get()[v0] + b * P1->get()[v0];
+                           p1 = a * P0->get()[v1] + b * P1->get()[v1];
+                           p2 = a * P0->get()[v2] + b * P1->get()[v2];
                            
                            e0 = p1 - p0;
                            e1 = p2 - p0;
                         }
                         else
                         {
-                           e0 = P0->get()[v1] - P0->get()[v0];
-                           e1 = P0->get()[v2] - P0->get()[v0];
+                           p0 = P0->get()[v0];
+                           
+                           e0 = P0->get()[v1] - p0;
+                           e1 = P0->get()[v2] - p0;
                         }
                         
                         e0.normalize();
                         e1.normalize();
                         
+                        // reverseWinding means CCW, CW otherwise, decides normal orientation
                         fN = (mDso->reverseWinding() ? e0.cross(e1) : e1.cross(e0));
                         fN.normalize();
                         
@@ -1820,14 +1836,14 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                      vi += nfv;
                   }
                   
-                  for (unsigned int i=0; i<vlist->nelements; ++i)
+                  for (unsigned int p=0; p<pointCount; ++p)
                   {
-                     normals[i].normalize();
+                     normals[p].normalize();
                   }
                }
                
-               // Build tangents and binormals
-               size_t bytesize = 3 * vlist->nelements * sizeof(float);
+               // Build tangents and bitangent
+               size_t bytesize = 3 * pointCount * sizeof(float);
                float *T = (float*) AiMalloc(bytesize);
                float *B = (float*) AiMalloc(bytesize);
                memset(T, 0, bytesize);
@@ -1839,39 +1855,55 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                   
                   for (unsigned int fv=2; fv<nfv; ++fv)
                   {
-                     unsigned int iv1 = vertexPointIndices[v];
-                     unsigned int iv2 = vertexPointIndices[v+fv-1];
-                     unsigned int iv3 = vertexPointIndices[v+fv];
+                     unsigned int iv0 = vertexPointIndices[v];
+                     unsigned int iv1 = vertexPointIndices[v+fv-1];
+                     unsigned int iv2 = vertexPointIndices[v+fv];
                      
-                     AtPoint v1 = AiArrayGetPnt(vlist, iv1);
-                     AtPoint v2 = AiArrayGetPnt(vlist, iv2);
-                     AtPoint v3 = AiArrayGetPnt(vlist, iv3);
+                     if (P1)
+                     {
+                        p0 = a * P0->get()[iv0] + b * P1->get()[iv0];
+                        p1 = a * P0->get()[iv1] + b * P1->get()[iv1];
+                        p2 = a * P0->get()[iv2] + b * P1->get()[iv2];
+                     }
+                     else
+                     {
+                        p0 = P0->get()[iv0];
+                        p1 = P0->get()[iv1];
+                        p2 = P0->get()[iv2];
+                     }
                      
-                     AtPoint2 uv1 = AiArrayGetPnt2(uvlist, AiArrayGetUInt(uvidxs, v));
-                     AtPoint2 uv2 = AiArrayGetPnt2(uvlist, AiArrayGetUInt(uvidxs, v+fv-1));
-                     AtPoint2 uv3 = AiArrayGetPnt2(uvlist, AiArrayGetUInt(uvidxs, v+fv));
+                     AtPoint2 uv0 = AiArrayGetPnt2(uvlist, AiArrayGetUInt(uvidxs, v));
+                     AtPoint2 uv1 = AiArrayGetPnt2(uvlist, AiArrayGetUInt(uvidxs, v+fv-1));
+                     AtPoint2 uv2 = AiArrayGetPnt2(uvlist, AiArrayGetUInt(uvidxs, v+fv));
                      
-                     float s1 = uv2.x - uv1.x;
-                     float t1 = uv2.y - uv1.y;
+                     // For any point Q(u,v) in triangle:
+                     // (0) Q - p0 = T * (u - u0) + B * (v - v0)
+                     // 
+                     // Replace Q by p1 and p2 in (0)
+                     // (1) p1 - p0 = T * (u1 - u0) + B * (v1 - v0)
+                     // (2) p2 - p0 = T * (u2 - u0) + B * (v2 - v0)
                      
-                     float s2 = uv3.x - uv1.x;
-                     float t2 = uv3.y - uv1.y;
+                     float s1 = uv1.x - uv0.x;
+                     float t1 = uv1.y - uv0.y;
                      
-                     float x1 = v2.x - v1.x;
-                     float y1 = v2.y - v1.y;
-                     float z1 = v2.z - v1.z;
+                     float x1 = p1.x - p0.x;
+                     float y1 = p1.y - p0.y;
+                     float z1 = p1.z - p0.z;
                      
-                     float x2 = v3.x - v1.x;
-                     float y2 = v3.y - v1.y;
-                     float z2 = v3.z - v1.z;
+                     float s2 = uv2.x - uv0.x;
+                     float t2 = uv2.y - uv0.y;
+                     
+                     float x2 = p2.x - p0.x;
+                     float y2 = p2.y - p0.y;
+                     float z2 = p2.z - p0.z;
                      
                      float r = (s1 * t2 - s2 * t1);
                      
-                     if (fabs(r) > 0.0001)
+                     if (fabs(r) > 0.000001f)
                      {
                         r = 1.0f / r;
                         
-                        unsigned int idxs[3] = {3*iv1, 3*iv2, 3*iv3};
+                        unsigned int idxs[3] = {3*iv0, 3*iv1, 3*iv2};
                         
                         float t[3] = {r * (t2 * x1 - t1 * x2),
                                       r * (t2 * y1 - t1 * y2),
@@ -1881,12 +1913,12 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                                       r * (s1 * y2 - s2 * y1),
                                       r * (s1 * z2 - s2 * z1)};
                         
-                        for (int i=0; i<3; ++i)
+                        for (int tbi=0; tbi<3; ++tbi)
                         {
-                           for (int j=0; j<3; ++j)
+                           for (int d=0; d<3; ++d)
                            {
-                              T[idxs[i]+j] += t[j];
-                              B[idxs[i]+j] += b[j];
+                              T[idxs[tbi]+d] += t[d];
+                              B[idxs[tbi]+d] += b[d];
                            }
                         }
                      }
@@ -1895,17 +1927,15 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                   v += nfv;
                }
                
-               for (unsigned int v=0, off=0; v<vlist->nelements; ++v, off+=3)
+               for (unsigned int v=0, off=0; v<pointCount; ++v, off+=3)
                {
                   Alembic::Abc::V3f n = normals[v];
                   Alembic::Abc::V3f t(T[off], T[off+1], T[off+2]);
                   Alembic::Abc::V3f b(B[off], B[off+1], B[off+2]);
                   
-                  t.normalize();
-                  t = (t - n * t.dot(n)).normalize();
+                  t = (t - t.dot(n) * n).normalized();
                   
-                  b.normalize();
-                  b = (b - n * b.dot(n) - t * b.dot(t)).normalize();
+                  b = (b - b.dot(n) * n - b.dot(t) * t).normalized();
                   
                   T[off] = t.x;
                   T[off+1] = t.y;
@@ -1919,15 +1949,17 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                if (hasT)
                {
                   AiMsgWarning("[abcproc] Point user attribute \"%s\" already exists", Tname.c_str());
+                  AiFree(T);
                }
                else
                {
+                  // copy normals in for test
                   UserAttribute &Tattr = pointAttrs[Tname];
                   Tattr.arnoldCategory = AI_USERDEF_VARYING;
                   Tattr.arnoldType = AI_TYPE_VECTOR;
                   Tattr.arnoldTypeStr = "VECTOR";
                   Tattr.dataDim = 3;
-                  Tattr.dataCount = vlist->nelements;
+                  Tattr.dataCount = pointCount;
                   Tattr.data = T;
                   Tattr.indicesCount = 0;
                   Tattr.indices = 0;
@@ -1936,6 +1968,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                if (hasB)
                {
                   AiMsgWarning("[abcproc] Point user attribute \"%s\" already exists", Bname.c_str());
+                  AiFree(B);
                }
                else
                {
@@ -1944,7 +1977,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                   Battr.arnoldType = AI_TYPE_VECTOR;
                   Battr.arnoldTypeStr = "VECTOR";
                   Battr.dataDim = 3;
-                  Battr.dataCount = vlist->nelements;
+                  Battr.dataCount = pointCount;
                   Battr.data = B;
                   Battr.indicesCount = 0;
                   Battr.indices = 0;
