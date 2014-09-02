@@ -97,7 +97,7 @@ struct SampleUtils<Alembic::AbcGeom::ITypedGeomParam<Traits> >
    static void Get(const AlembicType &owner, SampleType &out,
                   const Alembic::Abc::ISampleSelector &selector = Alembic::Abc::ISampleSelector())
    {
-      if (owner.isIndexed())
+      if (owner.getScope() == Alembic::AbcGeom::kFacevaryingScope)
       {
          owner.getIndexed(out, selector);
       }

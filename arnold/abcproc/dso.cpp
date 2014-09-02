@@ -315,6 +315,7 @@ Dso::Dso(AtNode *node)
    , mShutterStep(0)
    , mMotionStart(std::numeric_limits<double>::max())
    , mMotionEnd(-std::numeric_limits<double>::max())
+   , mReverseWinding(true)
 {
    mCommonParams.reset();
    mSingleParams.reset();
@@ -350,6 +351,8 @@ Dso::Dso(AtNode *node)
    
    normalizeFilePath(mCommonParams.filePath);
    normalizeFilePath(mCommonParams.referenceFilePath);
+   
+   mReverseWinding = AiNodeGetBool(AiUniverseGetOptions(), "CCW_points");
    
    // Only acquire global lock when create new alembic scenes
    //

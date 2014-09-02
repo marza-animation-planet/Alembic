@@ -348,7 +348,7 @@ bool ReadGeomParam(GeomParam param, UserAttribute &ua, double t, bool interpolat
    
    vals0 = (const SrcT *) samp0->data().getVals()->getData();
    
-   if (blend > 0.0 && interpolate && ua.dataCount != samp1->data().getVals()->size())
+   if (blend > 0.0 && interpolate && ua.dataCount == samp1->data().getVals()->size())
    {
       vals1 = (const SrcT *) samp1->data().getVals()->getData();
       
@@ -374,12 +374,20 @@ bool ReadGeomParam(GeomParam param, UserAttribute &ua, double t, bool interpolat
       }
    }
    
-   if (param.isIndexed())
+   Alembic::Abc::UInt32ArraySamplePtr idxs = samp0->data().getIndices();
+   
+   if (idxs)
    {
-      ua.indicesCount = samp0->data().getIndices()->size();
+      // SampleUtils only uses getIndexed with kFacevaryingScope geom param
+      if (param.getScope() != Alembic::AbcGeom::kFacevaryingScope)
+      {
+         AiMsgWarning("[abcproc] Found non facevarying geo param using indices \"%s\"", param.getName().c_str());
+      }
+      
+      ua.indicesCount = idxs->size();
       ua.indices = (unsigned int*) AiMalloc(ua.indicesCount * sizeof(unsigned int));
       
-      const Alembic::Util::uint32_t *indices = samp0->data().getIndices()->get();
+      const Alembic::Util::uint32_t *indices = idxs->get();
       
       for (unsigned int i=0; i<ua.indicesCount; ++i)
       {
@@ -1095,7 +1103,7 @@ void _ArraySet<AI_TYPE_STRING, const char*>(AtArray *ary, unsigned int count, co
 
 
 template <int ArnoldType, typename T>
-void _SetUserAttribute(AtNode *node, const std::string &valName, const std::string &idxName, UserAttribute &ua)
+void _SetUserAttribute(AtNode *node, const std::string &valName, const std::string &idxName, UserAttribute &ua, unsigned int *remapIndices)
 {
    T *vals = (T*) ua.data;
    
@@ -1104,6 +1112,7 @@ void _SetUserAttribute(AtNode *node, const std::string &valName, const std::stri
       if (idxName.length() > 0)
       {
          // AI_USERDEF_INDEXED case
+         
          AtArray *valAry = AiArrayAllocate(ua.dataCount, 1, ArnoldType);
          
          _ArraySet<ArnoldType, T>(valAry, ua.dataCount, vals, 0);
@@ -1112,12 +1121,37 @@ void _SetUserAttribute(AtNode *node, const std::string &valName, const std::stri
          
          if (!ua.indices)
          {
+            // geom param was fully expanded
+            
             ua.indicesCount = ua.dataCount;
             ua.indices = (unsigned int*) AiMalloc(ua.indicesCount * sizeof(unsigned int));
+            
+            if (remapIndices)
+            {
+               for (unsigned int i=0; i<ua.indicesCount; ++i)
+               {
+                  ua.indices[remapIndices[i]] = i;
+               }
+            }
+            else
+            {
+               for (unsigned int i=0; i<ua.indicesCount; ++i)
+               {
+                  ua.indices[i] = i;
+               }
+            }
+         }
+         else if (remapIndices)
+         {
+            unsigned int *indices = (unsigned int*) AiMalloc(ua.indicesCount * sizeof(unsigned int));
+            
             for (unsigned int i=0; i<ua.indicesCount; ++i)
             {
-               ua.indices[i] = i;
+               indices[remapIndices[i]] = ua.indices[i];
             }
+            
+            AiFree(ua.indices);
+            ua.indices = indices;
          }
          
          AtArray *idxAry = AiArrayAllocate(ua.indicesCount, 1, AI_TYPE_UINT);
@@ -1130,6 +1164,11 @@ void _SetUserAttribute(AtNode *node, const std::string &valName, const std::stri
       {
          if (ua.indices)
          {
+            // Non facevarying attribute with indices
+            // This should not happen in theory as SampleUtils only query indices for kFacevaryingScope
+            // Do no apply remapping in this case!
+            AiMsgWarning("[abcproc] Setting non facevarying attribute from indexed values");
+            
             AtArray *valAry = AiArrayAllocate(ua.indicesCount, 1, ArnoldType);
             
             _ArraySet<ArnoldType, T>(valAry, ua.indicesCount, vals, ua.indices);
@@ -1152,7 +1191,7 @@ void _SetUserAttribute(AtNode *node, const std::string &valName, const std::stri
    }
 }
 
-void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua)
+void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigned int *remapIndices)
 {
    std::string decl;
    std::string valsName = name;
@@ -1204,52 +1243,52 @@ void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua)
    switch (ua.arnoldType)
    {
    case AI_TYPE_BOOLEAN:
-      _SetUserAttribute<AI_TYPE_BOOLEAN, bool>(node, valsName, idxsName, ua);
+      _SetUserAttribute<AI_TYPE_BOOLEAN, bool>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_BYTE:
-      _SetUserAttribute<AI_TYPE_BYTE, AtByte>(node, valsName, idxsName, ua);
+      _SetUserAttribute<AI_TYPE_BYTE, AtByte>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_INT:
-      _SetUserAttribute<AI_TYPE_INT, int>(node, valsName, idxsName, ua);
+      _SetUserAttribute<AI_TYPE_INT, int>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_UINT:
-      _SetUserAttribute<AI_TYPE_UINT, unsigned int>(node, valsName, idxsName, ua);
+      _SetUserAttribute<AI_TYPE_UINT, unsigned int>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_FLOAT:
-      _SetUserAttribute<AI_TYPE_FLOAT, float>(node, valsName, idxsName, ua);
+      _SetUserAttribute<AI_TYPE_FLOAT, float>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_POINT2:
-      _SetUserAttribute<AI_TYPE_POINT2, float>(node, valsName, idxsName, ua);
+      _SetUserAttribute<AI_TYPE_POINT2, float>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_POINT:
-      _SetUserAttribute<AI_TYPE_POINT, float>(node, valsName, idxsName, ua);
+      _SetUserAttribute<AI_TYPE_POINT, float>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_VECTOR:
-      _SetUserAttribute<AI_TYPE_VECTOR, float>(node, valsName, idxsName, ua);
+      _SetUserAttribute<AI_TYPE_VECTOR, float>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_RGB:
-      _SetUserAttribute<AI_TYPE_RGB, float>(node, valsName, idxsName, ua);
+      _SetUserAttribute<AI_TYPE_RGB, float>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_RGBA:
-      _SetUserAttribute<AI_TYPE_RGBA, float>(node, valsName, idxsName, ua);
+      _SetUserAttribute<AI_TYPE_RGBA, float>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_MATRIX:
-      _SetUserAttribute<AI_TYPE_MATRIX, float>(node, valsName, idxsName, ua);
+      _SetUserAttribute<AI_TYPE_MATRIX, float>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_STRING:
-      _SetUserAttribute<AI_TYPE_STRING, const char*>(node, valsName, idxsName, ua);
+      _SetUserAttribute<AI_TYPE_STRING, const char*>(node, valsName, idxsName, ua, remapIndices);
    default:
       break;
    }
 }
 
-void SetUserAttributes(AtNode *node, UserAttributes &attribs)
+void SetUserAttributes(AtNode *node, UserAttributes &attribs, unsigned int *remapIndices)
 {
    UserAttributes::iterator it = attribs.begin();
    
    while (it != attribs.end())
    {
-      SetUserAttribute(node, it->first.c_str(), it->second);
+      SetUserAttribute(node, it->first.c_str(), it->second, remapIndices);
       ++it;
    }
 }

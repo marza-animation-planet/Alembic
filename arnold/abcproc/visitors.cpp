@@ -461,9 +461,10 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
       }
    }
    
-   bool readNormals = (!subd && !smoothing);
+   // With smoothing off, nlist/nidxs have no influence
+   bool readNormals = (!subd && smoothing);
    
-   if (mDso->verbose())
+   if (mDso->verbose() && readNormals)
    {
       AiMsgInfo("[abcproc] Read normals data if available");
    }
@@ -602,7 +603,6 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
             switch (scope)
             {
             case Alembic::AbcGeom::kFacevaryingScope:
-            case Alembic::AbcGeom::kVertexScope:
                if (mDso->readVertexAttribs())
                {
                   ua.arnoldCategory = AI_USERDEF_INDEXED;
@@ -614,6 +614,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                }
                break;
             case Alembic::AbcGeom::kVaryingScope:
+            case Alembic::AbcGeom::kVertexScope:
                if (mDso->readPointAttribs() || specialPointNames.find(name) != specialPointNames.end())
                {
                   ua.arnoldCategory = AI_USERDEF_VARYING;
@@ -672,9 +673,23 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
    std::string baseName = node.formatPartialPath(mDso->namePrefix().c_str(), AlembicNode::LocalPrefix, '|');
    std::string name = mDso->uniqueName(baseName);
    
+   unsigned int pointCount = 0;
+   unsigned int vertexCount = 0;
+   unsigned int polygonCount = 0;
+   unsigned int *polygonVertexCount = 0;
+   unsigned int *vertexPointIndices = 0;
+   // alembic vertex index -> arnold vertex index (if winding is not reversed we have remapVertexIndex[i] == i)
+   unsigned int *arnoldVertexIndex = 0;
+   
+   AtArray *nsides = 0;
+   AtArray *vidxs = 0;
+   AtArray *vlist = 0;
+   AtArray *nlist = 0;
+   AtArray *nidxs = 0;
+   
    mNode = AiNode("polymesh");
    AiNodeSetStr(mNode, "name", name.c_str());
-      
+   
    if (meshSamples.size() == 1)
    {
       samp0 = meshSamples.begin();
@@ -683,17 +698,50 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
       Alembic::Abc::Int32ArraySamplePtr FC = samp0->data().getFaceCounts();
       Alembic::Abc::Int32ArraySamplePtr FI = samp0->data().getFaceIndices();
       
-      AtArray *vlist = AiArrayAllocate(P->size(), 1, AI_TYPE_POINT);
-      AtArray *nsides = AiArrayAllocate(FC->size(), 1, AI_TYPE_UINT);
-      AtArray *vidxs = AiArrayAllocate(FI->size(), 1, AI_TYPE_UINT);
+      pointCount = P->size();
+      polygonCount = FC->size();
+      polygonVertexCount = new unsigned int[FC->size()];
+      vertexPointIndices = new unsigned int[FI->size()];
+      arnoldVertexIndex = new unsigned int[FI->size()];
+      
+      vlist = AiArrayAllocate(P->size(), 1, AI_TYPE_POINT);
+      nsides = AiArrayAllocate(FC->size(), 1, AI_TYPE_UINT);
+      vidxs = AiArrayAllocate(FI->size(), 1, AI_TYPE_UINT);
       
       for (size_t i=0, j=0; i<FC->size(); ++i)
       {
-         size_t nv = (*FC)[i];
-         AiArraySetUInt(nsides, i, (*FC)[i]);
-         for (size_t k=0; k<nv; ++k, ++j)
+         unsigned int nv = FC->get()[i];
+         
+         polygonVertexCount[i] = nv;
+         vertexCount += nv;
+         
+         if (nv == 0)
          {
-            AiArraySetUInt(vidxs, j, (*FI)[j]);
+            continue;
+         }
+         
+         // Alembic winding is CW not CCW
+         if (mDso->reverseWinding())
+         {
+            // Keep first vertex unchanged
+            arnoldVertexIndex[j] = j;
+            vertexPointIndices[j] = FI->get()[j];
+            
+            for (size_t k=1; k<nv; ++k)
+            {
+               arnoldVertexIndex[j+k] = j + nv - k;
+               vertexPointIndices[j+nv-k] = FI->get()[j+k];
+            }
+            
+            j += nv;
+         }
+         else
+         {
+            for (size_t k=0; k<nv; ++k, ++j)
+            {
+               arnoldVertexIndex[j] = j;
+               vertexPointIndices[j] = FI->get()[j];
+            }
          }
       }
       
@@ -704,10 +752,6 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
          
          AiArraySetPnt(vlist, i, p);
       }
-      
-      AiNodeSetArray(mNode, "nsides", nsides);
-      AiNodeSetArray(mNode, "vlist", vlist);
-      AiNodeSetArray(mNode, "vidxs", vidxs);
       
       if (mDso->verbose())
       {
@@ -727,8 +771,15 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
          Alembic::Abc::P3fArraySamplePtr P = samp0->data().getPositions();
          Alembic::Abc::Int32ArraySamplePtr FC = samp0->data().getFaceCounts();
          Alembic::Abc::Int32ArraySamplePtr FI = samp0->data().getFaceIndices();
-      
-         size_t numPoints = P->size();
+         
+         polygonCount = FC->size();
+         pointCount = P->size();
+         polygonVertexCount = new unsigned int[FC->size()];
+         vertexPointIndices = new unsigned int[FI->size()];
+         arnoldVertexIndex = new unsigned int[FI->size()];
+         
+         nsides = AiArrayAllocate(FC->size(), 1, AI_TYPE_UINT);
+         vidxs = AiArrayAllocate(FI->size(), 1, AI_TYPE_UINT);
          
          // Get velocity
          const float *vel = 0;
@@ -740,10 +791,10 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
          {
             UserAttributes::iterator it = pointAttrs.find("velocity");
             
-            if (it == pointAttrs.end() || it->second.arnoldType != AI_TYPE_VECTOR || it->second.dataCount != numPoints)
+            if (it == pointAttrs.end() || it->second.arnoldType != AI_TYPE_VECTOR || it->second.dataCount != pointCount)
             {
                it = pointAttrs.find("v");
-               if (it != pointAttrs.end() && (it->second.arnoldType != AI_TYPE_VECTOR || it->second.dataCount != numPoints))
+               if (it != pointAttrs.end() && (it->second.arnoldType != AI_TYPE_VECTOR || it->second.dataCount != pointCount))
                {
                   it = pointAttrs.end();
                }
@@ -761,13 +812,13 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
          {
             UserAttributes::iterator it = pointAttrs.find("acceleration");
             
-            if (it == pointAttrs.end() || it->second.arnoldType != AI_TYPE_VECTOR || it->second.dataCount != numPoints)
+            if (it == pointAttrs.end() || it->second.arnoldType != AI_TYPE_VECTOR || it->second.dataCount != pointCount)
             {
                it = pointAttrs.find("accel");
-               if (it == pointAttrs.end() || it->second.arnoldType != AI_TYPE_VECTOR || it->second.dataCount != numPoints)
+               if (it == pointAttrs.end() || it->second.arnoldType != AI_TYPE_VECTOR || it->second.dataCount != pointCount)
                {
                   it = pointAttrs.find("a");
-                  if (it != pointAttrs.end() && (it->second.arnoldType != AI_TYPE_VECTOR || it->second.dataCount != numPoints))
+                  if (it != pointAttrs.end() && (it->second.arnoldType != AI_TYPE_VECTOR || it->second.dataCount != pointCount))
                   {
                      it = pointAttrs.end();
                   }
@@ -780,18 +831,38 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
             }
          }
          
-         AtArray *nsides = AiArrayAllocate(FC->size(), 1, AI_TYPE_UINT);
-         AtArray *vidxs = AiArrayAllocate(FI->size(), 1, AI_TYPE_UINT);
-         AtArray *vlist = 0;
-         AtPoint pnt;
-         
          for (size_t i=0, j=0; i<FC->size(); ++i)
          {
-            size_t nv = (*FC)[i];
-            AiArraySetUInt(nsides, i, (*FC)[i]);
-            for (size_t k=0; k<nv; ++k, ++j)
+            unsigned int nv = FC->get()[i];
+            
+            polygonVertexCount[i] = nv;
+            vertexCount += nv;
+            
+            if (nv == 0)
             {
-               AiArraySetUInt(vidxs, j, (*FI)[j]);
+               continue;
+            }
+            
+            if (mDso->reverseWinding())
+            {
+               arnoldVertexIndex[j] = j;
+               vertexPointIndices[j] = FI->get()[j];
+               
+               for (size_t k=1; k<nv; ++k)
+               {
+                  arnoldVertexIndex[j+k] = j + nv - k;
+                  vertexPointIndices[j+nv-k] = FI->get()[j+k];
+               }
+               
+               j += nv;
+            }
+            else
+            {
+               for (size_t k=0; k<nv; ++k, ++j)
+               {
+                  arnoldVertexIndex[j] = j;
+                  vertexPointIndices[j] = FI->get()[j];
+               }
             }
          }
          
@@ -810,6 +881,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                }
             }
          }
+         
+         AtPoint pnt;
          
          if (!vel)
          {
@@ -864,20 +937,12 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                   }
                }
                
-               j += numPoints;
+               j += pointCount;
             }
          }
-         
-         AiNodeSetArray(mNode, "nsides", nsides);
-         AiNodeSetArray(mNode, "vlist", vlist);
-         AiNodeSetArray(mNode, "vidxs", vidxs);
       }
       else
       {
-         AtArray *vlist = 0;
-         AtArray *vidxs = 0;
-         AtArray *nsides = 0;
-         
          AtPoint pnt;
          
          for (size_t i=0, j=0; i<mDso->numMotionSamples(); ++i)
@@ -894,21 +959,63 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
             
             Alembic::Abc::P3fArraySamplePtr P0 = samp0->data().getPositions();
             
+            if (pointCount > 0 && P0->size() != pointCount)
+            {
+               AiMsgWarning("[abcproc] Changing points count amongst sample");
+               if (nsides) AiArrayDestroy(nsides);
+               if (vidxs) AiArrayDestroy(vidxs);
+               if (vlist) AiArrayDestroy(vlist);
+               nsides = vidxs = vlist = 0;
+               break;
+            }
+            
+            pointCount = P0->size();
+            
             if (!nsides)
             {
                Alembic::Abc::Int32ArraySamplePtr FC = samp0->data().getFaceCounts();
                Alembic::Abc::Int32ArraySamplePtr FI = samp0->data().getFaceIndices();
+               
+               polygonCount = FC->size();
+               polygonVertexCount = new unsigned int[FC->size()];
+               vertexPointIndices = new unsigned int[FI->size()];
+               arnoldVertexIndex = new unsigned int[FI->size()];
                
                nsides = AiArrayAllocate(FC->size(), 1, AI_TYPE_UINT);
                vidxs = AiArrayAllocate(FI->size(), 1, AI_TYPE_UINT);
                
                for (size_t k=0, l=0; k<FC->size(); ++k)
                {
-                  size_t nv = (*FC)[k];
-                  AiArraySetUInt(nsides, k, nv);
-                  for (size_t m=0; m<nv; ++m, ++l)
+                  unsigned int nv = FC->get()[k];
+                  
+                  polygonVertexCount[k] = nv;
+                  vertexCount += nv;
+                  
+                  if (nv == 0)
                   {
-                     AiArraySetUInt(vidxs, l, (*FI)[l]);
+                     continue;
+                  }
+                  
+                  if (mDso->reverseWinding())
+                  {
+                     arnoldVertexIndex[l] = l;
+                     vertexPointIndices[l] = FI->get()[l];
+                     
+                     for (size_t m=1; m<nv; ++m)
+                     {
+                        arnoldVertexIndex[l+m] = l + nv - m;
+                        vertexPointIndices[l+nv-m] = FI->get()[l+m];
+                     }
+                     
+                     l += nv;
+                  }
+                  else
+                  {
+                     for (size_t m=0; m<nv; ++m, ++l)
+                     {
+                        arnoldVertexIndex[l] = l;
+                        vertexPointIndices[l] = FI->get()[l];
+                     }
                   }
                }
                
@@ -971,12 +1078,27 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
       }
    }
    
+   if (!nsides || !vidxs || !vlist || !polygonVertexCount || !vertexPointIndices)
+   {
+      AiNodeDestroy(mNode);
+      mNode = 0;
+      AiMsgWarning("[abcproc] Failed to generated mesh data");
+      return AlembicNode::DontVisitChildren;
+   }
+   
+   AiArraySetKey(nsides, 0, polygonVertexCount);
+   AiArraySetKey(vidxs, 0, vertexPointIndices);
+   
+   AiNodeSetArray(mNode, "nsides", nsides);
+   AiNodeSetArray(mNode, "vidxs", vidxs);
+   AiNodeSetArray(mNode, "vlist", vlist);
+   
+   // Set mesh normals
+   
    if (Nsamples.size() > 0)
    {
       TimeSampleList<Alembic::AbcGeom::IN3fGeomParam>::ConstIterator n0, n1;
       double blend = 0.0;
-      AtArray *nlist = 0;
-      AtArray *nidxs = 0;
       AtVector vec;
       
       if (varyingTopology || Nsamples.size() == 1)
@@ -986,8 +1108,10 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
          Nsamples.getSamples(mDso->renderTime(), n0, n1, blend);
          
          Alembic::Abc::N3fArraySamplePtr vals = n0->data().getVals();
+         Alembic::Abc::UInt32ArraySamplePtr idxs = n0->data().getIndices();
          
          nlist = AiArrayAllocate(vals->size(), 1, AI_TYPE_VECTOR);
+         
          for (size_t i=0; i<vals->size(); ++i)
          {
             Alembic::Abc::N3f val = vals->get()[i];
@@ -1004,14 +1128,13 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
             AiMsgInfo("[abcproc] Read %lu normals", vals->size());
          }
          
-         if (n0->data().isIndexed())
+         if (idxs)
          {
-            Alembic::Abc::UInt32ArraySamplePtr idxs = n0->data().getIndices();
-            
             nidxs = AiArrayAllocate(idxs->size(), 1, AI_TYPE_UINT);
+            
             for (size_t i=0; i<idxs->size(); ++i)
             {
-               AiArraySetUInt(nidxs, i, idxs->get()[i]);
+               AiArraySetUInt(nidxs, arnoldVertexIndex[i], idxs->get()[i]);
             }
             
             if (mDso->verbose())
@@ -1022,9 +1145,10 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
          else
          {
             nidxs = AiArrayAllocate(vals->size(), 1, AI_TYPE_UINT);
+            
             for (size_t i=0; i<vals->size(); ++i)
             {
-               AiArraySetUInt(nidxs, i, i);
+               AiArraySetUInt(nidxs, arnoldVertexIndex[i], i);
             }
          }
       }
@@ -1047,6 +1171,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
             {
                Alembic::Abc::N3fArraySamplePtr vals0 = n0->data().getVals();
                Alembic::Abc::N3fArraySamplePtr vals1 = n1->data().getVals();
+               Alembic::Abc::UInt32ArraySamplePtr idxs0 = n0->data().getIndices();
+               Alembic::Abc::UInt32ArraySamplePtr idxs1 = n1->data().getIndices();
                
                if (mDso->verbose())
                {
@@ -1055,19 +1181,15 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                
                double a = 1.0 - blend;
                
-               if (n0->data().isIndexed())
+               if (idxs0)
                {
-                  Alembic::Abc::UInt32ArraySamplePtr idxs0 = n0->data().getIndices();
-                  
                   if (mDso->verbose())
                   {
                      AiMsgInfo("[abcproc] Read %lu normal indices", idxs0->size());
                   }
                   
-                  if (n1->data().isIndexed())
+                  if (idxs1)
                   {
-                     Alembic::Abc::UInt32ArraySamplePtr idxs1 = n1->data().getIndices();
-                     
                      if (mDso->verbose())
                      {
                         AiMsgInfo("[abcproc] Read %lu normal indices", idxs0->size());
@@ -1099,7 +1221,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                         vec.y = a * val0.y + blend * val1.y;
                         vec.z = a * val0.z + blend * val1.z;
                         
-                        AiArraySetVec(nlist, j+k, vec);
+                        AiArraySetVec(nlist, j + arnoldVertexIndex[k], vec);
                      }
                   }
                   else
@@ -1130,16 +1252,14 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                         vec.y = a * val0.y + blend * val1.y;
                         vec.z = a * val0.z + blend * val1.z;
                         
-                        AiArraySetVec(nlist, j+k, vec);
+                        AiArraySetVec(nlist, j + arnoldVertexIndex[k], vec);
                      }
                   }
                }
                else
                {
-                  if (n1->data().isIndexed())
+                  if (idxs1)
                   {
-                     Alembic::Abc::UInt32ArraySamplePtr idxs1 = n1->data().getIndices();
-                     
                      if (mDso->verbose())
                      {
                         AiMsgInfo("[abcproc] Read %lu normal indices", idxs1->size());
@@ -1171,7 +1291,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                         vec.y = a * val0.y + blend * val1.y;
                         vec.z = a * val0.z + blend * val1.z;
                         
-                        AiArraySetVec(nlist, j+k, vec);
+                        AiArraySetVec(nlist, j + arnoldVertexIndex[k], vec);
                      }
                   }
                   else
@@ -1202,7 +1322,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                         vec.y = a * val0.y + blend * val1.y;
                         vec.z = a * val0.z + blend * val1.z;
                         
-                        AiArraySetVec(nlist, j+k, vec);
+                        AiArraySetVec(nlist, j + arnoldVertexIndex[k], vec);
                      }
                   }
                }
@@ -1210,16 +1330,15 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
             else
             {
                Alembic::Abc::N3fArraySamplePtr vals = n0->data().getVals();
+               Alembic::Abc::UInt32ArraySamplePtr idxs = n0->data().getIndices();
                
                if (mDso->verbose())
                {
                   AiMsgInfo("[abcproc] Read %lu normals", vals->size());
                }
             
-               if (n0->data().isIndexed())
+               if (idxs)
                {
-                  Alembic::Abc::UInt32ArraySamplePtr idxs = n0->data().getIndices();
-                  
                   if (mDso->verbose())
                   {
                      AiMsgInfo("[abcproc] Read %lu normal indices", idxs->size());
@@ -1250,7 +1369,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                      vec.y = val.y;
                      vec.z = val.z;
                      
-                     AiArraySetVec(nlist, j+k, vec);
+                     AiArraySetVec(nlist, j + arnoldVertexIndex[k], vec);
                   }
                }
                else
@@ -1280,14 +1399,16 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                      vec.y = val.y;
                      vec.z = val.z;
                      
-                     AiArraySetVec(nlist, j+k, vec);
+                     AiArraySetVec(nlist, j + arnoldVertexIndex[k], vec);
                   }
                }
             }
             
             if (!nidxs)
             {
+               // vertex remapping already happened at values level
                nidxs = AiArrayAllocate(numNormals, 1, AI_TYPE_UINT);
+               
                for (size_t k=0; k<numNormals; ++k)
                {
                   AiArraySetUInt(nidxs, k, k);
@@ -1310,6 +1431,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
    }
    
    // For all reamaining data, no motion blur
+   
+   // Set mesh UVs
    
    for (std::map<std::string, Alembic::AbcGeom::IV2fGeomParam>::iterator uvit=UVs.begin(); uvit!=UVs.end(); ++uvit)
    {
@@ -1343,50 +1466,23 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                
                Alembic::Abc::V2fArraySamplePtr vals0 = uv0->data().getVals();
                Alembic::Abc::V2fArraySamplePtr vals1 = uv1->data().getVals();
+               Alembic::Abc::UInt32ArraySamplePtr idxs0 = uv0->data().getIndices();
+               Alembic::Abc::UInt32ArraySamplePtr idxs1 = uv1->data().getIndices();
                
                if (mDso->verbose())
                {
                   AiMsgInfo("[abcproc] Read %lu uvs / %lu uvs [interpolate]", vals0->size(), vals1->size());
                }
                
-               if (uv0->data().isIndexed())
+               if (idxs0)
                {
-                  Alembic::Abc::UInt32ArraySamplePtr idxs0 = uv0->data().getIndices();
-                  
                   if (mDso->verbose())
                   {
                      AiMsgInfo("[abcproc] Read %lu uv indices", idxs0->size());
                   }
                   
-                  if (!uv1->data().isIndexed())
+                  if (idxs1)
                   {
-                     // I don't think this should happend
-                     if (vals1->size() != idxs0->size())
-                     {
-                        AiMsgWarning("[abcproc] Ignore UVs: samples topology don't match");
-                     }
-                     else
-                     {
-                        uvlist = AiArrayAllocate(idxs0->size(), 1, AI_TYPE_POINT2);
-                        uvidxs = AiArrayAllocate(idxs0->size(), 1, AI_TYPE_UINT);
-                        
-                        for (size_t i=0; i<idxs0->size(); ++i)
-                        {
-                           Alembic::Abc::V2f val0 = vals0->get()[idxs0->get()[i]];
-                           Alembic::Abc::V2f val1 = vals1->get()[i];
-                           
-                           pnt2.x = a * val0.x + blend * val1.x;
-                           pnt2.y = a * val0.y + blend * val1.y;
-                           
-                           AiArraySetPnt2(uvlist, i, pnt2);
-                           AiArraySetUInt(uvidxs, i, i);
-                        }
-                     }
-                  }
-                  else
-                  {
-                     Alembic::Abc::UInt32ArraySamplePtr idxs1 = uv1->data().getIndices();
-                     
                      if (mDso->verbose())
                      {
                         AiMsgInfo("[abcproc] Read %lu uv indices", idxs1->size());
@@ -1410,14 +1506,39 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                            pnt2.y = a * val0.y + blend * val1.y;
                            
                            AiArraySetPnt2(uvlist, i, pnt2);
-                           AiArraySetUInt(uvidxs, i, i);
+                           AiArraySetUInt(uvidxs, arnoldVertexIndex[i], i);
+                        }
+                     }
+                  }
+                  else
+                  {
+                     // I don't think this should happend
+                     if (vals1->size() != idxs0->size())
+                     {
+                        AiMsgWarning("[abcproc] Ignore UVs: samples topology don't match");
+                     }
+                     else
+                     {
+                        uvlist = AiArrayAllocate(idxs0->size(), 1, AI_TYPE_POINT2);
+                        uvidxs = AiArrayAllocate(idxs0->size(), 1, AI_TYPE_UINT);
+                        
+                        for (size_t i=0; i<idxs0->size(); ++i)
+                        {
+                           Alembic::Abc::V2f val0 = vals0->get()[idxs0->get()[i]];
+                           Alembic::Abc::V2f val1 = vals1->get()[i];
+                           
+                           pnt2.x = a * val0.x + blend * val1.x;
+                           pnt2.y = a * val0.y + blend * val1.y;
+                           
+                           AiArraySetPnt2(uvlist, i, pnt2);
+                           AiArraySetUInt(uvidxs, arnoldVertexIndex[i], i);
                         }
                      }
                   }
                }
                else
                {
-                  if (uv1->data().isIndexed())
+                  if (idxs1)
                   {
                      Alembic::Abc::UInt32ArraySamplePtr idxs1 = uv1->data().getIndices();
                      
@@ -1444,7 +1565,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                            pnt2.y = a * val0.y + blend * val1.y;
                            
                            AiArraySetPnt2(uvlist, i, pnt2);
-                           AiArraySetUInt(uvidxs, i, i);
+                           AiArraySetUInt(uvidxs, arnoldVertexIndex[i], i);
                         }
                      }
                   }
@@ -1468,7 +1589,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                            pnt2.y = a * val0.y + blend * val1.y;
                            
                            AiArraySetPnt2(uvlist, i, pnt2);
-                           AiArraySetUInt(uvidxs, i, i);
+                           AiArraySetUInt(uvidxs, arnoldVertexIndex[i], i);
                         }
                      }
                   }
@@ -1477,16 +1598,15 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
             else
             {
                Alembic::Abc::V2fArraySamplePtr vals = uv0->data().getVals();
+               Alembic::Abc::UInt32ArraySamplePtr idxs = uv0->data().getIndices();
                
                if (mDso->verbose())
                {
                   AiMsgInfo("[abcproc] Read %lu uvs", vals->size());
                }
                
-               if (uv0->data().isIndexed())
+               if (idxs)
                {
-                  Alembic::Abc::UInt32ArraySamplePtr idxs = uv0->data().getIndices();
-                  
                   if (mDso->verbose())
                   {
                      AiMsgInfo("[abcproc] Read %lu uv indices", idxs->size());
@@ -1507,7 +1627,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                   
                   for (size_t i=0; i<idxs->size(); ++i)
                   {
-                     AiArraySetUInt(uvidxs, i, idxs->get()[i]);
+                     AiArraySetUInt(uvidxs, arnoldVertexIndex[i], idxs->get()[i]);
                   }
                }
                else
@@ -1523,7 +1643,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                      pnt2.y = val.y;
                      
                      AiArraySetPnt2(uvlist, i, pnt2);
-                     AiArraySetUInt(uvidxs, i, i);
+                     AiArraySetUInt(uvidxs, arnoldVertexIndex[i], i);
                   }
                }
             }
@@ -1552,16 +1672,22 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
       }
    }
    
+   // Set user defined attributes
+   
    SetUserAttributes(mNode, objectAttrs);
    SetUserAttributes(mNode, primitiveAttrs);
    SetUserAttributes(mNode, pointAttrs);
-   SetUserAttributes(mNode, vertexAttrs);
+   SetUserAttributes(mNode, vertexAttrs, arnoldVertexIndex);
    
    DestroyUserAttributes(objectAttrs);
    DestroyUserAttributes(primitiveAttrs);
    DestroyUserAttributes(pointAttrs);
    DestroyUserAttributes(vertexAttrs);
-         
+   
+   delete[] polygonVertexCount;
+   delete[] vertexPointIndices;
+   delete[] arnoldVertexIndex;
+   
    return AlembicNode::ContinueVisit;
 }
 

@@ -34,9 +34,9 @@ bool ReadUserAttribute(UserAttribute &ua,
                        bool geoparam,
                        bool interpolate);
 
-void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua);
+void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigned int *remapIndices=0);
 
-void SetUserAttributes(AtNode *node, UserAttributes &attribs);
+void SetUserAttributes(AtNode *node, UserAttributes &attribs, unsigned int *remapIndices=0);
 
 void DestroyUserAttribute(UserAttribute &);
 

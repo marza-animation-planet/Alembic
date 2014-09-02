@@ -195,6 +195,13 @@ public:
    
    std::string uniqueName(const std::string &name) const;
    
+   // Mesh
+   
+   inline bool reverseWinding() const
+   {
+      return mReverseWinding;
+   }
+   
    // Points/Curves
    
    inline double radiusMin() const
@@ -393,6 +400,8 @@ private:
    double mMotionEnd;
    
    std::vector<AtNode*> mGeneratedNodes;
+   
+   bool mReverseWinding;
    
    static std::map<std::string, std::string> msMasterNodes;
 };
