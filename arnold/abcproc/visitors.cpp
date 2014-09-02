@@ -765,9 +765,9 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
       
       pointCount = P->size();
       polygonCount = FC->size();
-      polygonVertexCount = new unsigned int[FC->size()];
-      vertexPointIndices = new unsigned int[FI->size()];
-      arnoldVertexIndex = new unsigned int[FI->size()];
+      polygonVertexCount = (unsigned int*) AiMalloc(sizeof(unsigned int) * FC->size());
+      vertexPointIndices = (unsigned int*) AiMalloc(sizeof(unsigned int) * FI->size());
+      arnoldVertexIndex = (unsigned int*) AiMalloc(sizeof(unsigned int) * FI->size());
       
       vlist = AiArrayAllocate(P->size(), 1, AI_TYPE_POINT);
       nsides = AiArrayAllocate(FC->size(), 1, AI_TYPE_UINT);
@@ -839,9 +839,9 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
          
          polygonCount = FC->size();
          pointCount = P->size();
-         polygonVertexCount = new unsigned int[FC->size()];
-         vertexPointIndices = new unsigned int[FI->size()];
-         arnoldVertexIndex = new unsigned int[FI->size()];
+         polygonVertexCount = (unsigned int*) AiMalloc(sizeof(unsigned int) * FC->size());
+         vertexPointIndices = (unsigned int*) AiMalloc(sizeof(unsigned int) * FI->size());
+         arnoldVertexIndex = (unsigned int*) AiMalloc(sizeof(unsigned int) * FI->size());
          
          nsides = AiArrayAllocate(FC->size(), 1, AI_TYPE_UINT);
          vidxs = AiArrayAllocate(FI->size(), 1, AI_TYPE_UINT);
@@ -1042,9 +1042,9 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                Alembic::Abc::Int32ArraySamplePtr FI = samp0->data().getFaceIndices();
                
                polygonCount = FC->size();
-               polygonVertexCount = new unsigned int[FC->size()];
-               vertexPointIndices = new unsigned int[FI->size()];
-               arnoldVertexIndex = new unsigned int[FI->size()];
+               polygonVertexCount = (unsigned int*) AiMalloc(sizeof(unsigned int) * FC->size());
+               vertexPointIndices = (unsigned int*) AiMalloc(sizeof(unsigned int) * FI->size());
+               arnoldVertexIndex = (unsigned int*) AiMalloc(sizeof(unsigned int) * FI->size());
                
                nsides = AiArrayAllocate(FC->size(), 1, AI_TYPE_UINT);
                vidxs = AiArrayAllocate(FI->size(), 1, AI_TYPE_UINT);
@@ -1498,7 +1498,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
    // For all reamaining data, no motion blur
    
    // Set mesh UVs
-   Alembic::Abc::N3f *normals = 0;
+   float *smoothNormals = 0;
    
    for (std::map<std::string, Alembic::AbcGeom::IV2fGeomParam>::iterator uvit=UVs.begin(); uvit!=UVs.end(); ++uvit)
    {
@@ -1751,9 +1751,15 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                   continue;
                }
                
+               if (!node.sampleSchema(mDso->renderTime(), mDso->renderTime(), true))
+               {
+                  AiMsgWarning("[abcproc] Skip tangents generation for uv set \"%s\": could not sample positions at t = %lf", uvit->first.c_str(), mDso->renderTime());
+                  continue;
+               }
+               
                if (!meshSamples.getSamples(mDso->renderTime(), samp0, samp1, blend))
                {
-                  AiMsgWarning("[abcproc] Skip tangents generation for uv set \"%s\": could not sample positions", uvit->first.c_str());
+                  AiMsgWarning("[abcproc] Skip tangents generation for uv set \"%s\": could not retreive sample positions at t = %lf", uvit->first.c_str(), mDso->renderTime());
                   continue;
                }
                
@@ -1771,7 +1777,9 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                   a = 1.0f - b;
                }
                
-               if (!normals)
+               size_t bytesize = 3 * pointCount * sizeof(float);
+               
+               if (!smoothNormals)
                {
                   // Compute per-point normals
                   
@@ -1780,29 +1788,20 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                      AiMsgInfo("[abcproc] Compute smooth point normals");
                   }
                   
-                  normals = new Alembic::Abc::N3f[pointCount];
+                  smoothNormals = (float*) AiMalloc(bytesize);
+                  memset(smoothNormals, 0, bytesize);
                   
                   Alembic::Abc::V3f fN, e0, e1;
                   
-                  for (unsigned int f=0, vi=0; f<polygonCount; ++f)
+                  for (unsigned int f=0, v=0; f<polygonCount; ++f)
                   {
                      unsigned int nfv = polygonVertexCount[f];
                      
-                     if (vi >= vertexCount)
-                        AiMsgError("[abcproc] Polygon %u: Invalid vertex offset %u", f, vi);
-                     
                      for (unsigned int fv=2; fv<nfv; ++fv)
                      {
-                        unsigned int v0 = vertexPointIndices[vi];
-                        unsigned int v1 = vertexPointIndices[vi+fv-1];
-                        unsigned int v2 = vertexPointIndices[vi+fv];
-                        
-                        if (v0 >= pointCount)
-                           AiMsgError("[abcproc] Polygon %u, Triangle %u: Invalid vertex index %u", f, fv-2, v0);
-                        if (v1 >= pointCount)
-                           AiMsgError("[abcproc] Polygon %u, Triangle %u: Invalid vertex index %u", f, fv-2, v1);
-                        if (v2 >= pointCount)
-                           AiMsgError("[abcproc] Polygon %u, Triangle %u: Invalid vertex index %u", f, fv-2, v2);
+                        unsigned int v0 = vertexPointIndices[v];
+                        unsigned int v1 = vertexPointIndices[v+fv-1];
+                        unsigned int v2 = vertexPointIndices[v+fv];
                         
                         if (P1)
                         {
@@ -1821,29 +1820,36 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                            e1 = P0->get()[v2] - p0;
                         }
                         
-                        e0.normalize();
-                        e1.normalize();
-                        
                         // reverseWinding means CCW, CW otherwise, decides normal orientation
                         fN = (mDso->reverseWinding() ? e0.cross(e1) : e1.cross(e0));
                         fN.normalize();
                         
-                        normals[v0] += fN;
-                        normals[v1] += fN;
-                        normals[v2] += fN;
+                        unsigned int idxs[3] = {3*v0, 3*v1, 3*v2};
+                        for (int ni=0; ni<3; ++ni)
+                           for (int d=0; d<3; ++d)
+                              smoothNormals[idxs[ni]+d] += fN[d];
                      }
                      
-                     vi += nfv;
+                     v += nfv;
                   }
                   
-                  for (unsigned int p=0; p<pointCount; ++p)
+                  for (unsigned int p=0, off=0; p<pointCount; ++p, off+=3)
                   {
-                     normals[p].normalize();
+                     float l = smoothNormals[off] * smoothNormals[off]
+                             + smoothNormals[off+1] * smoothNormals[off+1]
+                             + smoothNormals[off+2] * smoothNormals[off+2];
+                     
+                     if (l > 0.0f)
+                     {
+                        l = 1.0f / sqrtf(l);
+                        smoothNormals[off] *= l;
+                        smoothNormals[off+1] *= l;
+                        smoothNormals[off+2] *= l;
+                     }
                   }
                }
                
                // Build tangents and bitangent
-               size_t bytesize = 3 * pointCount * sizeof(float);
                float *T = (float*) AiMalloc(bytesize);
                float *B = (float*) AiMalloc(bytesize);
                memset(T, 0, bytesize);
@@ -1927,9 +1933,9 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                   v += nfv;
                }
                
-               for (unsigned int v=0, off=0; v<pointCount; ++v, off+=3)
+               for (unsigned int p=0, off=0; p<pointCount; ++p, off+=3)
                {
-                  Alembic::Abc::V3f n = normals[v];
+                  Alembic::Abc::V3f n(smoothNormals[off], smoothNormals[off+1], smoothNormals[off+2]);
                   Alembic::Abc::V3f t(T[off], T[off+1], T[off+2]);
                   Alembic::Abc::V3f b(B[off], B[off+1], B[off+2]);
                   
@@ -1955,14 +1961,13 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                {
                   // copy normals in for test
                   UserAttribute &Tattr = pointAttrs[Tname];
+                  InitUserAttribute(Tattr);
                   Tattr.arnoldCategory = AI_USERDEF_VARYING;
                   Tattr.arnoldType = AI_TYPE_VECTOR;
                   Tattr.arnoldTypeStr = "VECTOR";
                   Tattr.dataDim = 3;
                   Tattr.dataCount = pointCount;
                   Tattr.data = T;
-                  Tattr.indicesCount = 0;
-                  Tattr.indices = 0;
                }
                
                if (hasB)
@@ -1973,14 +1978,13 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                else
                {
                   UserAttribute &Battr = pointAttrs[Bname];
+                  InitUserAttribute(Battr);
                   Battr.arnoldCategory = AI_USERDEF_VARYING;
                   Battr.arnoldType = AI_TYPE_VECTOR;
                   Battr.arnoldTypeStr = "VECTOR";
                   Battr.dataDim = 3;
                   Battr.dataCount = pointCount;
                   Battr.data = B;
-                  Battr.indicesCount = 0;
-                  Battr.indices = 0;
                }
             }
          }
@@ -2003,13 +2007,13 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
    DestroyUserAttributes(pointAttrs);
    DestroyUserAttributes(vertexAttrs);
    
-   delete[] polygonVertexCount;
-   delete[] vertexPointIndices;
-   delete[] arnoldVertexIndex;
+   AiFree(polygonVertexCount);
+   AiFree(vertexPointIndices);
+   AiFree(arnoldVertexIndex);
    
-   if (normals)
+   if (smoothNormals)
    {
-      delete[] normals;
+      AiFree(smoothNormals);
    }
    
    return AlembicNode::ContinueVisit;
