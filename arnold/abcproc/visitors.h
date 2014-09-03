@@ -368,6 +368,7 @@ public:
    
    AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicSubD &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicPoints &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0);
    
    void leave(AlembicNode &node, AlembicNode *instance=0);
@@ -392,6 +393,49 @@ private:
       UserAttributes pointAttrs;
       UserAttributes vertexAttrs;
       UVSets UVs;
+      
+      
+      inline MeshInfo()
+         : varyingTopology(false)
+         , polygonCount(0)
+         , pointCount(0)
+         , polygonVertexCount(0)
+         , vertexPointIndex(0)
+         , arnoldVertexIndex(0)
+      {
+      }
+      
+      inline ~MeshInfo()
+      {
+         if (polygonVertexCount) AiFree(polygonVertexCount);
+         if (vertexPointIndex) AiFree(vertexPointIndex);
+         if (arnoldVertexIndex) AiFree(arnoldVertexIndex);
+         
+         DestroyUserAttributes(objectAttrs);
+         DestroyUserAttributes(primitiveAttrs);
+         DestroyUserAttributes(pointAttrs);
+         DestroyUserAttributes(vertexAttrs);
+         
+         UVs.clear();
+      }
+   };
+   
+   struct PointsInfo
+   {
+      unsigned int pointCount;
+      UserAttributes objectAttrs;
+      UserAttributes pointAttrs;
+      
+      inline PointsInfo()
+         : pointCount(0)
+      {
+      }
+      
+      inline ~PointsInfo()
+      {
+         DestroyUserAttributes(objectAttrs);
+         DestroyUserAttributes(pointAttrs);
+      }
    };
    
 private:

@@ -1336,19 +1336,6 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
    
    outputInstanceNumber(node, instance);
    
-   // Cleanup
-   
-   DestroyUserAttributes(info.objectAttrs);
-   DestroyUserAttributes(info.primitiveAttrs);
-   DestroyUserAttributes(info.pointAttrs);
-   DestroyUserAttributes(info.vertexAttrs);
-   
-   AiFree(info.polygonVertexCount);
-   AiFree(info.vertexPointIndex);
-   AiFree(info.arnoldVertexIndex);
-   
-   info.UVs.clear();
-   
    return AlembicNode::ContinueVisit;
 }
 
@@ -1533,18 +1520,102 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
    
    outputInstanceNumber(node, instance);
    
-   // Cleanup
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *instance)
+{
+   Alembic::AbcGeom::IPointsSchema schema = node.typedObject().getSchema();
    
-   DestroyUserAttributes(info.objectAttrs);
-   DestroyUserAttributes(info.primitiveAttrs);
-   DestroyUserAttributes(info.pointAttrs);
-   DestroyUserAttributes(info.vertexAttrs);
+   if (mDso->isVolume())
+   {
+      mNode = generateVolumeBox(schema);
+      outputInstanceNumber(node, instance);
+      return AlembicNode::ContinueVisit;
+   }
    
-   AiFree(info.polygonVertexCount);
-   AiFree(info.vertexPointIndex);
-   AiFree(info.arnoldVertexIndex);
+   PointsInfo info;
    
-   info.UVs.clear();
+   // Collect attributes
+   
+   double attribsTime = mDso->attribsTime(mDso->attribsFrame());
+   
+   bool interpolateAttribs = false;
+   
+   collectUserAttributes(schema.getUserProperties(),
+                         schema.getArbGeomParams(),
+                         attribsTime,
+                         interpolateAttribs,
+                         &info.objectAttrs,
+                         0,
+                         &info.pointAttrs,
+                         0,
+                         0);
+   
+   // Generate base points
+   
+   TimeSampleList<Alembic::AbcGeom::IPointsSchema> &samples = node.samples().schemaSamples;
+   TimeSampleList<Alembic::AbcGeom::IPointsSchema>::ConstIterator samp0, samp1;
+   
+   for (size_t i=0; i<mDso->numMotionSamples(); ++i)
+   {
+      double t = mDso->motionSampleTime(i);
+      
+      if (mDso->verbose())
+      {
+         AiMsgInfo("[abcproc] Sample points \"%s\" at t=%lf", node.path().c_str(), t);
+      }
+   
+      node.sampleSchema(t, t, i > 0);
+   }
+   
+   if (mDso->verbose())
+   {
+      AiMsgInfo("[abcproc] Read %lu points samples", samples.size());
+   }
+   
+   if (samples.size() == 0)
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   
+   std::string name = arnoldNodeName(node);
+   
+   mNode = AiNode("points");
+   AiNodeSetStr(mNode, "name", name.c_str());
+   
+   // mode: disk|sphere|quad
+   // points[]
+   // radius[]
+   // aspect[]
+   // rotation[]
+   // look for alternative names?
+   
+   Alembic::AbcGeom::IFloatGeomParam widths = schema.getWidthsParam();
+   if (widths.valid())
+   {
+      if (info.pointAttrs.find("radius") != info.pointAttrs.end() ||
+          info.objectAttrs.find("radius") != info.objectAttrs.end())
+      {
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Ignore alembic \"widths\" property: \"radius\" attribute set");
+         }
+      }
+      else
+      {
+         // radius
+      }
+   }
+   
+   // Output user defined attributes
+   
+   SetUserAttributes(mNode, info.objectAttrs);
+   SetUserAttributes(mNode, info.pointAttrs);
+   
+   // Make sure we have the 'instance_num' attribute
+   
+   outputInstanceNumber(node, instance);
    
    return AlembicNode::ContinueVisit;
 }
