@@ -1220,23 +1220,27 @@ void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigne
       idxsName = valsName + "idxs";
    }
    
-   const AtUserParamEntry *pe = AiNodeLookUpUserParameter(node, name);
-   
+   const AtParamEntry *pe = AiNodeEntryLookUpParameter(AiNodeGetNodeEntry(node), name);
    if (pe == 0)
    {
-      AiNodeDeclare(node, name, decl.c_str());
-   }
-   else
-   {
-      bool isArray = (AiUserParamGetType(pe) == AI_TYPE_ARRAY);
-      int type = (isArray ? AiUserParamGetArrayType(pe) : AiUserParamGetType(pe));
+      const AtUserParamEntry *upe = AiNodeLookUpUserParameter(node, name);
       
-      if (type != ua.arnoldType ||
-          AiUserParamGetCategory(pe) != ua.arnoldCategory,
-          (ua.dataDim >= 1 || ua.indices) != isArray)
+      if (upe == 0)
       {
-         // Attribute spec mismatch
-         return;
+         AiNodeDeclare(node, name, decl.c_str());
+      }
+      else
+      {
+         bool isArray = (AiUserParamGetType(upe) == AI_TYPE_ARRAY);
+         int type = (isArray ? AiUserParamGetArrayType(upe) : AiUserParamGetType(upe));
+         
+         if (type != ua.arnoldType ||
+             AiUserParamGetCategory(upe) != ua.arnoldCategory,
+             (ua.dataDim >= 1 || ua.indices) != isArray)
+         {
+            // Attribute spec mismatch
+            return;
+         }
       }
    }
    
