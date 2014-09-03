@@ -217,7 +217,6 @@ void CountShapes::leave(AlembicNode &, AlembicNode *)
 
 // ---
 
-
 MakeProcedurals::MakeProcedurals(Dso *dso)
    : mDso(dso)
 {
@@ -265,7 +264,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicXform &node, AlembicNode 
             AiMsgInfo("[abcproc] Sample xform \"%s\" at t=%lf", node.path().c_str(), t);
          }
          
-         node.sampleBounds(t, t, i>0);
+         node.sampleBounds(t, t, (i > 0 || instance != 0));
       }
       
       if (xformSamples.size() == 0)
@@ -419,6 +418,96 @@ void MakeProcedurals::leave(AlembicXform &node, AlembicNode *instance)
 }
 
 void MakeProcedurals::leave(AlembicNode &node, AlembicNode *)
+{
+   if (node.isInstance() && !mDso->ignoreInstances())
+   {
+      AlembicNode *m = node.master();
+      m->leave(*this, &node);
+   }
+}
+
+// ---
+
+CollectWorldMatrices::CollectWorldMatrices(Dso *dso)
+   : mDso(dso)
+{
+}
+   
+AlembicNode::VisitReturn CollectWorldMatrices::enter(AlembicXform &node, AlembicNode *)
+{
+   if (!node.isLocator() && !mDso->ignoreTransforms())
+   {
+      Alembic::AbcGeom::IXformSchema schema = node.typedObject().getSchema();
+      
+      Alembic::Abc::M44d parentWorldMatrix;
+      
+      if (mMatrixStack.size() > 0)
+      {
+         parentWorldMatrix = mMatrixStack.back();
+      }
+      
+      Alembic::Abc::M44d localMatrix = schema.getValue().getMatrix();
+      
+      mMatrixStack.push_back(schema.getInheritsXforms() ? localMatrix * parentWorldMatrix : localMatrix);
+   }
+   
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn CollectWorldMatrices::enter(AlembicMesh &node, AlembicNode *instance)
+{
+   return shapeEnter(node, instance);
+}
+
+AlembicNode::VisitReturn CollectWorldMatrices::enter(AlembicSubD &node, AlembicNode *instance)
+{
+   return shapeEnter(node, instance);
+}
+
+AlembicNode::VisitReturn CollectWorldMatrices::enter(AlembicPoints &node, AlembicNode *instance)
+{
+   return shapeEnter(node, instance);
+}
+
+AlembicNode::VisitReturn CollectWorldMatrices::enter(AlembicCurves &node, AlembicNode *instance)
+{
+   return shapeEnter(node, instance);
+}
+
+AlembicNode::VisitReturn CollectWorldMatrices::enter(AlembicNuPatch &node, AlembicNode *instance)
+{
+   return shapeEnter(node, instance);
+}
+
+AlembicNode::VisitReturn CollectWorldMatrices::enter(AlembicNode &node, AlembicNode *)
+{
+   if (node.isInstance())
+   {
+      if (!mDso->ignoreInstances())
+      {
+         AlembicNode *m = node.master();
+         return m->enter(*this, &node);
+      }
+      else
+      {
+         return AlembicNode::DontVisitChildren;
+      }
+   }
+   else
+   {
+      return AlembicNode::ContinueVisit;
+   }
+}
+
+void CollectWorldMatrices::leave(AlembicXform &node, AlembicNode *)
+{
+   if (!node.isLocator() && !mDso->ignoreTransforms())
+   {
+      mMatrixStack.pop_back();
+   }
+}
+
+void CollectWorldMatrices::leave(AlembicNode &node, AlembicNode *)
 {
    if (node.isInstance() && !mDso->ignoreInstances())
    {
@@ -1809,16 +1898,17 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
                            p1 = a * P0->get()[v1] + b * P1->get()[v1];
                            p2 = a * P0->get()[v2] + b * P1->get()[v2];
                            
-                           e0 = p1 - p0;
-                           e1 = p2 - p0;
+                           
                         }
                         else
                         {
                            p0 = P0->get()[v0];
-                           
-                           e0 = P0->get()[v1] - p0;
-                           e1 = P0->get()[v2] - p0;
+                           p1 = P0->get()[v1];
+                           p2 = P0->get()[v2];
                         }
+                        
+                        e0 = p1 - p0;
+                        e1 = p2 - p1;
                         
                         // reverseWinding means CCW, CW otherwise, decides normal orientation
                         fN = (mDso->reverseWinding() ? e0.cross(e1) : e1.cross(e0));
@@ -1995,6 +2085,120 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
       }
    }
    
+   if (mDso->referenceScene())
+   {
+      // if we have a reference should output
+      // Pref
+      AlembicNode *refNode = mDso->referenceScene()->find(node.path());
+      
+      if (refNode)
+      {
+         AlembicMesh *refMesh = dynamic_cast<AlembicMesh*>(refNode);
+         
+         if (refMesh)
+         {
+            Alembic::AbcGeom::IPolyMeshSchema meshSchema = refMesh->typedObject().getSchema();
+            
+            Alembic::AbcGeom::IPolyMeshSchema::Sample meshSample = meshSchema.getValue();
+            
+            Alembic::Abc::P3fArraySamplePtr Pref = meshSample.getPositions();
+            
+            if (Pref->size() == pointCount && pointAttrs.find("Pref") == pointAttrs.end())
+            {
+               if (mDso->verbose())
+               {
+                  AiMsgInfo("[abcproc] Ouptut Pref");
+               }
+               
+               float *vals = (float*) AiMalloc(pointCount * 3 * sizeof(float));
+               
+               Alembic::Abc::M44d W;
+               
+               const AtUserParamEntry *upe = AiNodeLookUpUserParameter(mDso->procNode(), "Mref");
+               if (upe != 0 &&
+                   AiUserParamGetCategory(upe) == AI_USERDEF_CONSTANT &&
+                   AiUserParamGetType(upe) == AI_TYPE_MATRIX)
+               {
+                  if (mDso->verbose())
+                  {
+                     AiMsgInfo("[abcproc] Using provided Mref");
+                  }
+                  
+                  AtMatrix mtx;
+                  AiNodeGetMatrix(mDso->procNode(), "Mref", mtx);
+                  for (int r=0; r<4; ++r)
+                  {
+                     for (int c=0; c<4; ++c)
+                     {
+                        W[r][c] = mtx[r][c];
+                     }
+                  }
+               }
+               else
+               {
+                  // recompute matrix
+                  if (mDso->verbose())
+                  {
+                     AiMsgInfo("[abcproc] Compute reference world matrix Mref");
+                  }
+                  
+                  AlembicXform *refParent = dynamic_cast<AlembicXform*>(refNode->parent());
+                  
+                  while (refParent)
+                  {
+                     Alembic::AbcGeom::IXformSchema xformSchema = refParent->typedObject().getSchema();
+                     
+                     Alembic::AbcGeom::XformSample xformSample = xformSchema.getValue();
+                     
+                     W = W * xformSample.getMatrix();
+                     
+                     if (xformSchema.getInheritsXforms())
+                     {
+                        refParent = dynamic_cast<AlembicXform*>(refParent->parent());
+                     }
+                     else
+                     {
+                        refParent = 0;
+                     }
+                  }
+               }
+               
+               for (unsigned int p=0, off=0; p<pointCount; ++p, off+=3)
+               {
+                  Alembic::Abc::V3f P = Pref->get()[p] * W;
+                  vals[off] = P.x;
+                  vals[off+1] = P.y;
+                  vals[off+2] = P.z;
+               }
+               
+               UserAttribute &ua = pointAttrs["Pref"];
+               InitUserAttribute(ua);
+               ua.arnoldCategory = AI_USERDEF_VARYING;
+               ua.arnoldType = AI_TYPE_POINT;
+               ua.arnoldTypeStr = "POINT";
+               ua.dataDim = 3;
+               ua.dataCount = pointCount;
+               ua.data = vals;
+            }
+            else
+            {
+               if (Pref->size() != pointCount)
+               {
+                  AiMsgWarning("[abcproc] Point count mismatch in reference alembic for mesh \"%s\"", node.path().c_str());
+               }
+               else
+               {
+                  AiMsgWarning("[abcproc] \"Pref\" user attribute already exists, ignore values from reference alembic");
+               }
+            }
+            
+            // Nref?
+            // Tref?
+            // Bref?
+         }
+      }
+   }
+   
    // Set user defined attributes
    
    SetUserAttributes(mNode, objectAttrs);
@@ -2006,6 +2210,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
    DestroyUserAttributes(primitiveAttrs);
    DestroyUserAttributes(pointAttrs);
    DestroyUserAttributes(vertexAttrs);
+   
+   // Cleanup
    
    AiFree(polygonVertexCount);
    AiFree(vertexPointIndices);
@@ -2019,13 +2225,13 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *)
    return AlembicNode::ContinueVisit;
 }
 
-AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *)
+AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &, AlembicNode *)
 {
    // generate a polymesh
    return AlembicNode::ContinueVisit;
 }
 
-AlembicNode::VisitReturn MakeShape::enter(AlembicNode &node, AlembicNode *)
+AlembicNode::VisitReturn MakeShape::enter(AlembicNode &, AlembicNode *)
 {
    return AlembicNode::ContinueVisit;
 }

@@ -35,17 +35,42 @@ AtNode* ProcGetNode(void *user_ptr, int i)
       if (dso->mode() == PM_multi)
       {
          // only generates new procedural nodes (read transform and bound information)
-         MakeProcedurals visitor(dso);
-         dso->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
+         MakeProcedurals procNodes(dso);
+         dso->scene()->visit(AlembicNode::VisitDepthFirst, procNodes);
          
-         if (visitor.numNodes() != dso->numShapes())
+         if (procNodes.numNodes() != dso->numShapes())
          {
-            AiMsgWarning("[abcproc] %lu procedural(s) generated (%lu expected)", visitor.numNodes(), dso->numShapes());
+            AiMsgWarning("[abcproc] %lu procedural(s) generated (%lu expected)", procNodes.numNodes(), dso->numShapes());
+         }
+         
+         CollectWorldMatrices refMatrices(dso);
+         if (dso->referenceScene() && !dso->ignoreTransforms())
+         {
+            dso->referenceScene()->visit(AlembicNode::VisitDepthFirst, refMatrices);
          }
          
          for (size_t i=0; i<dso->numShapes(); ++i)
          {
-            dso->setGeneratedNode(i, visitor.node(i));
+            AtNode *node = procNodes.node(i);
+            Alembic::Abc::M44d W;
+            AtMatrix mtx;
+            
+            if (node && refMatrices.getWorldMatrix(procNodes.path(i), W))
+            {
+               for (int r=0; r<4; ++r)
+               {
+                  for (int c=0; c<4; ++c)
+                  {
+                     mtx[r][c] = W[r][c];
+                  }
+               }
+               
+               // Store reference object world matrix to avoid having to re-compute it later
+               AiNodeDeclare(node, "Mref", "constant MATRIX");
+               AiNodeSetMatrix(node, "Mref", mtx);
+            }
+            
+            dso->setGeneratedNode(i, node);
          }
       }
       else

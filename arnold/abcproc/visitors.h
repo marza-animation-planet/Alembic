@@ -130,6 +130,7 @@ public:
    
    inline size_t numNodes() const { return mNodes.size(); }
    inline AtNode* node(size_t i) const { return (i < numNodes() ? mNodes[i] : 0); }
+   inline const char* path(size_t i) const { return (i < numNodes() ? mPaths[i].c_str() : 0); }
    
 private:
    
@@ -141,6 +142,7 @@ private:
    class Dso *mDso;
    std::vector<std::vector<Alembic::Abc::M44d> > mMatrixSamplesStack;
    std::vector<AtNode*> mNodes;
+   std::vector<std::string> mPaths;
 };
 
 template <class T>
@@ -165,13 +167,14 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
             AiMsgInfo("[abcproc] Sample bounds \"%s\" at t=%lf", node.path().c_str(), t);
          }
          
-         node.sampleBounds(t, t, i>0);
+         node.sampleBounds(t, t, (i > 0 || instance != 0));
       }
       
       if (boundsSamples.size() == 0)
       {
          // no data... -> empty box, don't generate node
          mNodes.push_back(0);
+         mPaths.push_back("");
          AiMsgWarning("[abcproc] No valid bounds for \"%s\"", node.path().c_str());
          return AlembicNode::ContinueVisit;
       }
@@ -305,6 +308,7 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
       AiNodeSetInt(proc, "instance_num", int(node.instanceNumber()));
       
       mNodes.push_back(proc);
+      mPaths.push_back(targetNode->path());
       
       return AlembicNode::ContinueVisit;
    }
@@ -312,6 +316,68 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
    {
       return AlembicNode::DontVisitChildren;
    }
+}
+
+// ---
+
+class CollectWorldMatrices
+{
+public:
+   
+   CollectWorldMatrices(class Dso *dso);
+   
+   AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicSubD &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicPoints &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicCurves &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicNuPatch &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0);
+   
+   void leave(AlembicXform &node, AlembicNode *instance=0);
+   void leave(AlembicNode &node, AlembicNode *instance=0);
+   
+   inline bool getWorldMatrix(const std::string &objectPath, Alembic::Abc::M44d &W) const
+   {
+      std::map<std::string, Alembic::Abc::M44d>::const_iterator it = mMatrices.find(objectPath);
+      if (it != mMatrices.end())
+      {
+         W = it->second;
+         return true;
+      }
+      else
+      {
+         return false;
+      }
+   }
+   
+private:
+   
+   template <class T>
+   AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance=0);
+   
+private:
+   
+   class Dso *mDso;
+   std::vector<Alembic::Abc::M44d> mMatrixStack;
+   std::map<std::string, Alembic::Abc::M44d> mMatrices;
+};
+
+template <class T>
+AlembicNode::VisitReturn CollectWorldMatrices::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance)
+{
+   Alembic::Abc::M44d W;
+   
+   if (mMatrixStack.size() > 0)
+   {
+      W = mMatrixStack.back();
+   }
+   
+   std::string path = (instance ? instance->path() : node.path());
+   
+   mMatrices[path] = W;
+   
+   return AlembicNode::ContinueVisit;
 }
 
 // ---
