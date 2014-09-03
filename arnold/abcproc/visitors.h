@@ -148,8 +148,6 @@ private:
 template <class T>
 AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance)
 {
-   // Bounds padding? [check disp_padding]
-   
    Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
    
    if (visible)
@@ -200,24 +198,12 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
                   Alembic::Abc::Box3d b2((1.0 - blend) * b0.min + blend * b1.min,
                                          (1.0 - blend) * b0.max + blend * b1.max);
                   box.extendBy(b2);
-                  
-                  // if (mDso->verbose())
-                  // {
-                  //    AiMsgInfo("[abcproc] Interpolated bounds at t=%lf: (%lf, %lf, %lf) -> (%lf, %lf, %lf)",
-                  //              t, b2.min.x, b2.min.y, b2.min.z, b2.max.x, b2.max.y, b2.max.z);
-                  // }
                }
                else
                {
                   Alembic::Abc::Box3d b = samp0->data();
                   
                   box.extendBy(b);
-                  
-                  // if (mDso->verbose())
-                  // {
-                  //    AiMsgInfo("[abcproc] Bounds at t=%lf: (%lf, %lf, %lf) -> (%lf, %lf, %lf)",
-                  //              t, b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z);
-                  // }
                }
             }
          }
@@ -283,15 +269,6 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
                for (int c=0; c<4; ++c)
                   dst[r][c] = float(src[r][c]);
             
-            // if (mDso->verbose())
-            // {
-            //    AiMsgInfo("[abcproc] [[%lf, %lf, %lf, %lf],\n[%lf, %lf, %lf, %lf],\n[%lf, %lf, %lf, %lf],\n[%lf, %lf, %lf, %lf]]",
-            //              src[0][0], src[0][1], src[0][2], src[0][3],
-            //              src[1][0], src[1][1], src[1][2], src[1][3],
-            //              src[2][0], src[2][1], src[2][2], src[2][3],
-            //              src[3][0], src[3][1], src[3][2], src[3][3]);
-            // }
-            
             AiArraySetMtx(ary, i, dst);
          }
          
@@ -305,7 +282,7 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
       {
          AiNodeDeclare(proc, "instance_num", "constant INT");
       }
-      AiNodeSetInt(proc, "instance_num", int(node.instanceNumber()));
+      AiNodeSetInt(proc, "instance_num", int(targetNode->instanceNumber()));
       
       mNodes.push_back(proc);
       mPaths.push_back(targetNode->path());
