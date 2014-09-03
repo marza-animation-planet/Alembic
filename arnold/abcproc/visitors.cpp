@@ -1535,17 +1535,14 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    }
    
    PointsInfo info;
+   UserAttributes extraPointAttrs;
    
    // Collect attributes
    
-   double attribsTime = mDso->attribsTime(mDso->attribsFrame());
-   
-   bool interpolateAttribs = false;
-   
    collectUserAttributes(schema.getUserProperties(),
                          schema.getArbGeomParams(),
-                         attribsTime,
-                         interpolateAttribs,
+                         mDso->renderTime(),
+                         false,
                          &info.objectAttrs,
                          0,
                          &info.pointAttrs,
@@ -1556,6 +1553,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    
    TimeSampleList<Alembic::AbcGeom::IPointsSchema> &samples = node.samples().schemaSamples;
    TimeSampleList<Alembic::AbcGeom::IPointsSchema>::ConstIterator samp0, samp1;
+   double a = 1.0;
+   double b = 0.0;
    
    for (size_t i=0; i<mDso->numMotionSamples(); ++i)
    {
@@ -1574,7 +1573,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
       AiMsgInfo("[abcproc] Read %lu points samples", samples.size());
    }
    
-   if (samples.size() == 0)
+   if (samples.size() == 0 ||
+       !samples.getSamples(mDso->renderTime(), samp0, samp1, b))
    {
       return AlembicNode::DontVisitChildren;
    }
@@ -1584,16 +1584,277 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    mNode = AiNode("points");
    AiNodeSetStr(mNode, "name", name.c_str());
    
+   // Build IDmap
+   Alembic::Abc::P3fArraySamplePtr P0 = samp0->data().getPositions();
+   Alembic::Abc::V3fArraySamplePtr V0 = samp0->data().getVelocities();
+   Alembic::Abc::UInt64ArraySamplePtr ID0 = samp0->data().getIds();
+   
+   Alembic::Abc::P3fArraySamplePtr P1;
+   Alembic::Abc::UInt64ArraySamplePtr ID1;
+   Alembic::Abc::V3fArraySamplePtr V1;
+   
+   std::map<Alembic::Util::uint64_t, size_t> idmap0; // ID -> index in P0/ID0/V0
+   std::map<Alembic::Util::uint64_t, std::pair<size_t, size_t> > idmap1; // ID -> (index in P1/ID1/V1, index in final point list)
+   std::map<Alembic::Util::uint64_t, size_t> sharedids; // ID -> index in P1/ID1/V1
+   
+   const float *vel0 = 0;
+   const float *vel1 = 0;
+   const float *acc0 = 0;
+   const float *acc1 = 0;
+   
+   for (size_t i=0; i<ID0->size(); ++i)
+   {
+      idmap0[ID0->get()[i]] = i;
+   }
+   
+   info.pointCount = idmap0.size();
+   
+   // Get velocities and accelerations
+   
+   if (V0)
+   {
+      vel0 = (const float*) V0->getData();
+   }
+   else
+   {
+      UserAttributes::iterator it = info.pointAttrs.find("velocity");
+      if (it == info.pointAttrs.end() ||
+          it->second.arnoldType != AI_TYPE_VECTOR ||
+          it->second.dataCount != info.pointCount)
+      {
+         it = info.pointAttrs.find("v");
+         if (it != info.pointAttrs.end() &&
+             (it->second.arnoldType != AI_TYPE_VECTOR ||
+              it->second.dataCount != info.pointCount))
+         {
+            it = info.pointAttrs.end();
+         }
+      }
+      if (it != info.pointAttrs.end())
+      {
+         vel0 = (const float*) it->second.data;
+      }
+   }
+   
+   if (vel0)
+   {
+      UserAttributes::iterator it = info.pointAttrs.find("acceleration");
+      if (it == info.pointAttrs.end() ||
+          it->second.arnoldType != AI_TYPE_VECTOR ||
+          it->second.dataCount != info.pointCount)
+      {
+         it = info.pointAttrs.find("accel");
+         if (it == info.pointAttrs.end() ||
+             it->second.arnoldType != AI_TYPE_VECTOR ||
+             it->second.dataCount != info.pointCount)
+         {
+            it = info.pointAttrs.find("a");
+            if (it != info.pointAttrs.end() &&
+                (it->second.arnoldType != AI_TYPE_VECTOR ||
+                 it->second.dataCount != info.pointCount))
+            {
+               it = info.pointAttrs.end();
+            }
+         }
+      }
+      if (it != info.pointAttrs.end())
+      {
+         acc0 = (const float*) it->second.data;
+      }
+   }
+   
+   if (b > 0.0)
+   {
+      P1 = samp1->data().getPositions();
+      ID1 = samp1->data().getIds();
+      V1 = samp1->data().getVelocities();
+      
+      a = 1.0 - b;
+      
+      for (size_t i=0; i<ID1->size(); ++i)
+      {
+         Alembic::Util::uint64_t id = ID1->get()[i];
+         
+         if (idmap0.find(id) != idmap0.end())
+         {
+            sharedids[id] = i;
+         }
+         else
+         {
+            std::pair<size_t, size_t> idxs;
+            
+            idxs.first = i;
+            idxs.second = info.pointCount++;
+            
+            idmap1[id] = idxs;
+         }
+      }
+      
+      if (idmap1.size() > 0)
+      {
+         // Collect point attributes
+         
+         collectUserAttributes(Alembic::Abc::ICompoundProperty(), schema.getArbGeomParams(),
+                               samp1->time(), false, 0, 0, &extraPointAttrs, 0, 0);
+         
+         // Get velocities and accelerations
+         
+         if (V1)
+         {
+            vel1 = (const float*) V1->getData();
+         }
+         else
+         {
+            UserAttributes::iterator it = extraPointAttrs.find("velocity");
+            if (it == extraPointAttrs.end() ||
+                it->second.arnoldType != AI_TYPE_VECTOR ||
+                it->second.dataCount != P1->size())
+            {
+               it = extraPointAttrs.find("v");
+               if (it != extraPointAttrs.end() &&
+                   (it->second.arnoldType != AI_TYPE_VECTOR ||
+                    it->second.dataCount != P1->size()))
+               {
+                  it = extraPointAttrs.end();
+               }
+            }
+            if (it != extraPointAttrs.end())
+            {
+               vel1 = (const float*) it->second.data;
+            }
+         }
+         
+         if (vel1)
+         {
+            UserAttributes::iterator it = extraPointAttrs.find("acceleration");
+            if (it == extraPointAttrs.end() ||
+                it->second.arnoldType != AI_TYPE_VECTOR ||
+                it->second.dataCount != info.pointCount)
+            {
+               it = extraPointAttrs.find("accel");
+               if (it == extraPointAttrs.end() ||
+                   it->second.arnoldType != AI_TYPE_VECTOR ||
+                   it->second.dataCount != info.pointCount)
+               {
+                  it = extraPointAttrs.find("a");
+                  if (it != extraPointAttrs.end() &&
+                      (it->second.arnoldType != AI_TYPE_VECTOR ||
+                       it->second.dataCount != info.pointCount))
+                  {
+                     it = extraPointAttrs.end();
+                  }
+               }
+            }
+            if (it != extraPointAttrs.end())
+            {
+               acc1 = (const float*) it->second.data;
+            }
+         }
+      }
+   }
+   
+   // Fill points
+   
+   unsigned int nkeys = (vel0 ? mDso->numMotionSamples() : 1);
+   
+   AtArray *points = AiArrayAllocate(info.pointCount, nkeys, AI_TYPE_POINT);
+   
+   std::map<Alembic::Util::uint64_t, size_t>::iterator idit;
+   AtPoint pnt;
+   
+   for (unsigned int i=0, koff=0; i<nkeys; ++i, koff+=info.pointCount)
+   {
+      double t = (vel0 ? mDso->motionSampleTime(i) : mDso->renderTime());
+      
+      for (size_t j=0, voff=0; j<P0->size(); ++j, voff+=3)
+      {
+         Alembic::Util::uint64_t id = ID0->get()[j];
+         
+         idit = sharedids.find(id);
+         
+         if (idit != sharedids.end())
+         {
+            Alembic::Abc::V3f P = float(a) * P0->get()[j] + float(b) * P1->get()[idit->second];
+            
+            pnt.x = P.x;
+            pnt.y = P.y;
+            pnt.z = P.z;
+         }
+         else
+         {
+            Alembic::Abc::V3f P = P0->get()[j];
+            
+            pnt.x = P.x;
+            pnt.y = P.y;
+            pnt.z = P.z;
+            
+            if (vel0)
+            {
+               double dt = t - samp0->time();
+               double hdt2 = 0.5 * dt * dt;
+               
+               pnt.x += dt * vel0[voff  ];
+               pnt.y += dt * vel0[voff+1];
+               pnt.z += dt * vel0[voff+2];
+               
+               if (acc0)
+               {
+                  pnt.x += hdt2 * acc0[voff  ];
+                  pnt.y += hdt2 * acc0[voff+1];
+                  pnt.z += hdt2 * acc0[voff+2];
+               }
+            }
+         }
+         
+         AiArraySetPnt(points, koff+j, pnt);
+      }
+      
+      std::map<Alembic::Util::uint64_t, std::pair<size_t, size_t> >::iterator it;
+      
+      for (it=idmap1.begin(); it!=idmap1.end(); ++it)
+      {
+         Alembic::Abc::V3f P = P1->get()[it->second.first];
+         
+         pnt.x = P.x;
+         pnt.y = P.y;
+         pnt.z = P.z;
+         
+         if (vel1)
+         {
+            double dt = t - samp1->time();
+            double hdt2 = 0.5 * dt * dt;
+            
+            unsigned int voff = 3 * it->second.first;
+            
+            pnt.x += dt * vel1[voff  ];
+            pnt.y += dt * vel1[voff+1];
+            pnt.z += dt * vel1[voff+2];
+            
+            if (acc1)
+            {
+               pnt.x += hdt2 * acc1[voff  ];
+               pnt.y += hdt2 * acc1[voff+1];
+               pnt.z += hdt2 * acc1[voff+2];
+            }
+         }
+         
+         AiArraySetPnt(points, koff + it->second.second, pnt);
+      }
+   }
+   
    // mode: disk|sphere|quad
-   // points[]
    // radius[]
-   // aspect[]
-   // rotation[]
-   // look for alternative names?
+   // aspect[]    (only for quad)
+   // rotation[]  (only for quad)
+   //
+   // Use alternatives for mode, aspect, rotation and radius?
+   // radius is handled by Alembic as 'widths' property
    
    Alembic::AbcGeom::IFloatGeomParam widths = schema.getWidthsParam();
    if (widths.valid())
    {
+      // Convert to point attribute 'radius'
+      
       if (info.pointAttrs.find("radius") != info.pointAttrs.end() ||
           info.objectAttrs.find("radius") != info.objectAttrs.end())
       {
@@ -1604,11 +1865,51 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
       }
       else
       {
-         // radius
+         TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> wsamples;
+         TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator wsamp0, wsamp1;
+         
+         if (!wsamples.update(widths, mDso->renderTime(), mDso->renderTime(), false))
+         {
+            // default to 1?
+         }
+         else if (!wsamples.getSamples(mDso->renderTime(), wsamp0, wsamp1, b))
+         {
+            // default to 1?
+         }
+         else
+         {
+            float *radius = (float*) AiMalloc(info.pointCount * sizeof(float));
+            
+            for (size_t i=0; i<P0->size(); ++i)
+            {
+               Alembic::Abc::FloatArraySamplePtr r0 = wsamp0->data().getVals();
+            }
+            
+            // 
+         }
       }
    }
    
    // Output user defined attributes
+   
+   // Apply dso radiusmin/radiusmax/radiusscale to 'radius' point attribute
+   
+   if (idmap1.size() > 0)
+   {
+      // Extend point attributes data (skip radius already processed above)
+      
+      for (UserAttributes::iterator it = info.pointAttrs.begin(); it != info.pointAttrs.end(); ++it)
+      {
+         if (extraPointAttrs.find(it->first) == extraPointAttrs.end())
+         {
+            // Fill with adhoc values?
+         }
+         else
+         {
+            // Use idmap1 to extend dataCount to info.pointCount
+         }
+      }
+   }
    
    SetUserAttributes(mNode, info.objectAttrs);
    SetUserAttributes(mNode, info.pointAttrs);
