@@ -440,6 +440,8 @@ private:
    
 private:
    
+   float adjustPointRadius(float radius) const;
+   
    std::string arnoldNodeName(AlembicNode &node) const;
    
    void collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
@@ -486,6 +488,24 @@ private:
    class Dso *mDso;
    AtNode *mNode;
 };
+
+inline float MakeShape::adjustPointRadius(float radius) const
+{
+   radius *= mDso->radiusScale();
+   
+   if (radius < mDso->radiusMin())
+   {
+      return mDso->radiusMin();
+   }
+   else if (radius > mDso->radiusMax())
+   {
+      return mDso->radiusMax();
+   }
+   else
+   {
+      return radius;
+   }
+}
 
 template <class T>
 void MakeShape::outputInstanceNumber(AlembicNodeT<T> &node, AlembicNode *instance)
@@ -1489,6 +1509,7 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
                   Tattr.arnoldType = AI_TYPE_VECTOR;
                   Tattr.arnoldTypeStr = "VECTOR";
                   Tattr.dataDim = 3;
+                  Tattr.isArray = true;
                   Tattr.dataCount = info.pointCount;
                   Tattr.data = T;
                }
@@ -1508,6 +1529,7 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
                   Battr.arnoldType = AI_TYPE_VECTOR;
                   Battr.arnoldTypeStr = "VECTOR";
                   Battr.dataDim = 3;
+                  Battr.isArray = true;
                   Battr.dataCount = info.pointCount;
                   Battr.data = B;
                }
@@ -1530,6 +1552,7 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
       ua.arnoldCategory = AI_USERDEF_VARYING;
       ua.arnoldType = AI_TYPE_VECTOR;
       ua.arnoldTypeStr = "VECTOR";
+      ua.isArray = true;
       ua.dataDim = 3;
       ua.dataCount = info.pointCount;
       ua.data = smoothNormals;

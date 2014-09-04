@@ -552,7 +552,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
          mDso->cleanAttribName(ua.first);
          InitUserAttribute(ua.second);
          
-         ua.second.arnoldCategory = AI_USERDEF_CONSTANT;
+         //ua.second.arnoldCategory = AI_USERDEF_CONSTANT;
          
          if (ReadUserAttribute(ua.second, userProps, header, t, false, interpolate))
          {
@@ -614,7 +614,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
             case Alembic::AbcGeom::kFacevaryingScope:
                if (vertexAttrs && mDso->readVertexAttribs())
                {
-                  ua.second.arnoldCategory = AI_USERDEF_INDEXED;
+                  //ua.second.arnoldCategory = AI_USERDEF_INDEXED;
                   attrs = vertexAttrs;
                   if (mDso->verbose())
                   {
@@ -627,7 +627,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
             case Alembic::AbcGeom::kVertexScope:
                if (pointAttrs && (mDso->readPointAttribs() || specialPointNames.find(ua.first) != specialPointNames.end()))
                {
-                  ua.second.arnoldCategory = AI_USERDEF_VARYING;
+                  //ua.second.arnoldCategory = AI_USERDEF_VARYING;
                   attrs = pointAttrs;
                   if (mDso->verbose())
                   {
@@ -639,7 +639,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
             case Alembic::AbcGeom::kUniformScope:
                if (primitiveAttrs && mDso->readPrimitiveAttribs())
                {
-                  ua.second.arnoldCategory = AI_USERDEF_UNIFORM;
+                  //ua.second.arnoldCategory = AI_USERDEF_UNIFORM;
                   attrs = primitiveAttrs;
                   if (mDso->verbose())
                   {
@@ -651,7 +651,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
             case Alembic::AbcGeom::kConstantScope:
                if (objectAttrs && mDso->readObjectAttribs())
                {
-                  ua.second.arnoldCategory = AI_USERDEF_CONSTANT;
+                  //ua.second.arnoldCategory = AI_USERDEF_CONSTANT;
                   attrs = objectAttrs;
                   if (mDso->verbose())
                   {
@@ -1302,6 +1302,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
                ua.arnoldCategory = AI_USERDEF_VARYING;
                ua.arnoldType = AI_TYPE_POINT;
                ua.arnoldTypeStr = "POINT";
+               ua.isArray = true;
                ua.dataDim = 3;
                ua.dataCount = info.pointCount;
                ua.data = vals;
@@ -1486,6 +1487,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
                ua.arnoldCategory = AI_USERDEF_VARYING;
                ua.arnoldType = AI_TYPE_POINT;
                ua.arnoldTypeStr = "POINT";
+               ua.isArray = true;
                ua.dataDim = 3;
                ua.dataCount = info.pointCount;
                ua.data = vals;
@@ -1847,16 +1849,17 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    // aspect[]    (only for quad)
    // rotation[]  (only for quad)
    //
-   // Use alternatives for mode, aspect, rotation and radius?
+   // Use alternative attribtues for mode, aspect, rotation and radius?
+   //
    // radius is handled by Alembic as 'widths' property
+   // give priority to user defined 'radius' 
    
    Alembic::AbcGeom::IFloatGeomParam widths = schema.getWidthsParam();
    if (widths.valid())
    {
       // Convert to point attribute 'radius'
       
-      if (info.pointAttrs.find("radius") != info.pointAttrs.end() ||
-          info.objectAttrs.find("radius") != info.objectAttrs.end())
+      if (info.pointAttrs.find("radius") != info.pointAttrs.end())
       {
          if (mDso->verbose())
          {
@@ -1865,48 +1868,178 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
       }
       else
       {
+         UserAttributes::iterator it = info.objectAttrs.find("radius");
+         
+         if (it != info.objectAttrs.end())
+         {
+            if (mDso->verbose())
+            {
+               AiMsgInfo("[abcproc] Ignore \"radius\" object attribute");
+            }
+            DestroyUserAttribute(it->second);
+            info.objectAttrs.erase(it);
+         }
+         
          TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> wsamples;
          TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator wsamp0, wsamp1;
          
+         double br = 0.0;
+         
          if (!wsamples.update(widths, mDso->renderTime(), mDso->renderTime(), false))
          {
+            AiMsgWarning("[abcproc] Could not read alembic points \"widths\" property for t = %lf", mDso->renderTime());
             // default to 1?
          }
-         else if (!wsamples.getSamples(mDso->renderTime(), wsamp0, wsamp1, b))
+         else if (!wsamples.getSamples(mDso->renderTime(), wsamp0, wsamp1, br))
          {
+            AiMsgWarning("[abcproc] Could not read alembic points \"widths\" property for t = %lf", mDso->renderTime());
             // default to 1?
          }
          else
          {
-            float *radius = (float*) AiMalloc(info.pointCount * sizeof(float));
+            Alembic::Abc::FloatArraySamplePtr R0 = wsamp0->data().getVals();
+            Alembic::Abc::FloatArraySamplePtr R1;
             
-            for (size_t i=0; i<P0->size(); ++i)
+            if (wsamp0->time() != samp0->time())
             {
-               Alembic::Abc::FloatArraySamplePtr r0 = wsamp0->data().getVals();
+               AiMsgWarning("[abcproc] \"widths\" property sample time doesn't match points schema sample time (%lf and %lf respectively)",
+                            samp0->time(), wsamp0->time());
             }
-            
-            // 
+            else if (R0->size() != P0->size())
+            {
+               AiMsgWarning("[abcproc] \"widths\" property size doesn't match render time point count");
+            }
+            else
+            {
+               bool process = true;
+               
+               if (br > 0.0)
+               {
+                  R1 = wsamp1->data().getVals();
+                  
+                  if (wsamp1->time() != samp1->time())
+                  {
+                     AiMsgWarning("[abcproc] \"widths\" property sample time doesn't match points schema sample time (%lf and %lf respectively)",
+                                  samp1->time(), wsamp1->time());
+                     process = false;
+                  }
+                  else if (R1->size() != P1->size())
+                  {
+                     AiMsgWarning("[abcproc] \"widths\" property size doesn't match render time point count");
+                     process = false;
+                  }
+               }
+               
+               if (process)
+               {
+                  float *radius = (float*) AiMalloc(info.pointCount * sizeof(float));
+                  float r;
+                  
+                  if (R1)
+                  {
+                     for (size_t i=0; i<R0->size(); ++i)
+                     {
+                        Alembic::Util::uint64_t id = ID0->get()[i];
+                        
+                        idit = sharedids.find(id);
+                        
+                        if (idit != sharedids.end())
+                        {
+                           r = (1 - br) * R0->get()[i] + br * R1->get()[idit->second];
+                        }
+                        else
+                        {
+                           r = R0->get()[i];
+                        }
+                        
+                        radius[i] = adjustPointRadius(r);
+                     }
+                     
+                     std::map<Alembic::Util::uint64_t, std::pair<size_t, size_t> >::iterator idit1;
+                     
+                     for (idit1 = idmap1.begin(); idit1 != idmap1.end(); ++idit1)
+                     {
+                        r = R1->get()[idit1->second.first];
+                        
+                        radius[idit1->second.second] = adjustPointRadius(r);
+                     }
+                  }
+                  else
+                  {
+                     // asset(R0->size() == info.pointCount);
+                     
+                     for (size_t i=0; i<R0->size(); ++i)
+                     {
+                        r = R0->get()[i];
+                        
+                        radius[i] = adjustPointRadius(r);
+                     }
+                  }
+                  
+                  AiNodeSetArray(mNode, "radius", AiArrayConvert(info.pointCount, 1, AI_TYPE_FLOAT, radius));
+               }
+            }
          }
       }
    }
    
    // Output user defined attributes
    
-   // Apply dso radiusmin/radiusmax/radiusscale to 'radius' point attribute
+   // Extend existing attributes
    
    if (idmap1.size() > 0)
    {
-      // Extend point attributes data (skip radius already processed above)
-      
-      for (UserAttributes::iterator it = info.pointAttrs.begin(); it != info.pointAttrs.end(); ++it)
+      for (UserAttributes::iterator it0 = info.pointAttrs.begin(); it0 != info.pointAttrs.end(); ++it0)
       {
-         if (extraPointAttrs.find(it->first) == extraPointAttrs.end())
+         ResizeUserAttribute(it0->second, info.pointCount);
+         
+         UserAttributes::iterator it1 = extraPointAttrs.find(it0->first);
+         
+         if (it1 != extraPointAttrs.end())
          {
-            // Fill with adhoc values?
+            std::map<Alembic::Util::uint64_t, std::pair<size_t, size_t> >::iterator idit;
+            
+            for (idit = idmap1.begin(); idit != idmap1.end(); ++idit)
+            {
+               if (!CopyUserAttribute(it1->second, idit->second.first, 1,
+                                      it0->second, idit->second.second))
+               {
+                  AiMsgWarning("[abcproc] Failed to copy extended user attribute data");
+               }
+            }
          }
-         else
+      }
+   }
+   
+   // Adjust radiuses
+   
+   UserAttribute *ra = 0;
+   
+   UserAttributes::iterator ait = info.pointAttrs.find("radius");
+   
+   if (ait == info.pointAttrs.end())
+   {
+      ait = info.objectAttrs.find("radius");
+      
+      if (ait != info.objectAttrs.end())
+      {
+         ra = &(ait->second);
+      }
+   }
+   else
+   {
+      ra = &(ait->second);
+   }
+   
+   if (ra && ra->data && ra->arnoldType == AI_TYPE_FLOAT)
+   {
+      float *r = (float*) ra->data;
+         
+      for (unsigned int i=0; i<ra->dataCount; ++i)
+      {
+         for (unsigned int j=0; i<ra->dataDim; ++j, ++r)
          {
-            // Use idmap1 to extend dataCount to info.pointCount
+            *r = adjustPointRadius(*r);
          }
       }
    }
