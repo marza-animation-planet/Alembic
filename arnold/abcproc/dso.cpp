@@ -41,7 +41,8 @@ void Dso::CommonParameters::reset()
    fps = 0.0;
    preserveStartFrame = false;
    
-   ignoreMotionBlur = false;
+   ignoreDeformBlur = false;
+   ignoreTransformBlur = false;
    ignoreVisibility = false;
    ignoreTransforms = false;
    ignoreInstances = false;
@@ -106,9 +107,13 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    {
       oss << " -preservestartframe";
    }
-   if (ignoreMotionBlur)
+   if (ignoreTransformBlur)
    {
-      oss << " -ignoremotionblur";
+      oss << " -ignoretransformblur";
+   }
+   if (ignoreDeformBlur)
+   {
+      oss << " -ignoredeformblur";
    }
    if (targetShape || ignoreTransforms)
    {
@@ -188,9 +193,9 @@ std::string Dso::CommonParameters::shapeKey() const
    {
       oss << " -preservestartframe";
    }
-   if (ignoreMotionBlur)
+   if (ignoreDeformBlur)
    {
-      oss << " -ignoremotionblur";
+      oss << " -ignoredeformblur";
    }
    if (samplesExpandIterations > 0)
    {
@@ -454,7 +459,7 @@ Dso::Dso(AtNode *node)
       
       mTimeSamples.clear();
       
-      if (mCommonParams.ignoreMotionBlur)
+      if (ignoreMotionBlur() || (mMode == PM_single && ignoreDeformBlur()))
       {
          mTimeSamples.push_back(mRenderTime);
       }
@@ -1212,7 +1217,16 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
    }
    else if (args[i] == "-ignoremotionblur")
    {
-      mCommonParams.ignoreMotionBlur = true;
+      mCommonParams.ignoreTransformBlur = true;
+      mCommonParams.ignoreDeformBlur = true;
+   }
+   else if (args[i] == "-ignoredeformblur")
+   {
+      mCommonParams.ignoreDeformBlur = true;
+   }
+   else if (args[i] == "-ignoretransformblur")
+   {
+      mCommonParams.ignoreTransformBlur = true;
    }
    else if (args[i] == "-ignoretransforms")
    {
@@ -1681,7 +1695,30 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
          {
-            mCommonParams.ignoreMotionBlur = AiNodeGetBool(mProcNode, pname);
+            mCommonParams.ignoreDeformBlur = (AiNodeGetBool(mProcNode, pname) || mCommonParams.ignoreDeformBlur);
+            mCommonParams.ignoreTransformBlur = (AiNodeGetBool(mProcNode, pname) || mCommonParams.ignoreTransformBlur);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
+         }
+      }
+      else if (param == "ignoredeformblur")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
+         {
+            mCommonParams.ignoreDeformBlur = (AiNodeGetBool(mProcNode, pname) || mCommonParams.ignoreDeformBlur);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
+         }
+      }
+      else if (param == "ignoretransformblur")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
+         {
+            mCommonParams.ignoreTransformBlur = (AiNodeGetBool(mProcNode, pname) || mCommonParams.ignoreTransformBlur);
          }
          else
          {

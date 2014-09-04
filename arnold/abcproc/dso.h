@@ -115,7 +115,17 @@ public:
    
    inline bool ignoreMotionBlur() const
    {
-      return mCommonParams.ignoreMotionBlur;
+      return (ignoreDeformBlur() && ignoreTransformBlur());
+   }
+   
+   inline bool ignoreDeformBlur() const
+   {
+      return mCommonParams.ignoreDeformBlur;
+   }
+   
+   inline bool ignoreTransformBlur() const
+   {
+      return mCommonParams.ignoreTransformBlur;
    }
    
    inline bool ignoreTransforms() const
@@ -143,6 +153,11 @@ public:
    inline double motionSampleTime(size_t i) const
    {
       return mExpandedTimeSamples[i];
+   }
+   
+   inline const std::vector<double>& motionSampleTimes() const
+   {
+      return mExpandedTimeSamples;
    }
    
    double computeTime(double frame) const;
@@ -321,7 +336,8 @@ private:
       double offset;
       double fps;
       
-      bool ignoreMotionBlur;
+      bool ignoreDeformBlur;
+      bool ignoreTransformBlur;
       bool ignoreVisibility;
       bool ignoreTransforms;
       bool ignoreInstances;

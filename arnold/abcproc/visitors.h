@@ -157,9 +157,25 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
       
       Alembic::Abc::Box3d box;
       
-      for (size_t i=0; i<mDso->numMotionSamples(); ++i)
+      double renderTime = mDso->renderTime();
+      
+      const double *sampleTimes = 0;
+      size_t sampleTimesCount = 0;
+      
+      if (mDso->ignoreDeformBlur())
       {
-         double t = mDso->motionSampleTime(i);
+         sampleTimes = &renderTime;
+         sampleTimesCount = 1;
+      }
+      else
+      {
+         sampleTimes = &(mDso->motionSampleTimes()[0]);
+         sampleTimesCount = mDso->numMotionSamples();
+      }
+         
+      for (size_t i=0; i<sampleTimesCount; ++i)
+      {
+         double t = sampleTimes[i];
          
          if (mDso->verbose())
          {
@@ -183,9 +199,9 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
       }
       else
       {
-         for (size_t i=0; i<mDso->numMotionSamples(); ++i)
+         for (size_t i=0; i<sampleTimesCount; ++i)
          {
-            double t = mDso->motionSampleTime(i);
+            double t = sampleTimes[i];
             
             TimeSampleList<Alembic::Abc::IBox3dProperty>::ConstIterator samp0, samp1;
             double blend = 0.0;
