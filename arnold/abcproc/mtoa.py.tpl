@@ -39,22 +39,17 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
    # => just leave everything up to sciptedTranslator extension
    node = arnold.AiNodeLookUpByName(arnoldNodeName)
    if not node:
-      #print("mtoa_AbcShape.Export: No such arnold node \"%s\"" % arnoldNodeName)
       return []
    
    if arnold.AiNodeIs(node, "box"):
-      #print("mtoa_AbcShape.Export: \"%s\" [box]" % nodeName)
       return []
 
    elif arnold.AiNodeIs(node, "ginstance"):
-      #print("mtoa_AbcShape.Export: \"%s\" [instance of \"%s\"]" % (nodeName, masterNodeName))
       return []
    
    elif not arnold.AiNodeIs(node, "procedural"):
-      #print("mtoa_AbcShape.Export: Unsupported arnold node \"%s\"" % arnoldNodeName)
       return []
    
-   #print("mtoa_AbcShape.Export: \"%s\" [step %d, frame %f, motion sample %f]" % (nodeName, step, renderFrame, sampleFrame))
    if step == 0:
       arnold.AiNodeSetStr(node, "dso", "abcproc")
       
@@ -188,9 +183,9 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
             pad = cmds.getAttr(nodeName+".aiDispPadding")
             Paddings[nodeName] = pad
          
-         # Note: For instanced AbcShape with time related attribute overrides, 'outBoxMin', 'outBoxMax'
+         # Note: For instanced <<NodeName>> with time related attribute overrides, 'outBoxMin', 'outBoxMax'
          #       attributes won't return the right values, maybe provide some additional attributes
-         #       on the AbcShape node to compute an alternate bounding box (using a different set of 
+         #       on the <<NodeName>> node to compute an alternate bounding box (using a different set of 
          #       speed/offset/startFrame/endFrame/time/preserveStartFrame attributes) ?
          
          bmin = cmds.getAttr(nodeName+".outBoxMin")[0]
@@ -285,7 +280,7 @@ def SetupAttrs():
       attrs.append(stu.AttrData(name="mtoa_optimizeSamples", shortName="optsamp", type=arnold.AI_TYPE_BOOLEAN, defaultValue=False))
       
    except Exception, e:
-      print("mtoa_AbcShape.SetupAttrs: Failed\n%s" % e)
+      print("mtoa_<<NodeName>>.SetupAttrs: Failed\n%s" % e)
       attrs = []
    
    return map(str, attrs)
@@ -293,13 +288,13 @@ def SetupAttrs():
 
 def SetupAE(translator):
    import pymel.core as pm
-   if not pm.pluginInfo("AbcShape", query=1, loaded=1):
+   if not pm.pluginInfo("<<NodeName>>", query=1, loaded=1):
       return
    
    try:
       import mtoa.ui.ae.templates as templates
       
-      class AbcShapeTemplate(templates.ShapeTranslatorTemplate):
+      class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
          def setup(self):
             self.commonShapeAttributes()
             self.addSeparator()
@@ -337,7 +332,7 @@ def SetupAE(translator):
             self.addControl("aiUserOptions", label="User Options")
             self.addSeparator()
      
-      templates.registerTranslatorUI(AbcShapeTemplate, "AbcShape", translator)
+      templates.registerTranslatorUI(<<NodeName>>Template, "<<NodeName>>", translator)
       
    except Exception, e:
-      print("mtoa_AbcShape.SetupAE: Failed\n%s" % e)
+      print("mtoa_<<NodeName>>.SetupAE: Failed\n%s" % e)

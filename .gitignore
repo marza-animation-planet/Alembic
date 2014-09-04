@@ -5,3 +5,4 @@ debug
 *.dblite
 excons.cache
 maya/AbcShape/AE*Template.mel
+arnold/abcproc/*.py

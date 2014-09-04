@@ -512,7 +512,7 @@ if build_arnold_plugins:
                 "custom": [arnold.Require]})
 
 if build_maya_plugins:
-   def replace_in_mel(src, dst, srcStr, dstStr):
+   def replace_in_file(src, dst, srcStr, dstStr):
       fdst = open(dst, "w")
       fsrc = open(src, "r")
       for line in fsrc.readlines():
@@ -522,9 +522,12 @@ if build_maya_plugins:
    
    AbcShapeName = "%sAbcShape" % nameprefix
    AbcShapeMel = "maya/AbcShape/AE%sTemplate.mel" % AbcShapeName
+   AbcShapeMtoa = "arnold/abcproc/mtoa_%s.py" % AbcShapeName
    
    if not os.path.exists(AbcShapeMel):
-      replace_in_mel("maya/AbcShape/AETemplate.mel.tpl", AbcShapeMel, "<<NodeName>>", AbcShapeName)
+      replace_in_file("maya/AbcShape/AETemplate.mel.tpl", AbcShapeMel, "<<NodeName>>", AbcShapeName)
+   if not os.path.exists(AbcShapeMtoa):
+      replace_in_file("arnold/abcproc/mtoa.py.tpl", AbcShapeMtoa, "<<NodeName>>", AbcShapeName)
    
    prjs.extend([{"name": "%sAbcImport" % nameprefix,
                  "type": "dynamicmodule",
@@ -559,7 +562,8 @@ if build_maya_plugins:
                  "libdirs": libdirs,
                  "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
                  "srcs": glob.glob("maya/AbcShape/*.cpp") + glob.glob("lib/SceneHelper/*.cpp"),
-                 "install": {"maya/scripts": glob.glob("maya/AbcShape/*.mel")},
+                 "install": {"maya/scripts": glob.glob("maya/AbcShape/*.mel"),
+                             "maya/python": [AbcShapeMtoa]},
                  "custom": [maya.Require, maya.Plugin]}])
 
 if build_houdini_plugins:
