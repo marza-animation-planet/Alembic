@@ -15,11 +15,12 @@ struct UserAttribute
    int arnoldType;
    std::string arnoldTypeStr;
    Alembic::AbcCoreAbstract::DataType abcType;
+   bool isArray; // only for constant attributes
    unsigned int dataDim;
    unsigned int dataCount;
    void *data;
-   unsigned int indicesCount;
-   unsigned int *indices;
+   unsigned int indicesCount; // only for indexed attributes (facevarying)
+   unsigned int *indices; // only for indexed attributes (facevarying)
    std::set<std::string> strings;
 };
 
@@ -33,6 +34,10 @@ bool ReadUserAttribute(UserAttribute &ua,
                        double t,
                        bool geoparam,
                        bool interpolate);
+
+bool ResizeUserAttribute(UserAttribute &ua, unsigned int newSize);
+
+bool CopyUserAttribute(UserAttribute &src, unsigned int srcIdx, unsigned int count, UserAttribute &dst, unsigned int dstIdx);
 
 void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigned int *remapIndices=0);
 

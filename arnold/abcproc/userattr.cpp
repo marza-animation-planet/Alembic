@@ -7,11 +7,223 @@ void InitUserAttribute(UserAttribute &attrib)
    attrib.arnoldType = AI_TYPE_UNDEFINED;
    attrib.arnoldTypeStr = "";
    attrib.abcType = Alembic::AbcCoreAbstract::DataType();
+   attrib.isArray = false;
    attrib.dataDim = 0;
-   attrib.dataCount = 0; // Note: use dataCount == 0 for non-array attributes to differentiate with 1 element arrays
+   attrib.dataCount = 0;
    attrib.data = 0;
    attrib.indicesCount = 0;
    attrib.indices = 0;
+}
+
+bool ResizeUserAttribute(UserAttribute &ua, unsigned int newSize)
+{
+   if (ua.arnoldType == AI_TYPE_UNDEFINED)
+   {
+      return false;
+   }
+   
+   // Do not handled resizing for indexed user attribute
+   if (ua.indicesCount > 0)
+   {
+      return false;
+   }
+   
+   bool boolDef = false;
+   AtByte byteDef = 0;
+   int intDef = 0;
+   unsigned int uintDef = 0;
+   float floatDef = 0.0f;
+   AtPoint2 pnt2Def = {0.0f, 0.0f};
+   AtPoint pntDef = {0.0f, 0.0f, 0.0f};
+   AtVector vecDef = {0.0f, 0.0f, 0.0f};
+   AtColor rgbDef = {0.0f, 0.0f, 0.0f};
+   AtRGBA rgbaDef = {0.0f, 0.0f, 0.0f, 1.0f};
+   AtMatrix matrixDef;
+   const char *strDef = 0;
+   
+   AiM4Identity(matrixDef);
+   
+   std::set<std::string>::iterator it = ua.strings.insert("").first;
+   strDef = it->c_str();
+   
+   size_t oldBytesize = (ua.data ? ua.dataCount : 0) * ua.dataDim;
+   size_t newBytesize = newSize * ua.dataDim;
+   size_t podSize = 0;
+   void *defaultValue = 0;
+   
+   switch (ua.arnoldType)
+   {
+   case AI_TYPE_BOOLEAN:
+      podSize = sizeof(bool);
+      defaultValue = &boolDef;
+      break;
+   case AI_TYPE_BYTE:
+      podSize = sizeof(AtByte);
+      defaultValue = &byteDef;
+      break;
+   case AI_TYPE_INT:
+      defaultValue = &intDef;
+      podSize = sizeof(int);
+      break;
+   case AI_TYPE_UINT:
+      defaultValue = &uintDef;
+      podSize = sizeof(unsigned int);
+      break;
+   case AI_TYPE_FLOAT:
+      defaultValue = &floatDef;
+      podSize = sizeof(float);
+      break;
+   case AI_TYPE_POINT2:
+      defaultValue = &(pnt2Def.x);
+      podSize = sizeof(float);
+      break;
+   case AI_TYPE_POINT:
+      defaultValue = &(pntDef.x);
+      podSize = sizeof(float);
+      break;
+   case AI_TYPE_VECTOR:
+      defaultValue = &(vecDef.x);
+      podSize = sizeof(float);
+      break;
+   case AI_TYPE_RGB:
+      defaultValue = &(rgbDef.r);
+      podSize = sizeof(float);
+      break;
+   case AI_TYPE_RGBA:
+      defaultValue = &(rgbaDef.r);
+      podSize = sizeof(float);
+      break;
+   case AI_TYPE_MATRIX:
+      defaultValue = &(matrixDef[0][0]);
+      podSize = sizeof(float);
+      break;
+   case AI_TYPE_STRING:
+      defaultValue = &strDef;
+      podSize = sizeof(const char*);
+      break;
+   default:
+      break;
+   }
+   
+   oldBytesize *= podSize;
+   newBytesize *= podSize;
+   
+   if (newBytesize == 0)
+   {
+      if (ua.data)
+      {
+         AiFree(ua.data);
+         ua.data = 0;
+         ua.dataCount = 0;
+      }
+   }
+   else
+   {
+      size_t copySize = (oldBytesize > newBytesize ? newBytesize : oldBytesize);
+      size_t resetSize = (newBytesize > oldBytesize ? (newBytesize - oldBytesize) : 0);
+      
+      unsigned char *oldBytes = (unsigned char*) ua.data;
+      unsigned char *newBytes = (unsigned char*) AiMalloc(newBytesize);
+      
+      if (oldBytes)
+      {
+         memcpy(newBytes, oldBytes, copySize);
+         AiFree(oldBytes);
+      }
+      
+      unsigned char *newElem = newBytes + oldBytesize;
+      size_t elemSize = ua.dataDim * podSize;
+      
+      for (size_t i=0; i<resetSize; ++i, newElem += elemSize)
+      {
+         memcpy(newElem, defaultValue, elemSize);
+      }
+      
+      ua.data = newBytes;
+      ua.dataCount = newSize;
+   }
+   
+   return true;
+}
+
+bool CopyUserAttribute(UserAttribute &src, unsigned int srcIdx, unsigned int count,
+                       UserAttribute &dst, unsigned int dstIdx)
+{
+   if (src.arnoldType != dst.arnoldType ||
+       src.dataDim != dst.dataDim ||
+       src.indicesCount > 0 ||
+       dst.indicesCount > 0 ||
+       src.data == 0 ||
+       dst.data == 0 ||
+       srcIdx >= src.dataCount ||
+       dstIdx >= dst.dataCount ||
+       srcIdx + count > src.dataCount ||
+       dstIdx + count > dst.dataCount)
+   {
+      return false;
+   }
+   
+   size_t podSize = 0;
+   
+   switch (src.arnoldType)
+   {
+   case AI_TYPE_BOOLEAN:
+      podSize = sizeof(bool);
+      break;
+   case AI_TYPE_BYTE:
+      podSize = sizeof(AtByte);
+      break;
+   case AI_TYPE_INT:
+      podSize = sizeof(int);
+      break;
+   case AI_TYPE_UINT:
+      podSize = sizeof(unsigned int);
+      break;
+   case AI_TYPE_FLOAT:
+   case AI_TYPE_POINT2:
+   case AI_TYPE_POINT:
+   case AI_TYPE_VECTOR:
+   case AI_TYPE_RGB:
+   case AI_TYPE_RGBA:
+   case AI_TYPE_MATRIX:
+      podSize = sizeof(float);
+      break;
+   case AI_TYPE_STRING:
+      podSize = sizeof(const char*);
+      break;
+   default:
+      break;
+   }
+   
+   if (podSize == 0)
+   {
+      return false;
+   }
+   
+   if (src.arnoldType == AI_TYPE_STRING)
+   {
+      const char** srcStrs = ((const char**) src.data) + (srcIdx * src.dataDim);
+      const char** dstStrs = ((const char**) dst.data) + (dstIdx * src.dataDim);
+      
+      for (unsigned int i=0; i<count; ++i, ++srcStrs, ++dstStrs)
+      {
+         *dstStrs = dst.strings.insert(*srcStrs).first->c_str();
+      }
+   }
+   else
+   {
+      size_t elemSize = src.dataDim * podSize;
+      
+      unsigned char *srcBytes = ((unsigned char*) src.data) + srcIdx * elemSize;
+      unsigned char *dstBytes = ((unsigned char*) src.data) + dstIdx * elemSize;
+      
+      for (unsigned int i=0; i<count; ++i, srcBytes += elemSize, dstBytes += elemSize)
+      {
+         memcpy(dstBytes, srcBytes, elemSize);
+      }
+   }
+   
+   return true;
 }
 
 void DestroyUserAttribute(UserAttribute &attrib)
@@ -51,8 +263,7 @@ struct TypeHelper
 {
    static inline void Alloc(UserAttribute &ua)
    {
-      size_t count = (ua.dataCount == 0 ? 1 : ua.dataCount) * ua.dataDim;
-      ua.data = AiMalloc(count * sizeof(DstT));
+      ua.data = AiMalloc(ua.dataCount * ua.dataDim * sizeof(DstT));
    }
    
    static inline DstT Convert(UserAttribute &, const SrcT &v)
@@ -71,8 +282,7 @@ struct TypeHelper<T, T>
 {
    static inline void Alloc(UserAttribute &ua)
    {
-      size_t count = (ua.dataCount == 0 ? 1 : ua.dataCount) * ua.dataDim;
-      ua.data = AiMalloc(count * sizeof(T));
+      ua.data = AiMalloc(ua.dataCount * ua.dataDim * sizeof(T));
    }
    
    static inline T Convert(UserAttribute &, const T &v)
@@ -91,8 +301,7 @@ struct TypeHelper<SrcT, bool>
 {
    static inline void Alloc(UserAttribute &ua)
    {
-      size_t count = (ua.dataCount == 0 ? 1 : ua.dataCount) * ua.dataDim;
-      ua.data = AiMalloc(count * sizeof(bool));
+      ua.data = AiMalloc(ua.dataCount * ua.dataDim * sizeof(bool));
    }
    
    static inline bool Convert(UserAttribute &, const SrcT &v)
@@ -111,8 +320,7 @@ struct TypeHelper<Alembic::Util::bool_t, bool>
 {
    static inline void Alloc(UserAttribute &ua)
    {
-      size_t count = (ua.dataCount == 0 ? 1 : ua.dataCount) * ua.dataDim;
-      ua.data = AiMalloc(count * sizeof(bool));
+      ua.data = AiMalloc(ua.dataCount * ua.dataDim * sizeof(bool));
    }
    
    static inline bool Convert(UserAttribute &, const Alembic::Util::bool_t &v)
@@ -131,8 +339,7 @@ struct TypeHelper<std::string, const char*>
 {
    static inline void Alloc(UserAttribute &ua)
    {
-      size_t count = (ua.dataCount == 0 ? 1 : ua.dataCount) * ua.dataDim;
-      ua.data = AiMalloc(count * sizeof(const char*));
+      ua.data = AiMalloc(ua.dataCount * ua.dataDim * sizeof(const char*));
    }
    
    static inline const char* Convert(UserAttribute &ua, const std::string &v)
@@ -223,7 +430,10 @@ bool ReadScalarProperty(ScalarProperty prop, UserAttribute &ua, double t, bool i
       return false;
    }
    
-   ua.dataCount = 0;
+   ua.arnoldCategory = AI_USERDEF_CONSTANT;
+   ua.dataCount = 1;
+   ua.isArray = false;
+   
    TypeHelper<SrcT, DstT>::Alloc(ua);
    
    output = (DstT*) ua.data;
@@ -273,18 +483,19 @@ bool ReadArrayProperty(ArrayProperty prop, UserAttribute &ua, double t, bool int
    }
    
    // Note: Array may be used as scalar, in that case declare a scalar in arnold
-   unsigned int count = 0;
+   
+   ua.arnoldCategory = AI_USERDEF_CONSTANT;
    
    if (prop.isScalarLike())
    {
       // assert samp0->data()->size() == 1
-      count = 1;
-      ua.dataCount = 0;
+      ua.isArray = false;
+      ua.dataCount = 1;
    }
    else
    {
-      count = samp0->data()->size();
-      ua.dataCount = count;
+      ua.isArray = true;
+      ua.dataCount = samp0->data()->size();
    }
    
    TypeHelper<SrcT, DstT>::Alloc(ua);
@@ -293,14 +504,14 @@ bool ReadArrayProperty(ArrayProperty prop, UserAttribute &ua, double t, bool int
    
    vals0 = (const SrcT *) samp0->data()->getData();
    
-   if (blend > 0.0 && interpolate && count != samp1->data()->size())
+   if (blend > 0.0 && interpolate && ua.dataCount != samp1->data()->size())
    {
       vals1 = (const SrcT *) samp1->data()->getData();
       
       double a = 1.0 - blend;
       double b = blend;
       
-      for (unsigned int i=0, k=0; i<count; ++i)
+      for (unsigned int i=0, k=0; i<ua.dataCount; ++i)
       {
          for (unsigned int j=0; j<ua.dataDim; ++j, ++k)
          {
@@ -310,7 +521,7 @@ bool ReadArrayProperty(ArrayProperty prop, UserAttribute &ua, double t, bool int
    }
    else
    {
-      for (unsigned int i=0, k=0; i<count; ++i)
+      for (unsigned int i=0, k=0; i<ua.dataCount; ++i)
       {
          for (unsigned int j=0; j<ua.dataDim; ++j, ++k)
          {
@@ -341,7 +552,26 @@ bool ReadGeomParam(GeomParam param, UserAttribute &ua, double t, bool interpolat
       return false;
    }
    
+   switch (param.getScope())
+   {
+   case Alembic::AbcGeom::kFacevaryingScope:
+      ua.arnoldCategory = AI_USERDEF_INDEXED;
+      break;
+   case Alembic::AbcGeom::kVertexScope:
+   case Alembic::AbcGeom::kVaryingScope:
+      ua.arnoldCategory = AI_USERDEF_VARYING;
+      break;
+   case Alembic::AbcGeom::kUniformScope:
+      ua.arnoldCategory = AI_USERDEF_UNIFORM;
+      break;
+   default:
+      ua.arnoldCategory = AI_USERDEF_CONSTANT;
+      break;
+   }
+   
    ua.dataCount = (unsigned int) samp0->data().getVals()->size();
+   ua.isArray = (ua.arnoldCategory != AI_USERDEF_CONSTANT ? true : ua.dataCount > 1);
+   
    TypeHelper<SrcT, DstT>::Alloc(ua);
    
    output = (DstT*) ua.data;
@@ -374,14 +604,22 @@ bool ReadGeomParam(GeomParam param, UserAttribute &ua, double t, bool interpolat
       }
    }
    
+   // SampleUtils only uses getIndexed with kFacevaryingScope geom param
+   
    Alembic::Abc::UInt32ArraySamplePtr idxs = samp0->data().getIndices();
    
    if (idxs)
    {
-      // SampleUtils only uses getIndexed with kFacevaryingScope geom param
       if (param.getScope() != Alembic::AbcGeom::kFacevaryingScope)
       {
-         AiMsgWarning("[abcproc] Found non facevarying geo param using indices \"%s\"", param.getName().c_str());
+         AiMsgWarning("[abcproc] Ignore non facevarying geo param using indices \"%s\"", param.getName().c_str());
+         
+         AiFree(ua.data);
+         ua.data = 0;
+         ua.dataCount = 0;
+         ua.isArray = false;
+         
+         return false;
       }
       
       ua.indicesCount = idxs->size();
@@ -419,11 +657,6 @@ bool _ReadUserAttribute(UserAttribute &ua,
    }
    else
    {
-      if (ua.arnoldCategory != AI_USERDEF_CONSTANT)
-      {
-         return false;
-      }
-      
       if (header.isScalar())
       {
          Alembic::Abc::ITypedScalarProperty<Traits> prop(parent, header.getName());
@@ -731,6 +964,12 @@ template <>
 void _NodeSet<AI_TYPE_INT, int>(AtNode *node, const char *name, int *vals)
 {
    AiNodeSetInt(node, name, vals[0]);
+}
+
+template <>
+void _NodeSet<AI_TYPE_INT, unsigned int>(AtNode *node, const char *name, unsigned int *vals)
+{
+   AiNodeSetUInt(node, name, vals[0]);
 }
 
 template <>
@@ -1107,7 +1346,8 @@ void _SetUserAttribute(AtNode *node, const std::string &valName, const std::stri
 {
    T *vals = (T*) ua.data;
    
-   if (ua.dataCount >= 1 || ua.indices)
+   //if (ua.dataCount >= 1 || ua.indices)
+   if (ua.arnoldCategory != AI_USERDEF_CONSTANT || ua.isArray)
    {
       if (idxName.length() > 0)
       {
@@ -1121,7 +1361,7 @@ void _SetUserAttribute(AtNode *node, const std::string &valName, const std::stri
          
          if (!ua.indices)
          {
-            // geom param was fully expanded
+            // geom param was fully expanded, build indices
             
             ua.indicesCount = ua.dataCount;
             ua.indices = (unsigned int*) AiMalloc(ua.indicesCount * sizeof(unsigned int));
@@ -1166,8 +1406,8 @@ void _SetUserAttribute(AtNode *node, const std::string &valName, const std::stri
          {
             // Non facevarying attribute with indices
             // This should not happen in theory as SampleUtils only query indices for kFacevaryingScope
-            // Do no apply remapping in this case!
-            AiMsgWarning("[abcproc] Setting non facevarying attribute from indexed values");
+            // (Do no apply remapping in this case)
+            AiMsgWarning("[abcproc] Setting non facevarying attribute with indexed values");
             
             AtArray *valAry = AiArrayAllocate(ua.indicesCount, 1, ArnoldType);
             
@@ -1200,7 +1440,7 @@ void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigne
    if (ua.arnoldCategory == AI_USERDEF_CONSTANT)
    {
       decl += "constant ";
-      if (ua.dataCount >= 1)
+      if (ua.isArray)
       {
          decl += "ARRAY ";
       }
@@ -1236,7 +1476,7 @@ void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigne
          
          if (type != ua.arnoldType ||
              AiUserParamGetCategory(upe) != ua.arnoldCategory,
-             (ua.dataDim >= 1 || ua.indices) != isArray)
+             ua.isArray != isArray)
          {
             // Attribute spec mismatch
             return;
