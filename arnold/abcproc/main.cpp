@@ -159,7 +159,15 @@ int ProcCleanup(void *user_ptr)
 
 // ---
 
-#ifndef _WIN32
+#include <H5pubconf.h>
+
+#ifdef H5_HAVE_THREADSAFE
+
+#ifdef _WIN32
+
+// ToDo
+
+#else
 
 #include <pthread.h>
 
@@ -179,6 +187,8 @@ static int __attribute__((destructor)) on_dlclose(void)
    
    return 0;
 }
+
+#endif
 
 #endif
 
