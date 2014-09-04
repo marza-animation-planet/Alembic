@@ -159,6 +159,29 @@ int ProcCleanup(void *user_ptr)
 
 // ---
 
+#ifndef _WIN32
+
+#include <pthread.h>
+
+static int __attribute__((destructor)) on_dlclose(void)
+{
+   // Hack around thread termination segfault
+   // -> alembic procedural is unloaded before thread finishes
+   //    resulting on HDF5 keys to leak
+   
+   extern pthread_key_t H5TS_errstk_key_g;
+   extern pthread_key_t H5TS_funcstk_key_g;
+   extern pthread_key_t H5TS_cancel_key_g;
+   
+   pthread_key_delete(H5TS_cancel_key_g);
+   pthread_key_delete(H5TS_funcstk_key_g);
+   pthread_key_delete(H5TS_errstk_key_g);
+   
+   return 0;
+}
+
+#endif
+
 proc_loader
 {
    vtable->Init     = ProcInit;
