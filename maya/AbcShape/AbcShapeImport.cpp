@@ -194,6 +194,7 @@ private:
    
    bool hasDag(const std::string &path) const;
    bool addDag(const std::string &path, const MDagPath &dag);
+   bool checkExistingDag(const char *dagType, AlembicNode *node);
    bool createDag(const char *dagType, AlembicNode *node);
    
    template <class T>
@@ -271,7 +272,7 @@ private:
    double mOffset;
    bool mPreserveStartFrame;
    AbcShape::CycleType mCycleType;
-   std::map<std::string, MDagPath> mCreatedDags;
+   std::map<std::string, MDagPath> mDags;
    Keyframer mKeyframer;
 };
 
@@ -294,14 +295,14 @@ CreateTree::CreateTree(const std::string &abcPath,
 
 bool CreateTree::hasDag(const std::string &path) const
 {
-   return (mCreatedDags.find(path) != mCreatedDags.end());
+   return (mDags.find(path) != mDags.end());
 }
 
 const MDagPath& CreateTree::getDag(const std::string &path) const
 {
    static MDagPath sInvalidDag;
-   std::map<std::string, MDagPath>::const_iterator it = mCreatedDags.find(path);
-   return (it != mCreatedDags.end() ? it->second : sInvalidDag);
+   std::map<std::string, MDagPath>::const_iterator it = mDags.find(path);
+   return (it != mDags.end() ? it->second : sInvalidDag);
 }
 
 bool CreateTree::addDag(const std::string &path, const MDagPath &dag)
@@ -311,9 +312,73 @@ bool CreateTree::addDag(const std::string &path, const MDagPath &dag)
       return false;
    }
    
-   mCreatedDags[path] = dag;
+   mDags[path] = dag;
    
    return true;
+}
+
+bool CreateTree::checkExistingDag(const char *dagType, AlembicNode *node)
+{
+   if (!dagType || !node)
+   {
+      return false;
+   }
+   else if (!hasDag(node->path()))
+   {
+      MString curNs = MNamespace::currentNamespace();
+      MSelectionList sl;
+      MDagPath dagPath;
+      
+      std::string tmp = node->path();
+      
+      size_t p0 = 0;
+      size_t p1 = tmp.find('/');
+      while (p1 != std::string::npos)
+      {
+         tmp[p1] = '|';
+         p0 = p1 + 1;
+         p1 = tmp.find('/', p0);
+      }
+      
+      if (curNs != "" && curNs != ":")
+      {
+         std::string ns = curNs.asChar();
+         
+         if (ns[ns.length()-1] != ':')
+         {
+            ns += ":";
+         }
+         
+         p0 = 0;
+         p1 = tmp.find('|');
+         while (p1 != std::string::npos)
+         {
+            tmp.insert(p1+1, ns);
+            p0 = p1 + 1 + ns.length();
+            p1 = tmp.find('|', p0);
+         }
+      }
+      
+      if (sl.add(tmp.c_str()) == MS::kSuccess && sl.getDagPath(0, dagPath) == MS::kSuccess)
+      {
+         MFnDagNode dagNode(dagPath);
+         
+         // Check type
+         if (dagNode.typeName () == dagType)
+         {
+            MGlobal::displayInfo("[" + MString(PREFIX_NAME("AbcShapeImport")) + "] Re-use existing DAG \"" + dagPath.fullPathName() + "\"");
+            
+            mDags[node->path()] = dagPath;
+            return true;
+         }
+      }
+      
+      return false;
+   }
+   else
+   {
+      return true;
+   }
 }
 
 bool CreateTree::createDag(const char *dagType, AlembicNode *node)
@@ -366,6 +431,11 @@ template <class T>
 AlembicNode::VisitReturn CreateTree::enterShape(AlembicNodeT<T> &node, AlembicNode *instance)
 {
    AlembicNode *target = (instance ? instance : &node);
+   
+   if (checkExistingDag(PREFIX_NAME("AbcShape"), target))
+   {
+      return AlembicNode::ContinueVisit;
+   }
    
    if (!createDag(PREFIX_NAME("AbcShape"), target))
    {
@@ -439,6 +509,11 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicNuPatch &node, AlembicNode *in
 AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *instance)
 {
    AlembicNode *target = (instance ? instance : &node);
+   
+   if (checkExistingDag(node.isLocator() ? "locator" : "transform", target))
+   {
+      return AlembicNode::ContinueVisit;
+   }
    
    if (node.isLocator())
    {

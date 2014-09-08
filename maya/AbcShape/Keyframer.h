@@ -93,7 +93,7 @@ private:
 private:
  
    CurveEntry& getOrCreateEntry(const MFnDependencyNode &node, const MString &attrName, MFnAnimCurve::AnimCurveType type);
-   void cleanupCurve(CurveEntry &e, std::vector<unsigned int> &tempIndices, double threshold=0);
+   void cleanupCurve(CurveEntry &e, std::vector<unsigned int> &tempIndices, double threshold=0.000001);
 
 private:
  

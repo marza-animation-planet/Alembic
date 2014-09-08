@@ -447,7 +447,7 @@ void Keyframer::createCurves(MFnAnimCurve::InfinityType preInf,
 {
    MStatus stat;
    std::vector<unsigned int> tempIndices;
-   double threshold = 0.0;
+   double threshold = 0.000001;
    
    CurveIterator it = mCurves.begin();
   
