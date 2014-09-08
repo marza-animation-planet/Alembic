@@ -304,6 +304,8 @@ public:
 
 private:
    
+   std::string getReferencePath(const std::string &basePath) const;
+   
    void strip(std::string &s) const;
    void toLower(std::string &s) const;
    bool isFlag(std::string &s) const;

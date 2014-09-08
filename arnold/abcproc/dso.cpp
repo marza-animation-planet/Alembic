@@ -2,6 +2,7 @@
 #include "visitors.h"
 #include "globallock.h"
 #include <sstream>
+#include <fstream>
 
 const char* CycleTypeNames[] =
 {
@@ -367,6 +368,12 @@ Dso::Dso(AtNode *node)
    // Check frame and get from options node if needed? ('frame' user attribute)
    
    normalizeFilePath(mCommonParams.filePath);
+   if (mCommonParams.referenceFilePath.length() == 0)
+   {
+      // look if we have a .ref file alongside the abc file path
+      // this file if it exists, should contain the path to the 'reference' alembic file
+      mCommonParams.referenceFilePath = getReferencePath(mCommonParams.filePath);
+   }
    normalizeFilePath(mCommonParams.referenceFilePath);
    
    mReverseWinding = AiNodeGetBool(AiUniverseGetOptions(), "CCW_points");
@@ -674,6 +681,42 @@ Dso::~Dso()
    {
       AlembicSceneCache::Unref(mRefScene);
    }
+}
+
+std::string Dso::getReferencePath(const std::string &basePath) const
+{
+   std::string dotRefPath;
+   std::string refPath;
+  
+   size_t p0 = basePath.find_last_of("\\/");
+  
+   size_t p1 = basePath.rfind('.');
+   if (p1 == std::string::npos || (p0 != std::string::npos && p0 > p1))
+   {
+      dotRefPath = basePath + ".ref";
+   }
+   else
+   {
+      dotRefPath = basePath.substr(0, p1) + ".ref";
+   }
+   
+   std::ifstream dotRefFile(dotRefPath.c_str());
+   
+   if (dotRefFile.is_open())
+   {
+      std::getline(dotRefFile, refPath);
+      
+      if (!dotRefFile.fail())
+      {
+         if (verbose())
+         {
+            AiMsgInfo("[abcproc] Got reference path from .ref file: %s", refPath.c_str());
+         }
+         return refPath;
+      }
+   }
+   
+   return "";
 }
 
 std::string Dso::dataString(const char *targetShape) const
