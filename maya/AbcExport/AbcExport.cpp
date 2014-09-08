@@ -403,7 +403,7 @@ try
                 jobArgs.writeVisibility = true;
             }
             
-            else if (arg == "-wi" || arg == "-writeInstances")
+            else if (arg == "-wi" || arg == "-writeinstances")
             {
                 jobArgs.writeInstances = true;
             }
