@@ -67,6 +67,7 @@
 #include <maya/MItSelectionList.h>
 #include <maya/MItDependencyGraph.h>
 #include <maya/MFnParticleSystem.h>
+#include <maya/MNamespace.h>
 
 #include <map>
 #include <set>
@@ -370,6 +371,24 @@ CreateSceneVisitor::CreateSceneVisitor(double iFrame,
         iExcludeFilterString != MString("*"))
     {
         iExcludeFilterString.split(' ', mExceptPatterns);
+    }
+    
+    MString curNs = MNamespace::currentNamespace();
+    if (curNs != "" && curNs != ":")
+    {
+        mNamespace = curNs.asChar();
+        if (mNamespace[mNamespace.length()-1] != ':')
+        {
+            mNamespace += ":";
+        }
+        if (mNamespace[0] == ':')
+        {
+            mNamespace = mNamespace.substr(1);
+        }
+    }
+    else
+    {
+        mNamespace = "";
     }
 }
 
@@ -789,7 +808,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ICamera & iNode)
     bool hasDag = false;
     if (mAction != NONE && mConnectDagNode.isValid())
     {
-        hasDag = getDagPathByChildName(mConnectDagNode, iNode.getName());
+        hasDag = getDagPathByChildName(mConnectDagNode, mNamespace + iNode.getName());
         if (hasDag)
         {
             cameraObj = mConnectDagNode.node();
@@ -888,7 +907,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ICurves & iNode)
     bool hasDag = false;
     if (mAction != NONE && mConnectDagNode.isValid())
     {
-        hasDag = getDagPathByChildName(mConnectDagNode, iNode.getName());
+        hasDag = getDagPathByChildName(mConnectDagNode, mNamespace + iNode.getName());
         if (hasDag)
         {
             curvesObj = mConnectDagNode.node();
@@ -1002,7 +1021,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPoints& iNode)
     bool hasDag = false;
     if (mAction != NONE && mConnectDagNode.isValid())
     {
-        hasDag = getDagPathByChildName(mConnectDagNode, iNode.getName());
+        hasDag = getDagPathByChildName(mConnectDagNode, mNamespace + iNode.getName());
         if (hasDag)
         {
             particleObj = mConnectDagNode.node();
@@ -1100,7 +1119,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ISubD& iNode)
     bool hasDag = false;
     if (mAction != NONE && mConnectDagNode.isValid())
     {
-        hasDag = getDagPathByChildName(mConnectDagNode, iNode.getName());
+        hasDag = getDagPathByChildName(mConnectDagNode, mNamespace + iNode.getName());
         if (hasDag)
         {
             subDObj = mConnectDagNode.node();
@@ -1202,7 +1221,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPolyMesh& iNode)
     bool hasDag = false;
     if (mAction != NONE && mConnectDagNode.isValid())
     {
-        hasDag = getDagPathByChildName(mConnectDagNode, iNode.getName());
+        hasDag = getDagPathByChildName(mConnectDagNode, mNamespace + iNode.getName());
         if (hasDag)
         {
             polyObj = mConnectDagNode.node();
@@ -1293,7 +1312,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::INuPatch& iNode)
     bool hasDag = false;
     if (mAction != NONE && mConnectDagNode.isValid())
     {
-        hasDag = getDagPathByChildName(mConnectDagNode, iNode.getName());
+        hasDag = getDagPathByChildName(mConnectDagNode, mNamespace + iNode.getName());
         if (hasDag)
         {
             nurbsObj = mConnectDagNode.node();
@@ -1391,7 +1410,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IXform & iNode,
             if (mAction != NONE && mConnectDagNode.isValid())
             {
                 hasDag = getDagPathByChildName(mConnectDagNode,
-                    iNode.getName());
+                    mNamespace + iNode.getName());
                 if (hasDag)
                 {
                     xformObj = mConnectDagNode.node();
@@ -1467,7 +1486,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IXform & iNode,
         bool hasDag = false;
         if (mAction != NONE && mConnectDagNode.isValid())
         {
-            hasDag = getDagPathByChildName(mConnectDagNode, iNode.getName());
+            hasDag = getDagPathByChildName(mConnectDagNode, mNamespace + iNode.getName());
             if (hasDag)
             {
                 xformObj = mConnectDagNode.node();
@@ -1662,7 +1681,7 @@ MStatus CreateSceneVisitor::createEmptyObject(AlembicObjectPtr iNodeObject)
 
     if (mAction != NONE && mConnectDagNode.isValid())
     {
-        hasDag = getDagPathByChildName(mConnectDagNode, iNode.getName());
+        hasDag = getDagPathByChildName(mConnectDagNode, mNamespace + iNode.getName());
         if (hasDag)
         {
             xformObj = mConnectDagNode.node();

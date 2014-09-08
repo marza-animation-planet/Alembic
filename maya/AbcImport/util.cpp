@@ -310,7 +310,7 @@ bool getDagPathByChildName(MDagPath & ioDagPath, const std::string & iChildName)
     {
         MObject child = ioDagPath.child(i);
         MFnDagNode dagChild(child);
-        std::string name = dagChild.partialPathName().asChar();
+        std::string name = dagChild.name().asChar();
         if (name == iChildName)
         {
             ioDagPath.push(child);

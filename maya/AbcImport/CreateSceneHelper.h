@@ -186,6 +186,8 @@ private:
     std::map<std::string, MObject> mImportedObjects;
     std::map<std::string, std::vector<MDagPath> > mPendingInstances;
     
+    std::string mNamespace;
+    
 };  // class CreateSceneVisitor
 
 
