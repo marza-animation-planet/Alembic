@@ -763,6 +763,7 @@ private:
             if (indexIt != end)
             {
                it0 = ConstIterator(indexIt);
+               it1 = ConstIterator(end);
                
                if (t - indexIt->second->time() > 0.0001)
                {
@@ -802,77 +803,47 @@ private:
       
       for (indexIt = beg; indexIt != end; ++indexIt)
       {
-         if (t < indexIt->second->time())
+         if (fabs(t - indexIt->second->time()) <= 0.0001)
          {
-            if (indexIt == beg)
+            // Found matching sample
+            if (which == -2)
             {
-               if (which >= 0)
-               {
-                  return end;
-               }
+               // We want the previous sample
+               return (indexIt == beg ? end : --indexIt);
+            }
+            else if (which == 2)
+            {
+               // We want the next sample
+               return ++indexIt;
             }
             else
             {
-               IteratorType prevIt = indexIt;
-               --prevIt;
-               
-               if (t - prevIt->second->time() <= 0.0001)
-               {
-                  // found exact sample
-                  if (which == -2)
-                  {
-                     if (prevIt == beg)
-                     {
-                        return end;
-                     }
-                     else
-                     {
-                        indexIt = prevIt;
-                        --indexIt;
-                     }
-                  }
-                  else if (which != 2)
-                  {
-                     // query includes exact sample
-                     indexIt = prevIt;
-                  }
-               }
-               else
-               {
-                  // t doesn't match any real sample
-                  if (which == 0)
-                  {
-                     return end;
-                  }
-                  else if (which < 0)
-                  {
-                     indexIt = prevIt;
-                  }
-               }
+               return indexIt;
             }
+         }
+         else if (indexIt->second->time() > t)
+         {
+            // indexIt->second->time() > t
+            // => if we have a previous sample we know its time is not t
             
-            break;
+            if (which >= 1)
+            {
+               return indexIt;
+            }
+            else if (which <= -1)
+            {
+               return (indexIt == beg ? end : --indexIt);
+            }
+            else
+            {
+               // we wanted the 'exact' sample
+               return end;
+            }
          }
          else
          {
-            if (t - indexIt->second->time() <= 0.0001)
-            {
-               if (which == -2)
-               {
-                  if (indexIt == beg)
-                  {
-                     return end;
-                  }
-                  --indexIt;
-               }
-               else if (which == 2)
-               {
-                  ++indexIt;
-                  return indexIt;
-               }
-               
-               break;
-            }
+            // indexIt->second->time() < t
+            // just continue to next sample
          }
       }
       
