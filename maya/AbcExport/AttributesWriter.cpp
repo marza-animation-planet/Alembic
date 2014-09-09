@@ -36,6 +36,7 @@
 
 #include "AttributesWriter.h"
 #include "MayaUtility.h"
+#include <maya/MFnParticleSystem.h>
 
 namespace Abc = Alembic::Abc;
 namespace AbcGeom = Alembic::AbcGeom;
@@ -2036,6 +2037,16 @@ AttributesWriter::AttributesWriter(
     const JobArgs & iArgs)
 {
     PlugAndObjScalar visPlug;
+    
+    MFnParticleSystem psys;
+    MObject iObject = iNode.object();
+    bool particles = false;
+    
+    if (iObject.hasFn(MFn::kParticle))
+    {
+        psys.setObject(iObject);
+        particles = true;
+    }
 
     unsigned int attrCount = iNode.attributeCount();
     unsigned int i;
@@ -2078,13 +2089,28 @@ AttributesWriter::AttributesWriter(
             continue;
 
         int sampType = util::getSampledType(plug);
-
+        
         MPlug scopePlug = iNode.findPlug(propName + cAttrScope);
         AbcGeom::GeometryScope scope = AbcGeom::kUnknownScope;
 
         if (!scopePlug.isNull())
         {
             scope = strToScope(scopePlug.asString());
+        }
+        else if (particles)
+        {
+            if (psys.isPerParticleIntAttribute(propName) ||
+                psys.isPerParticleDoubleAttribute(propName) ||
+                psys.isPerParticleVectorAttribute(propName))
+            {
+                scope = AbcGeom::kVaryingScope;
+            }
+        }
+
+        if (particles && scope == AbcGeom::kVaryingScope)
+        {
+            // for sampled type for per-particle attributes
+            sampType = 1;
         }
 
         MString typeStr;
