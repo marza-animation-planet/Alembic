@@ -769,6 +769,7 @@ bool ReadUserAttribute(UserAttribute &ua,
          }
          else
          {
+            AiMsgWarning("[abcproc] Unhandled interpretation \"%s\" for Float16[3] data", interp.c_str());
             return false;
          }
       case 4:
@@ -780,9 +781,11 @@ bool ReadUserAttribute(UserAttribute &ua,
          }
          else
          {
+            AiMsgWarning("[abcproc] Unhandled interpretation \"%s\" for Float16[4] data", interp.c_str());
             return false;
          }
       default:
+         AiMsgWarning("[abcproc] Unhandled dimension %u for Float16 POD data", ua.dataDim);
          return false;
       }
    
@@ -810,6 +813,7 @@ bool ReadUserAttribute(UserAttribute &ua,
          }
          else
          {
+            AiMsgWarning("[abcproc] Unhandled interpretation \"%s\" for Float32[2] data", interp.c_str());
             return false;
          }
       case 3:
@@ -833,12 +837,13 @@ bool ReadUserAttribute(UserAttribute &ua,
             {
                return _ReadUserAttribute<Alembic::Abc::N3fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
             }
-            else if (interp.find("vector"))
+            else if (interp.find("vector") != std::string::npos)
             {
                return _ReadUserAttribute<Alembic::Abc::V3fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
             }
             else
             {
+               AiMsgWarning("[abcproc] Unhandled interpretation \"%s\" for Float32[3] data", interp.c_str());
                return false;
             }
          }
@@ -851,6 +856,7 @@ bool ReadUserAttribute(UserAttribute &ua,
          }
          else
          {
+            AiMsgWarning("[abcproc] Unhandled interpretation \"%s\" for Float32[4] data", interp.c_str());
             return false;
          }
       case 16:
@@ -858,6 +864,7 @@ bool ReadUserAttribute(UserAttribute &ua,
          ua.arnoldTypeStr = "MATRIX";
          return _ReadUserAttribute<Alembic::Abc::M44fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
       default:
+         AiMsgWarning("[abcproc] Unhandled dimension %u for Float32 POD data", ua.dataDim);
          return false;
       }
    
@@ -885,6 +892,7 @@ bool ReadUserAttribute(UserAttribute &ua,
          }
          else
          {
+            AiMsgWarning("[abcproc] Unhandled interpretation \"%s\" for Float64[2] data", interp.c_str());
             return false;
          }
       case 3:
@@ -903,24 +911,25 @@ bool ReadUserAttribute(UserAttribute &ua,
             {
                return _ReadUserAttribute<Alembic::Abc::N3dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
             }
-            else if (interp.find("vector"))
+            else if (interp.find("vector") != std::string::npos)
             {
                return _ReadUserAttribute<Alembic::Abc::V3dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
             }
             else
             {
+               AiMsgWarning("[abcproc] Unhandled interpretation \"%s\" for Float64[3] data", interp.c_str());
                return false;
             }
          }
-      case 4:
-         // QuatdTPTraits no supported
-         // no C4dTPTraits
-         return false;
       case 16:
          ua.arnoldType = AI_TYPE_MATRIX;
          ua.arnoldTypeStr = "MATRIX";
          return _ReadUserAttribute<Alembic::Abc::M44dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
+      case 4:
+         // QuatdTPTraits no supported
+         // no C4dTPTraits
       default:
+         AiMsgWarning("[abcproc] Unhandled dimension %u for Float64 POD data", ua.dataDim);
          return false;
       }
    
@@ -931,6 +940,7 @@ bool ReadUserAttribute(UserAttribute &ua,
       return _ReadUserAttribute<Alembic::Abc::StringTPTraits, std::string, const char*>(ua, parent, header, t, geoparam, interpolate);
    
    default:
+      AiMsgWarning("[abcproc] Unhandled POD type");
       return false;
    }
 }

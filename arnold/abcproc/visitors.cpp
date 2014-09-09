@@ -1648,6 +1648,9 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
       node.sampleSchema(t, t, i > 0);
    }
    
+   // renderTime() may not be in the sample list, let's at it just in case
+   node.sampleSchema(mDso->renderTime(), mDso->renderTime(), false);
+   
    if (mDso->verbose())
    {
       AiMsgInfo("[abcproc] Read %lu points samples", samples.size());
@@ -2131,6 +2134,12 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
       AiArraySetFlt(radius, 0, mDso->radiusMin());
       
       AiNodeSetArray(mNode, "radius", radius);
+   }
+   
+   // Note: arnold want particle point attributes as uniform attributes, not varying
+   for (UserAttributes::iterator it = info.pointAttrs.begin(); it != info.pointAttrs.end(); ++it)
+   {
+      it->second.arnoldCategory = AI_USERDEF_UNIFORM;
    }
    
    SetUserAttributes(mNode, info.objectAttrs);
