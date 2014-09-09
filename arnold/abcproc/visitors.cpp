@@ -44,9 +44,9 @@ AlembicNode::VisitReturn GetTimeRange::enter(AlembicSubD &node, AlembicNode *)
    return AlembicNode::ContinueVisit;
 }
 
-AlembicNode::VisitReturn GetTimeRange::enter(AlembicPoints &, AlembicNode *)
+AlembicNode::VisitReturn GetTimeRange::enter(AlembicPoints &node, AlembicNode *)
 {
-   //updateTimeRange(node);
+   updateTimeRange(node);
    return AlembicNode::ContinueVisit;
 }
 
@@ -173,10 +173,9 @@ AlembicNode::VisitReturn CountShapes::enter(AlembicSubD &node, AlembicNode *)
    return shapeEnter(node);
 }
 
-AlembicNode::VisitReturn CountShapes::enter(AlembicPoints &, AlembicNode *)
+AlembicNode::VisitReturn CountShapes::enter(AlembicPoints &node, AlembicNode *)
 {
-   //return shapeEnter(node);
-   return AlembicNode::ContinueVisit;
+   return shapeEnter(node);
 }
 
 AlembicNode::VisitReturn CountShapes::enter(AlembicCurves &, AlembicNode *)
@@ -376,18 +375,82 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicXform &node, AlembicNode 
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicMesh &node, AlembicNode *instance)
 {
-   return shapeEnter(node, instance);
+   bool interpolate = (node.typedObject().getSchema().getTopologyVariance() != Alembic::AbcGeom::kHeterogenousTopology);
+   return shapeEnter(node, instance, interpolate, 0.0);
 }
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicSubD &node, AlembicNode *instance)
 {
-   return shapeEnter(node, instance);
+   bool interpolate = (node.typedObject().getSchema().getTopologyVariance() != Alembic::AbcGeom::kHeterogenousTopology);
+   return shapeEnter(node, instance, interpolate, 0.0);
 }
 
-AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &, AlembicNode *)
+AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode *instance)
 {
-   //return shapeEnter(node, instance);
-   return AlembicNode::ContinueVisit;
+   // Take into account to point size in the computed bounds
+   
+   Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
+   
+   double extraPadding = 0.0;
+   
+   if (visible)
+   {
+      Alembic::AbcGeom::IFloatGeomParam widths = node.typedObject().getSchema().getWidthsParam();
+      
+      if (widths.valid())
+      {
+         TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> wsamples;
+         TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator wsample;
+            
+         double renderTime = mDso->renderTime();
+         
+         const double *sampleTimes = 0;
+         size_t sampleTimesCount = 0;
+         
+         if (mDso->ignoreDeformBlur())
+         {
+            sampleTimes = &renderTime;
+            sampleTimesCount = 1;
+         }
+         else
+         {
+            sampleTimes = &(mDso->motionSampleTimes()[0]);
+            sampleTimesCount = mDso->numMotionSamples();
+         }
+            
+         for (size_t i=0; i<sampleTimesCount; ++i)
+         {
+            double t = sampleTimes[i];
+            
+            wsamples.update(widths, t, t, (i > 0 || instance != 0));
+         }
+         
+         for (wsample=wsamples.begin(); wsample!=wsamples.end(); ++wsample)
+         {
+            Alembic::Abc::FloatArraySamplePtr vals = wsample->data().getVals();
+            
+            for (size_t i=0; i<vals->size(); ++i)
+            {
+               float r = vals->get()[i];
+               if (r > extraPadding)
+               {
+                  extraPadding = r;
+               }
+            }
+         }
+      }
+      else
+      {
+         extraPadding = mDso->radiusMin();
+      }
+      
+      if (mDso->verbose())
+      {
+         AiMsgInfo("[abcproc] Points extra bounds padding: %lf", extraPadding);
+      }
+   }
+   
+   return shapeEnter(node, instance, false, extraPadding);
 }
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &, AlembicNode *)
@@ -1859,6 +1922,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
       }
    }
    
+   AiNodeSetArray(mNode, "points", points);
+   
    // mode: disk|sphere|quad
    // radius[]
    // aspect[]    (only for quad)
@@ -2057,6 +2122,15 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
             *r = adjustPointRadius(*r);
          }
       }
+   }
+   else
+   {
+      AiMsgInfo("[abcproc] No radius set for points in alembic archive. Create particles with constant radius %lf (can be changed using dso '-radiusmin' data flag or 'abc_radiusmin' user attribute)", mDso->radiusMin());
+      
+      AtArray *radius = AiArrayAllocate(1, 1, AI_TYPE_FLOAT);
+      AiArraySetFlt(radius, 0, mDso->radiusMin());
+      
+      AiNodeSetArray(mNode, "radius", radius);
    }
    
    SetUserAttributes(mNode, info.objectAttrs);

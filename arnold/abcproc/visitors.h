@@ -136,7 +136,7 @@ public:
 private:
    
    template <class T>
-   AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance, bool interpolateBounds, double extraPadding);
 
 private:
 
@@ -147,7 +147,7 @@ private:
 };
 
 template <class T>
-AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance)
+AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance, bool interpolateBounds, double extraPadding)
 {
    Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
    
@@ -210,17 +210,23 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
             {
                if (blend > 0.0)
                {
-                  Alembic::Abc::Box3d b0 = samp0->data();
-                  Alembic::Abc::Box3d b1 = samp1->data();
-                  Alembic::Abc::Box3d b2((1.0 - blend) * b0.min + blend * b1.min,
-                                         (1.0 - blend) * b0.max + blend * b1.max);
-                  box.extendBy(b2);
+                  if (interpolateBounds)
+                  {
+                     Alembic::Abc::Box3d b0 = samp0->data();
+                     Alembic::Abc::Box3d b1 = samp1->data();
+                     Alembic::Abc::Box3d b2((1.0 - blend) * b0.min + blend * b1.min,
+                                            (1.0 - blend) * b0.max + blend * b1.max);
+                     box.extendBy(b2);
+                  }
+                  else
+                  {
+                     box.extendBy(samp0->data());
+                     box.extendBy(samp1->data());
+                  }
                }
                else
                {
-                  Alembic::Abc::Box3d b = samp0->data();
-                  
-                  box.extendBy(b);
+                  box.extendBy(samp0->data());
                }
             }
          }
@@ -236,13 +242,18 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
             AiMsgInfo("[abcproc] \"disp_padding\" attribute found on procedural, pad bounds by %f", padding);
          }
          
-         box.min.x -= padding;
-         box.min.y -= padding;
-         box.min.z -= padding;
+         extraPadding += padding;
+      }
+      
+      if (extraPadding > 0)
+      {
+         box.min.x -= extraPadding;
+         box.min.y -= extraPadding;
+         box.min.z -= extraPadding;
          
-         box.max.x += padding;
-         box.max.y += padding;
-         box.max.z += padding;
+         box.max.x += extraPadding;
+         box.max.y += extraPadding;
+         box.max.z += extraPadding;
       }
       
       AlembicNode *targetNode = (instance ? instance : &node);
