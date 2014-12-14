@@ -109,8 +109,8 @@ namespace
 
         // Remove the elements from all other sets (exclusivity constraint)
         MObjectArray   connSGObjs( getOutConnectedSG(dpShape) );
-        MObject	   connSGObj;
-        MFnSet	   fnOtherSet;
+        MObject connSGObj;
+        MFnSet fnOtherSet;
         MSelectionList setList, otherSetList, xorList;
         setList.add( dpShape, comp );
         int nSG = connSGObjs.length();
@@ -195,7 +195,7 @@ namespace
                     shadingGroup = createShadingGroup(faceSetName);
                 }
 
-                // set (and create if needed) 'AbcFacesetName' string 
+                // set (and create if needed) 'AbcFacesetName' string
                 // attribute on the shadingGroup
                 MFnDependencyNode fnDepNode(shadingGroup);
                 MPlug abcFacesetNamePlug = fnDepNode.findPlug("AbcFacesetName",
@@ -207,9 +207,9 @@ namespace
                     MObject strAttrObject = fnStringData.create("");
 
                     MFnTypedAttribute attr;
-                    MObject attrObj = attr.create(attrName, attrName, 
+                    MObject attrObj = attr.create(attrName, attrName,
                                               MFnData::kString, strAttrObject);
-                    fnDepNode.addAttribute(attrObj, 
+                    fnDepNode.addAttribute(attrObj,
                                          MFnDependencyNode::kLocalDynamicAttr);
                     abcFacesetNamePlug = fnDepNode.findPlug(attrObj, true);
                 }

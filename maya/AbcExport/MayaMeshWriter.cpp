@@ -197,13 +197,13 @@ getSetComponents( const MDagPath &dagPath, const MObject &SG, GetMembersMap& gmM
     if( status == MS::kFailure )
         return MS::kFailure;
 
-    // If the first plug in the array is connected, we have a whole object mapping. Return.
+    // if there are no elements,  this shading group is not connected as a face set
     if( iogPlug.numElements()<=0 )
         return MS::kFailure;
 
+    // the first element should always be connected as a source
     MPlugArray iogConnections;
     iogPlug.elementByLogicalIndex(0, &status).connectedTo(iogConnections, false, true, &status );
-    // this is not a shading group. skip it.
     if( status == MS::kFailure )
         return MS::kFailure;
 
@@ -242,7 +242,7 @@ getSetComponents( const MDagPath &dagPath, const MObject &SG, GetMembersMap& gmM
 
     // SG is a shading engine but has no components connected to the dagPath.
     // This means we have a whole object mapping!
-    return MS::kSuccess;
+    return MS::kFailure;
 }
 
 }
@@ -283,7 +283,13 @@ MayaMeshWriter::MayaMeshWriter(MDagPath & iDag,
     MObject surface = iDag.node();
 
     if (iTimeIndex != 0 && util::isAnimated(surface))
+    {
         mIsGeometryAnimated = true;
+    }
+    else
+    {
+        iTimeIndex = 0;
+    }
 
     std::vector<float> uvs;
     std::vector<Alembic::Util::uint32_t> indices;
@@ -530,10 +536,7 @@ MayaMeshWriter::MayaMeshWriter(MDagPath & iDag,
 
         if (status != MS::kSuccess)
         {
-            MFnDependencyNode fnDepNode(connSGObj);
-            MString message;
-            message.format("Could not retrive face indices from set ^1s.",  connSgObjName);
-            MGlobal::displayError(message);
+            // for some reason the shading group doesn't represent a face set
             continue;
         }
 
@@ -914,15 +917,7 @@ void MayaMeshWriter::writePoly(
         Alembic::Abc::Int32ArraySample(facePoints),
         Alembic::Abc::Int32ArraySample(pointCounts), iUVs, normalsSamp);
 
-    // if this mesh is animated, write out the animated geometry
-    if (mIsGeometryAnimated)
-    {
-        mPolySchema.set(samp);
-    }
-    else
-    {
-        mPolySchema.set(samp);
-    }
+    mPolySchema.set(samp);
     writeUV();
     writeColor();
 }
@@ -950,7 +945,7 @@ void MayaMeshWriter::writeSubD(
         Alembic::Abc::Int32ArraySample(pointCounts));
     samp.setUVs( iUVs );
 
-    MPlug plug = lMesh.findPlug("facVaryingInterpolateBoundary");
+    MPlug plug = lMesh.findPlug("faceVaryingInterpolateBoundary");
     if (!plug.isNull())
         samp.setFaceVaryingInterpolateBoundary(plug.asInt());
 

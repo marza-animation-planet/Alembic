@@ -67,7 +67,13 @@ MayaPointPrimitiveWriter::MayaPointPrimitiveWriter(
 
     MObject object = iDag.node();
     if (iTimeIndex != 0 && util::isAnimated(object))
+    {
         mIsAnimated = true;
+    }
+    else
+    {
+        iTimeIndex = 0;
+    }
 
     write(iFrame);
 }

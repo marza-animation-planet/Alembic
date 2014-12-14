@@ -114,10 +114,16 @@ void addArbAttrAndScope(MObject & iParent, const std::string & iAttrName,
 
     std::string attrStr;
 
-    // rgb isn't needed because we can use setUsedAsColor when we create the
-    // attribute
-
-    if (iInterp == "vector")
+    // constant scope colors can use setUsedAsColor
+    if (iInterp == "rgb" && iScope != "" && iScope != "con")
+    {
+        attrStr = "rgb";
+    }
+    else if (iInterp == "rgba" && iScope != "" && iScope != "con")
+    {
+        attrStr = "rgba";
+    }
+    else if (iInterp == "vector")
     {
         if (iExtent == 2)
             attrStr = "vector2";
@@ -968,7 +974,7 @@ bool addArrayProp(Alembic::Abc::IArrayProperty & iProp, MObject & iParent)
     typedAttr.setKeyable(true);
     numAttr.setKeyable(true);
 
-    if (interp == "rgb")
+    if (isScalarLike && interp == "rgb")
     {
         typedAttr.setUsedAsColor(true);
         numAttr.setUsedAsColor(true);
@@ -3231,11 +3237,11 @@ MString connectAttr(ArgData & iArgData)
                 }
 
                 srcPlug = srcArrayPlug.elementByLogicalIndex(index++);
-
+                MDGModifier plugMod;
                 if (!dstPlug.isConnected())
                 {
-                    status = modifier.connect(srcPlug, dstPlug);
-                    status = modifier.doIt();
+                    status = plugMod.connect(srcPlug, dstPlug);
+                    status = plugMod.doIt();
                 }
 
                 if (status != MS::kSuccess)

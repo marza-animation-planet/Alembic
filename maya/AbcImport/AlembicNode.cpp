@@ -311,6 +311,8 @@ MStatus AlembicNode::initialize()
     status = gAttr.addDataAccept(MFnData::kString);
     status = gAttr.addDataAccept(MFnData::kIntArray);
     status = gAttr.addDataAccept(MFnData::kDoubleArray);
+    status = gAttr.addDataAccept(MFnData::kVectorArray);
+    status = gAttr.addDataAccept(MFnData::kPointArray);
 
     status = gAttr.setWritable(false);
     status = gAttr.setKeyable(false);
@@ -1182,7 +1184,7 @@ MStringArray AlembicNode::getFilesToArchive(
 
     MPlug fileNamePlug(thisMObject(), mAbcFileNameAttr);
     MString fileName = fileNamePlug.asString(MDGContext::fsNormal, &status);
-    
+
     if (status == MS::kSuccess && fileName.length() > 0) {
         if(unresolvedName)
         {
@@ -1196,7 +1198,7 @@ MStringArray AlembicNode::getFilesToArchive(
             files.append(fileObject.resolvedFullName());
         }
     }
-    
+
     return files;
 }
 
