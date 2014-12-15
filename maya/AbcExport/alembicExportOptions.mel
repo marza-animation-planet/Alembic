@@ -101,7 +101,7 @@ global proc int _alembicExportOptions(string $parent,
          columnLayout;
             checkBoxGrp -ncb 1 -l "" -l1 "No Normals" -adj 2 -cal 1 right -cal 2 left -v1 false optNoNormals;
             checkBoxGrp -ncb 1 -l "" -l1 "Write Primary UV" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteUV;
-            checkBoxGrp -ncb 1 -l "" -l1 "Write Secondary UVs" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteExtraUV;
+            checkBoxGrp -ncb 1 -l "" -l1 "Write All UVs" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteAllUVs;
             checkBoxGrp -ncb 1 -l "" -l1 "Write Color Sets" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteColors;
             checkBoxGrp -ncb 1 -l "" -l1 "Write Face Sets" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteFaceSets;
          setParent ..;
@@ -229,9 +229,9 @@ global proc int _alembicExportOptions(string $parent,
             {
                checkBoxGrp -e -v1 ($val == "1") optWriteUV;
             }
-            else if ($key == "weu")
+            else if ($key == "wuvs")
             {
-               checkBoxGrp -e -v1 ($val == "1") optWriteExtraUV;
+               checkBoxGrp -e -v1 ($val == "1") optWriteAllUVs;
             }
             else if ($key == "wcs")
             {
@@ -383,9 +383,9 @@ global proc int _alembicExportOptions(string $parent,
          $optionsString += ";uv=1";
       }
       
-      if (`checkBoxGrp -q -v1 optWriteExtraUV` == true)
+      if (`checkBoxGrp -q -v1 optWriteAllUVs` == true)
       {
-         $optionsString += ";weu=1";
+         $optionsString += ";wuvs=1";
       }
       
       if (`checkBoxGrp -q -v1 optWriteColors` == true)

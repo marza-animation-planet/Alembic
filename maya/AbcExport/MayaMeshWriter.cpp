@@ -91,41 +91,39 @@ void getColorSet(MFnMesh & iMesh, const MString * iColorSet, bool isRGBA,
     }
 };
 
-void getUVSet(MFnMesh &iMesh, const MString * iUVSet,
-              std::vector<float> & oUVs, std::vector<Alembic::Util::uint32_t> & oUVIndices)
+void getUVSet(const MFnMesh & iMesh, const MString & iUVSetName,
+    std::vector<float> & oUVs, std::vector<Alembic::Util::uint32_t> & oIndices)
 {
     MFloatArray uArray, vArray;
-    iMesh.getUVs(uArray, vArray, iUVSet);
-
-    // convert the raw uv list into vector uvsvec.clear();
+    iMesh.getUVs(uArray, vArray, &iUVSetName);
     if ( uArray.length() != vArray.length() )
     {
-        MString msg = "uv Set" + *iUVSet +
-            "uArray and vArray not the same length";
+        MString msg = "UV Set " + iUVSetName +
+            " uArray and vArray not the same length";
         MGlobal::displayError(msg);
         return;
     }
 
-    unsigned int len = uArray.length();
+    unsigned int arLen = uArray.length();
     oUVs.clear();
-    oUVs.reserve(len * 2);
-    for (unsigned int i = 0; i < len; i++)
+    oUVs.reserve(arLen * 2);
+    for (unsigned int i = 0; i < arLen; ++i)
     {
         oUVs.push_back(uArray[i]);
         oUVs.push_back(vArray[i]);
     }
 
-    oUVIndices.clear();
-    oUVIndices.reserve(iMesh.numFaceVertices());
+    oIndices.clear();
+    oIndices.reserve(iMesh.numFaceVertices());
     int faceCount = iMesh.numPolygons();
     int uvId = 0;
-    for (int f = 0; f < faceCount; f++)
+    for (int j = 0; j < faceCount; ++j)
     {
-        int len = iMesh.polygonVertexCount(f);
-        for (int i = len-1; i >= 0; i--)
+        int vc = iMesh.polygonVertexCount(j);
+        for (int i = vc - 1; i >= 0; i--)
         {
-            iMesh.getPolygonUVid(f, i, uvId, iUVSet);
-            oUVIndices.push_back(uvId);
+            iMesh.getPolygonUVid(j, i, uvId, &iUVSetName);
+            oIndices.push_back(uvId);
         }
     }
 }
@@ -247,9 +245,9 @@ getSetComponents( const MDagPath &dagPath, const MObject &SG, GetMembersMap& gmM
 
 }
 
-// assumption is we don't support multiple uv sets
 void MayaMeshWriter::getUVs(std::vector<float> & uvs,
-    std::vector<Alembic::Util::uint32_t> & indices)
+    std::vector<Alembic::Util::uint32_t> & indices,
+    std::string & name)
 {
     MStatus status = MS::kSuccess;
     MFnMesh lMesh( mDagPath, &status );
@@ -259,7 +257,47 @@ void MayaMeshWriter::getUVs(std::vector<float> & uvs,
     }
 
     MString uvSetName = lMesh.currentUVSetName(&status);
-    getUVSet(lMesh, &uvSetName, uvs, indices);
+    if (uvSetName.length() != 0)
+    {
+        MFloatArray uArray, vArray;
+        status = lMesh.getUVs(uArray, vArray, &uvSetName);
+        // convert the raw uv list into vector uvsvec.clear();
+        if ( uArray.length() != vArray.length() )
+        {
+            MString msg = "uv Set" + uvSetName +
+                "uArray and vArray not the same length";
+            MGlobal::displayError(msg);
+            return;
+        }
+
+        if (uvSetName != "map1")
+        {
+            name = uvSetName.asChar();
+        }
+
+        unsigned int len = uArray.length();
+        uvs.clear();
+        uvs.reserve(len * 2);
+        for (unsigned int i = 0; i < len; i++)
+        {
+            uvs.push_back(uArray[i]);
+            uvs.push_back(vArray[i]);
+        }
+
+        indices.clear();
+        indices.reserve(lMesh.numFaceVertices());
+        int faceCount = lMesh.numPolygons();
+        int uvId = 0;
+        for (int f = 0; f < faceCount; f++)
+        {
+            int len = lMesh.polygonVertexCount(f);
+            for (int i = len-1; i >= 0; i--)
+            {
+                lMesh.getPolygonUVid(f, i, uvId, &uvSetName);
+                indices.push_back(uvId);
+            }
+        }
+    }
 }
 
 MayaMeshWriter::MayaMeshWriter(MDagPath & iDag,
@@ -267,8 +305,8 @@ MayaMeshWriter::MayaMeshWriter(MDagPath & iDag,
     const JobArgs & iArgs, GetMembersMap& gmMap)
   : mNoNormals(iArgs.noNormals),
     mWriteUVs(iArgs.writeUVs),
-    mWriteExtraUVs(iArgs.writeExtraUVs),
     mWriteColorSets(iArgs.writeColorSets),
+    mWriteUVSets(iArgs.writeUVSets),
     mIsGeometryAnimated(false),
     mDagPath(iDag)
 {
@@ -293,6 +331,7 @@ MayaMeshWriter::MayaMeshWriter(MDagPath & iDag,
 
     std::vector<float> uvs;
     std::vector<Alembic::Util::uint32_t> indices;
+    std::string uvSetName;
 
     MString name = lMesh.name();
     name = util::stripNamespaces(name, iArgs.stripNamespace);
@@ -305,33 +344,15 @@ MayaMeshWriter::MayaMeshWriter(MDagPath & iDag,
         mSubDSchema = obj.getSchema();
 
         Alembic::AbcGeom::OV2fGeomParam::Sample uvSamp;
-        if ( mWriteUVs )
+        if (mWriteUVs || mWriteUVSets)
         {
-            getUVs(uvs, indices);
+            getUVs(uvs, indices, uvSetName);
 
             if (!uvs.empty())
             {
-                // Only set UV source name if necessary
-                if (mWriteExtraUVs)
+                if (!uvSetName.empty())
                 {
-                    std::string uvSetName = lMesh.currentUVSetName().asChar();
-                    if (uvSetName != "map1")
-                    {
-                        // Primary uv set name is not map1
-                        // Check if it is used by any of the secondary uv sets
-                        MStringArray uvSetNames;
-                        lMesh.getUVSetNames(uvSetNames);
-                        for (unsigned int i=0; i<uvSetNames.length(); ++i)
-                        {
-                            if (uvSetNames[i] == "map1")
-                            {
-                                // map1 used as a secondary uv set
-                                // Set UV source name so that the importer won't overwrite the primary UVs
-                                mSubDSchema.setUVSourceName(uvSetName);
-                                break;
-                            }
-                        }
-                    }
+                    mSubDSchema.setUVSourceName(uvSetName);
                 }
 
                 uvSamp.setScope( Alembic::AbcGeom::kFacevaryingScope );
@@ -364,35 +385,16 @@ MayaMeshWriter::MayaMeshWriter(MDagPath & iDag,
 
         Alembic::AbcGeom::OV2fGeomParam::Sample uvSamp;
 
-        if ( mWriteUVs )
+        if (mWriteUVs || mWriteUVSets)
         {
-            getUVs(uvs, indices);
+            getUVs(uvs, indices, uvSetName);
 
             if (!uvs.empty())
             {
-                // Only set UV source name if necessary
-                if (mWriteExtraUVs)
+                if (!uvSetName.empty())
                 {
-                    std::string uvSetName = lMesh.currentUVSetName().asChar();
-                    if (uvSetName != "map1")
-                    {
-                        // Primary uv set name is not map1
-                        // Check if it is used by any of the secondary uv sets
-                        MStringArray uvSetNames;
-                        lMesh.getUVSetNames(uvSetNames);
-                        for (unsigned int i=0; i<uvSetNames.length(); ++i)
-                        {
-                            if (uvSetNames[i] == "map1")
-                            {
-                                // map1 used as a secondary uv set
-                                // Set UV source name so that the importer won't overwrite the primary UVs
-                                mPolySchema.setUVSourceName(uvSetName);
-                                break;
-                            }
-                        }
-                    }
+                    mPolySchema.setUVSourceName(uvSetName);
                 }
-
                 uvSamp.setScope( Alembic::AbcGeom::kFacevaryingScope );
                 uvSamp.setVals(Alembic::AbcGeom::V2fArraySample(
                     (const Imath::V2f *) &uvs.front(), uvs.size() / 2));
@@ -419,46 +421,6 @@ MayaMeshWriter::MayaMeshWriter(MDagPath & iDag,
         writePoly(uvSamp);
     }
     
-    if (mWriteExtraUVs)
-    {
-        MStringArray uvSetNames;
-        MString masterUVSetName = lMesh.currentUVSetName();
-
-        lMesh.getUVSetNames(uvSetNames);
-
-        if (uvSetNames.length() > 1)
-        {
-            Alembic::Abc::OCompoundProperty arbParams;
-            if (mPolySchema)
-            {
-                arbParams =  mPolySchema.getArbGeomParams();
-            }
-            else
-            {
-                arbParams =  mSubDSchema.getArbGeomParams();
-            }
-
-            for (unsigned long i=0; i<uvSetNames.length(); ++i)
-            {
-                if (uvSetNames[i] == masterUVSetName)
-                {
-                    continue;
-                }
-                
-                std::string uvPropName = uvSetNames[i].asChar();
-
-                Alembic::AbcCoreAbstract::MetaData md;
-
-                Alembic::AbcGeom::SetIsUV(md, true);
-
-                Alembic::AbcGeom::OV2fGeomParam uvProp(arbParams, uvPropName, true,
-                                                       Alembic::AbcGeom::kFacevaryingScope, 1, iTimeIndex, md);
-                
-                mUVParams.push_back(uvProp);
-            }
-        }
-    }
-
     if (mWriteColorSets)
     {
         MStringArray colorSetNames;
@@ -469,7 +431,7 @@ MayaMeshWriter::MayaMeshWriter(MDagPath & iDag,
 
             // Create the color sets compound prop
             Alembic::Abc::OCompoundProperty arbParams;
-            if (mPolySchema)
+            if (mPolySchema.valid())
             {
                 arbParams =  mPolySchema.getArbGeomParams();
             }
@@ -511,6 +473,50 @@ MayaMeshWriter::MayaMeshWriter(MDagPath & iDag,
                 }
             }
             writeColor();
+        }
+    }
+
+    if (mWriteUVSets)
+    {
+        MStringArray uvSetNames;
+        lMesh.getUVSetNames(uvSetNames);
+        unsigned int uvSetNamesLen = uvSetNames.length();
+
+        if (uvSetNamesLen > 1)
+        {
+            // Create the uv sets compound prop
+            Alembic::Abc::OCompoundProperty arbParams;
+            if (mPolySchema.valid())
+            {
+                arbParams =  mPolySchema.getArbGeomParams();
+            }
+            else
+            {
+                arbParams =  mSubDSchema.getArbGeomParams();
+            }
+
+            MString currentUV = lMesh.currentUVSetName();
+
+            for (unsigned int i = 0; i < uvSetNamesLen; ++i)
+            {
+                // Create an array property for each uv set
+                MString uvSetPropName = uvSetNames[i];
+
+                // the current UV set gets mapped to the primary UVs
+                if (currentUV == uvSetPropName)
+                {
+                    continue;
+                }
+
+                if (uvSetPropName.length() > 0 &&
+                    lMesh.numUVs(uvSetPropName) > 0)
+                {
+                    mUVparams.push_back(Alembic::AbcGeom::OV2fGeomParam(
+                        arbParams, uvSetPropName.asChar(), true,
+                        Alembic::AbcGeom::kFacevaryingScope, 1, iTimeIndex));
+                }
+            }
+            writeUVSets();
         }
     }
 
@@ -569,7 +575,7 @@ MayaMeshWriter::MayaMeshWriter(MDagPath & iDag,
             faceSetName = abcFacesetNamePlug.asString().asChar();
         }
 
-        if (mPolySchema)
+        if (mPolySchema.valid())
         {
             if (mPolySchema.hasFaceSet(faceSetName))
             {
@@ -742,36 +748,37 @@ void MayaMeshWriter::getPolyNormals(std::vector<float> & oNormals)
     }
 }
 
-void MayaMeshWriter::writeUV()
+void MayaMeshWriter::writeUVSets()
 {
+
     MStatus status = MS::kSuccess;
-    MFnMesh lMesh( mDagPath, &status );
-    if ( !status )
+    const MFnMesh lMesh(mDagPath, &status);
+    if (!status)
     {
         MGlobal::displayError(
             "MFnMesh() failed for MayaMeshWriter::writeUV" );
         return;
     }
 
-    //Write UVs
-    std::vector<Alembic::AbcGeom::OV2fGeomParam>::iterator uvIt = mUVParams.begin();
-    std::vector<Alembic::AbcGeom::OV2fGeomParam>::iterator uvItEnd = mUVParams.end();
-
-    for (; uvIt != uvItEnd; ++uvIt)
+    //Write uvs
+    const UVParamsVec::const_iterator uvItEnd = mUVparams.end();
+    for (UVParamsVec::iterator uvIt = mUVparams.begin();
+        uvIt != uvItEnd; ++uvIt)
     {
         std::vector<float> uvs;
-        std::vector< Alembic::Util::uint32_t > indices;
+        std::vector<Alembic::Util::uint32_t> indices;
 
         MString uvSetName(uvIt->getName().c_str());
-        getUVSet(lMesh, &uvSetName, uvs, indices);
+        getUVSet(lMesh, uvSetName, uvs, indices);
 
         //cast the vector to the sample type
-        Alembic::AbcGeom::OV2fGeomParam::Sample samp(
-            Alembic::Abc::V2fArraySample((const Imath::V2f *) &uvs.front(), uvs.size()/2),
+        Alembic::AbcGeom::OV2fGeomParam::Sample sample(
+            Alembic::Abc::V2fArraySample(
+                (const Imath::V2f *) &uvs.front(), uvs.size() / 2),
             Alembic::Abc::UInt32ArraySample(indices),
             Alembic::AbcGeom::kFacevaryingScope);
 
-        uvIt->set(samp);
+        uvIt->set(sample);
     }
 }
 
@@ -848,13 +855,25 @@ void MayaMeshWriter::write()
     Alembic::AbcGeom::OV2fGeomParam::Sample uvSamp;
     std::vector<float> uvs;
     std::vector<Alembic::Util::uint32_t> indices;
+    std::string uvSetName;
 
-    if ( mWriteUVs )
+    if (mWriteUVs || mWriteUVSets)
     {
-        getUVs(uvs, indices);
+        getUVs(uvs, indices, uvSetName);
 
         if (!uvs.empty())
         {
+            if (!uvSetName.empty())
+            {
+                if (mPolySchema.valid())
+                {
+                    mPolySchema.setUVSourceName(uvSetName);
+                }
+                else if (mSubDSchema.valid())
+                {
+                    mSubDSchema.setUVSourceName(uvSetName);
+                }
+            }
             uvSamp.setScope( Alembic::AbcGeom::kFacevaryingScope );
             uvSamp.setVals(Alembic::AbcGeom::V2fArraySample(
                 (const Imath::V2f *) &uvs.front(), uvs.size() / 2));
@@ -920,6 +939,7 @@ void MayaMeshWriter::writePoly(
     mPolySchema.set(samp);
     writeUV();
     writeColor();
+    writeUVSets();
 }
 
 void MayaMeshWriter::writeSubD(
@@ -1024,6 +1044,7 @@ void MayaMeshWriter::writeSubD(
     mSubDSchema.set(samp);
     writeUV();
     writeColor();
+    writeUVSets();
 }
 
 // the arrays being passed in are assumed to be empty

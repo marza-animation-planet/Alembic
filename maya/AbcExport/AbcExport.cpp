@@ -1,6 +1,6 @@
 //-*****************************************************************************
 //
-// Copyright (c) 2009-2012,
+// Copyright (c) 2009-2014,
 //  Sony Pictures Imageworks Inc. and
 //  Industrial Light & Magic, a division of Lucasfilm Entertainment Company Ltd.
 //
@@ -372,11 +372,6 @@ try
             {
                 jobArgs.writeUVs = true;
             }
-            
-            else if (arg == "-weu" || arg == "-writeextrauvs")
-            {
-                jobArgs.writeExtraUVs = true;
-            }
 
             else if (arg == "-wcs" || arg == "-writecolorsets")
             {
@@ -396,6 +391,11 @@ try
             else if (arg == "-ws" || arg == "-worldspace")
             {
                 jobArgs.worldSpace = true;
+            }
+
+            else if (arg == "-wuvs" || arg == "-writeuvsets")
+            {
+                jobArgs.writeUVSets = true;
             }
 
             else if (arg == "-wv" || arg == "-writevisibility")

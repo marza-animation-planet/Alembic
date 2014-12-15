@@ -156,7 +156,7 @@ struct JobArgs
         worldSpace = false;
         writeVisibility = false;
         writeUVs = false;
-        writeExtraUVs = false;
+        writeUVSets = false;
         writeColorSets = false;
         writeFaceSets = false;
         writeInstances = false;
@@ -170,7 +170,7 @@ struct JobArgs
     bool worldSpace;
     bool writeVisibility;
     bool writeUVs;
-    bool writeExtraUVs;
+    bool writeUVSets;
     bool writeColorSets;
     bool writeFaceSets;
     bool writeInstances;
