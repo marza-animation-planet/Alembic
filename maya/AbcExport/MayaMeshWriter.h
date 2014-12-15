@@ -102,9 +102,6 @@ class MayaMeshWriter
     void writeColor();
     std::vector<Alembic::AbcGeom::OC3fGeomParam> mRGBParams;
     std::vector<Alembic::AbcGeom::OC4fGeomParam> mRGBAParams;
-    
-    void writeUV();
-    std::vector<Alembic::AbcGeom::OV2fGeomParam> mUVParams;
 
     void writeUVSets();
     typedef std::vector<Alembic::AbcGeom::OV2fGeomParam> UVParamsVec;

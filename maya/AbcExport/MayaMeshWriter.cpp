@@ -937,7 +937,6 @@ void MayaMeshWriter::writePoly(
         Alembic::Abc::Int32ArraySample(pointCounts), iUVs, normalsSamp);
 
     mPolySchema.set(samp);
-    writeUV();
     writeColor();
     writeUVSets();
 }
@@ -1042,7 +1041,6 @@ void MayaMeshWriter::writeSubD(
 #endif
 
     mSubDSchema.set(samp);
-    writeUV();
     writeColor();
     writeUVSets();
 }
