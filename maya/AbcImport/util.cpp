@@ -404,7 +404,11 @@ MStatus deleteDagNode(MDagPath & dagPath)
         if (!parentPath.isInstanced())
         {
             MFnDagNode parentNode(parentPath);
-            parentNode.removeChild(obj);
+            return parentNode.removeChild(obj);
+        }
+        else
+        {
+            return MS::kFailure;
         }
     }
     else

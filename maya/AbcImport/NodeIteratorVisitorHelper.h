@@ -186,7 +186,6 @@ public:
     std::vector< Alembic::AbcGeom::IV2fGeomParam > mV2s;
     std::vector< Alembic::AbcGeom::IC3fGeomParam > mC3s;
     std::vector< Alembic::AbcGeom::IC4fGeomParam > mC4s;
-    std::vector< Alembic::AbcGeom::IV2fGeomParam > mV2s;
 };
 
 class SubDAndFriends
@@ -196,7 +195,6 @@ public:
     std::vector< Alembic::AbcGeom::IV2fGeomParam > mV2s;
     std::vector< Alembic::AbcGeom::IC3fGeomParam > mC3s;
     std::vector< Alembic::AbcGeom::IC4fGeomParam > mC4s;
-    std::vector< Alembic::AbcGeom::IV2fGeomParam > mV2s;
 };
 
 // A data class for cleaner code when copying a group of info between functions
@@ -295,9 +293,5 @@ bool getUVandColorAttrs( Alembic::Abc::ICompoundProperty & iParent,
     std::vector< Alembic::AbcGeom::IC3fGeomParam > & ioC3s,
     std::vector< Alembic::AbcGeom::IC4fGeomParam > & ioC4s,
     bool iUnmarkedFaceVaryingColors);
-
-bool getUVAttrs( Alembic::Abc::ICompoundProperty & iParent,
-    std::vector< Alembic::AbcGeom::IV2fGeomParam > & ioV2s,
-    bool iUnmarkedFaceVaryingUVs);
 
 #endif  // ABCIMPORT_NODE_ITERATOR_HELPER_H_

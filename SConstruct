@@ -84,7 +84,7 @@ AddDirectories(hdf5_inc, hdf5_lib)
 
 ilmbase_inc, ilmbase_lib = excons.GetDirsWithDefault("ilmbase", incdirdef=deps_inc, libdirdef=deps_lib)
 ilmbase_libsuffix = excons.GetArgument("ilmbase-libsuffix", "")
-if not ilmbase_inc.endswith("OpenEXR"):
+if ilmbase_inc and not ilmbase_inc.endswith("OpenEXR"):
   ilmbase_inc += "/OpenEXR"
 if ilmbase_libsuffix:
   ilmbase_libs = map(lambda x: x+ilmbase_libsuffix, ilmbase_libs)
@@ -95,7 +95,7 @@ boostpy_libname = excons.GetArgument("boost-python-libname", "boost_python")
 AddDirectories(boostpy_inc, boostpy_lib)
 
 ilmbasepy_inc, ilmbasepy_lib = excons.GetDirsWithDefault("ilmbase-python", incdirdef=deps_inc, libdirdef=deps_lib)
-if not ilmbasepy_inc.endswith("OpenEXR"):
+if ilmbasepy_inc and not ilmbasepy_inc.endswith("OpenEXR"):
   ilmbasepy_inc += "/OpenEXR"
 AddDirectories(ilmbasepy_inc, ilmbasepy_lib)
 

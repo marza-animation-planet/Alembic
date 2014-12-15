@@ -2717,16 +2717,6 @@ void WriterData::getFrameRange(double & oMin, double & oMax)
             oMin = std::min(ts->getSampleTime(0), oMin);
             oMax = std::max(ts->getSampleTime(numSamples-1), oMax);
         }
-        
-        std::vector< Alembic::AbcGeom::IV2fGeomParam >::iterator v2s, v2sEnd;
-        v2sEnd = mPolyMeshList[i].mV2s.end();
-        for (v2s = mPolyMeshList[i].mV2s.begin(); v2s != v2sEnd; ++v2s)
-        {
-            ts = v2s->getTimeSampling();
-            numSamples = v2s->getNumSamples();
-            oMin = std::min(ts->getSampleTime(0), oMin);
-            oMax = std::max(ts->getSampleTime(numSamples-1), oMax);
-        }
     }
 
     iEnd = mSubDList.size();
@@ -3372,38 +3362,6 @@ bool getUVandColorAttrs(Alembic::Abc::ICompoundProperty & iParent,
             }
             ioC4s.push_back(cgp);
         }
-    }
-
-    return anyAnimated;
-}
-
-bool getUVAttrs(Alembic::Abc::ICompoundProperty & iParent,
-    std::vector< Alembic::AbcGeom::IV2fGeomParam > & ioV2s,
-    bool iUnmarkedFaceVaryingUVs)
-{
-    bool anyAnimated = false;
-
-    // invalid geom params bail early
-    if (!iParent)
-        return anyAnimated;
-
-    std::size_t numProps = iParent.getNumProperties();
-    for (std::size_t i = 0; i < numProps; ++i)
-    {
-        const Alembic::Abc::PropertyHeader & propHeader =
-            iParent.getPropertyHeader(i);
-
-        if (!isUVSet(propHeader, iUnmarkedFaceVaryingUVs))
-        {
-            continue;
-        }
-
-        Alembic::AbcGeom::IV2fGeomParam vgp(iParent, propHeader.getName());
-        if (!anyAnimated)
-        {
-            anyAnimated = !vgp.isConstant();
-        }
-        ioV2s.push_back(vgp);
     }
 
     return anyAnimated;

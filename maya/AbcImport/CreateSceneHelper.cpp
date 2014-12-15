@@ -1099,13 +1099,10 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ISubD& iNode)
         subdAndFriends.mC3s, subdAndFriends.mC4s,
         mUnmarkedFaceVaryingColors);
 
-    bool uvAnim = getUVAttrs(arbProp, subdColors.mV2s,
-        mUnmarkedFaceVaryingUVs);
-
     bool isConstant = iNode.getSchema().isConstant();
 
     // add animated SubDs to the list
-    if (!isConstant || colorAnim || uvAnim)
+    if (!isConstant || colorAnim)
     {
         mData.mSubDList.push_back(subdAndFriends);
     }
@@ -1124,7 +1121,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ISubD& iNode)
         if (hasDag)
         {
             subDObj = mConnectDagNode.node();
-            if (!isConstant || colorAnim || uvAnim)
+            if (!isConstant || colorAnim)
             {
                 mData.mSubDObjList.push_back(subDObj);
             }
@@ -1207,9 +1204,6 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPolyMesh& iNode)
         meshAndFriends.mC3s, meshAndFriends.mC4s,
         mUnmarkedFaceVaryingColors);
 
-    bool uvAnim = getUVAttrs(arbProp, meshColors.mV2s,
-        mUnmarkedFaceVaryingUVs);
-
     // add animated poly mesh to the list
     if (!isConstant || colorAnim)
         mData.mPolyMeshList.push_back(meshAndFriends);
@@ -1227,7 +1221,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPolyMesh& iNode)
         if (hasDag)
         {
             polyObj = mConnectDagNode.node();
-            if (!isConstant || colorAnim || uvAnim)
+            if (!isConstant || colorAnim)
             {
                 mData.mPolyMeshObjList.push_back(polyObj);
             }
