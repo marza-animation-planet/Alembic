@@ -107,6 +107,21 @@ nameprefix = excons.GetArgument("name-prefix", default="")
 
 env = excons.MakeBaseEnv()
 
+if sys.platform == "darwin":
+   import platform
+   vers = map(int, platform.mac_ver()[0].split("."))
+   if vers[0] > 10 or vers[1] >= 9:
+      # Shut clang's up
+      env.Append(CPPFLAGS=" ".join([" -std=c++11",
+                                    "-Wno-deprecated-register",
+                                    "-Wno-deprecated-declarations",
+                                    "-Wno-missing-field-initializers",
+                                    "-Wno-unused-parameter",
+                                    "-Wno-unused-value",
+                                    "-Wno-unused-function",
+                                    "-Wno-unused-variable",
+                                    "-Wno-unused-private-field"]))
+
 prjs = [
    {"name": "AlembicUtil",
     "type": "staticlib",
