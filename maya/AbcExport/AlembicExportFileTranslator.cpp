@@ -221,11 +221,11 @@ MStatus AlembicExportFileTranslator::writer(
                 jobopts += " -uv";
             }
         }
-        else if (key == "weu")
+        else if (key == "wuvs")
         {
             if (val == "1")
             {
-                jobopts += " -weu";
+                jobopts += " -wuvs";
             }
         }
         else if (key == "wcs")
