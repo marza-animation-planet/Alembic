@@ -47,10 +47,11 @@ Building boost 1.44.0 as static libraries but for boost python
    # 'using gcc : : : <compileflags>-fPIC ;' (*)
    ./bjam --without-python variant=release link=static runtime-link=shared threading=multi --prefix=$BUILD_DIR install
    # Revert the compileflags in user-config.jam and possibly setup python
+   # [OSX only] Fix boost build python tool (see notes below)
    # As for ilmbase libraries, prefix generated library with '_alembic'
    # In libs/python/build/Jamfile.v2, replace 'boost_python' by
    #   'boost_python_alembic' in the rule name and library name
-   ./bjam --with-python variant=release link=shared runtime-link=shared threading=multi --prefix=$BUILD_DIR install
+   ./bjam --with-python variant=release link=shared runtime-link=shared threading=single --prefix=$BUILD_DIR install
    
    Notes:
    - Setting up python version in user-config.jam:
@@ -59,6 +60,32 @@ Building boost 1.44.0 as static libraries but for boost python
        using python : 2.6 : path/to/python ;
        (See bjam documentation for more details)
    - On windows, Add "toolset=msvc-9.0 address-model=64” to the command line
+   - On OSX, boost build does explicitely link python framework to boost_python
+     library. This ends up being problematic (crash) when trying to load python
+     module using it from an application that embeds its own python.
+     In tools/build/v2/tools/python.jam replace:
+     
+       if $(target-os) in windows cygwin darwin 
+       {
+         alias python_for_extensions : python : $(target-requirements) ;
+       }
+     
+     with:
+     
+       if $(target-os) in windows cygwin
+       {
+         alias python_for_extensions : python : $(target-requirements) ;
+       }
+       else if $(target-os) = darwin
+       {
+         alias python_for_extensions
+                   :
+                   : $(target-requirements)
+                   :
+                   : $(usage-requirements)
+       <linkflags>"-undefined dynamic_lookup"
+                   ;
+       }
    - On OSX Yosemite, boost 1.44.0 doesn’t build properly, use 1.49.0 instead
      'bjam' is renamed to 'b2' and signals library won’t build as it is.
      Either ignore it (—without-signals) or modify the
@@ -74,7 +101,11 @@ Building pyilmbase
    ./configure --prefix=$BUILD_DIR --disable-ilmbasetest --with-ilmbase-prefix=$BUILD_DIR --with-boost-include-dir=$BUILD_DIR/include --with-boost-lib-dir=$BUILD_DIR/lib --with-boost-python-libname=boost_python_alembic --disable-boostpythontest
    # Edit Makefiles to use suffixed version if ilmbase libraries
    # Also add '_alembic' suffix to PyImath and PyIex library names
-   # (hint: Look for all ".la" and "-lPyI" in Makefiles)
+   #   (hint: Look for all ".la" and "-lPyI" in Makefiles)
+   # [OSX only] Further fix Makefiles to allow undefined symbols and don't link
+   #   libraries to python. Look for the following strings:
+   #     _LDFLAGS: add "-undefined dynamic_lookup" (and remove "-no_undefined")
+   #     LIBS: comment out "-lpythonx.x"
    make -j2
    make install
 

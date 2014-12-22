@@ -207,7 +207,7 @@ prjs = [
     "libdirs": libdirs,
     "libs": alembic_libs + [boostpy_libname] + ilmbasepy_libs + ilmbase_libs + hdf5_libs + libs,
     "srcs": glob.glob("python/PyAlembic/*.cpp"),
-    "custom": [python.Require],
+    "custom": [python.SoftRequire],
     "install": {"%s/%s" % (python.ModulePrefix(), python.Version()): "python/examples/cask/cask.py"}
    },
    {"name": "abcconvert",
