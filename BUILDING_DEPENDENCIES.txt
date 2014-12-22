@@ -74,17 +74,15 @@ Building pyilmbase
    ./configure --prefix=$BUILD_DIR --disable-ilmbasetest --with-ilmbase-prefix=$BUILD_DIR --with-boost-include-dir=$BUILD_DIR/include --with-boost-lib-dir=$BUILD_DIR/lib --with-boost-python-libname=boost_python_alembic --disable-boostpythontest
    # Edit Makefiles to use suffixed version if ilmbase libraries
    # Also add '_alembic' suffix to PyImath and PyIex library names
-   #   - Look for all ".la" in Makefiles
-   #   - In PyImath/Makefile, replace "-lPyImath" by "libPyImath_alembic.la"
+   # (hint: Look for all ".la" and "-lPyI" in Makefiles)
    make -j2
    make install
 
    Notes:
-   - To use another python than the system-wide one, an easy way is to symlink
-     the command line interpreter of the version to use in a directory prepended
-     to the PATH environment var:
-       ln -s /usr/bin/python2.6 ./python
-       export PATH=`pwd`:$PATH
+   - To use another python than the system-wide one, one can set PYTHON and
+     PYTHON_VERSION environment prior to calling configure
+       export PYTHON=/usr/bin/python2.6
+       export PYTHON_VERSION=2.6
    - If you don't have numpy installed you may want to add --without-numpy to
      the configure line
    - On OSX Yosemite, build failed out of the box.
