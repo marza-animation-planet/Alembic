@@ -1,0 +1,105 @@
+Setup BUILD_DIR to point to whatever directory you want the output libraries to be
+
+Building szip as a static library
+   
+   # Force PIC objects
+   export CFLAGS="-fPIC" (*)
+   export CXXFLAGS=$CFLAGS
+   # Configure
+   ./configure --prefix=$BUILD_DIR --enable-static --disable-shared --with-pic --enable-production
+   # Build
+   make
+   # Deploy
+   make install
+
+Building zlib as a static library
+   
+   export CFLAGS="-fPIC" (*)
+   export CXXFLAGS=$CFLAGS
+   ./configure --prefix=$BUILD_DIR --static
+   make
+   make install
+
+Building hdf5 as a static library
+   
+   export CFLAGS="-fPIC" (*)
+   export CXXFLAGS=$CFLAGS
+   ./configure --prefix=$BUILD_DIR --with-szlib=$BUILD_DIR --with-zlib=$BUILD_DIR --enable-production --enable-cxx --enable-static --disable-shared (--enable-threadsafe --enable-unsupported)
+   make
+   make install
+
+Building ilmbase as shared libraries
+   
+   # Be sure to reset CFLAGS/CXXFLAGS first
+   export CFLAGS=
+   export CXXFLAGS=
+   ./configure --prefix=$BUILD_DIR --disable-static --enable-shared
+   # To avoid conflict with existing system/application wide ilmbase libraries
+   # add a '_alembic' suffix to all generated libraries by editing Makefile
+   # files manually (hint: look for the string ".la")
+   make
+   make install
+
+Building boost 1.44.0 as static libraries but for boost python
+   
+   ./bootstrap.sh --prefix=$BUILD_DIR
+   # Edit tools/build/v2/user-config.jam to add gcc compile flags adding a line
+   # 'using gcc : : : <compileflags>-fPIC ;' (*)
+   ./bjam --without-python variant=release link=static runtime-link=shared threading=multi --prefix=$BUILD_DIR install
+   # Revert the compileflags in user-config.jam and possibly setup python
+   # As for ilmbase libraries, prefix generated library with '_alembic'
+   # In libs/python/build/Jamfile.v2, replace 'boost_python' by
+   #   'boost_python_alembic' in the rule name and library name
+   ./bjam --with-python variant=release link=shared runtime-link=shared threading=multi --prefix=$BUILD_DIR install
+   
+   Notes:
+   - Setting up python version in user-config.jam:
+       using python : 2.6 ;
+       or
+       using python : 2.6 : path/to/python ;
+       (See bjam documentation for more details)
+   - On windows, Add "toolset=msvc-9.0 address-model=64” to the command line
+   - On OSX Yosemite, boost 1.44.0 doesn’t build properly, use 1.49.0 instead
+     'bjam' is renamed to 'b2' and signals library won’t build as it is.
+     Either ignore it (—without-signals) or modify the
+       libs/signals/src/named_slot_map.cpp as indicated:
+       
+       Line 105: replace "groups.erase(group)” by
+                 "groups.erase(static_cast<const_group_iterator>(group))"
+       Line 128: replace "groups.erase(g++)” by
+                 "groups.erase(static_cast<const_group_iterator>(g++))"
+
+Building pyilmbase
+   
+   ./configure --prefix=$BUILD_DIR --disable-ilmbasetest --with-ilmbase-prefix=$BUILD_DIR --with-boost-include-dir=$BUILD_DIR/include --with-boost-lib-dir=$BUILD_DIR/lib --with-boost-python-libname=boost_python_alembic --disable-boostpythontest
+   # Edit Makefiles to use suffixed version if ilmbase libraries
+   # Also add '_alembic' suffix to PyImath and PyIex library names
+   #   - Look for all ".la" in Makefiles
+   #   - In PyImath/Makefile, replace "-lPyImath" by "libPyImath_alembic.la"
+   make -j2
+   make install
+
+   Notes:
+   - To use another python than the system-wide one, an easy way is to symlink
+     the command line interpreter of the version to use in a directory prepended
+     to the PATH environment var:
+       ln -s /usr/bin/python2.6 ./python
+       export PATH=`pwd`:$PATH
+   - If you don't have numpy installed you may want to add --without-numpy to
+     the configure line
+   - On OSX Yosemite, build failed out of the box.
+     I had to fix the following files:
+     
+     PyImathStringTable.cpp
+       Replace any “_table.get<>" by "_table.template get<>"
+     
+     PyImathFixedArray2D.h
+       Operators must be declared in PyImath namespace, not global scope:
+       => line 463: comment out PyImath namespace closing
+       => line 637: comment out PyImath namespace opening
+
+
+(*): On OSX, use "-fPIC -fno-common -fvisibility=hidden -DPIC" instead.
+     The visibility flags is for gcc to stop issuing warning about code
+     visibility changes when the static library is linked to a dynamic
+     one or a program.

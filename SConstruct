@@ -95,8 +95,11 @@ boostpy_libname = excons.GetArgument("boost-python-libname", "boost_python")
 AddDirectories(boostpy_inc, boostpy_lib)
 
 ilmbasepy_inc, ilmbasepy_lib = excons.GetDirsWithDefault("ilmbase-python", incdirdef=deps_inc, libdirdef=deps_lib)
+ilmbasepy_libsuffix = excons.GetArgument("ilmbase-python-libsuffix", ilmbase_libsuffix)
 if ilmbasepy_inc and not ilmbasepy_inc.endswith("OpenEXR"):
   ilmbasepy_inc += "/OpenEXR"
+if ilmbasepy_libsuffix:
+  ilmbasepy_libs = map(lambda x: x+ilmbasepy_libsuffix, ilmbasepy_libs)
 AddDirectories(ilmbasepy_inc, ilmbasepy_lib)
 
 nameprefix = excons.GetArgument("name-prefix", default="")
