@@ -29,7 +29,7 @@ public:
       {
       }  
       
-      inline Tri(int32_t _v0, int32_t _v1, int32_t _v2)
+      inline Tri(Alembic::Abc::int32_t _v0, Alembic::Abc::int32_t _v1, Alembic::Abc::int32_t _v2)
          : v0(_v0), v1(_v1), v2(_v2)
       {
       }
@@ -58,7 +58,7 @@ public:
       {
       }  
       
-      inline Line(int32_t _v0, int32_t _v1)
+      inline Line(Alembic::Abc::int32_t _v0, Alembic::Abc::int32_t _v1)
          : v0(_v0), v1(_v1)
       {
       }

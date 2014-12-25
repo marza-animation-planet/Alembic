@@ -23,7 +23,8 @@ libdirs = []
 libs    = []
 
 if sys.platform == "win32":
-   defs.extend(["PLATFORM_WINDOWS", "PLATFORM=WINDOWS"])
+   #defs.extend(["PLATFORM_WINDOWS", "PLATFORM=WINDOWS"])
+   defs.extend(["PLATFORM_WINDOWS"])
 elif sys.platform == "darwin":
    defs.extend(["PLATFORM_DARWIN", "PLATFORM=DARWIN"])
    libs.append("m")
@@ -31,7 +32,7 @@ else:
    defs.extend(["PLATFORM_LINUX", "PLATFORM=LINUX"])
    libs.extend(["dl", "rt", "m"])
 
-hdf5_libs = ["hdf5_hl", "hdf5", "z", "sz"]
+hdf5_libs = []
 
 ilmbase_libs = ["IlmThread", "Imath", "IexMath", "Iex", "Half"]
 
@@ -50,6 +51,9 @@ alembic_libs = ["AlembicAbcMaterial",
 
 alembicgl_libs = ["AlembicAbcOpenGL"]
 
+regex_def = []
+regex_inc = []
+regex_src = []
 
 
 
@@ -70,18 +74,38 @@ def SafeRemove(lst, item):
    return lst
 
 
+# Default dependencies include and library path
 deps_inc, deps_lib = excons.GetDirs("deps", noexc=True, silent=True)
 AddDirectories(deps_inc, deps_lib)
 
-zlib_inc, zlib_lib = excons.GetDirsWithDefault("zlib", incdirdef=deps_inc, libdirdef=deps_lib)
-AddDirectories(zlib_inc, zlib_lib)
-
+# Boost library setup
 boost_inc, boost_lib = excons.GetDirsWithDefault("boost", incdirdef=deps_inc, libdirdef=deps_lib)
 AddDirectories(boost_inc, boost_lib)
 
+# Boost python setup
+boostpy_inc, boostpy_lib = excons.GetDirsWithDefault("boost-python", incdirdef=deps_inc, libdirdef=deps_lib)
+boostpy_libname = excons.GetArgument("boost-python-libname", "boost_python")
+AddDirectories(boostpy_inc, boostpy_lib)
+
+# HDF5 library setup
 hdf5_inc, hdf5_lib = excons.GetDirsWithDefault("hdf5", incdirdef=deps_inc, libdirdef=deps_lib)
 AddDirectories(hdf5_inc, hdf5_lib)
+hdf5_libname = excons.GetArgument("hdf5-libname", ("hdf5" if sys.platform != "win32" else "libhdf5"))
+hdf5_libs.extend([hdf5_libname+"_hl", hdf5_libname])
 
+# zlib library setup
+zlib_inc, zlib_lib = excons.GetDirsWithDefault("zlib", incdirdef=deps_inc, libdirdef=deps_lib)
+AddDirectories(zlib_inc, zlib_lib)
+zlib_libname = excons.GetArgument("zlib-libname", ("z" if sys.platform != "win32" else "zlib"))
+hdf5_libs.append(zlib_libname)
+
+# szip library setup
+szip_inc, szip_lib = excons.GetDirsWithDefault("szip", incdirdef=deps_inc, libdirdef=deps_lib)
+AddDirectories(szip_inc, szip_lib)
+szip_libname = excons.GetArgument("szip-libname", ("sz" if sys.platform != "win32" else "libszip"))
+hdf5_libs.append(szip_libname)
+
+# IlmBase library setup
 ilmbase_inc, ilmbase_lib = excons.GetDirsWithDefault("ilmbase", incdirdef=deps_inc, libdirdef=deps_lib)
 ilmbase_libsuffix = excons.GetArgument("ilmbase-libsuffix", "")
 if ilmbase_inc and not ilmbase_inc.endswith("OpenEXR"):
@@ -90,10 +114,7 @@ if ilmbase_libsuffix:
   ilmbase_libs = map(lambda x: x+ilmbase_libsuffix, ilmbase_libs)
 AddDirectories(ilmbase_inc, ilmbase_lib)
 
-boostpy_inc, boostpy_lib = excons.GetDirsWithDefault("boost-python", incdirdef=deps_inc, libdirdef=deps_lib)
-boostpy_libname = excons.GetArgument("boost-python-libname", "boost_python")
-AddDirectories(boostpy_inc, boostpy_lib)
-
+# IlmBase python setup
 ilmbasepy_inc, ilmbasepy_lib = excons.GetDirsWithDefault("ilmbase-python", incdirdef=deps_inc, libdirdef=deps_lib)
 ilmbasepy_libsuffix = excons.GetArgument("ilmbase-python-libsuffix", ilmbase_libsuffix)
 if ilmbasepy_inc and not ilmbasepy_inc.endswith("OpenEXR"):
@@ -102,10 +123,11 @@ if ilmbasepy_libsuffix:
   ilmbasepy_libs = map(lambda x: x+ilmbasepy_libsuffix, ilmbasepy_libs)
 AddDirectories(ilmbasepy_inc, ilmbasepy_lib)
 
+# Others
 nameprefix = excons.GetArgument("name-prefix", default="")
 
-# arnold, maya, python, glut, glew => excons tools
-# GLEW setup (default): glew-static=1, glew-no-glu=1, glew-mx=0
+# arnold, maya, python, glut, glew: using excons tools
+# (GLEW default setup: glew-static=1, glew-no-glu=1, glew-mx=0)
 
 
 env = excons.MakeBaseEnv()
@@ -124,6 +146,13 @@ if sys.platform == "darwin":
                                     "-Wno-unused-function",
                                     "-Wno-unused-variable",
                                     "-Wno-unused-private-field"]))
+elif sys.platform == "win32":
+   env.Append(CCFLAGS = " /bigobj")
+   defs.extend(["NOMINMAX", "OPENEXR_DLL"])
+   regex_dir = "lib/SceneHelper/regex-2.7/src"
+   regex_def = ["REGEX_STATIC"]
+   regex_inc = [regex_dir]
+   regex_src = [regex_dir + "/regex.c"]
 
 prjs = [
    {"name": "AlembicUtil",
@@ -198,7 +227,8 @@ prjs = [
     "srcs": glob.glob("lib/Alembic/Ogawa/*.cpp"),
     "install": {"include/Alembic/Ogawa": glob.glob("lib/Alembic/Ogawa/*.h")}
    },
-   {"name": "alembicmodule",
+   {"name": ("alembicmodule" if sys.platform != "win32" else "alembic"),
+    "alias": "pyalembic",
     "type": "dynamicmodule",
     "ext": python.ModuleExtension(),
     "prefix": "%s/%s" % (python.ModulePrefix(), python.Version()),
@@ -267,7 +297,8 @@ prjs = [
     "srcs": glob.glob("lib/AbcOpenGL/*.cpp"),
     "install": {"include/AbcOpenGL": glob.glob("lib/AbcOpenGL/*.h")}
    },
-   {"name": "alembicglmodule",
+   {"name": ("alembicglmodule" if sys.platform != "win32" else "alembicgl"),
+    "alias": "pyalembicgl",
     "type": "dynamicmodule",
     "ext": python.ModuleExtension(),
     "prefix": "%s/%s" % (python.ModulePrefix(), python.Version()),
@@ -289,11 +320,11 @@ prjs = [
    },
    {"name": "SceneHelper",
     "type": "program",
-    "defs": defs,
-    "incdirs": incdirs + ["examples/bin/SceneHelper", "lib/SceneHelper"],
+    "defs": defs + regex_def,
+    "incdirs": incdirs + ["examples/bin/SceneHelper", "lib/SceneHelper"] + regex_inc,
     "libdirs": libdirs,
     "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs + (["pthread"] if sys.platform != "win32" else []),
-    "srcs": glob.glob("examples/bin/SceneHelper/*.cpp") + glob.glob("lib/SceneHelper/*.cpp")
+    "srcs": glob.glob("examples/bin/SceneHelper/*.cpp") + glob.glob("lib/SceneHelper/*.cpp") + regex_src
    }
 ]
 
@@ -316,11 +347,11 @@ if excons.GetArgument("with-arnold", default=None) is not None:
                 "type": "dynamicmodule",
                 "ext": arnold.PluginExt(),
                 "prefix": "arnold",
-                "defs": defs,
-                "incdirs": incdirs + ["arnold/abcproc"] + ["lib/SceneHelper"],
+                "defs": defs + regex_def,
+                "incdirs": incdirs + ["arnold/abcproc"] + ["lib/SceneHelper"] + regex_inc,
                 "libdirs": libdirs,
                 "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
-                "srcs": glob.glob("arnold/abcproc/*.cpp") + glob.glob("lib/SceneHelper/*.cpp"),
+                "srcs": glob.glob("arnold/abcproc/*.cpp") + glob.glob("lib/SceneHelper/*.cpp") + regex_src,
                 "custom": [arnold.Require]})
 
 if excons.GetArgument("with-maya", default=None) is not None:
@@ -369,11 +400,11 @@ if excons.GetArgument("with-maya", default=None) is not None:
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins",
-                 "defs": plugin_defs,
-                 "incdirs": incdirs + ["maya/AbcShape", "lib/SceneHelper"],
+                 "defs": plugin_defs + regex_def,
+                 "incdirs": incdirs + ["maya/AbcShape", "lib/SceneHelper"] + regex_inc,
                  "libdirs": libdirs,
                  "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
-                 "srcs": glob.glob("maya/AbcShape/*.cpp") + glob.glob("lib/SceneHelper/*.cpp"),
+                 "srcs": glob.glob("maya/AbcShape/*.cpp") + glob.glob("lib/SceneHelper/*.cpp") + regex_src,
                  "install": {"maya/scripts": glob.glob("maya/AbcShape/*.mel"),
                              "maya/python": [AbcShapeMtoa]},
                  "custom": [maya.Require, maya.Plugin]}])

@@ -54,8 +54,8 @@ void MeshData::_update(bool varyingTopology,
       std::cout << "[MeshData] Rebuild faces" << std::endl;
       #endif
       
-      const int32_t *counts = fc->get();
-      const int32_t *indices = fi->get();
+      const Alembic::Abc::int32_t *counts = fc->get();
+      const Alembic::Abc::int32_t *indices = fi->get();
       size_t ii = 0;
       
       for (size_t i=0; i<nf; ++i)

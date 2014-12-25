@@ -1,7 +1,10 @@
 Setup BUILD_DIR to point to whatever directory you want the output libraries to be
 
-Building szip as a static library
+
+Building szip 2.1 as a static library
    
+   [unix]
+
    # Force PIC objects
    export CFLAGS="-fPIC" (*)
    export CXXFLAGS=$CFLAGS
@@ -12,42 +15,61 @@ Building szip as a static library
    # Deploy
    make install
 
-Building zlib as a static library
+   [windows]
+
+   Use the visual studio project provided with the source code to build the static version of the library as it is.
+
+
+Building zlib 1.2.8 as a static library
    
+   [unix]
+
    export CFLAGS="-fPIC" (*)
    export CXXFLAGS=$CFLAGS
    ./configure --prefix=$BUILD_DIR --static
    make
    make install
 
-Building hdf5 as a static library
+   [windows]
+
+   Overwrite the content of zlib source tree "contrib/vstudio/vc9" directory with that of "build/Windows/vc9/zlib-1.2.8/contrib/vstudio/vc9".
+   Open a visual studio prompt and run zlib source tree "contrib/masmx64/bld_ml64.bat" from its own directory.
+   Open the "contrib/vstudio/vc9/zlibvc.sln" solution and build the "zlibvc" target.
+
+
+Building hdf5 1.8.13 as a static library
    
+   [unix]
+
    export CFLAGS="-fPIC" (*)
    export CXXFLAGS=$CFLAGS
    ./configure --prefix=$BUILD_DIR --with-szlib=$BUILD_DIR --with-zlib=$BUILD_DIR --enable-production --enable-cxx --enable-static --disable-shared (--enable-threadsafe --enable-unsupported)
    make
    make install
 
-Building ilmbase as shared libraries
-   
-   # Be sure to reset CFLAGS/CXXFLAGS first
-   export CFLAGS=
-   export CXXFLAGS=
-   ./configure --prefix=$BUILD_DIR --disable-static --enable-shared
-   # To avoid conflict with existing system/application wide ilmbase libraries
-   # add a '_alembic' suffix to all generated libraries by editing Makefile
-   # files manually (hint: look for the string ".la")
-   make
-   make install
+   [windows]
+
+   Use cmake gui to generate the visual studio solution
+     Enable HL and C++ lib
+     Enable zlib and setup to point at the zlib compiled in previous step
+     Enable szip and setup to point at the szip compiled in previous step
+     Enable tools
+     Build as static
+     DO NOT enable threadsafe yet (won't work anyway)
+   Once the solution is generated, go to the build directory and edit the H5pubconf.h to enable thread safety
+     #define H5_HAVE_WIN_THREADS 1
+     #define H5_HAVE_THREADSAFE 1
+   Build ALL_BUILD target from generated solution
+
 
 Building boost 1.44.0 as static libraries but for boost python
    
    ./bootstrap.sh --prefix=$BUILD_DIR
-   # Edit tools/build/v2/user-config.jam to add gcc compile flags adding a line
-   # 'using gcc : : : <compileflags>-fPIC ;' (*)
+   # [unix] Edit tools/build/v2/user-config.jam to add gcc compile flags adding a line
+   #   'using gcc : : : <compileflags>-fPIC ;' (*)
    ./bjam --without-python variant=release link=static runtime-link=shared threading=multi --prefix=$BUILD_DIR install
-   # Revert the compileflags in user-config.jam and possibly setup python
-   # [OSX only] Fix boost build python tool (see notes below)
+   # [unix] Revert the compileflags in user-config.jam and possibly setup python
+   # [osx] Fix boost build python tool (see notes below)
    # As for ilmbase libraries, prefix generated library with '_alembic'
    # In libs/python/build/Jamfile.v2, replace 'boost_python' by
    #   'boost_python_alembic' in the rule name and library name
@@ -96,8 +118,44 @@ Building boost 1.44.0 as static libraries but for boost python
        Line 128: replace "groups.erase(g++)” by
                  "groups.erase(static_cast<const_group_iterator>(g++))"
 
-Building pyilmbase
+
+Building ilmbase 1.0.3 as shared libraries
    
+   [unix]
+
+   # Be sure to reset CFLAGS/CXXFLAGS first
+   export CFLAGS=
+   export CXXFLAGS=
+   ./configure --prefix=$BUILD_DIR --disable-static --enable-shared
+   # To avoid conflict with existing system/application wide ilmbase libraries
+   # add a '_alembic' suffix to all generated libraries by editing Makefile
+   # files manually (hint: look for the string ".la")
+   make
+   make install
+
+   [windows]
+
+   Overwrite the content of ilmbase source tree top directory with that of "build/Windows/vc9/ilmbase-1.0.3".
+   You have to observe the following directory layout:
+     path-to-work-directory/ (or wherever you want)
+       boost/ (FIXED NAME, output build from previous step)
+         include/
+           boost/
+         lib/
+       python26/ (FIXED NAME, a standard python 2.6 install)
+         include/
+         libs/
+       src/ (or whatever name you want)
+         ilmbase-1.0.3/
+         pyilmbase-1.0.0/
+       Deploy/ (output of ilmbase, pyilmbase build)
+   Open the "vc/vc9/IlmBase/PyIlmBase.sln" solution and build the "Half", "Iex", "IexMath" and "Imath" targets.
+
+
+Building pyilmbase 1.0.0
+   
+   [unix]
+
    ./configure --prefix=$BUILD_DIR --disable-ilmbasetest --with-ilmbase-prefix=$BUILD_DIR --with-boost-include-dir=$BUILD_DIR/include --with-boost-lib-dir=$BUILD_DIR/lib --with-boost-python-libname=boost_python_alembic --disable-boostpythontest
    # Edit Makefiles to use suffixed version if ilmbase libraries
    # Also add '_alembic' suffix to PyImath and PyIex library names
@@ -126,6 +184,11 @@ Building pyilmbase
        Operators must be declared in PyImath namespace, not global scope:
        => line 463: comment out PyImath namespace closing
        => line 637: comment out PyImath namespace opening
+
+   [windows]
+   
+   Overwrite the content of pyilmbase source tree top directory with that of "build/Windows/vc9/pyilmbase-1.0.0".
+   Open the solution from ilmbase build step and build the "iexmodule" and "imathmodule" targets.
 
 
 (*): On OSX, use "-fPIC -fno-common -fvisibility=hidden -DPIC" instead.
