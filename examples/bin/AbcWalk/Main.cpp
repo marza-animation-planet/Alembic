@@ -35,10 +35,55 @@
 //-*****************************************************************************
 
 #include <stdio.h>
-#include <pthread.h>
-#include <sys/time.h>
+#include <OpenEXR/IlmThread.h>
 #include <Alembic/Abc/All.h>
 #include <Alembic/AbcCoreFactory/All.h>
+
+#ifdef _WIN32
+
+#include <windows.h>
+#include <time.h>
+
+double getTimeSec()
+{
+    static bool _freq_init = true;
+    static bool _use_clock = false;
+    static double _freq = 0.0;
+
+    if (_freq_init)
+    {
+        LARGE_INTEGER freq;
+        freq.QuadPart = 0;
+        
+        if (QueryPerformanceFrequency(&freq) && freq.QuadPart > 0)
+        {
+            _freq = 1.0 / double(freq.QuadPart);
+        }
+        else
+        {
+            _use_clock = true;
+            _freq = 1.0 / CLOCKS_PER_SEC;
+        }
+
+        _freq_init = false;
+    }
+
+    if (_use_clock)
+    {
+        return (clock() * _freq);
+    }
+    else
+    {
+        LARGE_INTEGER count;
+        count.QuadPart = 0;
+        QueryPerformanceCounter(&count);
+        return (count.QuadPart * _freq);
+    }
+}
+
+#else
+
+#include <sys/time.h>
 
 double getTimeSec()
 {
@@ -46,6 +91,8 @@ double getTimeSec()
     gettimeofday(&t, 0);
     return (double) t.tv_sec + (double) t.tv_usec / 1000000.0;
 }
+
+#endif
 
 using namespace Alembic;
 
@@ -140,8 +187,6 @@ void readProps(WorkUnit & data)
 
     printf("readProps Work Unit End %d %d %f\n",
            data.start, data.end, getTimeSec() - startTime);
-
-    pthread_exit(0);
 }
 
 void findProps(int iArchiveNum, Abc::ICompoundProperty & iParent)
@@ -209,19 +254,47 @@ void walkArchives(WorkUnit & data)
 
 };
 
-void * readPropsWrap(void * ptr)
+class ReadPropsThread : public IlmThread::Thread
 {
-    WorkUnit * data = (WorkUnit *) ptr;
-    data->walker->readProps(*data);
-    pthread_exit(0);
-}
+public:
 
-void * walkArchivesWrap(void * ptr)
+    ReadPropsThread(WorkUnit &workUnit)
+        : IlmThread::Thread(), mWorkUnit(workUnit)
+    {
+    }
+
+    virtual void run()
+    {
+        mWorkUnit.walker->readProps(mWorkUnit);
+    }
+
+private:
+
+    ReadPropsThread();
+
+    WorkUnit &mWorkUnit;
+};
+
+class WalkArchivesThread : public IlmThread::Thread
 {
-    WorkUnit * data = (WorkUnit *) ptr;
-    data->walker->walkArchives(*data);
-    pthread_exit(0);
-}
+public:
+
+    WalkArchivesThread(WorkUnit &workUnit)
+        : IlmThread::Thread(), mWorkUnit(workUnit)
+    {
+    }
+
+    virtual void run()
+    {
+        mWorkUnit.walker->walkArchives(mWorkUnit);
+    }
+
+private:
+
+    WalkArchivesThread();
+
+    WorkUnit &mWorkUnit;
+};
 
 int main(int argc, char ** argv)
 {
@@ -258,7 +331,7 @@ int main(int argc, char ** argv)
     if ((int) walker.mArchives.size() > numTraverse)
         workRem = walker.mArchives.size() % numTraverse;
 
-    pthread_t * walkThreads = new pthread_t[numTraverse];
+    IlmThread::Thread ** walkThreads = new IlmThread::Thread*[numTraverse];
 
     for (int i = 0; i < numTraverse; ++i)
     {
@@ -270,13 +343,13 @@ int main(int argc, char ** argv)
             lastEnd ++;
         traverseArchives[i].end = lastEnd;
 
-        pthread_create(&(walkThreads[i]), NULL, walkArchivesWrap,
-            (void *) &(traverseArchives[i]));
+        walkThreads[i] = new WalkArchivesThread(traverseArchives[i]);
+        walkThreads[i]->start();
     }
 
     for (int i = 0; i < numTraverse; ++i)
     {
-        pthread_join(walkThreads[i], NULL);
+        delete walkThreads[i];
     }
 
     delete [] walkThreads;
@@ -300,7 +373,8 @@ int main(int argc, char ** argv)
     if ((int) maxSamples > numSamples)
         workRem = maxSamples % numSamples;
 
-    pthread_t * readThreads = new pthread_t[numSamples];
+    IlmThread::Thread ** readThreads = new IlmThread::Thread*[numSamples];
+    
     for (int i = 0; i < numSamples; ++i)
     {
         readSamples[i].archive = i;  // ignored
@@ -310,13 +384,13 @@ int main(int argc, char ** argv)
         if (i < workRem)
             lastEnd ++;
         readSamples[i].end = lastEnd;
-        pthread_create(&(readThreads[i]), NULL, readPropsWrap,
-            (void *) &(readSamples[i]));
+        readThreads[i] = new ReadPropsThread(readSamples[i]);
+        readThreads[i]->start();
     }
 
     for (int i = 0; i < numSamples; ++i)
     {
-        pthread_join(readThreads[i], NULL);
+        delete readThreads[i];
     }
 
     delete [] readThreads;

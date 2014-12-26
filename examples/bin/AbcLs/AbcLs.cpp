@@ -357,14 +357,14 @@ void printValue( Abc::ICompoundProperty iParent, Abc::PropertyHeader header,
         switch ( pod )
         {
             CASE_RETURN_ARRAY_VALUE(Abc::BooleanTPTraits, bool, p, header, iss);
-            CASE_RETURN_ARRAY_VALUE(Abc::Uint8TPTraits, uint8_t, p, header, iss);
-            CASE_RETURN_ARRAY_VALUE(Abc::Int8TPTraits, int8_t, p, header, iss);
-            CASE_RETURN_ARRAY_VALUE(Abc::Uint16TPTraits, uint16_t, p, header, iss);
-            CASE_RETURN_ARRAY_VALUE(Abc::Int16TPTraits, int16_t, p, header, iss);
-            CASE_RETURN_ARRAY_VALUE(Abc::Uint32TPTraits, uint32_t, p, header, iss);
-            CASE_RETURN_ARRAY_VALUE(Abc::Int32TPTraits, int32_t, p, header, iss);
-            CASE_RETURN_ARRAY_VALUE(Abc::Uint64TPTraits, uint64_t, p, header, iss);
-            CASE_RETURN_ARRAY_VALUE(Abc::Int64TPTraits, int64_t, p, header, iss);
+            CASE_RETURN_ARRAY_VALUE(Abc::Uint8TPTraits, AbcU::uint8_t, p, header, iss);
+            CASE_RETURN_ARRAY_VALUE(Abc::Int8TPTraits, AbcU::int8_t, p, header, iss);
+            CASE_RETURN_ARRAY_VALUE(Abc::Uint16TPTraits, AbcU::uint16_t, p, header, iss);
+            CASE_RETURN_ARRAY_VALUE(Abc::Int16TPTraits, AbcU::int16_t, p, header, iss);
+            CASE_RETURN_ARRAY_VALUE(Abc::Uint32TPTraits, AbcU::uint32_t, p, header, iss);
+            CASE_RETURN_ARRAY_VALUE(Abc::Int32TPTraits, AbcU::int32_t, p, header, iss);
+            CASE_RETURN_ARRAY_VALUE(Abc::Uint64TPTraits, AbcU::uint64_t, p, header, iss);
+            CASE_RETURN_ARRAY_VALUE(Abc::Int64TPTraits, AbcU::int64_t, p, header, iss);
             CASE_RETURN_ARRAY_VALUE(Abc::Float32TPTraits, float, p, header, iss);
             CASE_RETURN_ARRAY_VALUE(Abc::Float64TPTraits, double, p, header, iss);
             CASE_RETURN_ARRAY_VALUE(Abc::StringTPTraits, std::string, p, header, iss);
@@ -630,11 +630,13 @@ int main( int argc, char *argv[] )
     );
 
     // seg fault handler
+#ifndef _WIN32
     struct sigaction act;
     sigemptyset(&act.sa_mask);
     act.sa_handler = segfault_sigaction;
     act.sa_flags = SA_SIGINFO;
     sigaction(SIGSEGV, &act, NULL);
+#endif
 
     // check for min args
     if ( argc < 2 ) {
@@ -760,9 +762,9 @@ int main( int argc, char *argv[] )
         };
 
         if ( opt_time && seglist.size() == 0 ) {
-            uint32_t numTimes = archive.getNumTimeSamplings();
+            AbcU::uint32_t numTimes = archive.getNumTimeSamplings();
             std::cout << std::endl << "Time Samplings: " << std::endl;
-            for ( uint32_t k = 0; k < numTimes; ++k ) {
+            for ( AbcU::uint32_t k = 0; k < numTimes; ++k ) {
                 AbcA::TimeSamplingPtr ts = archive.getTimeSampling( k );
                 index_t maxSample =
                     archive.getMaxNumSamplesForTimeSamplingIndex( k );

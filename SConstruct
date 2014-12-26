@@ -129,7 +129,6 @@ nameprefix = excons.GetArgument("name-prefix", default="")
 # arnold, maya, python, glut, glew: using excons tools
 # (GLEW default setup: glew-static=1, glew-no-glu=1, glew-mx=0)
 
-
 env = excons.MakeBaseEnv()
 
 if sys.platform == "darwin":
@@ -242,6 +241,7 @@ prjs = [
    },
    {"name": "abcconvert",
     "type": "program",
+    "defs": defs,
     "incdirs": incdirs,
     "libdirs": libdirs,
     "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
@@ -249,6 +249,7 @@ prjs = [
    },
    {"name": "abcecho",
     "type": "program",
+    "defs": defs,
     "incdirs": incdirs,
     "libdirs": libdirs,
     "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
@@ -256,6 +257,7 @@ prjs = [
    },
    {"name": "abcboundsecho",
     "type": "program",
+    "defs": defs,
     "incdirs": incdirs,
     "libdirs": libdirs,
     "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
@@ -263,6 +265,7 @@ prjs = [
    },
    {"name": "abcls",
     "type": "program",
+    "defs": defs,
     "incdirs": incdirs,
     "libdirs": libdirs,
     "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
@@ -270,6 +273,7 @@ prjs = [
    },
    {"name": "abcstitcher",
     "type": "program",
+    "defs": defs,
     "incdirs": incdirs,
     "libdirs": libdirs,
     "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
@@ -277,6 +281,7 @@ prjs = [
    },
    {"name": "abctree",
     "type": "program",
+    "defs": defs,
     "incdirs": incdirs,
     "libdirs": libdirs,
     "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
@@ -284,6 +289,7 @@ prjs = [
    },
    {"name": "abcwalk",
     "type": "program",
+    "defs": defs,
     "incdirs": incdirs,
     "libdirs": libdirs,
     "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
@@ -295,6 +301,7 @@ prjs = [
     "defs": defs + gldefs,
     "incdirs": incdirs,
     "srcs": glob.glob("lib/AbcOpenGL/*.cpp"),
+    "custom": [glut.Require],
     "install": {"include/AbcOpenGL": glob.glob("lib/AbcOpenGL/*.h")}
    },
    {"name": ("alembicglmodule" if sys.platform != "win32" else "alembicgl"),
@@ -307,7 +314,7 @@ prjs = [
     "libdirs": libdirs,
     "srcs": glob.glob("python/PyAbcOpenGL/*.cpp"),
     "libs": alembicgl_libs + alembic_libs + [boostpy_libname] + ilmbasepy_libs + ilmbase_libs + hdf5_libs + libs,
-    "custom": glreqs + [python.SoftRequire]
+    "custom": glreqs + [glut.Require, python.SoftRequire]
    },
    {"name": "SimpleAbcViewer",
     "type": "program",
