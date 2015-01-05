@@ -145,7 +145,7 @@ void ProcessIndexedBuiltinParam(
     if ( !param.valid() ) { return; }
     
     bool isFirstSample = true;
-    for ( SampleTimeSet::iterator I = sampleTimes.begin();
+    for ( SampleTimeSet::const_iterator I = sampleTimes.begin();
           I != sampleTimes.end(); ++I, isFirstSample = false)
     {
         ISampleSelector sampleSelector( *I );
