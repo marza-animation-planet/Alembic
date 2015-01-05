@@ -88,22 +88,48 @@ boostpy_libname = excons.GetArgument("boost-python-libname", "boost_python")
 AddDirectories(boostpy_inc, boostpy_lib)
 
 # HDF5 library setup
+hdf5_threadsafe = False
+hdf5_zlib = False
+hdf5_szip = False
+
 hdf5_inc, hdf5_lib = excons.GetDirsWithDefault("hdf5", incdirdef=deps_inc, libdirdef=deps_lib)
 AddDirectories(hdf5_inc, hdf5_lib)
 hdf5_libname = excons.GetArgument("hdf5-libname", ("hdf5" if sys.platform != "win32" else "libhdf5"))
 hdf5_libs.extend([hdf5_libname+"_hl", hdf5_libname])
 
-# zlib library setup
-zlib_inc, zlib_lib = excons.GetDirsWithDefault("zlib", incdirdef=deps_inc, libdirdef=deps_lib)
-AddDirectories(zlib_inc, zlib_lib)
-zlib_libname = excons.GetArgument("zlib-libname", ("z" if sys.platform != "win32" else "zlib"))
-hdf5_libs.append(zlib_libname)
+h5conf = os.path.join(hdf5_inc, "H5pubconf.h")
+if os.path.isfile(h5conf):
+  f = open(h5conf, "r")
+  tse = re.compile(r"^\s*#define\s+H5_HAVE_THREADSAFE\s+1")
+  sze = re.compile(r"^\s*#define\s+H5_HAVE_SZLIB_H\s+1")
+  zle = re.compile(r"^\s*#define\s+H5_HAVE_ZLIB_H\s+1")
+  for l in f.readlines():
+    l = l.strip()
+    if tse.match(l):
+      print("HDF5 thread safe")
+      hdf5_threadsafe = True
+    elif sze.match(l):
+      print("HDF5 using szip")
+      hdf5_szip = True
+    elif zle.match(l):
+      print("HDF5 using zlib")
+      hdf5_zlib = True
+  f.close()
 
-# szip library setup
-szip_inc, szip_lib = excons.GetDirsWithDefault("szip", incdirdef=deps_inc, libdirdef=deps_lib)
-AddDirectories(szip_inc, szip_lib)
-szip_libname = excons.GetArgument("szip-libname", ("sz" if sys.platform != "win32" else "libszip"))
-hdf5_libs.append(szip_libname)
+if hdf5_threadsafe and sys.platform != "win32":
+  hdf5_libs.append("pthread")
+
+if hdf5_zlib:
+  zlib_inc, zlib_lib = excons.GetDirsWithDefault("zlib", incdirdef=deps_inc, libdirdef=deps_lib)
+  AddDirectories(zlib_inc, zlib_lib)
+  zlib_libname = excons.GetArgument("zlib-libname", ("z" if sys.platform != "win32" else "zlib"))
+  hdf5_libs.append(zlib_libname)
+
+if hdf5_szip:
+  szip_inc, szip_lib = excons.GetDirsWithDefault("szip", incdirdef=deps_inc, libdirdef=deps_lib)
+  AddDirectories(szip_inc, szip_lib)
+  szip_libname = excons.GetArgument("szip-libname", ("sz" if sys.platform != "win32" else "libszip"))
+  hdf5_libs.append(szip_libname)
 
 # IlmBase library setup
 ilmbase_inc, ilmbase_lib = excons.GetDirsWithDefault("ilmbase", incdirdef=deps_inc, libdirdef=deps_lib)
