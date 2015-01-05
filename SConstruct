@@ -88,7 +88,7 @@ boostpy_libname = excons.GetArgument("boost-python-libname", "boost_python")
 AddDirectories(boostpy_inc, boostpy_lib)
 
 # HDF5 library setup
-hdf5_static = False
+hdf5_static = (excons.GetArgument("hdf5-static", 1, int) == 1)
 hdf5_threadsafe = False
 hdf5_zlib = False
 hdf5_szip = False
@@ -100,28 +100,26 @@ hdf5_libs.extend([hdf5_libname+"_hl", hdf5_libname])
 
 h5conf = os.path.join(hdf5_inc, "H5pubconf.h")
 if os.path.isfile(h5conf):
+  print("[HDF5] Reading configuration header...")
   f = open(h5conf, "r")
-  sbe = re.compile(r"^\s*#define\s+H5_BUILT_AS_STATIC_LIB\s+1")
   tse = re.compile(r"^\s*#define\s+H5_HAVE_THREADSAFE\s+1")
   sze = re.compile(r"^\s*#define\s+H5_HAVE_SZLIB_H\s+1")
   zle = re.compile(r"^\s*#define\s+H5_HAVE_ZLIB_H\s+1")
   for l in f.readlines():
     l = l.strip()
     if tse.match(l):
-      print("HDF5 thread safe")
+      print("[HDF5] Thread safe")
       hdf5_threadsafe = True
     elif sze.match(l):
-      print("HDF5 using szip")
+      print("[HDF5] Using szip")
       hdf5_szip = True
     elif zle.match(l):
-      print("HDF5 using zlib")
+      print("[HDF5] Using zlib")
       hdf5_zlib = True
-    elif sbe.match(l):
-      print("HDF5 static build")
-      hdf5_static = True
   f.close()
 
 if hdf5_static:
+  print("[HDF5] Static build")
   if hdf5_threadsafe and sys.platform != "win32":
     hdf5_libs.append("pthread")
 
