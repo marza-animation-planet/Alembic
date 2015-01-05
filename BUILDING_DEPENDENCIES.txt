@@ -48,17 +48,25 @@ Building hdf5 1.8.13 as a static library
    make install
 
    [windows]
+   
+   Edit CMakeLists.txt to enable use of thread safe build with static build and cpp lib
+     comment out line 705, 706, 707, 714, 715 and 716:
+     
+     #if (H5_BUILT_AS_STATIC_LIB)
+     #  message (FATAL_ERROR " **** thread-safety option not supported with static library **** ")
+     #endif (H5_BUILT_AS_STATIC_LIB)
+
+     #if (HDF5_BUILD_CPP_LIB)
+     #  message (FATAL_ERROR " **** C++ and thread-safety options are not supported **** ")
+     #endif (HDF5_BUILD_CPP_LIB)
 
    Use cmake gui to generate the visual studio solution
      Enable HL and C++ lib
      Enable zlib and setup to point at the zlib compiled in previous step
      Enable szip and setup to point at the szip compiled in previous step
      Enable tools
+     Enable threadsafe yet (won't work anyway)
      Build as static
-     DO NOT enable threadsafe yet (won't work anyway)
-   Once the solution is generated, go to the build directory and edit the H5pubconf.h to enable thread safety
-     #define H5_HAVE_WIN_THREADS 1
-     #define H5_HAVE_THREADSAFE 1
    Build ALL_BUILD target from generated solution
 
 
