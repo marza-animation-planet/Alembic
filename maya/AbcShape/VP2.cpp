@@ -249,7 +249,17 @@ public:
             bool hasDirection;
             bool hasPosition;
             
+#if MAYA_API_VERSION >= 201400
+            MFloatPointArray positions;
+            status = context.getLightInformation(i, positions, direction, intensity, color, hasDirection, hasPosition);
+            if (positions.length() > 0)
+            {
+               // only ever use first provided position for area light
+               position = positions[0];
+            }
+#else
             status = context.getLightInformation(i, position, direction, intensity, color, hasDirection, hasPosition);
+#endif
             
             col[0] = intensity * color[0];
             col[1] = intensity * color[1];
@@ -414,7 +424,11 @@ MBoundingBox AbcShapeOverride::boundingBox(const MDagPath &, const MDagPath &) c
    return MBoundingBox();
 }
 
+#if MAYA_API_VERSION >= 201400
+MUserData* AbcShapeOverride::prepareForDraw(const MDagPath &objPath, const MDagPath &, const MHWRender::MFrameContext &, MUserData *oldData)
+#else
 MUserData* AbcShapeOverride::prepareForDraw(const MDagPath &objPath, const MDagPath &, MUserData *oldData)
+#endif
 {
    MStatus status;
    MFnDependencyNode node(objPath.node(), &status);

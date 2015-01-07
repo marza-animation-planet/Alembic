@@ -4,6 +4,9 @@
 #include <maya/MPxDrawOverride.h>
 #include <maya/MDagPath.h>
 #include <maya/MUserData.h>
+#if MAYA_API_VERSION >= 201400
+#  include <maya/MFrameContext.h>
+#endif
 
 class AbcShapeOverride : public MHWRender::MPxDrawOverride
 {
@@ -27,7 +30,11 @@ public:
 
    virtual MBoundingBox boundingBox(const MDagPath& objPath, const MDagPath& cameraPath) const;
 
+#if MAYA_API_VERSION >= 201400
+   virtual MUserData* prepareForDraw(const MDagPath& objPath, const MDagPath& cameraPath, const MHWRender::MFrameContext& frameContext, MUserData* oldData);
+#else
    virtual MUserData* prepareForDraw(const MDagPath& objPath, const MDagPath& cameraPath, MUserData* oldData);
+#endif
 };
 
 #endif
