@@ -44,18 +44,20 @@
 #include <maya/MObject.h>
 #include <maya/MGlobal.h>
 
+#ifndef ABCIMPORT_VERSION
+#  define ABCIMPORT_VERSION "1.0"
+#endif
+
 // Interesting trivia: 0x2697 is the unicode character for Alembic
 const MTypeId AlembicNode::mMayaNodeId(0x00082697);
 
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
-    const char * pluginVersion = "1.0";
-    
     MString name = PREFIX_NAME("Alembic");
     MString commandName = PREFIX_NAME("AbcImport");
     MString nodeName = PREFIX_NAME("AlembicNode");
     
-    MFnPlugin plugin(obj, name.asChar(), pluginVersion, "Any");
+    MFnPlugin plugin(obj, name.asChar(), ABCIMPORT_VERSION, "Any");
 
     MStatus status;
 
@@ -88,7 +90,7 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     }
 
     MString info = commandName + " v";
-    info += pluginVersion;
+    info += ABCIMPORT_VERSION;
     info += " using ";
     info += Alembic::AbcCoreAbstract::GetLibraryVersion().c_str();
     MGlobal::displayInfo(info);

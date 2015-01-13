@@ -4,14 +4,16 @@
 #include "AbcShapeImport.h"
 #include "VP2.h"
 
+#ifndef ABCSHAPE_VERSION
+#  define ABCSHAPE_VERSION "1.0"
+#endif
+
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
-   const char * pluginVersion = "1.0";
-   
    MString nodeName = PREFIX_NAME("AbcShape");
    MString commandName = PREFIX_NAME("AbcShapeImport");
    
-   MFnPlugin plugin(obj, nodeName.asChar(), pluginVersion, "Any");
+   MFnPlugin plugin(obj, nodeName.asChar(), ABCSHAPE_VERSION, "Any");
 
    MStatus status = plugin.registerShape(nodeName,
                                          AbcShape::ID,

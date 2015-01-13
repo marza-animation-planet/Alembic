@@ -404,6 +404,10 @@ if excons.GetArgument("with-maya", default=None) is not None:
    AbcShapeMel = "maya/AbcShape/AE%sTemplate.mel" % AbcShapeName
    AbcShapeMtoa = "arnold/abcproc/mtoa_%s.py" % AbcShapeName
    
+   impver = excons.GetArgument("maya-abcimport-version", None)
+   expver = excons.GetArgument("maya-abcexport-version", None)
+   shpver = excons.GetArgument("maya-abcshape-version", None)
+   
    if not os.path.exists(AbcShapeMel):
       replace_in_file("maya/AbcShape/AETemplate.mel.tpl", AbcShapeMel, "<<NodeName>>", AbcShapeName)
    if not os.path.exists(AbcShapeMtoa):
@@ -413,7 +417,7 @@ if excons.GetArgument("with-maya", default=None) is not None:
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins",
-                 "defs": plugin_defs,
+                 "defs": plugin_defs + (["ABCIMPORT_VERSION=\"\\\"%s\\\"\"" % impver] if impver else []),
                  "incdirs": incdirs + ["maya/AbcImport"],
                  "libdirs": libdirs,
                  "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
@@ -425,7 +429,7 @@ if excons.GetArgument("with-maya", default=None) is not None:
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins",
-                 "defs": plugin_defs,
+                 "defs": plugin_defs + (["ABCEXPORT_VERSION=\"\\\"%s\\\"\"" % expver] if expver else []),
                  "incdirs": incdirs + ["maya/AbcExport"],
                  "libdirs": libdirs,
                  "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
@@ -437,7 +441,7 @@ if excons.GetArgument("with-maya", default=None) is not None:
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins",
-                 "defs": plugin_defs + regex_def,
+                 "defs": plugin_defs + regex_def + (["ABCSHAPE_VERSION=\"\\\"%s\\\"\"" % shpver] if expver else []),
                  "incdirs": incdirs + ["maya/AbcShape", "lib/SceneHelper"] + regex_inc,
                  "libdirs": libdirs,
                  "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,

@@ -138,6 +138,8 @@
 #  define NAME_PREFIX ""
 #endif
 
-#define ABCEXPORT_VERSION "1.0"
+#ifndef ABCEXPORT_VERSION
+#  define ABCEXPORT_VERSION "1.0"
+#endif
 
 #endif  // _AbcExport_Foundation_h_
