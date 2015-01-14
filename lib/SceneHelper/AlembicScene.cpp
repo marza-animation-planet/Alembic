@@ -151,28 +151,32 @@ bool AlembicScene::filter(AlembicNode *node)
 {
    size_t numChildren = 0;
    
-   bool included = (!mIncludeFilter || regexec(mIncludeFilter, node->path().c_str(), 0, NULL, 0) == 0);
-   bool excluded = (!included || (mExcludeFilter && regexec(mExcludeFilter, node->path().c_str(), 0, NULL, 0) == 0));
+   bool excluded = (mExcludeFilter && regexec(mExcludeFilter, node->path().c_str(), 0, NULL, 0) == 0);
    
-   for (Array::iterator it=node->beginChild(); it!=node->endChild(); ++it)
+   if (!excluded)
    {
-      if (filter(*it))
+      for (Array::iterator it=node->beginChild(); it!=node->endChild(); ++it)
       {
-         ++numChildren;
-         mFilteredNodes.insert(*it);
+         if (filter(*it))
+         {
+            ++numChildren;
+            mFilteredNodes.insert(*it);
+         }
       }
    }
    
-   // Even if node should be excluded, if any of the children was filtered successfully, include it
-   if (numChildren > 0 || !excluded)
+   // Even if node should not be included, if any of the children was filtered successfully, include it
+   if (numChildren == 0)
    {
-      return true;
+      bool included = (!mIncludeFilter || regexec(mIncludeFilter, node->path().c_str(), 0, NULL, 0) == 0);
+      
+      if (!included)
+      {
+         node->reset();
+         return false;
+      }
    }
-   else
-   {
-      node->reset();
-      return false;
-   }
+   return true;
 }
 
 AlembicNode::Set::iterator AlembicScene::beginFiltered()
