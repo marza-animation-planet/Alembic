@@ -16,7 +16,10 @@ public:
    virtual AlembicNode* clone(AlembicNode *parent=0) const;
    
    bool isFiltered(AlembicNode *node) const;
-   void setFilter(const std::string &filter);
+   inline void setFilter(const std::string &filter) { setIncludeFilter(filter); }
+   void setIncludeFilter(const std::string &includeFilter);
+   void setExcludeFilter(const std::string &excludeFilter);
+   void setFilters(const std::string &incl, const std::string &excl);
    Set::iterator beginFiltered();
    Set::iterator endFiltered();
    Set::const_iterator beginFiltered() const;
@@ -40,9 +43,12 @@ private:
 private:
    
    Alembic::Abc::IArchive mArchive;
-   bool mFiltered;
-   std::string mFilterStr;
-   regex_t mFilter;
+   std::string mIncludeFilterStr;
+   std::string mExcludeFilterStr;
+   regex_t *mIncludeFilter;
+   regex_t mIncludeFilter_;
+   regex_t *mExcludeFilter;
+   regex_t mExcludeFilter_;
    std::set<AlembicNode*> mFilteredNodes;
 };
 

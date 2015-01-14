@@ -50,6 +50,7 @@ MSyntax AbcShapeImport::createSyntax()
    syntax.addFlag("-ct", "-cycleType", MSyntax::kString);
    syntax.addFlag("-ri", "-rotationInterpolation", MSyntax::kString);
    syntax.addFlag("-ft", "-filterObjects", MSyntax::kString);
+   syntax.addFlag("-eft", "-excludeFilterObjects", MSyntax::kString);
    syntax.addFlag("-h", "-help", MSyntax::kNoArg);
    
    syntax.addArg(MSyntax::kString);
@@ -2434,6 +2435,8 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       MGlobal::displayInfo("                               Set the current time to the start of the frame range.");
       MGlobal::displayInfo("-ft / -filterObjects         : string");
       MGlobal::displayInfo("                               Selective import cache objects whose name matches expression.");
+      MGlobal::displayInfo("-eft / -excludeFilterObjects : string");
+      MGlobal::displayInfo("                               Selective exclude cache objects whose name matches expression.");
       MGlobal::displayInfo("-h / -help                   :");
       MGlobal::displayInfo("                               Display this help.");
       MGlobal::displayInfo("");
@@ -2720,7 +2723,8 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
    {
       MString filename("");
       MString ns("");
-      MString filter("");
+      MString includeFilter("");
+      MString excludeFilter("");
       MString curNs = MNamespace::currentNamespace();
       MDagPath parentDag;
       
@@ -2784,11 +2788,26 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
          
          if (status == MS::kSuccess)
          {
-            filter = val;
+            includeFilter = val;
          }
          else
          {
             MGlobal::displayWarning("Invalid filterObjects flag argument");
+         }
+      }
+      
+      if (argData.isFlagSet("excludeFilterObjects"))
+      {
+         MString val;
+         status = argData.getFlagArgument("excludeFilterObjects", 0, val);
+         
+         if (status == MS::kSuccess)
+         {
+            excludeFilter = val;
+         }
+         else
+         {
+            MGlobal::displayWarning("Invalid excludeFilterObjects flag argument");
          }
       }
       
@@ -2812,7 +2831,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
             AlembicScene *scene = AlembicSceneCache::Ref(abcPath);
             if (scene)
             {
-               scene->setFilter(filter.asChar());
+               scene->setFilters(includeFilter.asChar(), excludeFilter.asChar());
                
                CreateTree visitor(abcPath, dm, createInstances, speed, offset, preserveStartFrame, ct);
                scene->visit(AlembicNode::VisitDepthFirst, visitor);

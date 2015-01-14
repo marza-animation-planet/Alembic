@@ -3,7 +3,8 @@
 AlembicScene::AlembicScene(Alembic::Abc::IArchive iArch)
    : AlembicNode(iArch.getTop())
    , mArchive(iArch)
-   , mFiltered(false)
+   , mIncludeFilter(0)
+   , mExcludeFilter(0)
 {
    resolveInstances(this);
 }
@@ -11,14 +12,26 @@ AlembicScene::AlembicScene(Alembic::Abc::IArchive iArch)
 AlembicScene::AlembicScene(const AlembicScene &rhs)
    : AlembicNode(rhs)
    , mArchive(rhs.mArchive)
-   , mFiltered(false)
+   , mIncludeFilter(0)
+   , mExcludeFilter(0)
 {
    resolveInstances(this);
-   setFilter(rhs.mFilterStr);
+   setFilters(rhs.mIncludeFilterStr, rhs.mExcludeFilterStr);
 }
 
 AlembicScene::~AlembicScene()
 {
+   if (mIncludeFilter)
+   {
+      regfree(mIncludeFilter);
+      mIncludeFilter = 0;
+   }
+   
+   if (mExcludeFilter)
+   {
+      regfree(mExcludeFilter);
+      mExcludeFilter = 0;
+   }
 }
 
 AlembicNode* AlembicScene::clone(AlembicNode *) const
@@ -26,42 +39,120 @@ AlembicNode* AlembicScene::clone(AlembicNode *) const
    return new AlembicScene(*this);
 }
 
-void AlembicScene::setFilter(const std::string &expr)
+void AlembicScene::setIncludeFilter(const std::string &expr)
 {
-   if (mFiltered)
+   if (mIncludeFilter)
    {
-      regfree(&mFilter);
+      regfree(mIncludeFilter);
+      mIncludeFilter = 0;
    }
    
    mFilteredNodes.clear();
-   mFilterStr = "";
-   mFiltered = (expr.length() > 0);
+   mIncludeFilterStr = "";
    
-   if (mFiltered)
+   if (expr.length() > 0)
    {
-      if (regcomp(&mFilter, expr.c_str(), REG_EXTENDED|REG_NOSUB) != 0)
+      if (regcomp(&mIncludeFilter_, expr.c_str(), REG_EXTENDED|REG_NOSUB) != 0)
       {
          std::cout << "Invalid expression: \"" << expr << "\"" << std::endl;
-         mFiltered = false;
       }
       else
       {
-         mFilterStr = expr;
+         mIncludeFilterStr = expr;
+         mIncludeFilter = &mIncludeFilter_;
          filter(this);
       }
    }
 }
 
+void AlembicScene::setExcludeFilter(const std::string &expr)
+{
+   if (mExcludeFilter)
+   {
+      regfree(mExcludeFilter);
+      mExcludeFilter = 0;
+   }
+   
+   mFilteredNodes.clear();
+   mExcludeFilterStr = "";
+   
+   if (expr.length() > 0)
+   {
+      if (regcomp(&mExcludeFilter_, expr.c_str(), REG_EXTENDED|REG_NOSUB) != 0)
+      {
+         std::cout << "Invalid expression: \"" << expr << "\"" << std::endl;
+      }
+      else
+      {
+         mExcludeFilterStr = expr;
+         mExcludeFilter = &mExcludeFilter_;
+         filter(this);
+      }
+   }
+}
+
+void AlembicScene::setFilters(const std::string &incl, const std::string &excl)
+{
+   if (mIncludeFilter)
+   {
+      regfree(mIncludeFilter);
+      mIncludeFilter = 0;
+   }
+   
+   if (mExcludeFilter)
+   {
+      regfree(mExcludeFilter);
+      mExcludeFilter = 0;
+   }
+   
+   mFilteredNodes.clear();
+   
+   mIncludeFilterStr = "";
+   mExcludeFilterStr = "";
+   
+   if (incl.length() > 0)
+   {
+      if (regcomp(&mIncludeFilter_, incl.c_str(), REG_EXTENDED|REG_NOSUB) != 0)
+      {
+         std::cout << "Invalid expression: \"" << incl << "\"" << std::endl;
+      }
+      else
+      {
+         mIncludeFilterStr = incl;
+         mIncludeFilter = &mIncludeFilter_;
+      }
+   }
+   
+   if (excl.length() > 0)
+   {
+      if (regcomp(&mExcludeFilter_, excl.c_str(), REG_EXTENDED|REG_NOSUB) != 0)
+      {
+         std::cout << "Invalid expression: \"" << excl << "\"" << std::endl;
+      }
+      else
+      {
+         mExcludeFilterStr = excl;
+         mExcludeFilter = &mExcludeFilter_;
+      }
+   }
+   
+   if (mIncludeFilter || mExcludeFilter)
+   {
+      filter(this);
+   }
+}
+
 bool AlembicScene::isFiltered(AlembicNode *node) const
 {
-   return (!mFiltered || mFilteredNodes.find(node) != mFilteredNodes.end());
+   return ((!mIncludeFilter && !mExcludeFilter) || mFilteredNodes.find(node) != mFilteredNodes.end());
 }
 
 bool AlembicScene::filter(AlembicNode *node)
 {
    size_t numChildren = 0;
    
-   bool matched = (regexec(&mFilter, node->path().c_str(), 0, NULL, 0) == 0);
+   bool included = (!mIncludeFilter || regexec(mIncludeFilter, node->path().c_str(), 0, NULL, 0) == 0);
+   bool excluded = (!included || (mExcludeFilter && regexec(mExcludeFilter, node->path().c_str(), 0, NULL, 0) == 0));
    
    for (Array::iterator it=node->beginChild(); it!=node->endChild(); ++it)
    {
@@ -72,8 +163,8 @@ bool AlembicScene::filter(AlembicNode *node)
       }
    }
    
-   // Even if result is 0, if any of the children was filtered successfully, keep this node
-   if (numChildren > 0 || matched)
+   // Even if node should be excluded, if any of the children was filtered successfully, include it
+   if (numChildren > 0 || !excluded)
    {
       return true;
    }
