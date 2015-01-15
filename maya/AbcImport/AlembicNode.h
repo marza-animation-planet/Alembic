@@ -127,14 +127,6 @@ public:
                                            bool markCouldBeImageSequence) const;
 
     void   setDebugMode(bool iDebugOn){ mDebugOn = iDebugOn; }
-    void   setIncludeFilterString(const MString & iIncludeFilterString)
-    {
-        mIncludeFilterString = iIncludeFilterString;
-    }
-    void   setExcludeFilterString(const MString & iExcludeFilterString)
-    {
-        mExcludeFilterString = iExcludeFilterString;
-    }
 
 private:
     // compute the adjusted time from inputTime, speed and time offset.
@@ -179,8 +171,6 @@ private:
     bool    mCreateIfNotFound;
     bool    mRemoveIfNoUpdate;
     MString mConnectRootNodes;
-    MString mIncludeFilterString;
-    MString mExcludeFilterString;
 
     WriterData mData;
 };

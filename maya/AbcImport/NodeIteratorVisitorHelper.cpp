@@ -2950,8 +2950,9 @@ MString connectAttr(ArgData & iArgData)
     {
         alembicNodePtr->setReaderPtrList(iArgData.mData);
         alembicNodePtr->setDebugMode(iArgData.mDebugOn);
-        alembicNodePtr->setIncludeFilterString(iArgData.mIncludeFilterString);
-        alembicNodePtr->setExcludeFilterString(iArgData.mExcludeFilterString);
+        
+        alembicNodeFn.findPlug("regexIncludeFilter").setString(iArgData.mIncludeFilterString);
+        alembicNodeFn.findPlug("regexExcludeFilter").setString(iArgData.mExcludeFilterString);
     }
 
     if (iArgData.mRecreateColorSets)

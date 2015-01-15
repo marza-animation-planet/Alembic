@@ -514,39 +514,11 @@ MStatus AlembicNode::compute(const MPlug & plug, MDataBlock & dataBlock)
         mSubDInitialized = false;
         mPolyInitialized = false;
 
-        // When an alembic cache will be imported at the first time using
-        // AbcImport, we need to set mIncludeFilterAttr (filterHandle) to be
-        // mIncludeFilterString for later use. When we save a maya scene(.ma)
-        // mIncludeFilterAttr will be saved. Then when we load the saved
-        // .ma file, mIncludeFilterString will be set to be mIncludeFilterAttr.
-        MDataHandle includeFilterHandle =
-                        dataBlock.inputValue(mIncludeFilterAttr, &status);
+        MDataHandle includeFilterHandle = dataBlock.inputValue(mIncludeFilterAttr, &status);
         MString& includeFilterString = includeFilterHandle.asString();
 
-       if (mIncludeFilterString.length() > 0)
-        {
-            includeFilterHandle.set(mIncludeFilterString);
-            dataBlock.setClean(mIncludeFilterAttr);
-        }
-        else if (includeFilterString.length() > 0)
-        {
-            mIncludeFilterString = includeFilterString;
-        }
-
-        MDataHandle excludeFilterHandle =
-                        dataBlock.inputValue(mExcludeFilterAttr, &status);
+        MDataHandle excludeFilterHandle = dataBlock.inputValue(mExcludeFilterAttr, &status);
         MString& excludeFilterString = excludeFilterHandle.asString();
-
-       if (mExcludeFilterString.length() > 0)
-        {
-            excludeFilterHandle.set(mExcludeFilterString);
-            dataBlock.setClean(mExcludeFilterAttr);
-        }
-        else if (excludeFilterString.length() > 0)
-        {
-            mExcludeFilterString = excludeFilterString;
-        }
-
 
         MFnDependencyNode dep(thisMObject());
         MPlug allSetsPlug = dep.findPlug("allColorSets");
@@ -558,7 +530,7 @@ MStatus AlembicNode::compute(const MPlug & plug, MDataBlock & dataBlock)
         
         CreateSceneVisitor visitor(inputTime, !allSetsPlug.isNull(), !allUVsPlug.isNull(),
             MObject::kNullObj, CreateSceneVisitor::NONE, "",
-            mIncludeFilterString, mExcludeFilterString, !createInstPlug.isNull());
+            includeFilterString, excludeFilterString, !createInstPlug.isNull());
 
         visitor.walk(archive);
 
