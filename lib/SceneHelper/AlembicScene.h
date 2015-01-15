@@ -16,7 +16,7 @@ public:
    virtual AlembicNode* clone(AlembicNode *parent=0) const;
    
    bool isFiltered(AlembicNode *node) const;
-   inline void setFilter(const std::string &filter) { setIncludeFilter(filter); }
+   inline void setFilter(const std::string &filter) { setFilters(filter, ""); }
    void setIncludeFilter(const std::string &includeFilter);
    void setExcludeFilter(const std::string &excludeFilter);
    void setFilters(const std::string &incl, const std::string &excl);

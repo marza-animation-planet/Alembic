@@ -153,15 +153,18 @@ bool AlembicScene::filter(AlembicNode *node)
    
    bool excluded = (mExcludeFilter && regexec(mExcludeFilter, node->path().c_str(), 0, NULL, 0) == 0);
    
-   if (!excluded)
+   if (excluded)
    {
-      for (Array::iterator it=node->beginChild(); it!=node->endChild(); ++it)
+      node->reset();
+      return false;
+   }
+   
+   for (Array::iterator it=node->beginChild(); it!=node->endChild(); ++it)
+   {
+      if (filter(*it))
       {
-         if (filter(*it))
-         {
-            ++numChildren;
-            mFilteredNodes.insert(*it);
-         }
+         ++numChildren;
+         mFilteredNodes.insert(*it);
       }
    }
    
