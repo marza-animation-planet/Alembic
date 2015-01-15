@@ -50,15 +50,21 @@ AlembicNode::AlembicNode(const AlembicNode &rhs, AlembicNode *parent)
    
    size_t numChildren = rhs.childCount();
    
-   mChildren.resize(numChildren);
+   mChildren.reserve(numChildren);
    
    for (size_t i=0; i<numChildren; ++i)
    {
       AlembicNode *c = rhs.child(i)->clone(this);
       if (c)
       {
-         mChildren[i] = c;
+         mChildren.push_back(c);
          mChildByName[c->name()] = c;
+      }
+      else
+      {
+         #ifdef _DEBUG
+         std::cout << "[AlembicNode] Failed to clone rhs child[" << i << "] (" << rhs.child(i)->name() << ")" << std::endl;
+         #endif
       }
    }
 }
@@ -91,15 +97,23 @@ AlembicNode::AlembicNode(Alembic::Abc::IObject iObj, AlembicNode *parent)
          mMasterPath = mIObj.getHeader().getFullName();
       }
       
-      mChildren.resize(mIObj.valid() ? mIObj.getNumChildren() : 0);
+      size_t numChildren = (mIObj.valid() ? mIObj.getNumChildren() : 0);
       
-      for (Array::iterator it = mChildren.begin(); it != mChildren.end(); ++it)
+      mChildren.reserve(numChildren);
+      
+      for (size_t i=0; i<numChildren; ++i)
       {
-         AlembicNode *c = Wrap(mIObj.getChild(it - mChildren.begin()), this);
+         AlembicNode *c = Wrap(mIObj.getChild(i), this);
          if (c)
          {
-            *it = c;
+            mChildren.push_back(c);
             mChildByName[c->name()] = c;
+         }
+         else
+         {
+            #ifdef _DEBUG
+            std::cout << "[AlembicNode] Failed to clone iObj child[" << i << "] (" << mIObj.getChild(i).getName() << ")" << std::endl;
+            #endif
          }
       }
    }
