@@ -135,10 +135,6 @@ public:
     {
         mExcludeFilterString = iExcludeFilterString;
     }
-    void   setCreateInstances(bool iCreateInstances)
-    {
-        mCreateInstances = iCreateInstances;
-    }
 
 private:
     // compute the adjusted time from inputTime, speed and time offset.
@@ -185,7 +181,6 @@ private:
     MString mConnectRootNodes;
     MString mIncludeFilterString;
     MString mExcludeFilterString;
-    bool    mCreateInstances;
 
     WriterData mData;
 };

@@ -551,13 +551,14 @@ MStatus AlembicNode::compute(const MPlug & plug, MDataBlock & dataBlock)
         MFnDependencyNode dep(thisMObject());
         MPlug allSetsPlug = dep.findPlug("allColorSets");
         MPlug allUVsPlug = dep.findPlug("allUVSets");
+        MPlug createInstPlug = dep.findPlug("createInstances");
         
         // we don't know yet the frame range so we can't observe preserveStartFrame yet
         inputTime = computeAdjustedTime(inputTime, speed, offset/fps);
         
         CreateSceneVisitor visitor(inputTime, !allSetsPlug.isNull(), !allUVsPlug.isNull(),
             MObject::kNullObj, CreateSceneVisitor::NONE, "",
-            mIncludeFilterString, mExcludeFilterString, mCreateInstances);
+            mIncludeFilterString, mExcludeFilterString, !createInstPlug.isNull());
 
         visitor.walk(archive);
 

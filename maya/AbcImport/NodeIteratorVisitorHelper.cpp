@@ -2952,7 +2952,6 @@ MString connectAttr(ArgData & iArgData)
         alembicNodePtr->setDebugMode(iArgData.mDebugOn);
         alembicNodePtr->setIncludeFilterString(iArgData.mIncludeFilterString);
         alembicNodePtr->setExcludeFilterString(iArgData.mExcludeFilterString);
-        alembicNodePtr->setCreateInstances(iArgData.mCreateInstances);
     }
 
     if (iArgData.mRecreateColorSets)
@@ -2972,7 +2971,16 @@ MString connectAttr(ArgData & iArgData)
         alembicNodeFn.addAttribute(attrObj,
             MFnDependencyNode::kLocalDynamicAttr);
     }
-
+    
+    if (iArgData.mCreateInstances)
+    {
+        MFnNumericAttribute numAttr;
+        MObject attrObj = numAttr.create("createInstances", "createInstances",
+            MFnNumericData::kBoolean);
+        alembicNodeFn.addAttribute(attrObj,
+            MFnDependencyNode::kLocalDynamicAttr);
+    }
+    
     // set AlembicNode name
     MString fileName;
     stripFileName(iArgData.mFileName, fileName);
