@@ -615,9 +615,12 @@ double AbcShape::getSampleTime() const
 void AbcShape::updateScene()
 {
    #ifdef _DEBUG
-   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Update scene: " << mFilePath << std::endl;
+   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Update scene: " << mFilePath.asChar() << std::endl;
    #endif
-   AlembicSceneCache::Unref(mScene);
+   if (mScene && !AlembicSceneCache::Unref(mScene))
+   {
+      delete mScene;
+   }
    
    mGeometry.clear();
    
@@ -668,12 +671,32 @@ void AbcShape::updateScene()
 void AbcShape::updateObjects()
 {
    #ifdef _DEBUG
-   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Filter objects: \"" << mObjectExpression << "\"" << std::endl;
+   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Filter objects: \"" << mObjectExpression.asChar() << "\"" << std::endl;
    #endif
    
-   mScene->setFilter(mObjectExpression.asChar());
+   mGeometry.clear();
    
-   updateWorld();
+   mSceneFilter.set(mObjectExpression.asChar(), "");
+   
+   AlembicScene *scene = AlembicSceneCache::Ref(mFilePath.asChar(), mSceneFilter);
+   
+   if (mScene && !AlembicSceneCache::Unref(mScene))
+   {
+      delete mScene;
+   }
+   
+   mScene = scene;
+   
+   if (mScene)
+   {
+      updateWorld();
+   }
+   else
+   {
+      #ifdef _DEBUG
+      std::cout << "[" << PREFIX_NAME("AbcShape") << "] Update objects: failed to create filtered scene" << std::endl;
+      #endif
+   }
 }
 
 void AbcShape::updateWorld()
@@ -1058,8 +1081,12 @@ void AbcShape::copyInternalData(MPxNode *source)
       mDrawTransformBounds = node->mDrawTransformBounds;
       mDrawLocators = node->mDrawLocators;
       
-      AlembicSceneCache::Unref(mScene);
+      if (mScene && !AlembicSceneCache::Unref(mScene))
+      {
+         delete mScene;
+      }
       mScene = 0;
+      mSceneFilter.reset();
       mNumShapes = 0;
       mGeometry.clear();
       mUpdateLevel = UL_scene;

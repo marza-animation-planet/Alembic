@@ -471,11 +471,11 @@ AlembicNode::VisitReturn CreateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
    plug = dagNode.findPlug("objectExpression");
    plug.setString(node.path().c_str());
    
-   plug = dagNode.findPlug("filePath");
-   plug.setString(mAbcPath.c_str());
-   
    plug = dagNode.findPlug("displayMode");
    plug.setShort(short(mMode));
+   
+   plug = dagNode.findPlug("filePath");
+   plug.setString(mAbcPath.c_str());
    
    addUserProps(node, instance);
    
@@ -2828,10 +2828,12 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
          {
             std::string abcPath = file.resolvedFullName().asChar();
             
-            AlembicScene *scene = AlembicSceneCache::Ref(abcPath);
+            AlembicSceneFilter filter(includeFilter.asChar(), excludeFilter.asChar());
+            
+            AlembicScene *scene = AlembicSceneCache::Ref(abcPath, filter);
             if (scene)
             {
-               scene->setFilters(includeFilter.asChar(), excludeFilter.asChar());
+               // scene->setFilters(includeFilter.asChar(), excludeFilter.asChar());
                
                CreateTree visitor(abcPath, dm, createInstances, speed, offset, preserveStartFrame, ct);
                scene->visit(AlembicNode::VisitDepthFirst, visitor);
@@ -2891,7 +2893,10 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
                   }
                }
                
-               AlembicSceneCache::Unref(scene);
+               if (scene && !AlembicSceneCache::Unref(scene))
+               {
+                  delete scene;
+               }
             }
             else
             {

@@ -153,6 +153,7 @@ private:
     bool mDrawTransformBounds;
     bool mDrawLocators;
     int mUpdateLevel;
+    AlembicSceneFilter mSceneFilter;
 };
 
 class AbcShapeUI : public MPxSurfaceShapeUI
