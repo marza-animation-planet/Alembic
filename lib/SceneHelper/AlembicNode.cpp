@@ -69,6 +69,59 @@ AlembicNode::AlembicNode(const AlembicNode &rhs, AlembicNode *parent)
    }
 }
 
+AlembicNode::AlembicNode(const AlembicNode &rhs, const AlembicSceneFilter &filter, AlembicNode *parent)
+   : mIObj(rhs.mIObj)
+   , mType(rhs.mType)
+   , mParent(parent)
+   , mMasterPath(rhs.mMasterPath)
+   , mMaster(0)
+   , mInstanceNumber(0)
+   , mBoundsProp(rhs.mBoundsProp)
+   , mInheritsTransform(true)
+   , mLocatorProp(rhs.mLocatorProp)
+   , mVisible(true)
+{
+   if (rhs.isLocator())
+   {
+      mSelfBounds.makeInfinite();
+   }
+   else
+   {
+      mSelfBounds.makeEmpty();
+   }
+   mChildBounds.makeEmpty();
+   mSelfMatrix.makeIdentity();
+   mWorldMatrix.makeIdentity();
+   mLocatorPosition.setValue(0, 0, 0);
+   mLocatorScale.setValue(1, 1, 1);
+   
+   size_t numChildren = rhs.childCount();
+   
+   mChildren.reserve(numChildren);
+   
+   for (size_t i=0; i<numChildren; ++i)
+   {
+      if (filter.isExcluded(rhs.child(i)))
+      {
+         continue;
+      }
+      
+      AlembicNode *c = rhs.child(i)->filteredClone(filter, this);
+      
+      if (c)
+      {
+         mChildren.push_back(c);
+         mChildByName[c->name()] = c;
+      }
+      else
+      {
+         #ifdef _DEBUG
+         std::cout << "[AlembicNode] Failed to clone rhs child[" << i << "] (" << rhs.child(i)->name() << ")" << std::endl;
+         #endif
+      }
+   }
+}
+
 AlembicNode::AlembicNode(Alembic::Abc::IObject iObj, AlembicNode *parent)
    : mIObj(iObj)
    , mType(AlembicNode::TypeGeneric)
@@ -149,6 +202,24 @@ AlembicNode::~AlembicNode()
 AlembicNode* AlembicNode::clone(AlembicNode *parent) const
 {
    return new AlembicNode(*this, parent);
+}
+
+AlembicNode* AlembicNode::filteredClone(const AlembicSceneFilter &filter, AlembicNode *parent) const
+{
+   AlembicNode *rv = 0;
+   
+   if (!filter.isExcluded(this))
+   {
+      rv = new AlembicNode(*this, filter, parent);
+      
+      if (rv && rv->childCount() == 0 && !filter.isIncluded(rv))
+      {
+         delete rv;
+         rv = 0;
+      }
+   }
+   
+   return rv;
 }
 
 AlembicNode::NodeType AlembicNode::type() const
@@ -581,6 +652,9 @@ void AlembicNode::resolveInstances(AlembicScene *scene)
    if (isInstance() && !mMaster)
    {
       mMaster = scene->find(mMasterPath.c_str());
+      
+      // TODO:
+      //   master shape may have been filtered out
       
       if (mMaster)
       {

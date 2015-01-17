@@ -6,9 +6,29 @@ AlembicScene* AlembicSceneCache::Ref(const std::string &filepath, bool persisten
    return Instance().ref(filepath, persistent);
 }
 
+AlembicScene* AlembicSceneCache::Ref(const std::string &filepath, const AlembicSceneFilter &filter, bool persistent)
+{
+   return Instance().ref(filepath, filter, persistent);
+}
+
+AlembicScene* AlembicSceneCache::Ref(const std::string &filepath, const std::string &id, bool persistent)
+{
+   return Instance().ref(filepath, id, persistent);
+}
+
+AlembicScene* AlembicSceneCache::Ref(const std::string &filepath, const std::string &id, const AlembicSceneFilter &filter, bool persistent)
+{
+   return Instance().ref(filepath, id, filter, persistent);
+}
+
 bool AlembicSceneCache::Unref(AlembicScene *scene)
 {
    return Instance().unref(scene);
+}
+
+bool AlembicSceneCache::Unref(AlembicScene *scene, const std::string &id)
+{
+   return Instance().unref(scene, id);
 }
 
 AlembicSceneCache& AlembicSceneCache::Instance()
@@ -64,10 +84,17 @@ std::string AlembicSceneCache::formatPath(const std::string &filepath)
 
 AlembicScene* AlembicSceneCache::ref(const std::string &filepath, bool persistent)
 {
+   return ref(filepath, "", persistent);
+}
+
+AlembicScene* AlembicSceneCache::ref(const std::string &filepath, const std::string &id, bool persistent)
+{
    std::string path = formatPath(filepath);
+   std::string key = path + id;
+   
    AlembicScene *rv = 0;
    
-   std::map<std::string, CacheEntry>::iterator it = mScenes.find(path);
+   std::map<std::string, CacheEntry>::iterator it = mScenes.find(key);
    
    if (it != mScenes.end())
    {
@@ -78,41 +105,111 @@ AlembicScene* AlembicSceneCache::ref(const std::string &filepath, bool persisten
       else
       {
          it->second.refcount++;
-         //it->second.persistent = it->second.persistent || persistent;
-         if (it->second.type != Alembic::AbcCoreFactory::IFactory::kHDF5)
+         
+         if (id == "")
          {
-            it->second.persistent = persistent;
+            // only update persistent flag for empty id scene
+            if (it->second.type != Alembic::AbcCoreFactory::IFactory::kHDF5)
+            {
+               it->second.persistent = persistent;
+            }
          }
+         
          #ifdef _DEBUG
-         std::cout << "[AlembicSceneCache] Clone master scene" << std::endl;
+         std::cout << "[AlembicSceneCache] Return master scene [id=" << id << ", refcount=" << it->second.refcount << "]" << std::endl;
          #endif
-         rv = new AlembicScene(*(it->second.master));
-         // Reset filter
-         rv->setFilter("");
+         
+         rv = it->second.master;
       }
    }
    else
    {
-      Alembic::AbcCoreFactory::IFactory factory;
-      Alembic::AbcCoreFactory::IFactory::CoreType coreType;
-      
-      factory.setPolicy(Alembic::Abc::ErrorHandler::kQuietNoopPolicy);
-      Alembic::Abc::IArchive archive = factory.getArchive(path, coreType);
-      
-      if (archive.valid())
+      if (id != "")
       {
-         CacheEntry &ce = mScenes[path];
+         // This will create master scene if required
+         rv = ref(filepath, persistent);
          
-         ce.archive = archive;
-         ce.type = coreType;
-         ce.refcount = 1;
-         // encountered issues keeping HDF5 achives around in arnold procedural
-         ce.persistent = (ce.type != Alembic::AbcCoreFactory::IFactory::kHDF5 ? persistent : false);
-         ce.master = new AlembicScene(Alembic::Abc::IArchive(ce.archive.getPtr(),
-                                                             Alembic::Abc::kWrapExisting,
-                                                             Alembic::Abc::ErrorHandler::kQuietNoopPolicy));
+         if (rv)
+         {
+            CacheEntry &me = mScenes[path];
+            CacheEntry &ce = mScenes[key];
+            
+            ce.archive = me.archive;
+            ce.type = me.type;
+            ce.refcount = 1;
+            ce.persistent = false;
+            
+            #ifdef _DEBUG
+            std::cout << "[AlembicSceneCache] Create master scene clone" << std::endl;
+            #endif
+            
+            ce.master = (AlembicScene*) rv->clone();
+            
+            rv = ce.master;
+            
+            // Don't call unref as we want to keep the scene with no id around
+            // for probable further cloning
+            //unref(rv);
+         }
+      }
+      else
+      {
+         Alembic::AbcCoreFactory::IFactory factory;
+         Alembic::AbcCoreFactory::IFactory::CoreType coreType;
          
-         rv = ce.master;
+         factory.setPolicy(Alembic::Abc::ErrorHandler::kQuietNoopPolicy);
+         Alembic::Abc::IArchive archive = factory.getArchive(path, coreType);
+         
+         if (archive.valid())
+         {
+            #ifdef _DEBUG
+            std::cout << "[AlembicSceneCache] Create master scene" << std::endl;
+            #endif
+            
+            // note: key == path
+            CacheEntry &ce = mScenes[key];
+            
+            ce.archive = archive;
+            ce.type = coreType;
+            ce.refcount = 1;
+            // encountered issues keeping HDF5 achives around in arnold procedural
+            ce.persistent = (ce.type != Alembic::AbcCoreFactory::IFactory::kHDF5 ? persistent : false);
+            ce.master = new AlembicScene(Alembic::Abc::IArchive(ce.archive.getPtr(),
+                                                                Alembic::Abc::kWrapExisting,
+                                                                Alembic::Abc::ErrorHandler::kQuietNoopPolicy));
+            
+            rv = ce.master;
+         }
+      }
+   }
+   
+   return rv;
+}
+
+AlembicScene* AlembicSceneCache::ref(const std::string &filepath, const AlembicSceneFilter &filter, bool persistent)
+{
+   return ref(filepath, "", filter, persistent);
+}
+
+AlembicScene* AlembicSceneCache::ref(const std::string &filepath, const std::string &id, const AlembicSceneFilter &filter, bool persistent)
+{
+   AlembicScene *rv = ref(filepath, id, persistent);
+   
+   if (rv)
+   {
+      if (filter.isSet())
+      {
+         #ifdef _DEBUG
+         std::cout << "[AlembicSceneCache] Create filtered scene" << std::endl;
+         #endif
+         
+         rv = (AlembicScene*) rv->filteredClone(filter);
+      }
+      else
+      {
+         #ifdef _DEBUG
+         std::cout << "[AlembicSceneCache] Empty filter, return master scene" << std::endl;
+         #endif
       }
    }
    
@@ -121,6 +218,11 @@ AlembicScene* AlembicSceneCache::ref(const std::string &filepath, bool persisten
 
 bool AlembicSceneCache::unref(AlembicScene *scene)
 {
+   return unref(scene, "");
+}
+
+bool AlembicSceneCache::unref(AlembicScene *scene, const std::string &id)
+{
    if (!scene)
    {
       return false;
@@ -128,17 +230,18 @@ bool AlembicSceneCache::unref(AlembicScene *scene)
    
    bool rv = false;
    
-   #ifdef _DEBUG
-   std::cout << "[AlembicSceneCache] Unreferencing scene" << std::endl;
-   #endif
-   
    std::string path = formatPath(scene->archive().getName());
+   std::string key = path + id;
    
-   std::map<std::string, CacheEntry>::iterator it = mScenes.find(path);
+   std::map<std::string, CacheEntry>::iterator it = mScenes.find(key);
    
    if (it != mScenes.end())
    {
       it->second.refcount--;
+      
+      #ifdef _DEBUG
+      std::cout << "[AlembicSceneCache] Unreferencing master scene [id=" << id << ", refcount=" << it->second.refcount << "]" << std::endl;
+      #endif
       
       bool isMasterScene = (scene == it->second.master);
       
@@ -153,9 +256,11 @@ bool AlembicSceneCache::unref(AlembicScene *scene)
             #ifdef _DEBUG
             std::cout << "[AlembicSceneCache] Destroy master scene" << std::endl;
             #endif
+            
             if (it->second.master)
             {
                delete it->second.master;
+               it->second.master = 0;
             }
             
             mScenes.erase(it);
@@ -169,9 +274,19 @@ bool AlembicSceneCache::unref(AlembicScene *scene)
       if (!isMasterScene)
       {
          #ifdef _DEBUG
-         std::cout << "[AlembicSceneCache] Destroy scene" << std::endl;
+         std::cout << "[AlembicSceneCache] Destroy filtered scene" << std::endl;
          #endif
+         
          delete scene;
+      }
+      else if (id != "")
+      {
+         // unref empty id master scene too
+         it = mScenes.find(path);
+         if (it != mScenes.end())
+         {
+            unref(it->second.master);
+         }
       }
       
       rv = true;

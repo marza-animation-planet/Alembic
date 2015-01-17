@@ -3,6 +3,7 @@
 
 #include "LocatorProperty.h"
 #include "SampleUtils.h"
+#include "AlembicSceneFilter.h"
 #include <Alembic/AbcGeom/All.h>
 #include <vector>
 #include <map>
@@ -24,8 +25,7 @@ public:
    enum VisitMode
    {
       VisitDepthFirst = 0,
-      VisitBreadthFirst,
-      VisitFilteredFlat
+      VisitBreadthFirst
    };
    
    enum VisitReturn
@@ -64,6 +64,7 @@ public:
    virtual ~AlembicNode();
    
    virtual AlembicNode* clone(AlembicNode *parent=0) const;
+   virtual AlembicNode* filteredClone(const AlembicSceneFilter &filter, AlembicNode *parent=0) const;
    
    bool isValid() const;
    
@@ -223,6 +224,7 @@ public:
 protected:
    
    AlembicNode(const AlembicNode &rhs, AlembicNode *parent=0);
+   AlembicNode(const AlembicNode &rhs, const AlembicSceneFilter &filter, AlembicNode *parent=0);
 
    void setType(NodeType nt);
    
@@ -306,6 +308,24 @@ public:
    
    virtual ~AlembicNodeT()
    {
+   }
+   
+   virtual AlembicNode* filteredClone(const AlembicSceneFilter &filter, AlembicNode *parent=0) const
+   {
+      AlembicNode *rv = 0;
+      
+      if (!filter.isExcluded(this))
+      {
+         rv = new AlembicNodeT<IObject>(*this, filter, parent);
+         
+         if (rv && rv->childCount() == 0 && !filter.isIncluded(rv))
+         {
+            delete rv;
+            rv = 0;
+         }
+      }
+      
+      return rv;
    }
    
    virtual AlembicNode* clone(AlembicNode *parent=0) const
@@ -397,6 +417,11 @@ protected:
    
    AlembicNodeT(const AlembicNodeT<IObject> &rhs, AlembicNode *iParent=0)
       : AlembicNode(rhs, iParent), mITypedObj(rhs.mITypedObj)
+   {
+   }
+   
+   AlembicNodeT(const AlembicNodeT<IObject> &rhs, const AlembicSceneFilter &filter, AlembicNode *iParent=0)
+      : AlembicNode(rhs, filter, iParent), mITypedObj(rhs.mITypedObj)
    {
    }
    

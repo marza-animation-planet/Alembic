@@ -2,6 +2,7 @@
 #define SCENEHELPER_ALEMBICSCENECACHE_H_
 
 #include "AlembicScene.h"
+#include "AlembicSceneFilter.h"
 #include <Alembic/AbcCoreFactory/All.h>
 #include <map>
 #include <string>
@@ -11,7 +12,11 @@ class AlembicSceneCache
 public:
    
    static AlembicScene* Ref(const std::string &filepath, bool persistent=false);
+   static AlembicScene* Ref(const std::string &filepath, const AlembicSceneFilter &filter, bool persistent=false);
+   static AlembicScene* Ref(const std::string &filepath, const std::string &id, bool persistent=false);
+   static AlembicScene* Ref(const std::string &filepath, const std::string &id, const AlembicSceneFilter &filter, bool persistent=false);
    static bool Unref(AlembicScene *scene);
+   static bool Unref(AlembicScene *scene, const std::string &id);
    
 private:
    
@@ -23,7 +28,11 @@ private:
    std::string formatPath(const std::string &filepath);
    
    AlembicScene* ref(const std::string &filepath, bool persistent=false);
+   AlembicScene* ref(const std::string &filepath, const AlembicSceneFilter &filter, bool persistent=false);
+   AlembicScene* ref(const std::string &filepath, const std::string &id, bool persistent=false);
+   AlembicScene* ref(const std::string &filepath, const std::string &id, const AlembicSceneFilter &filter, bool persistent=false);
    bool unref(AlembicScene *scene);
+   bool unref(AlembicScene *scene, const std::string &id);
    
    
 private:
