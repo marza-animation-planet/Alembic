@@ -85,9 +85,6 @@ void AlembicSceneFilter::set(const std::string &incl, const std::string &excl)
          }
       }
    }
-   
-   //#ifdef _DEBUG
-   std::cout << "[AlembicSceneFilter] include(\"" << mIncludeFilterStr << "\"), exclude(\"" << mExcludeFilterStr << "\")" << std::endl;
 }
 
 void AlembicSceneFilter::reset()

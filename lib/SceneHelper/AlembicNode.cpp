@@ -60,12 +60,6 @@ AlembicNode::AlembicNode(const AlembicNode &rhs, AlembicNode *parent)
          mChildren.push_back(c);
          mChildByName[c->name()] = c;
       }
-      else
-      {
-         #ifdef _DEBUG
-         std::cout << "[AlembicNode] Failed to clone rhs child[" << i << "] (" << rhs.child(i)->name() << ")" << std::endl;
-         #endif
-      }
    }
 }
 
@@ -112,12 +106,6 @@ AlembicNode::AlembicNode(const AlembicNode &rhs, const AlembicSceneFilter &filte
       {
          mChildren.push_back(c);
          mChildByName[c->name()] = c;
-      }
-      else
-      {
-         #ifdef _DEBUG
-         std::cout << "[AlembicNode] Failed to clone rhs child[" << i << "] (" << rhs.child(i)->name() << ")" << std::endl;
-         #endif
       }
    }
 }
