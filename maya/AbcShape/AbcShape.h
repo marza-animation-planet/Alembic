@@ -45,7 +45,6 @@ public:
     static MObject aOutBoxMax;
     
     static void* creator();
-    static void createdCallback(MObject& node, void* clientData);
     
     static MStatus initialize();
     

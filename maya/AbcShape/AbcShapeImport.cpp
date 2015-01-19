@@ -196,7 +196,7 @@ private:
    bool hasDag(const std::string &path) const;
    bool addDag(const std::string &path, const MDagPath &dag);
    bool checkExistingDag(const char *dagType, AlembicNode *node);
-   bool createDag(const char *dagType, AlembicNode *node);
+   bool createDag(const char *dagType, AlembicNode *node, bool force=false);
    
    template <class T>
    void addUserProps(AlembicNodeT<T> &node, AlembicNode *instance=0);
@@ -275,6 +275,7 @@ private:
    AbcShape::CycleType mCycleType;
    std::map<std::string, MDagPath> mDags;
    Keyframer mKeyframer;
+   MPlug mTimeSource;
 };
 
 CreateTree::CreateTree(const std::string &abcPath,
@@ -292,6 +293,14 @@ CreateTree::CreateTree(const std::string &abcPath,
    , mPreserveStartFrame(preserveStartFrame)
    , mCycleType(cycleType)
 {
+   MSelectionList sl;
+   MObject timeObj;
+   
+   sl.add("time1");
+   sl.getDependNode(0, timeObj);
+   
+   MFnDependencyNode timeNode(timeObj);
+   mTimeSource = timeNode.findPlug("outTime");
 }
 
 bool CreateTree::hasDag(const std::string &path) const
@@ -382,13 +391,13 @@ bool CreateTree::checkExistingDag(const char *dagType, AlembicNode *node)
    }
 }
 
-bool CreateTree::createDag(const char *dagType, AlembicNode *node)
+bool CreateTree::createDag(const char *dagType, AlembicNode *node, bool force)
 {
    if (!dagType || !node)
    {
       return false;
    }
-   else if (!hasDag(node->path()))
+   else if (force || !hasDag(node->path()))
    {
       MDagModifier dagmod;
       MStatus status;
@@ -408,14 +417,16 @@ bool CreateTree::createDag(const char *dagType, AlembicNode *node)
       
       if (status == MS::kSuccess && dagmod.doIt() == MS::kSuccess)
       {
-         MDagPath dag;
+         MDagPath dagPath;
          
-         MDagPath::getAPathTo(obj, dag);
+         MFnDagNode dagNode(obj);
          
-         dagmod.renameNode(obj, node->name().c_str());
-         dagmod.doIt();
+         dagNode.setName(node->name().c_str());
+         dagNode.getPath(dagPath);
          
-         return addDag(node->path(), dag);
+         mDags[node->path()] = dagPath;
+         
+         return true;
       }
       else
       {
@@ -438,7 +449,7 @@ AlembicNode::VisitReturn CreateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
       return AlembicNode::ContinueVisit;
    }
    
-   if (!createDag(PREFIX_NAME("AbcShape"), target))
+   if (!createDag(PREFIX_NAME("AbcShape"), target, true))
    {
       return AlembicNode::StopVisit;
    }
@@ -446,6 +457,12 @@ AlembicNode::VisitReturn CreateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
    // Set AbcShape (the order in which attributes are set is though as to have the lowest possible update cost)
    MPlug plug;
    MFnDagNode dagNode(getDag(target->path()));
+   
+   plug = dagNode.findPlug("visibleInReflections");
+   plug.setBool(true);
+   
+   plug = dagNode.findPlug("visibleInRefractions");
+   plug.setBool(true);
    
    plug = dagNode.findPlug("ignoreXforms");
    plug.setBool(true);
@@ -474,10 +491,15 @@ AlembicNode::VisitReturn CreateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
    plug = dagNode.findPlug("displayMode");
    plug.setShort(short(mMode));
    
-   plug = dagNode.findPlug("filePath");
-   plug.setString(mAbcPath.c_str());
+   plug = dagNode.findPlug("time");
+   MDGModifier dgmod;
+   dgmod.connect(mTimeSource, plug);
+   dgmod.doIt();
    
    addUserProps(node, instance);
+   
+   plug = dagNode.findPlug("filePath");
+   plug.setString(mAbcPath.c_str());
    
    return AlembicNode::ContinueVisit;
 }
@@ -518,7 +540,7 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
    
    if (node.isLocator())
    {
-      if (!createDag("locator", target))
+      if (!createDag("locator", target, true))
       {
          return AlembicNode::StopVisit;
       }
@@ -597,7 +619,7 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
    }
    else
    {
-      if (!createDag("transform", target))
+      if (!createDag("transform", target, true))
       {
          return AlembicNode::StopVisit;
       }

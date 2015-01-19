@@ -65,47 +65,6 @@ void* AbcShape::creator()
    return new AbcShape();
 }
 
-void AbcShape::createdCallback(MObject& node, void*)
-{
-   MFnDependencyNode dn(node);
-   MPlug plug;
-   
-   plug = dn.findPlug("visibleInReflections");
-   if (!plug.isNull())
-   {
-      plug.setBool(true);
-   }
-   
-   plug = dn.findPlug("visibleInRefractions");
-   if (!plug.isNull())
-   {
-      plug.setBool(true);
-   }
-   
-   plug = dn.findPlug("time");
-   if (!plug.isNull())
-   {
-      MSelectionList sl;
-      MObject obj;
-      
-      sl.add("time1");
-      
-      if (sl.getDependNode(0, obj) == MStatus::kSuccess)
-      {
-         MFnDependencyNode timeNode(obj);
-         MPlug srcPlug = timeNode.findPlug("outTime");
-         
-         if (!srcPlug.isNull())
-         {
-            MDGModifier mod;
-            
-            mod.connect(srcPlug, plug);
-            mod.doIt();
-         }
-      }
-   }
-}
-
 MStatus AbcShape::initialize()
 {
    MStatus stat;
@@ -359,8 +318,6 @@ AbcShape::~AbcShape()
 void AbcShape::postConstructor()
 {
    setRenderable(true);
-   
-   AbcShape::CallbackID = MDGMessage::addNodeAddedCallback(AbcShape::createdCallback, PREFIX_NAME("AbcShape"));
 }
 
 bool AbcShape::ignoreCulling() const
@@ -624,7 +581,9 @@ void AbcShape::updateScene()
    
    mGeometry.clear();
    
-   mScene = AlembicSceneCache::Ref(mFilePath.asChar());
+   mSceneFilter.set(mObjectExpression.asChar(), "");
+   
+   mScene = AlembicSceneCache::Ref(mFilePath.asChar(), mSceneFilter);
    
    if (mScene)
    {
@@ -660,7 +619,7 @@ void AbcShape::updateScene()
          }
       }
       
-      updateObjects();
+      updateWorld();
    }
    else
    {
