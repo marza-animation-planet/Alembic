@@ -22,7 +22,9 @@ public:
    void reset();
    bool isSet() const;
    
+   bool isIncluded(const char *path) const;
    bool isIncluded(const AlembicNode *node) const;
+   bool isExcluded(const char *path) const;
    bool isExcluded(const AlembicNode *node) const;
    
    inline const std::string& includeExpression() const { return mIncludeFilterStr; }

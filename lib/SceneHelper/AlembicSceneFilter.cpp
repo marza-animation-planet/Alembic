@@ -109,6 +109,17 @@ bool AlembicSceneFilter::isSet() const
    return (mIncludeFilter || mExcludeFilter);
 }
 
+bool AlembicSceneFilter::isIncluded(const char *path) const
+{
+   return (path && (!mIncludeFilter || regexec(mIncludeFilter, path, 0, NULL, 0) == 0));
+}
+
+bool AlembicSceneFilter::isExcluded(const char *path) const
+{
+   return (!path || (mExcludeFilter && regexec(mExcludeFilter, path, 0, NULL, 0) == 0));
+}
+
+
 bool AlembicSceneFilter::isIncluded(const AlembicNode *node) const
 {
    return (node && (!mIncludeFilter || regexec(mIncludeFilter, node->path().c_str(), 0, NULL, 0) == 0));

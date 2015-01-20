@@ -56,11 +56,13 @@ public:
 public:
    
    static AlembicNode* Wrap(Alembic::Abc::IObject iObj, AlembicNode *iParent);
+   static AlembicNode* FilteredWrap(Alembic::Abc::IObject iObj, const AlembicSceneFilter &filter, AlembicNode *iParent);
    
 public:
    
    AlembicNode();
    AlembicNode(Alembic::Abc::IObject iObj, AlembicNode *parent=0);
+   AlembicNode(Alembic::Abc::IObject iObj, const AlembicSceneFilter &filter, AlembicNode *parent=0);
    virtual ~AlembicNode();
    
    virtual AlembicNode* clone(AlembicNode *parent=0) const;
@@ -306,6 +308,12 @@ public:
    
    AlembicNodeT(IObject iObject, AlembicNode *iParent=0)
       : AlembicNode(iObject, iParent), mITypedObj(iObject)
+   {
+      setType((NodeType) ClassToType<SelfType>::Type);
+   }
+   
+   AlembicNodeT(IObject iObject, const AlembicSceneFilter &filter, AlembicNode *iParent=0)
+      : AlembicNode(iObject, filter, iParent), mITypedObj(iObject)
    {
       setType((NodeType) ClassToType<SelfType>::Type);
    }

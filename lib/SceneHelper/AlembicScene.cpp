@@ -14,6 +14,14 @@ AlembicScene::AlembicScene(Alembic::Abc::IArchive iArch)
    resolveInstances(this);
 }
 
+AlembicScene::AlembicScene(Alembic::Abc::IArchive iArch, const AlembicSceneFilter &filter)
+   : AlembicNode(iArch.getTop(), filter)
+   , mArchive(iArch)
+   , mIsFiltered(filter.isSet())
+{
+   resolveInstances(this);
+}
+
 AlembicScene::AlembicScene(const AlembicScene &rhs)
    : AlembicNode(rhs, 0)
    , mArchive(rhs.mArchive)

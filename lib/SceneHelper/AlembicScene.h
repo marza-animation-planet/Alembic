@@ -13,6 +13,7 @@ public:
    friend class AlembicSceneFilter;
    
    AlembicScene(Alembic::Abc::IArchive iArch);
+   AlembicScene(Alembic::Abc::IArchive iArch, const AlembicSceneFilter &filter);
    AlembicScene(const AlembicScene &rhs);
    virtual ~AlembicScene();
    
