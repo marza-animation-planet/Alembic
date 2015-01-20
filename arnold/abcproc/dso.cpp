@@ -678,13 +678,16 @@ Dso::~Dso()
 {
    ScopeLock _lock;
    
+   char id[64];
+   sprintf(id, "%p", AiThreadSelf());
+   
    if (mScene)
    {
-      AlembicSceneCache::Unref(mScene);
+      AlembicSceneCache::Unref(mScene, id);
    }
    if (mRefScene)
    {
-      AlembicSceneCache::Unref(mRefScene);
+      AlembicSceneCache::Unref(mRefScene, id);
    }
 }
 
