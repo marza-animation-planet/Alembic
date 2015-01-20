@@ -64,6 +64,7 @@ public:
    virtual ~AlembicNode();
    
    virtual AlembicNode* clone(AlembicNode *parent=0) const;
+   virtual AlembicNode* selfClone() const;
    virtual AlembicNode* filteredClone(const AlembicSceneFilter &filter, AlembicNode *parent=0) const;
    
    bool isValid() const;
@@ -223,9 +224,12 @@ public:
    
 protected:
    
-   AlembicNode(const AlembicNode &rhs, AlembicNode *parent=0);
-   AlembicNode(const AlembicNode &rhs, const AlembicSceneFilter &filter, AlembicNode *parent=0);
-
+   AlembicNode(const AlembicNode &rhs); // shallow copy
+   AlembicNode(const AlembicNode &rhs, AlembicNode *parent); // deep copy
+   AlembicNode(const AlembicNode &rhs, const AlembicSceneFilter &filter, AlembicNode *parent); // deep copy
+   
+   void addChild(AlembicNode *n);
+   
    void setType(NodeType nt);
    
    void addInstance(AlembicNode *node);
@@ -333,6 +337,11 @@ public:
       return new AlembicNodeT<IObject>(*this, parent);
    }
    
+   virtual AlembicNode* selfClone() const
+   {
+      return new AlembicNodeT<IObject>(*this);
+   }
+   
    inline IObject typedObject() const
    {
       return mITypedObj;
@@ -415,12 +424,17 @@ public:
    
 protected:
    
-   AlembicNodeT(const AlembicNodeT<IObject> &rhs, AlembicNode *iParent=0)
+   AlembicNodeT(const AlembicNodeT<IObject> &rhs)
+      : AlembicNode(rhs), mITypedObj(rhs.mITypedObj)
+   {
+   }
+   
+   AlembicNodeT(const AlembicNodeT<IObject> &rhs, AlembicNode *iParent)
       : AlembicNode(rhs, iParent), mITypedObj(rhs.mITypedObj)
    {
    }
    
-   AlembicNodeT(const AlembicNodeT<IObject> &rhs, const AlembicSceneFilter &filter, AlembicNode *iParent=0)
+   AlembicNodeT(const AlembicNodeT<IObject> &rhs, const AlembicSceneFilter &filter, AlembicNode *iParent)
       : AlembicNode(rhs, filter, iParent), mITypedObj(rhs.mITypedObj)
    {
    }

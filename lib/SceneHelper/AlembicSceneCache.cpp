@@ -203,7 +203,15 @@ AlembicScene* AlembicSceneCache::ref(const std::string &filepath, const std::str
          std::cout << "[AlembicSceneCache] Create filtered scene" << std::endl;
          #endif
          
-         rv = (AlembicScene*) rv->filteredClone(filter);
+         if (filter.excludeExpression().length() == 0 && rv->find(filter.includeExpression().c_str()) != 0)
+         {
+            // way faster for deep/huge hierarchy 
+            rv = rv->cloneSingle(filter.includeExpression().c_str());
+         }
+         else
+         {
+            rv = (AlembicScene*) rv->filteredClone(filter);
+         }
       }
       else
       {

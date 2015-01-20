@@ -18,6 +18,9 @@ public:
    
    virtual AlembicNode* filteredClone(const AlembicSceneFilter &filter, AlembicNode *parent=0) const;
    virtual AlembicNode* clone(AlembicNode *parent=0) const;
+   virtual AlembicNode* selfClone() const;
+   
+   AlembicScene* cloneSingle(const char *path) const;
    
    template <class Visitor>
    bool visit(VisitMode mode, Visitor &visitor);
@@ -34,6 +37,7 @@ public:
    
 private:
    
+   AlembicScene();
    AlembicScene(const AlembicScene &rhs, const AlembicSceneFilter &filter);
 
 private:
@@ -111,8 +115,6 @@ bool AlembicNode::visit(VisitMode mode, AlembicScene *scene, Visitor &visitor)
 template <class Visitor>
 bool AlembicScene::visit(VisitMode mode, Visitor &visitor)
 {
-   VisitReturn rv;
-   
    if (mode == VisitBreadthFirst)
    {
       return AlembicNode::visit(VisitBreadthFirst, this, visitor);

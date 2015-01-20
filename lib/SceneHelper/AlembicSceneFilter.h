@@ -24,6 +24,9 @@ public:
    
    bool isIncluded(const AlembicNode *node) const;
    bool isExcluded(const AlembicNode *node) const;
+   
+   inline const std::string& includeExpression() const { return mIncludeFilterStr; }
+   inline const std::string& excludeExpression() const { return mExcludeFilterStr; }
 
 protected:
    

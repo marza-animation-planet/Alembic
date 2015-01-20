@@ -22,6 +22,33 @@ AlembicNode::AlembicNode()
    mLocatorScale.setValue(1, 1, 1);
 }
 
+AlembicNode::AlembicNode(const AlembicNode &rhs)
+   : mIObj(rhs.mIObj)
+   , mType(rhs.mType)
+   , mParent(0)
+   , mMasterPath(rhs.mMasterPath)
+   , mMaster(0)
+   , mInstanceNumber(0)
+   , mBoundsProp(rhs.mBoundsProp)
+   , mInheritsTransform(true)
+   , mLocatorProp(rhs.mLocatorProp)
+   , mVisible(true)
+{
+   if (rhs.isLocator())
+   {
+      mSelfBounds.makeInfinite();
+   }
+   else
+   {
+      mSelfBounds.makeEmpty();
+   }
+   mChildBounds.makeEmpty();
+   mSelfMatrix.makeIdentity();
+   mWorldMatrix.makeIdentity();
+   mLocatorPosition.setValue(0, 0, 0);
+   mLocatorScale.setValue(1, 1, 1);
+}
+
 AlembicNode::AlembicNode(const AlembicNode &rhs, AlembicNode *parent)
    : mIObj(rhs.mIObj)
    , mType(rhs.mType)
@@ -192,6 +219,11 @@ AlembicNode* AlembicNode::clone(AlembicNode *parent) const
    return new AlembicNode(*this, parent);
 }
 
+AlembicNode* AlembicNode::selfClone() const
+{
+   return new AlembicNode(*this);
+}
+
 AlembicNode* AlembicNode::filteredClone(const AlembicSceneFilter &filter, AlembicNode *parent) const
 {
    AlembicNode *rv = 0;
@@ -208,6 +240,17 @@ AlembicNode* AlembicNode::filteredClone(const AlembicSceneFilter &filter, Alembi
    }
    
    return rv;
+}
+
+void AlembicNode::addChild(AlembicNode *n)
+{
+   if (n)
+   {
+      mChildren.push_back(n);
+      mChildByName[n->name()] = n;
+      
+      n->mParent = this;
+   }
 }
 
 AlembicNode::NodeType AlembicNode::type() const
@@ -641,12 +684,14 @@ void AlembicNode::resolveInstances(AlembicScene *scene)
    {
       mMaster = scene->find(mMasterPath.c_str());
       
-      // TODO:
-      //   master shape may have been filtered out
-      
       if (mMaster)
       {
          mMaster->addInstance(this);
+      }
+      else
+      {
+         // Un-instance node
+         mMasterPath = "";
       }
    }
    
