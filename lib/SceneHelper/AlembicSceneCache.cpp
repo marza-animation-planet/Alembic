@@ -53,6 +53,10 @@ AlembicSceneCache::~AlembicSceneCache()
    {
       if (it->second.master)
       {
+         #ifdef _DEBUG
+         std::cout << "[AlembicSceneCache]   " << it->first << std::endl;
+         #endif
+         
          delete it->second.master;
       }
    }
@@ -104,20 +108,16 @@ AlembicScene* AlembicSceneCache::ref(const std::string &filepath, const std::str
       }
       else
       {
-         it->second.refcount++;
-         
-         if (id == "")
-         {
-            // only update persistent flag for empty id scene
-            if (it->second.type != Alembic::AbcCoreFactory::IFactory::kHDF5)
-            {
-               it->second.persistent = persistent;
-            }
-         }
-         
          #ifdef _DEBUG
          std::cout << "[AlembicSceneCache] Return master scene [id=" << id << ", refcount=" << it->second.refcount << "]" << std::endl;
          #endif
+         
+         it->second.refcount++;
+         
+         if (it->second.type != Alembic::AbcCoreFactory::IFactory::kHDF5)
+         {
+            it->second.persistent = persistent;
+         }
          
          rv = it->second.master;
       }
@@ -137,7 +137,7 @@ AlembicScene* AlembicSceneCache::ref(const std::string &filepath, const std::str
             ce.archive = me.archive;
             ce.type = me.type;
             ce.refcount = 1;
-            ce.persistent = false;
+            ce.persistent = (ce.type != Alembic::AbcCoreFactory::IFactory::kHDF5 ? persistent : false);
             
             #ifdef _DEBUG
             std::cout << "[AlembicSceneCache] Create master scene clone" << std::endl;
@@ -272,6 +272,16 @@ bool AlembicSceneCache::unref(AlembicScene *scene, const std::string &id)
             }
             
             mScenes.erase(it);
+            
+            if (id != "")
+            {
+               // unref empty no id scene too
+               it = mScenes.find(path);
+               if (it != mScenes.end())
+               {
+                  unref(it->second.master);
+               }
+            }
          }
          else
          {
@@ -287,15 +297,7 @@ bool AlembicSceneCache::unref(AlembicScene *scene, const std::string &id)
          
          delete scene;
       }
-      else if (id != "")
-      {
-         // unref empty id master scene too
-         it = mScenes.find(path);
-         if (it != mScenes.end())
-         {
-            unref(it->second.master);
-         }
-      }
+      
       
       rv = true;
    }
