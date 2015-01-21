@@ -219,86 +219,139 @@ void WorldUpdate::leave(AlembicNode &node, AlembicNode *)
 
 // ---
 
-GetFrameRange::GetFrameRange()
+GetFrameRange::GetFrameRange(bool ignoreTransforms,
+                             bool ignoreInstances,
+                             bool ignoreVisibility)
    : mStartFrame(std::numeric_limits<double>::max())
    , mEndFrame(-std::numeric_limits<double>::max())
+   , mNoTransforms(ignoreTransforms)
+   , mNoInstances(ignoreInstances)
+   , mCheckVisibility(!ignoreVisibility)
 {
 }
    
-AlembicNode::VisitReturn GetFrameRange::enter(AlembicXform &node, AlembicNode *instance)
+AlembicNode::VisitReturn GetFrameRange::enter(AlembicXform &node, AlembicNode *)
 {
-   if (!instance)
+   if (mCheckVisibility && !node.isVisible())
    {
-      if (node.isLocator())
+      return AlembicNode::DontVisitChildren;
+   }
+   else
+   {
+      if (!mNoTransforms)
       {
-         const Alembic::Abc::IScalarProperty &prop = node.locatorProperty();
-         
-         Alembic::AbcCoreAbstract::TimeSamplingPtr ts = prop.getTimeSampling();
-         size_t nsamples = prop.getNumSamples();
-         
-         if (nsamples > 1)
+         if (node.isLocator())
          {
-            mStartFrame = std::min(ts->getSampleTime(0), mStartFrame);
-            mEndFrame = std::max(ts->getSampleTime(nsamples-1), mEndFrame);
+            const Alembic::Abc::IScalarProperty &prop = node.locatorProperty();
+            
+            Alembic::AbcCoreAbstract::TimeSamplingPtr ts = prop.getTimeSampling();
+            size_t nsamples = prop.getNumSamples();
+            
+            if (nsamples > 1)
+            {
+               mStartFrame = std::min(ts->getSampleTime(0), mStartFrame);
+               mEndFrame = std::max(ts->getSampleTime(nsamples-1), mEndFrame);
+            }
+         }
+         else
+         {
+            updateFrameRange(node);
+         }
+      }
+      
+      return AlembicNode::ContinueVisit;
+   }
+}
+
+AlembicNode::VisitReturn GetFrameRange::enter(AlembicMesh &node, AlembicNode *)
+{
+   if (mCheckVisibility && !node.isVisible())
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   else
+   {
+      updateFrameRange(node);
+      return AlembicNode::ContinueVisit;
+   }
+}
+
+AlembicNode::VisitReturn GetFrameRange::enter(AlembicSubD &node, AlembicNode *)
+{
+   if (mCheckVisibility && !node.isVisible())
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   else
+   {
+      updateFrameRange(node);
+      return AlembicNode::ContinueVisit;
+   }
+}
+
+AlembicNode::VisitReturn GetFrameRange::enter(AlembicPoints &node, AlembicNode *)
+{
+   if (mCheckVisibility && !node.isVisible())
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   else
+   {
+      updateFrameRange(node);
+      return AlembicNode::ContinueVisit;
+   }
+}
+
+AlembicNode::VisitReturn GetFrameRange::enter(AlembicCurves &node, AlembicNode *)
+{
+   if (mCheckVisibility && !node.isVisible())
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   else
+   {
+      updateFrameRange(node);
+      return AlembicNode::ContinueVisit;
+   }
+}
+
+AlembicNode::VisitReturn GetFrameRange::enter(AlembicNuPatch &node, AlembicNode *)
+{
+   if (mCheckVisibility && !node.isVisible())
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   else
+   {
+      updateFrameRange(node);
+      return AlembicNode::ContinueVisit;
+   }
+}
+
+AlembicNode::VisitReturn GetFrameRange::enter(AlembicNode &node, AlembicNode *)
+{
+   if (mCheckVisibility && !node.isVisible())
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   else
+   {
+      if (node.isInstance())
+      {
+         if (!mNoInstances)
+         {
+            return node.master()->enter(*this, &node);
+         }
+         else
+         {
+            return AlembicNode::DontVisitChildren;
          }
       }
       else
       {
-         updateFrameRange(node);
+         return AlembicNode::ContinueVisit;
       }
    }
-   
-   return AlembicNode::ContinueVisit;
-}
-
-AlembicNode::VisitReturn GetFrameRange::enter(AlembicMesh &node, AlembicNode *instance)
-{
-   if (!instance)
-   {
-      updateFrameRange(node);
-   }
-   return AlembicNode::ContinueVisit;
-}
-
-AlembicNode::VisitReturn GetFrameRange::enter(AlembicSubD &node, AlembicNode *instance)
-{
-   if (!instance)
-   {
-      updateFrameRange(node);
-   }
-   return AlembicNode::ContinueVisit;
-}
-
-AlembicNode::VisitReturn GetFrameRange::enter(AlembicPoints &node, AlembicNode *instance)
-{
-   if (!instance)
-   {
-      updateFrameRange(node);
-   }
-   return AlembicNode::ContinueVisit;
-}
-
-AlembicNode::VisitReturn GetFrameRange::enter(AlembicCurves &node, AlembicNode *instance)
-{
-   if (!instance)
-   {
-      updateFrameRange(node);
-   }
-   return AlembicNode::ContinueVisit;
-}
-
-AlembicNode::VisitReturn GetFrameRange::enter(AlembicNuPatch &node, AlembicNode *instance)
-{
-   if (!instance)
-   {
-      updateFrameRange(node);
-   }
-   return AlembicNode::ContinueVisit;
-}
-
-AlembicNode::VisitReturn GetFrameRange::enter(AlembicNode &, AlembicNode *)
-{
-   return AlembicNode::ContinueVisit;
 }
    
 void GetFrameRange::leave(AlembicNode &, AlembicNode *)

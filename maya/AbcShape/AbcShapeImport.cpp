@@ -491,15 +491,21 @@ AlembicNode::VisitReturn CreateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
    plug = dagNode.findPlug("displayMode");
    plug.setShort(short(mMode));
    
-   plug = dagNode.findPlug("time");
-   MDGModifier dgmod;
-   dgmod.connect(mTimeSource, plug);
-   dgmod.doIt();
-   
-   addUserProps(node, instance);
-   
    plug = dagNode.findPlug("filePath");
    plug.setString(mAbcPath.c_str());
+   
+   // Only connect time if animated
+   plug = dagNode.findPlug("animated");
+   if (plug.asBool())
+   {
+      MDGModifier dgmod;
+      
+      plug = dagNode.findPlug("time");
+      dgmod.connect(mTimeSource, plug);
+      dgmod.doIt();
+   }
+   
+   addUserProps(node, instance);
    
    return AlembicNode::ContinueVisit;
 }
@@ -2883,7 +2889,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
                {
                   double start, end;
                   
-                  GetFrameRange visitor;
+                  GetFrameRange visitor(false, false, false);
                   scene->visit(AlembicNode::VisitDepthFirst, visitor);
                   
                   if (visitor.getFrameRange(start, end))
