@@ -43,9 +43,9 @@ public:
     static MObject aDrawLocators;
     static MObject aOutBoxMin;
     static MObject aOutBoxMax;
+    static MObject aAnimated;
     
     static void* creator();
-    static void createdCallback(MObject& node, void* clientData);
     
     static MStatus initialize();
     
@@ -99,6 +99,7 @@ public:
     inline bool drawTransformBounds() const { return mDrawTransformBounds; }
     inline bool drawLocators() const { return mDrawLocators; }
     inline unsigned int numShapes() const { return mNumShapes; }
+    inline bool isAnimated() const { return mAnimated; }
     
     bool ignoreCulling() const;
 
@@ -115,8 +116,8 @@ private:
     void syncInternals();
     void syncInternals(MDataBlock &block);
     
-    void updateScene();
     void updateObjects();
+    void updateRange();
     void updateWorld();
     void updateGeometry();
     
@@ -125,8 +126,8 @@ private:
         UL_none = 0,
         UL_geometry,
         UL_world,
-        UL_objects,
-        UL_scene
+        UL_range,
+        UL_objects
     };
     
 private:
@@ -153,6 +154,8 @@ private:
     bool mDrawTransformBounds;
     bool mDrawLocators;
     int mUpdateLevel;
+    AlembicSceneFilter mSceneFilter;
+    bool mAnimated;
 };
 
 class AbcShapeUI : public MPxSurfaceShapeUI

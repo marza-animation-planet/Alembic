@@ -85,7 +85,8 @@ AtNode* ProcGetNode(void *user_ptr, int i)
          if (!isInstance)
          {
             MakeShape visitor(dso);
-            dso->scene()->visit(AlembicNode::VisitFilteredFlat, visitor);
+            // dso->scene()->visit(AlembicNode::VisitFilteredFlat, visitor);
+            dso->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
             
             output = visitor.node();
             

@@ -168,7 +168,9 @@ class GetFrameRange
 {
 public:
    
-   GetFrameRange();
+   GetFrameRange(bool ignoreTransforms,
+                 bool ignoreInstances,
+                 bool ignoreVisibility);
    
    AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
@@ -191,6 +193,9 @@ private:
    
    double mStartFrame;
    double mEndFrame;
+   bool mNoTransforms;
+   bool mNoInstances;
+   bool mCheckVisibility;
 };
 
 template <class T>

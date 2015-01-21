@@ -3,6 +3,7 @@
 
 #include "LocatorProperty.h"
 #include "SampleUtils.h"
+#include "AlembicSceneFilter.h"
 #include <Alembic/AbcGeom/All.h>
 #include <vector>
 #include <map>
@@ -24,8 +25,7 @@ public:
    enum VisitMode
    {
       VisitDepthFirst = 0,
-      VisitBreadthFirst,
-      VisitFilteredFlat
+      VisitBreadthFirst
    };
    
    enum VisitReturn
@@ -56,14 +56,18 @@ public:
 public:
    
    static AlembicNode* Wrap(Alembic::Abc::IObject iObj, AlembicNode *iParent);
+   static AlembicNode* FilteredWrap(Alembic::Abc::IObject iObj, const AlembicSceneFilter &filter, AlembicNode *iParent);
    
 public:
    
    AlembicNode();
    AlembicNode(Alembic::Abc::IObject iObj, AlembicNode *parent=0);
+   AlembicNode(Alembic::Abc::IObject iObj, const AlembicSceneFilter &filter, AlembicNode *parent=0);
    virtual ~AlembicNode();
    
    virtual AlembicNode* clone(AlembicNode *parent=0) const;
+   virtual AlembicNode* selfClone() const;
+   virtual AlembicNode* filteredClone(const AlembicSceneFilter &filter, AlembicNode *parent=0) const;
    
    bool isValid() const;
    
@@ -222,8 +226,12 @@ public:
    
 protected:
    
-   AlembicNode(const AlembicNode &rhs, AlembicNode *parent=0);
-
+   AlembicNode(const AlembicNode &rhs); // shallow copy
+   AlembicNode(const AlembicNode &rhs, AlembicNode *parent); // deep copy
+   AlembicNode(const AlembicNode &rhs, const AlembicSceneFilter &filter, AlembicNode *parent); // deep copy
+   
+   void addChild(AlembicNode *n);
+   
    void setType(NodeType nt);
    
    void addInstance(AlembicNode *node);
@@ -304,13 +312,42 @@ public:
       setType((NodeType) ClassToType<SelfType>::Type);
    }
    
+   AlembicNodeT(IObject iObject, const AlembicSceneFilter &filter, AlembicNode *iParent=0)
+      : AlembicNode(iObject, filter, iParent), mITypedObj(iObject)
+   {
+      setType((NodeType) ClassToType<SelfType>::Type);
+   }
+   
    virtual ~AlembicNodeT()
    {
+   }
+   
+   virtual AlembicNode* filteredClone(const AlembicSceneFilter &filter, AlembicNode *parent=0) const
+   {
+      AlembicNode *rv = 0;
+      
+      if (!filter.isExcluded(this))
+      {
+         rv = new AlembicNodeT<IObject>(*this, filter, parent);
+         
+         if (rv && rv->childCount() == 0 && !filter.isIncluded(rv))
+         {
+            delete rv;
+            rv = 0;
+         }
+      }
+      
+      return rv;
    }
    
    virtual AlembicNode* clone(AlembicNode *parent=0) const
    {
       return new AlembicNodeT<IObject>(*this, parent);
+   }
+   
+   virtual AlembicNode* selfClone() const
+   {
+      return new AlembicNodeT<IObject>(*this);
    }
    
    inline IObject typedObject() const
@@ -395,8 +432,18 @@ public:
    
 protected:
    
-   AlembicNodeT(const AlembicNodeT<IObject> &rhs, AlembicNode *iParent=0)
+   AlembicNodeT(const AlembicNodeT<IObject> &rhs)
+      : AlembicNode(rhs), mITypedObj(rhs.mITypedObj)
+   {
+   }
+   
+   AlembicNodeT(const AlembicNodeT<IObject> &rhs, AlembicNode *iParent)
       : AlembicNode(rhs, iParent), mITypedObj(rhs.mITypedObj)
+   {
+   }
+   
+   AlembicNodeT(const AlembicNodeT<IObject> &rhs, const AlembicSceneFilter &filter, AlembicNode *iParent)
+      : AlembicNode(rhs, filter, iParent), mITypedObj(rhs.mITypedObj)
    {
    }
    

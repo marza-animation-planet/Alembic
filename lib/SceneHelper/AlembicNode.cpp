@@ -22,6 +22,33 @@ AlembicNode::AlembicNode()
    mLocatorScale.setValue(1, 1, 1);
 }
 
+AlembicNode::AlembicNode(const AlembicNode &rhs)
+   : mIObj(rhs.mIObj)
+   , mType(rhs.mType)
+   , mParent(0)
+   , mMasterPath(rhs.mMasterPath)
+   , mMaster(0)
+   , mInstanceNumber(0)
+   , mBoundsProp(rhs.mBoundsProp)
+   , mInheritsTransform(true)
+   , mLocatorProp(rhs.mLocatorProp)
+   , mVisible(true)
+{
+   if (rhs.isLocator())
+   {
+      mSelfBounds.makeInfinite();
+   }
+   else
+   {
+      mSelfBounds.makeEmpty();
+   }
+   mChildBounds.makeEmpty();
+   mSelfMatrix.makeIdentity();
+   mWorldMatrix.makeIdentity();
+   mLocatorPosition.setValue(0, 0, 0);
+   mLocatorScale.setValue(1, 1, 1);
+}
+
 AlembicNode::AlembicNode(const AlembicNode &rhs, AlembicNode *parent)
    : mIObj(rhs.mIObj)
    , mType(rhs.mType)
@@ -60,11 +87,52 @@ AlembicNode::AlembicNode(const AlembicNode &rhs, AlembicNode *parent)
          mChildren.push_back(c);
          mChildByName[c->name()] = c;
       }
-      else
+   }
+}
+
+AlembicNode::AlembicNode(const AlembicNode &rhs, const AlembicSceneFilter &filter, AlembicNode *parent)
+   : mIObj(rhs.mIObj)
+   , mType(rhs.mType)
+   , mParent(parent)
+   , mMasterPath(rhs.mMasterPath)
+   , mMaster(0)
+   , mInstanceNumber(0)
+   , mBoundsProp(rhs.mBoundsProp)
+   , mInheritsTransform(true)
+   , mLocatorProp(rhs.mLocatorProp)
+   , mVisible(true)
+{
+   if (rhs.isLocator())
+   {
+      mSelfBounds.makeInfinite();
+   }
+   else
+   {
+      mSelfBounds.makeEmpty();
+   }
+   mChildBounds.makeEmpty();
+   mSelfMatrix.makeIdentity();
+   mWorldMatrix.makeIdentity();
+   mLocatorPosition.setValue(0, 0, 0);
+   mLocatorScale.setValue(1, 1, 1);
+   
+   size_t numChildren = rhs.childCount();
+   
+   mChildren.reserve(numChildren);
+   
+   for (size_t i=0; i<numChildren; ++i)
+   {
+      if (filter.isExcluded(rhs.child(i)))
       {
-         #ifdef _DEBUG
-         std::cout << "[AlembicNode] Failed to clone rhs child[" << i << "] (" << rhs.child(i)->name() << ")" << std::endl;
-         #endif
+         continue;
+      }
+      
+      AlembicNode *c = rhs.child(i)->filteredClone(filter, this);
+      
+      if (c)
+      {
+         mChildren.push_back(c);
+         mChildByName[c->name()] = c;
       }
    }
 }
@@ -119,6 +187,56 @@ AlembicNode::AlembicNode(Alembic::Abc::IObject iObj, AlembicNode *parent)
    }
 }
 
+AlembicNode::AlembicNode(Alembic::Abc::IObject iObj, const AlembicSceneFilter &filter, AlembicNode *parent)
+   : mIObj(iObj)
+   , mType(AlembicNode::TypeGeneric)
+   , mParent(parent)
+   , mMasterPath("")
+   , mMaster(0)
+   , mInstanceNumber(0)
+   , mInheritsTransform(true)
+   , mVisible(true)
+{
+   mSelfBounds.makeEmpty();
+   mChildBounds.makeEmpty();
+   mSelfMatrix.makeIdentity();
+   mWorldMatrix.makeIdentity();
+   mLocatorPosition.setValue(0, 0, 0);
+   mLocatorScale.setValue(1, 1, 1);
+   
+   if (mIObj.valid())
+   {
+      if (mIObj.isInstanceRoot())
+      {
+         mMasterPath = mIObj.instanceSourcePath();
+      }
+      else if (mIObj.isInstanceDescendant())
+      {
+         mMasterPath = mIObj.getHeader().getFullName();
+      }
+      
+      size_t numChildren = (mIObj.valid() ? mIObj.getNumChildren() : 0);
+      
+      mChildren.reserve(numChildren);
+      
+      for (size_t i=0; i<numChildren; ++i)
+      {
+         if (filter.isExcluded(mIObj.getFullName().c_str()))
+         {
+            continue;
+         }
+         
+         AlembicNode *c = FilteredWrap(mIObj.getChild(i), filter, this);
+         
+         if (c)
+         {
+            mChildren.push_back(c);
+            mChildByName[c->name()] = c;
+         }
+      }
+   }
+}
+
 AlembicNode::~AlembicNode()
 {
    while (mInstances.size() > 0)
@@ -149,6 +267,40 @@ AlembicNode::~AlembicNode()
 AlembicNode* AlembicNode::clone(AlembicNode *parent) const
 {
    return new AlembicNode(*this, parent);
+}
+
+AlembicNode* AlembicNode::selfClone() const
+{
+   return new AlembicNode(*this);
+}
+
+AlembicNode* AlembicNode::filteredClone(const AlembicSceneFilter &filter, AlembicNode *parent) const
+{
+   AlembicNode *rv = 0;
+   
+   if (!filter.isExcluded(this))
+   {
+      rv = new AlembicNode(*this, filter, parent);
+      
+      if (rv && rv->childCount() == 0 && !filter.isIncluded(rv))
+      {
+         delete rv;
+         rv = 0;
+      }
+   }
+   
+   return rv;
+}
+
+void AlembicNode::addChild(AlembicNode *n)
+{
+   if (n)
+   {
+      mChildren.push_back(n);
+      mChildByName[n->name()] = n;
+      
+      n->mParent = this;
+   }
 }
 
 AlembicNode::NodeType AlembicNode::type() const
@@ -586,6 +738,11 @@ void AlembicNode::resolveInstances(AlembicScene *scene)
       {
          mMaster->addInstance(this);
       }
+      else
+      {
+         // Un-instance node
+         mMasterPath = "";
+      }
    }
    
    for (Array::iterator it=mChildren.begin(); it!=mChildren.end(); ++it)
@@ -767,4 +924,57 @@ AlembicNode* AlembicNode::Wrap(Alembic::Abc::IObject iObj, AlembicNode *iParent)
    {
       return 0;
    }
+}
+
+AlembicNode* AlembicNode::FilteredWrap(Alembic::Abc::IObject iObj, const AlembicSceneFilter &filter, AlembicNode *iParent)
+{
+   if (!iObj.valid())
+   {
+      return 0;
+   }
+   
+   AlembicNode *rv = 0;
+   
+   if (iObj.isInstanceDescendant())
+   {
+      rv = new AlembicNode(iObj, filter, iParent);
+   }
+   else if (Alembic::AbcGeom::IXform::matches(iObj.getHeader()))
+   {
+      Alembic::AbcGeom::IXform iXform(iObj, Alembic::Abc::kWrapExisting);
+      rv = new AlembicXform(iXform, filter, iParent);
+   }
+   else if (Alembic::AbcGeom::IPoints::matches(iObj.getHeader()))
+   {
+      Alembic::AbcGeom::IPoints iPoints(iObj, Alembic::Abc::kWrapExisting);
+      rv = new AlembicPoints(iPoints, filter, iParent);
+   }
+   else if (Alembic::AbcGeom::IPolyMesh::matches(iObj.getHeader()))
+   {
+      Alembic::AbcGeom::IPolyMesh iMesh(iObj, Alembic::Abc::kWrapExisting);
+      rv = new AlembicMesh(iMesh, filter, iParent);
+   }
+   else if (Alembic::AbcGeom::ISubD::matches(iObj.getHeader()))
+   {
+      Alembic::AbcGeom::ISubD iSubD(iObj, Alembic::Abc::kWrapExisting);
+      rv = new AlembicSubD(iSubD, filter, iParent);
+   }
+   else if (Alembic::AbcGeom::INuPatch::matches(iObj.getHeader()))
+   {
+      Alembic::AbcGeom::INuPatch iNuPatch(iObj, Alembic::Abc::kWrapExisting);
+      rv = new AlembicNuPatch(iNuPatch, filter, iParent);
+   }
+   else if (Alembic::AbcGeom::ICurves::matches(iObj.getHeader()))
+   {
+      Alembic::AbcGeom::ICurves iCurves(iObj, Alembic::Abc::kWrapExisting);
+      rv = new AlembicCurves(iCurves, filter, iParent);
+   }
+   
+   if (rv && rv->childCount() == 0 && !filter.isIncluded(rv))
+   {
+      delete rv;
+      rv = 0;
+   }
+   
+   return rv;
 }

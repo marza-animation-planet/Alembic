@@ -59,51 +59,11 @@ MObject AbcShape::aDrawTransformBounds;
 MObject AbcShape::aDrawLocators;
 MObject AbcShape::aOutBoxMin;
 MObject AbcShape::aOutBoxMax;
+MObject AbcShape::aAnimated;
 
 void* AbcShape::creator()
 {
    return new AbcShape();
-}
-
-void AbcShape::createdCallback(MObject& node, void*)
-{
-   MFnDependencyNode dn(node);
-   MPlug plug;
-   
-   plug = dn.findPlug("visibleInReflections");
-   if (!plug.isNull())
-   {
-      plug.setBool(true);
-   }
-   
-   plug = dn.findPlug("visibleInRefractions");
-   if (!plug.isNull())
-   {
-      plug.setBool(true);
-   }
-   
-   plug = dn.findPlug("time");
-   if (!plug.isNull())
-   {
-      MSelectionList sl;
-      MObject obj;
-      
-      sl.add("time1");
-      
-      if (sl.getDependNode(0, obj) == MStatus::kSuccess)
-      {
-         MFnDependencyNode timeNode(obj);
-         MPlug srcPlug = timeNode.findPlug("outTime");
-         
-         if (!srcPlug.isNull())
-         {
-            MDGModifier mod;
-            
-            mod.connect(srcPlug, plug);
-            mod.doIt();
-         }
-      }
-   }
 }
 
 MStatus AbcShape::initialize()
@@ -282,10 +242,23 @@ MStatus AbcShape::initialize()
    stat = addAttribute(aOutBoxMax);
    MCHECKERROR(stat, "Could not add 'outBoxMax' attribute");
    
+   aAnimated = nAttr.create("animated", "anm", MFnNumericData::kBoolean, 0, &stat);
+   MCHECKERROR(stat, "Could not create 'animated' attribute");
+   nAttr.setWritable(true);
+   nAttr.setStorable(true);
+   stat = addAttribute(aAnimated);
+   MCHECKERROR(stat, "Could not add 'animated' attribute");
+   
    attributeAffects(aFilePath, aNumShapes);
    attributeAffects(aObjectExpression, aNumShapes);
    attributeAffects(aIgnoreInstances, aNumShapes);
    attributeAffects(aIgnoreVisibility, aNumShapes);
+   
+   attributeAffects(aFilePath, aAnimated);
+   attributeAffects(aObjectExpression, aAnimated);
+   attributeAffects(aIgnoreInstances, aAnimated);
+   attributeAffects(aIgnoreXforms, aAnimated);
+   attributeAffects(aIgnoreVisibility, aAnimated);
    
    attributeAffects(aObjectExpression, aOutBoxMin);
    attributeAffects(aDisplayMode, aOutBoxMin);
@@ -359,8 +332,6 @@ AbcShape::~AbcShape()
 void AbcShape::postConstructor()
 {
    setRenderable(true);
-   
-   AbcShape::CallbackID = MDGMessage::addNodeAddedCallback(AbcShape::createdCallback, PREFIX_NAME("AbcShape"));
 }
 
 bool AbcShape::ignoreCulling() const
@@ -417,6 +388,18 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
       
       return MS::kSuccess;
    }
+   else if (plug.attribute() == aAnimated)
+   {
+      syncInternals(block);
+      
+      MDataHandle hOut = block.outputValue(plug.attribute());
+      
+      hOut.setBool(mAnimated);
+      
+      block.setClean(plug);
+      
+      return MS::kSuccess;
+   }
    else
    {
       return MS::kUnknownParameter;
@@ -452,11 +435,11 @@ void AbcShape::syncInternals(MDataBlock &block)
    
    switch (mUpdateLevel)
    {
-   case UL_scene:
-      updateScene();
-      break;
    case UL_objects:
-      if (mScene) updateObjects();
+      updateObjects();
+      break;
+   case UL_range:
+      if (mScene) updateRange();
       break;
    case UL_world:
       if (mScene) updateWorld();
@@ -612,66 +595,74 @@ double AbcShape::getSampleTime() const
    return computeRetime(sampleTime, mStartFrame * invFPS, mEndFrame * invFPS, mCycleType);
 }
 
-void AbcShape::updateScene()
-{
-   #ifdef _DEBUG
-   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Update scene: " << mFilePath << std::endl;
-   #endif
-   AlembicSceneCache::Unref(mScene);
-   
-   mGeometry.clear();
-   
-   mScene = AlembicSceneCache::Ref(mFilePath.asChar());
-   
-   if (mScene)
-   {
-      GetFrameRange visitor;
-      mScene->visit(AlembicNode::VisitDepthFirst, visitor);
-      
-      double start, end;
-      
-      if (visitor.getFrameRange(start, end))
-      {
-         double fps = getFPS();
-         start *= fps;
-         end *= fps;
-         
-         if (fabs(mStartFrame - start) > 0.0001 ||
-             fabs(mEndFrame - end) > 0.0001)
-         {
-            #ifdef _DEBUG
-            std::cout << "[" << PREFIX_NAME("AbcShape") << "] Frame range: " << start << " - " << end << std::endl;
-            #endif
-            
-            mStartFrame = start;
-            mEndFrame = end;
-            mSampleTime = getSampleTime();
-            
-            // This will force instant refresh of AE values
-            // but won't trigger any update as mStartFrame and mEndFrame are unchanged
-            MPlug plug(thisMObject(), aStartFrame);
-            plug.setDouble(mStartFrame);
-            
-            plug.setAttribute(aEndFrame);
-            plug.setDouble(mEndFrame);
-         }
-      }
-      
-      updateObjects();
-   }
-   else
-   {
-      mNumShapes = 0;
-   }
-}
-
 void AbcShape::updateObjects()
 {
    #ifdef _DEBUG
-   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Filter objects: \"" << mObjectExpression << "\"" << std::endl;
+   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Update objects: \"" << mFilePath.asChar() << "\" | \"" << mObjectExpression.asChar() << "\"" << std::endl;
    #endif
    
-   mScene->setFilter(mObjectExpression.asChar());
+   mGeometry.clear();
+   mAnimated = false;
+   mNumShapes = 0;
+   
+   mSceneFilter.set(mObjectExpression.asChar(), "");
+   
+   AlembicScene *scene = AlembicSceneCache::Ref(mFilePath.asChar(), mSceneFilter);
+   
+   if (mScene && !AlembicSceneCache::Unref(mScene))
+   {
+      delete mScene;
+   }
+   
+   mScene = scene;
+   
+   if (mScene)
+   {
+      updateRange();
+   }
+}
+
+void AbcShape::updateRange()
+{
+   #ifdef _DEBUG
+   std::cout << "[" << PREFIX_NAME("AbcShape") << "] Update range" << std::endl;
+   #endif
+   
+   mAnimated = false;
+   
+   GetFrameRange visitor(mIgnoreTransforms, mIgnoreInstances, mIgnoreVisibility);
+   mScene->visit(AlembicNode::VisitDepthFirst, visitor);
+   
+   double start, end;
+   
+   if (visitor.getFrameRange(start, end))
+   {
+      double fps = getFPS();
+      start *= fps;
+      end *= fps;
+      
+      mAnimated = (fabs(end - start) > 0.0001);
+      
+      if (fabs(mStartFrame - start) > 0.0001 ||
+          fabs(mEndFrame - end) > 0.0001)
+      {
+         #ifdef _DEBUG
+         std::cout << "[" << PREFIX_NAME("AbcShape") << "] Frame range: " << start << " - " << end << std::endl;
+         #endif
+         
+         mStartFrame = start;
+         mEndFrame = end;
+         mSampleTime = getSampleTime();
+         
+         // This will force instant refresh of AE values
+         // but won't trigger any update as mStartFrame and mEndFrame are unchanged
+         MPlug plug(thisMObject(), aStartFrame);
+         plug.setDouble(mStartFrame);
+         
+         plug.setAttribute(aEndFrame);
+         plug.setDouble(mEndFrame);
+      }
+   }
    
    updateWorld();
 }
@@ -837,7 +828,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       if (filePath != mFilePath)
       {
          mFilePath = filePath;
-         mUpdateLevel = UL_scene;
+         mUpdateLevel = UL_objects;
       }
       
       return true;
@@ -849,10 +840,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       if (objectExpression != mObjectExpression)
       {
          mObjectExpression = objectExpression;
-         if (mScene)
-         {
-            mUpdateLevel = std::max<int>(mUpdateLevel, UL_objects);
-         }
+         mUpdateLevel = UL_objects;
       }
       
       return true;
@@ -866,7 +854,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
          mIgnoreTransforms = ignoreTransforms;
          if (mScene)
          {
-            mUpdateLevel = std::max<int>(mUpdateLevel, UL_world);
+            mUpdateLevel = std::max<int>(mUpdateLevel, UL_range);
          }
       }
       
@@ -881,7 +869,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
          mIgnoreInstances = ignoreInstances;
          if (mScene)
          {
-            mUpdateLevel = std::max<int>(mUpdateLevel, UL_world);
+            mUpdateLevel = std::max<int>(mUpdateLevel, UL_range);
          }
       }
       
@@ -896,7 +884,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
          mIgnoreVisibility = ignoreVisibility;
          if (mScene)
          {
-            mUpdateLevel = std::max<int>(mUpdateLevel, UL_world);
+            mUpdateLevel = std::max<int>(mUpdateLevel, UL_range);
          }
       }
       
@@ -927,7 +915,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       if (fabs(t.as(MTime::kSeconds) - mTime.as(MTime::kSeconds)) > 0.0001)
       {
          mTime = t;
-         sampleTimeUpdate = true;
+         sampleTimeUpdate = mAnimated;
       }
    }
    else if (plug == aSpeed)
@@ -937,7 +925,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       if (fabs(speed - mSpeed) > 0.0001)
       {
          mSpeed = speed;
-         sampleTimeUpdate = true;
+         sampleTimeUpdate = mAnimated;
       }
    }
    else if (plug == aPreserveStartFrame)
@@ -947,7 +935,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       if (psf != mPreserveStartFrame)
       {
          mPreserveStartFrame = psf;
-         sampleTimeUpdate = true;
+         sampleTimeUpdate = mAnimated;
       }
    }
    else if (plug == aOffset)
@@ -957,7 +945,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       if (fabs(offset - mOffset) > 0.0001)
       {
          mOffset = offset;
-         sampleTimeUpdate = true;
+         sampleTimeUpdate = mAnimated;
       }
    }
    else if (plug == aCycleType)
@@ -967,7 +955,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       if (c != mCycleType)
       {
          mCycleType = c;
-         sampleTimeUpdate = true;
+         sampleTimeUpdate = mAnimated;
       }
    }
    else if (plug == aStartFrame)
@@ -977,7 +965,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       if (fabs(sf - mStartFrame) > 0.0001)
       {
          mStartFrame = sf;
-         sampleTimeUpdate = true;
+         sampleTimeUpdate = mAnimated;
       }
    }
    else if (plug == aEndFrame)
@@ -987,7 +975,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       if (fabs(ef - mEndFrame) > 0.0001)
       {
          mEndFrame = ef;
-         sampleTimeUpdate = true;
+         sampleTimeUpdate = mAnimated;
       }
    }
    else if (plug == aLineWidth)
@@ -1057,12 +1045,17 @@ void AbcShape::copyInternalData(MPxNode *source)
       mPreserveStartFrame = node->mPreserveStartFrame;
       mDrawTransformBounds = node->mDrawTransformBounds;
       mDrawLocators = node->mDrawLocators;
+      mAnimated = node->mAnimated;
       
-      AlembicSceneCache::Unref(mScene);
+      if (mScene && !AlembicSceneCache::Unref(mScene))
+      {
+         delete mScene;
+      }
       mScene = 0;
+      mSceneFilter.reset();
       mNumShapes = 0;
       mGeometry.clear();
-      mUpdateLevel = UL_scene;
+      mUpdateLevel = UL_objects;
    }
    
 }

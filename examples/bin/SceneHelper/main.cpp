@@ -442,10 +442,10 @@ int main(int argc, char **argv)
             {
                mode = AlembicNode::VisitDepthFirst;
             }
-            else if (rv > AlembicNode::VisitFilteredFlat)
-            {
-               mode = AlembicNode::VisitFilteredFlat;
-            }
+            // else if (rv > AlembicNode::VisitFilteredFlat)
+            // {
+            //    mode = AlembicNode::VisitFilteredFlat;
+            // }
             else
             {
                mode = (AlembicNode::VisitMode) rv;
@@ -508,20 +508,20 @@ int main(int argc, char **argv)
       
       st = clock();
       
-      AlembicScene scene(archive);
+      AlembicScene scene(archive, AlembicSceneFilter(filter, ""));
       
       et = clock();
       std::cout << "Build graph in " << (ts * (et - st)) << " second(s)" << std::endl;
       
-      if (filter.length() > 0)
-      {
-         st = clock();
+      // if (filter.length() > 0)
+      // {
+      //    st = clock();
          
-         scene.setFilter(filter);
+      //    scene.setFilter(filter);
          
-         et = clock();
-         std::cout << "Filter graph in " << (ts * (et - st)) << " second(s)" << std::endl;
-      }
+      //    et = clock();
+      //    std::cout << "Filter graph in " << (ts * (et - st)) << " second(s)" << std::endl;
+      // }
       
       // ---
       

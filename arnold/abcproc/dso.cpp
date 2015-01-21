@@ -386,17 +386,22 @@ Dso::Dso(AtNode *node)
    {
       ScopeLock _lock;
       
-      mScene = AlembicSceneCache::Ref(mCommonParams.filePath, true);
+      char id[64];
+      sprintf(id, "%p", AiThreadSelf());
+      
+      AlembicSceneFilter filter(mCommonParams.objectPath, "");
+      
+      mScene = AlembicSceneCache::Ref(mCommonParams.filePath, id, filter, true);
    
       if (mCommonParams.referenceFilePath.length() > 0)
       {
-         mRefScene = AlembicSceneCache::Ref(mCommonParams.referenceFilePath, true);
+         mRefScene = AlembicSceneCache::Ref(mCommonParams.referenceFilePath, id, filter, true);
       }
    }
    
    if (mScene)
    {
-      mScene->setFilter(mCommonParams.objectPath);
+      // mScene->setFilter(mCommonParams.objectPath);
       
       if (mCommonParams.startFrame > mCommonParams.endFrame)
       {
@@ -673,13 +678,16 @@ Dso::~Dso()
 {
    ScopeLock _lock;
    
+   char id[64];
+   sprintf(id, "%p", AiThreadSelf());
+   
    if (mScene)
    {
-      AlembicSceneCache::Unref(mScene);
+      AlembicSceneCache::Unref(mScene, id);
    }
    if (mRefScene)
    {
-      AlembicSceneCache::Unref(mRefScene);
+      AlembicSceneCache::Unref(mRefScene, id);
    }
 }
 
