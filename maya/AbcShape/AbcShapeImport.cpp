@@ -498,7 +498,7 @@ AlembicNode::VisitReturn CreateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
    plug.setBool(mPreserveStartFrame);
    
    plug = dagNode.findPlug("objectExpression");
-   plug.setString(node.path().c_str());
+   plug.setString(target->path().c_str());
    
    plug = dagNode.findPlug("displayMode");
    plug.setShort(short(mMode));
@@ -2941,6 +2941,11 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       bool setToStartFrame = argData.isFlagSet("setToStartFrame");
       bool createInstances = argData.isFlagSet("createInstances");
       bool ignoreTransforms = argData.isFlagSet("ignoreTransforms");
+      
+      if (ignoreTransforms && createInstances)
+      {
+         MGlobal::displayWarning("'createInstances' and 'ignoreTransforms' options are incompatible");
+      }
       
       if (argData.isFlagSet("reparent"))
       {
