@@ -44,6 +44,7 @@ MSyntax AbcShapeImport::createSyntax()
    syntax.addFlag("-ftr", "-fitTimeRange", MSyntax::kNoArg);
    syntax.addFlag("-sts", "-setToStartFrame", MSyntax::kNoArg);
    syntax.addFlag("-ci", "-createInstances", MSyntax::kNoArg);
+   syntax.addFlag("-it", "-ignoreTransforms", MSyntax::kNoArg);
    syntax.addFlag("-s", "-speed", MSyntax::kDouble);
    syntax.addFlag("-o", "-offset", MSyntax::kDouble);
    syntax.addFlag("-psf", "-preserveStartFrame", MSyntax::kBoolean);
@@ -168,6 +169,7 @@ public:
    
    CreateTree(const std::string &abcPath,
               AbcShape::DisplayMode mode,
+              bool ignoreTransforms,
               bool createInstances,
               double speed,
               double offset,
@@ -197,6 +199,10 @@ private:
    bool addDag(const std::string &path, const MDagPath &dag);
    bool checkExistingDag(const char *dagType, AlembicNode *node);
    bool createDag(const char *dagType, AlembicNode *node, bool force=false);
+   
+   void getTransformSamples(AlembicXform *node, std::set<double> &samples);
+   void getDefaultTransform(AlembicXform *node, bool worldSpace, MMatrix &outM);
+   void getTransformAtTime(AlembicXform *node, double t, bool worldSpace, MMatrix &outM);
    
    template <class T>
    void addUserProps(AlembicNodeT<T> &node, AlembicNode *instance=0);
@@ -268,6 +274,7 @@ private:
    
    std::string mAbcPath;
    AbcShape::DisplayMode mMode;
+   bool mIgnoreTransforms;
    bool mCreateInstances;
    double mSpeed;
    double mOffset;
@@ -280,6 +287,7 @@ private:
 
 CreateTree::CreateTree(const std::string &abcPath,
                        AbcShape::DisplayMode mode,
+                       bool ignoreTransforms,
                        bool createInstances,
                        double speed,
                        double offset,
@@ -287,6 +295,7 @@ CreateTree::CreateTree(const std::string &abcPath,
                        AbcShape::CycleType cycleType)
    : mAbcPath(abcPath)
    , mMode(mode)
+   , mIgnoreTransforms(ignoreTransforms)
    , mCreateInstances(createInstances)
    , mSpeed(speed)
    , mOffset(offset)
@@ -465,10 +474,13 @@ AlembicNode::VisitReturn CreateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
    plug.setBool(true);
    
    plug = dagNode.findPlug("ignoreXforms");
-   plug.setBool(true);
+   // plug.setBool(true);
+   plug.setBool(!mIgnoreTransforms);
+   // Should I disable 'inheritsTransform' on parent too?
    
    plug = dagNode.findPlug("ignoreInstances");
-   plug.setBool(true);
+   // plug.setBool(true);
+   plug.setBool(mCreateInstances);
    
    plug = dagNode.findPlug("ignoreVisibility");
    plug.setBool(true);
@@ -535,6 +547,120 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicNuPatch &node, AlembicNode *in
    return enterShape(node, instance);
 }
 
+void CreateTree::getTransformSamples(AlembicXform *node, std::set<double> &samples)
+{
+   Alembic::AbcGeom::IXformSchema schema = node->typedObject().getSchema();
+   
+   size_t numSamples = schema.getNumSamples();
+   
+   Alembic::AbcCoreAbstract::TimeSamplingPtr ts = schema.getTimeSampling();
+   
+   double invSpeed = 1.0 / mSpeed;
+   double secStart = ts->getSampleTime(0);
+   double secEnd = ts->getSampleTime(numSamples-1);
+   double secOffset = MTime(mOffset, MTime::uiUnit()).as(MTime::kSeconds);
+   double offset = secOffset;
+   
+   if (mPreserveStartFrame)
+   {
+      offset += secStart * (mSpeed - 1.0) * invSpeed;
+   }
+   
+   for (size_t i=0; i<numSamples; ++i)
+   {
+      Alembic::AbcCoreAbstract::index_t idx = i;
+      
+      double t = ts->getSampleTime(idx);
+      if (mCycleType == AbcShape::CT_reverse)
+      {
+         t = secEnd - (t - secStart);
+      }
+      t = offset + invSpeed * t;
+      
+      samples.insert(t);
+   }
+   
+   if (node->parent() && node->parent()->type() == AlembicNode::TypeXform)
+   {
+      getTransformSamples((AlembicXform*) node->parent(), samples);
+   }
+}
+
+void CreateTree::getDefaultTransform(AlembicXform *node, bool worldSpace, MMatrix &outM)
+{
+   Alembic::AbcGeom::IXformSchema schema = node->typedObject().getSchema();
+   
+   Alembic::AbcGeom::XformSample sample = schema.getValue();
+   
+   MMatrix M = MMatrix(sample.getMatrix().x);
+   
+   if (!worldSpace)
+   {
+      outM = M;
+   }
+   else
+   {
+      AlembicNode *parent = node->parent();
+      
+      if (parent && parent->type() == AlembicNode::TypeXform)
+      {
+         MMatrix pM;
+         
+         getDefaultTransform((AlembicXform*) parent, true, pM);
+         
+         outM = M * pM;
+      }
+      else
+      {
+         outM = M;
+      }
+   }
+}
+
+void CreateTree::getTransformAtTime(AlembicXform *node, double t, bool worldSpace, MMatrix &outM)
+{
+   Alembic::AbcGeom::IXformSchema schema = node->typedObject().getSchema();
+   
+   MMatrix M;
+   
+   if (schema.isConstant() || fabs(mSpeed) <= 0.0001)
+   {
+      Alembic::AbcGeom::XformSample sample = schema.getValue();
+      
+      M = MMatrix(sample.getMatrix().x);
+   }
+   else
+   {
+      // Note: sample doesn't necessarily exists... should then interpolate ourselves
+      Alembic::Abc::ISampleSelector selector(t);
+      Alembic::AbcGeom::XformSample sample = schema.getValue(selector);
+      
+      M = MMatrix(sample.getMatrix().x);
+   }
+   
+   if (!worldSpace)
+   {
+      outM = M;
+   }
+   else
+   {
+      AlembicNode *parent = node->parent();
+      
+      if (parent && parent->type() == AlembicNode::TypeXform)
+      {
+         MMatrix pM;
+         
+         getTransformAtTime((AlembicXform*) parent, t, true, pM);
+         
+         outM = M * pM;
+      }
+      else
+      {
+         outM = M;
+      }
+   }
+}
+
 AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *instance)
 {
    AlembicNode *target = (instance ? instance : &node);
@@ -558,6 +684,48 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
       
       MFnDagNode locNode(getDag(target->path()));
       MObject locObj = locNode.object();
+      
+      if (mIgnoreTransforms)
+      {
+         // Key direct parent transform with world transformation
+         
+         AlembicNode *parent = target->parent();
+         
+         if (parent && parent->type() == AlembicNode::TypeXform)
+         {
+            MMatrix mmat;
+            std::set<double> samples;
+            
+            AlembicXform *pnode = (AlembicXform*) parent;
+            
+            MFnTransform xform(getDag(parent->path()));
+            MObject xformObj = xform.object();
+            
+            getTransformSamples(pnode, samples);
+            
+            if (samples.size() >= 2)
+            {
+               for (std::set<double>::iterator it=samples.begin(); it!=samples.end(); ++it)
+               {
+                  getTransformAtTime(pnode, *it, true, mmat);
+                  mKeyframer.setCurrentTime(*it);
+                  mKeyframer.addTransformKey(xformObj, mmat);
+               }
+            }
+            else if (samples.size() == 1)
+            {
+               getTransformAtTime(pnode, *(samples.begin()), true, mmat);
+               MTransformationMatrix tm(mmat);
+               xform.set(tm);
+            }
+            else
+            {
+               getDefaultTransform(pnode, true, mmat);
+               MTransformationMatrix tm(mmat);
+               xform.set(tm);
+            }
+         }
+      }
       
       MPlug pPx = locNode.findPlug("localPositionX");
       MPlug pPy = locNode.findPlug("localPositionY");
@@ -637,56 +805,67 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
       MFnTransform xform(getDag(target->path()));
       MObject xformObj = xform.object();
       
-      MPlug pIT = xform.findPlug("inheritsTransform");
-      
-      // Get default sample and set node state
-      Alembic::AbcGeom::XformSample sample = schema.getValue();
-      
-      MTransformationMatrix mmat(MMatrix(sample.getMatrix().x));
-      xform.set(mmat);
-      
-      bool inheritsXforms = sample.getInheritsXforms();
-      pIT.setBool(inheritsXforms);
-      
-      if (!schema.isConstant() && fabs(mSpeed) > 0.0001)
+      if (!mIgnoreTransforms)
       {
-         size_t numSamples = schema.getNumSamples();
+         // Note: even if mIgnoreTransforms is set, set maya's 'inheritsTransform' attribute?
          
-         Alembic::AbcCoreAbstract::TimeSamplingPtr ts = schema.getTimeSampling();
+         // Get default sample and set node state
+         Alembic::AbcGeom::XformSample sample = schema.getValue();
          
-         double invSpeed = 1.0 / mSpeed;
-         double secStart = ts->getSampleTime(0);
-         double secEnd = ts->getSampleTime(numSamples-1);
-         double secOffset = MTime(mOffset, MTime::uiUnit()).as(MTime::kSeconds);
+         // Inherit flag
+         MPlug pIT = xform.findPlug("inheritsTransform");
          
-         double offset = secOffset;
-         if (mPreserveStartFrame)
+         bool inheritsXforms = sample.getInheritsXforms();
+         pIT.setBool(inheritsXforms);
+         
+         // Transformation matrix
+         MTransformationMatrix mmat(MMatrix(sample.getMatrix().x));
+         xform.set(mmat);
+         
+         if (!schema.isConstant() && fabs(mSpeed) > 0.0001)
          {
-            offset += secStart * (mSpeed - 1.0) * invSpeed;
-         }
-         
-         for (size_t i=0; i<numSamples; ++i)
-         {
-            Alembic::AbcCoreAbstract::index_t idx = i;
+            size_t numSamples = schema.getNumSamples();
             
-            double t = ts->getSampleTime(idx);
-            if (mCycleType == AbcShape::CT_reverse)
+            Alembic::AbcCoreAbstract::TimeSamplingPtr ts = schema.getTimeSampling();
+            
+            double invSpeed = 1.0 / mSpeed;
+            double secStart = ts->getSampleTime(0);
+            double secEnd = ts->getSampleTime(numSamples-1);
+            double secOffset = MTime(mOffset, MTime::uiUnit()).as(MTime::kSeconds);
+            
+            double offset = secOffset;
+            if (mPreserveStartFrame)
             {
-               t = secEnd - (t - secStart);
+               offset += secStart * (mSpeed - 1.0) * invSpeed;
             }
-            t = offset + invSpeed * t;
             
-            Alembic::AbcGeom::XformSample sample = schema.getValue(Alembic::Abc::ISampleSelector(idx));
+            for (size_t i=0; i<numSamples; ++i)
+            {
+               Alembic::AbcCoreAbstract::index_t idx = i;
+               
+               double t = ts->getSampleTime(idx);
+               if (mCycleType == AbcShape::CT_reverse)
+               {
+                  t = secEnd - (t - secStart);
+               }
+               t = offset + invSpeed * t;
+               
+               Alembic::AbcGeom::XformSample sample = schema.getValue(Alembic::Abc::ISampleSelector(idx));
+               
+               MMatrix mmat(sample.getMatrix().x);
+               
+               mKeyframer.setCurrentTime(t);
+               mKeyframer.addTransformKey(xformObj, mmat);
+               mKeyframer.addInheritsTransformKey(xformObj, sample.getInheritsXforms());
+            }
             
-            MMatrix mmat(sample.getMatrix().x);
-            
-            mKeyframer.setCurrentTime(t);
-            mKeyframer.addTransformKey(xformObj, mmat);
-            mKeyframer.addInheritsTransformKey(xformObj, sample.getInheritsXforms());
+            mKeyframer.addCurvesImportInfo(xformObj, "", mSpeed, secOffset, secStart, secEnd,
+                                           (mCycleType == AbcShape::CT_reverse), mPreserveStartFrame);
          }
-         
-         mKeyframer.addCurvesImportInfo(xformObj, "", mSpeed, secOffset, secStart, secEnd,
-                                        (mCycleType == AbcShape::CT_reverse), mPreserveStartFrame);
+      }
+      else
+      {
+         // Leave transform to identity (AbcShape will handle it)
       }
       
       Alembic::Abc::ICompoundProperty props = node.object().getProperties();
@@ -2455,6 +2634,8 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       MGlobal::displayInfo("                               " + MString(PREFIX_NAME("AbcShape")) + " nodes cycle type (default to hold).");
       MGlobal::displayInfo("-ci / -createInstances       :");
       MGlobal::displayInfo("                               Create maya instances.");
+      MGlobal::displayInfo("-it / -ignoreTransforms      :");
+      MGlobal::displayInfo("                               Do not key transform nodes (but for locators direct parent).");
       MGlobal::displayInfo("-ri / -rotationInterpolation : string (none|euler|quaternion|quaternionSlerp|quaternionSquad)");
       MGlobal::displayInfo("                               Set created rotation curves interpolation type (default to quaternion).");
       MGlobal::displayInfo("-ftr / -fitTimeRange         :");
@@ -2759,6 +2940,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       bool fitTimeRange = argData.isFlagSet("fitTimeRange");
       bool setToStartFrame = argData.isFlagSet("setToStartFrame");
       bool createInstances = argData.isFlagSet("createInstances");
+      bool ignoreTransforms = argData.isFlagSet("ignoreTransforms");
       
       if (argData.isFlagSet("reparent"))
       {
@@ -2863,7 +3045,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
             {
                // scene->setFilters(includeFilter.asChar(), excludeFilter.asChar());
                
-               CreateTree visitor(abcPath, dm, createInstances, speed, offset, preserveStartFrame, ct);
+               CreateTree visitor(abcPath, dm, ignoreTransforms, createInstances, speed, offset, preserveStartFrame, ct);
                scene->visit(AlembicNode::VisitDepthFirst, visitor);
                
                visitor.keyTransforms(rotInterp);
