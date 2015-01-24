@@ -127,7 +127,7 @@ AlembicNode::AlembicNode(const AlembicNode &rhs, const AlembicSceneFilter &filte
          continue;
       }
       
-      AlembicNode *c = rhs.child(i)->filteredClone(filter, this);
+      AlembicNode *c = FilteredWrap(rhs.child(i)->object(), filter, this);
       
       if (c)
       {
@@ -135,6 +135,24 @@ AlembicNode::AlembicNode(const AlembicNode &rhs, const AlembicSceneFilter &filte
          mChildByName[c->name()] = c;
       }
    }
+}
+
+AlembicNode::AlembicNode(Alembic::Abc::IObject iObj)
+   : mIObj(iObj)
+   , mType(AlembicNode::TypeGeneric)
+   , mParent(0)
+   , mMasterPath("")
+   , mMaster(0)
+   , mInstanceNumber(0)
+   , mInheritsTransform(true)
+   , mVisible(true)
+{
+   mSelfBounds.makeEmpty();
+   mChildBounds.makeEmpty();
+   mSelfMatrix.makeIdentity();
+   mWorldMatrix.makeIdentity();
+   mLocatorPosition.setValue(0, 0, 0);
+   mLocatorScale.setValue(1, 1, 1);
 }
 
 AlembicNode::AlembicNode(Alembic::Abc::IObject iObj, AlembicNode *parent)
@@ -741,6 +759,9 @@ void AlembicNode::resolveInstances(AlembicScene *scene)
       else
       {
          // Un-instance node
+         #ifdef _DEBUG
+         std::cout << "[AlembicNode] resolveInstances: reset master path" << std::endl;
+         #endif
          mMasterPath = "";
       }
    }
@@ -892,33 +913,63 @@ AlembicNode* AlembicNode::Wrap(Alembic::Abc::IObject iObj, AlembicNode *iParent)
    }
    else if (Alembic::AbcGeom::IXform::matches(iObj.getHeader()))
    {
-      Alembic::AbcGeom::IXform iXform(iObj, Alembic::Abc::kWrapExisting);
-      return new AlembicXform(iXform, iParent);
+      return new AlembicXform(iObj, iParent);
    }
    else if (Alembic::AbcGeom::IPoints::matches(iObj.getHeader()))
    {
-      Alembic::AbcGeom::IPoints iPoints(iObj, Alembic::Abc::kWrapExisting);
-      return new AlembicPoints(iPoints, iParent);
+      return new AlembicPoints(iObj, iParent);
    }
    else if (Alembic::AbcGeom::IPolyMesh::matches(iObj.getHeader()))
    {
-      Alembic::AbcGeom::IPolyMesh iMesh(iObj, Alembic::Abc::kWrapExisting);
-      return new AlembicMesh(iMesh, iParent);
+      return new AlembicMesh(iObj, iParent);
    }
    else if (Alembic::AbcGeom::ISubD::matches(iObj.getHeader()))
    {
-      Alembic::AbcGeom::ISubD iSubD(iObj, Alembic::Abc::kWrapExisting);
-      return new AlembicSubD(iSubD, iParent);
+      return new AlembicSubD(iObj, iParent);
    }
    else if (Alembic::AbcGeom::INuPatch::matches(iObj.getHeader()))
    {
-      Alembic::AbcGeom::INuPatch iNuPatch(iObj, Alembic::Abc::kWrapExisting);
-      return new AlembicNuPatch(iNuPatch, iParent);
+      return new AlembicNuPatch(iObj, iParent);
    }
    else if (Alembic::AbcGeom::ICurves::matches(iObj.getHeader()))
    {
-      Alembic::AbcGeom::ICurves iCurves(iObj, Alembic::Abc::kWrapExisting);
-      return new AlembicCurves(iCurves, iParent);
+      return new AlembicCurves(iObj, iParent);
+   }
+   else
+   {
+      return 0;
+   }
+}
+
+AlembicNode* AlembicNode::WrapSingle(Alembic::Abc::IObject iObj)
+{
+   if (!iObj.valid())
+   {
+      return 0;
+   }
+   else if (Alembic::AbcGeom::IXform::matches(iObj.getHeader()))
+   {
+      return new AlembicXform(iObj);
+   }
+   else if (Alembic::AbcGeom::IPoints::matches(iObj.getHeader()))
+   {
+      return new AlembicPoints(iObj);
+   }
+   else if (Alembic::AbcGeom::IPolyMesh::matches(iObj.getHeader()))
+   {
+      return new AlembicMesh(iObj);
+   }
+   else if (Alembic::AbcGeom::ISubD::matches(iObj.getHeader()))
+   {
+      return new AlembicSubD(iObj);
+   }
+   else if (Alembic::AbcGeom::INuPatch::matches(iObj.getHeader()))
+   {
+      return new AlembicNuPatch(iObj);
+   }
+   else if (Alembic::AbcGeom::ICurves::matches(iObj.getHeader()))
+   {
+      return new AlembicCurves(iObj);
    }
    else
    {
@@ -937,37 +988,50 @@ AlembicNode* AlembicNode::FilteredWrap(Alembic::Abc::IObject iObj, const Alembic
    
    if (iObj.isInstanceDescendant())
    {
-      rv = new AlembicNode(iObj, filter, iParent);
+      Alembic::Abc::IObject p = iObj;
+      
+      while (p.valid() && !p.isInstanceRoot())
+      {
+         p = p.getParent();
+      }
+      
+      if (p.valid())
+      {
+         Alembic::Abc::IObject iRoot(p.getPtr(), Alembic::Abc::kWrapExisting);
+         
+         if (filter.keep(iRoot))
+         {
+            // Note: instance root parent will be included if any of its children is incuded
+            return new AlembicNode(iObj, filter, iParent);
+         }
+      }
+      
+      // seems not to get the right obj then...
    }
-   else if (Alembic::AbcGeom::IXform::matches(iObj.getHeader()))
+   
+   if (Alembic::AbcGeom::IXform::matches(iObj.getHeader()))
    {
-      Alembic::AbcGeom::IXform iXform(iObj, Alembic::Abc::kWrapExisting);
-      rv = new AlembicXform(iXform, filter, iParent);
+      rv = new AlembicXform(iObj, filter, iParent);
    }
    else if (Alembic::AbcGeom::IPoints::matches(iObj.getHeader()))
    {
-      Alembic::AbcGeom::IPoints iPoints(iObj, Alembic::Abc::kWrapExisting);
-      rv = new AlembicPoints(iPoints, filter, iParent);
+      rv = new AlembicPoints(iObj, filter, iParent);
    }
    else if (Alembic::AbcGeom::IPolyMesh::matches(iObj.getHeader()))
    {
-      Alembic::AbcGeom::IPolyMesh iMesh(iObj, Alembic::Abc::kWrapExisting);
-      rv = new AlembicMesh(iMesh, filter, iParent);
+      rv = new AlembicMesh(iObj, filter, iParent);
    }
    else if (Alembic::AbcGeom::ISubD::matches(iObj.getHeader()))
    {
-      Alembic::AbcGeom::ISubD iSubD(iObj, Alembic::Abc::kWrapExisting);
-      rv = new AlembicSubD(iSubD, filter, iParent);
+      rv = new AlembicSubD(iObj, filter, iParent);
    }
    else if (Alembic::AbcGeom::INuPatch::matches(iObj.getHeader()))
    {
-      Alembic::AbcGeom::INuPatch iNuPatch(iObj, Alembic::Abc::kWrapExisting);
-      rv = new AlembicNuPatch(iNuPatch, filter, iParent);
+      rv = new AlembicNuPatch(iObj, filter, iParent);
    }
    else if (Alembic::AbcGeom::ICurves::matches(iObj.getHeader()))
    {
-      Alembic::AbcGeom::ICurves iCurves(iObj, Alembic::Abc::kWrapExisting);
-      rv = new AlembicCurves(iCurves, filter, iParent);
+      rv = new AlembicCurves(iObj, filter, iParent);
    }
    
    if (rv && rv->childCount() == 0 && !filter.isIncluded(rv))

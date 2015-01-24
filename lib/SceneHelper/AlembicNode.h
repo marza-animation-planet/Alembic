@@ -56,12 +56,14 @@ public:
 public:
    
    static AlembicNode* Wrap(Alembic::Abc::IObject iObj, AlembicNode *iParent);
+   static AlembicNode* WrapSingle(Alembic::Abc::IObject iObj);
    static AlembicNode* FilteredWrap(Alembic::Abc::IObject iObj, const AlembicSceneFilter &filter, AlembicNode *iParent);
    
 public:
    
    AlembicNode();
-   AlembicNode(Alembic::Abc::IObject iObj, AlembicNode *parent=0);
+   AlembicNode(Alembic::Abc::IObject iObj);
+   AlembicNode(Alembic::Abc::IObject iObj, AlembicNode *parent);
    AlembicNode(Alembic::Abc::IObject iObj, const AlembicSceneFilter &filter, AlembicNode *parent=0);
    virtual ~AlembicNode();
    
@@ -306,14 +308,20 @@ public:
       setType((NodeType) ClassToType<SelfType>::Type);
    }
    
-   AlembicNodeT(IObject iObject, AlembicNode *iParent=0)
-      : AlembicNode(iObject, iParent), mITypedObj(iObject)
+   AlembicNodeT(Alembic::Abc::IObject iObject)
+      : AlembicNode(iObject), mITypedObj(iObject, Alembic::Abc::kWrapExisting)
+   {
+      setType((NodeType) ClassToType<SelfType>::Type);
+   }
+    
+   AlembicNodeT(Alembic::Abc::IObject iObject, AlembicNode *iParent)
+      : AlembicNode(iObject, iParent), mITypedObj(iObject, Alembic::Abc::kWrapExisting)
    {
       setType((NodeType) ClassToType<SelfType>::Type);
    }
    
-   AlembicNodeT(IObject iObject, const AlembicSceneFilter &filter, AlembicNode *iParent=0)
-      : AlembicNode(iObject, filter, iParent), mITypedObj(iObject)
+   AlembicNodeT(Alembic::Abc::IObject iObject, const AlembicSceneFilter &filter, AlembicNode *iParent=0)
+      : AlembicNode(iObject, filter, iParent), mITypedObj(iObject, Alembic::Abc::kWrapExisting)
    {
       setType((NodeType) ClassToType<SelfType>::Type);
    }

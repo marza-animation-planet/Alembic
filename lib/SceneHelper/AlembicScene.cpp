@@ -7,7 +7,7 @@ AlembicScene::AlembicScene()
 }
 
 AlembicScene::AlembicScene(Alembic::Abc::IArchive iArch)
-   : AlembicNode(iArch.getTop())
+   : AlembicNode(iArch.getTop(), 0)
    , mArchive(iArch)
    , mIsFiltered(false)
 {
@@ -62,29 +62,43 @@ AlembicNode* AlembicScene::selfClone() const
 AlembicScene* AlembicScene::cloneSingle(const char *path) const
 {
    const AlembicNode *n = find(path);
+   
    if (!n)
    {
       return 0;
    }
    
-   // clone n with its descendents
-   AlembicNode *cc = n->clone();
-   AlembicNode *cp = 0;
+   // Clone n with its descendents
+   // Note: node must be un-instanced so that 'clone' cannot be used for instances
+   AlembicNode *cc = (n->isInstance() ? AlembicNode::FilteredWrap(n->object(), AlembicSceneFilter(path, ""), 0) : n->clone());
    
-   // add parents up to root
+   // Add parents up to root
    const AlembicNode *p = n->parent();
+   AlembicNode *cp = 0;
    
    while (p)
    {
-      cp = p->selfClone();
-      cp->addChild(cc);
+      // Do not use 'clone' for the same reasan stated above
+      cp = AlembicNode::WrapSingle(p->object());
+      if (!cp)
+      {
+         break;
+      }
       
+      cp->addChild(cc);
       cc = cp;
+      
       p = p->parent();
    }
    
-   AlembicScene *cs = (AlembicScene*) selfClone();
-   cs->addChild(cc);
+   AlembicScene *cs = dynamic_cast<AlembicScene*>(cc);
+   
+   if (!cs)
+   {
+      cs = (AlembicScene*) selfClone();
+      cs->addChild(cc);
+   }
+   
    cs->resolveInstances(cs);
    
    return cs;

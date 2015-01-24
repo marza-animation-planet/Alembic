@@ -38,12 +38,15 @@ AlembicSceneFilter& AlembicSceneFilter::operator=(const AlembicSceneFilter &rhs)
 
 void AlembicSceneFilter::set(const std::string &incl, const std::string &excl)
 {
+   bool changed = false;
+   
    if (incl != mIncludeFilterStr)
    {
       if (mIncludeFilter)
       {
          regfree(mIncludeFilter);
          mIncludeFilter = 0;
+         changed = true;
       }
       
       mIncludeFilterStr = "";
@@ -58,6 +61,7 @@ void AlembicSceneFilter::set(const std::string &incl, const std::string &excl)
          {
             mIncludeFilterStr = incl;
             mIncludeFilter = &mIncludeFilter_;
+            changed = true;
          }
       }
    }
@@ -68,6 +72,7 @@ void AlembicSceneFilter::set(const std::string &incl, const std::string &excl)
       {
          regfree(mExcludeFilter);
          mExcludeFilter = 0;
+         changed = true;
       }
       
       mExcludeFilterStr = "";
@@ -82,8 +87,14 @@ void AlembicSceneFilter::set(const std::string &incl, const std::string &excl)
          {
             mExcludeFilterStr = excl;
             mExcludeFilter = &mExcludeFilter_;
+            changed = true;
          }
       }
+   }
+   
+   if (changed)
+   {
+      mCache.clear();
    }
 }
 
@@ -102,11 +113,54 @@ void AlembicSceneFilter::reset()
       mExcludeFilter = 0;
       mExcludeFilterStr = "";
    }
+   
+   mCache.clear();
 }
 
 bool AlembicSceneFilter::isSet() const
 {
    return (mIncludeFilter || mExcludeFilter);
+}
+
+bool AlembicSceneFilter::keep(Alembic::Abc::IObject iObj) const
+{
+   if (!iObj.valid())
+   {
+      return false;
+   }
+   
+   const std::string &path = iObj.getFullName();
+   
+   std::map<std::string, bool>::iterator it = mCache.find(path);
+   
+   if (it != mCache.end())
+   {
+      return it->second;
+   }
+   else
+   {
+      bool rv = false;
+      
+      if (!isExcluded(path.c_str()))
+      {
+         size_t n = iObj.getNumChildren();
+         size_t c = 0;
+         
+         for (size_t i=0; i<n; ++i)
+         {
+            if (keep(iObj.getChild(i)))
+            {
+               ++c;
+            }
+         }
+         
+         rv = (c > 0 || isIncluded(path.c_str()));
+      }
+      
+      mCache[path] = rv;
+      
+      return rv;
+   }
 }
 
 bool AlembicSceneFilter::isIncluded(const char *path) const

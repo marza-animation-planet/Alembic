@@ -1,5 +1,4 @@
-#include "AlembicScene.h"
-#include <Alembic/AbcCoreFactory/All.h>
+#include "AlembicSceneCache.h"
 #include <iostream>
 #include <ctime>
 
@@ -489,41 +488,16 @@ int main(int argc, char **argv)
       
       st = clock();
       
-      Alembic::Abc::IArchive archive;
+      AlembicScene *scene = AlembicSceneCache::Ref(path, AlembicSceneFilter(filter, ""));
       
-      Alembic::AbcCoreFactory::IFactory factory;
-      factory.setPolicy(Alembic::Abc::ErrorHandler::kQuietNoopPolicy);
-      archive = factory.getArchive(path.c_str());
-      
-      if (!archive.valid())
+      if (!scene)
       {
          std::cout << "Not a valid ABC file: \"" << path << "\"" << std::endl;
          return 1;
       }
       
       et = clock();
-      std::cout << "Read archive in " << (ts * (et - st)) << " second(s)" << std::endl;
-      
-      // ---
-      
-      st = clock();
-      
-      AlembicScene scene(archive, AlembicSceneFilter(filter, ""));
-      
-      et = clock();
-      std::cout << "Build graph in " << (ts * (et - st)) << " second(s)" << std::endl;
-      
-      // if (filter.length() > 0)
-      // {
-      //    st = clock();
-         
-      //    scene.setFilter(filter);
-         
-      //    et = clock();
-      //    std::cout << "Filter graph in " << (ts * (et - st)) << " second(s)" << std::endl;
-      // }
-      
-      // ---
+      std::cout << "Read scene in " << (ts * (et - st)) << " second(s)" << std::endl;
       
       if (frames.size() == 0)
       {
@@ -544,13 +518,13 @@ int main(int argc, char **argv)
          case Print:
             {
                PrintVisitor print;
-               scene.visit(mode, print);   
+               scene->visit(mode, print);   
             }
             break;
          case Bounds:
             {
                SampleBoundsVisitor sampleBounds(t, frames.size() > 1);
-               scene.visit(mode, sampleBounds);
+               scene->visit(mode, sampleBounds);
             }
             break;
          default:
@@ -561,10 +535,10 @@ int main(int argc, char **argv)
          std::cout << "[" << ActionNames[action] << " (t=" << t << ")] Visited graph in " << (ts * (et - st)) << " second(s)" << std::endl;
       }
       
-      // ---
-      
       std::cout << std::endl << "PRESS ENTER KEY TO FINISH" << std::endl;
       getchar();
+      
+      AlembicSceneCache::Unref(scene);
    }
    
    return 0;
