@@ -12,6 +12,7 @@ from excons.tools import boost
 from excons.tools import gl
 from excons.tools import glut
 from excons.tools import glew
+from excons.tools import vray
 
 
 defs    = []
@@ -400,6 +401,8 @@ if excons.GetArgument("with-maya", default=None) is not None:
       fdst.close()
       fsrc.close()
    
+   useVRay = (excons.GetArgument("with-vray", default=None) is not None)
+   
    AbcShapeName = "%sAbcShape" % nameprefix
    AbcShapeMel = "maya/AbcShape/AE%sTemplate.mel" % AbcShapeName
    AbcShapeMtoa = "arnold/abcproc/mtoa_%s.py" % AbcShapeName
@@ -440,14 +443,15 @@ if excons.GetArgument("with-maya", default=None) is not None:
                 {"name": "%sAbcShape" % nameprefix,
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
-                 "prefix": "maya/plug-ins",
-                 "defs": plugin_defs + regex_def + (["ABCSHAPE_VERSION=\"\\\"%s\\\"\"" % shpver] if expver else []),
+                 "prefix": "maya/plug-ins" + ("/vray" if useVRay else ""),
+                 "defs": plugin_defs + regex_def + (["ABCSHAPE_VERSION=\"\\\"%s\\\"\"" % shpver] if expver else [])
+                                                 + (["ABCSHAPE_VRAY_SUPPORT"] if useVRay else []),
                  "incdirs": incdirs + ["maya/AbcShape", "lib/SceneHelper"] + regex_inc,
                  "libdirs": libdirs,
                  "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
                  "srcs": glob.glob("maya/AbcShape/*.cpp") + glob.glob("lib/SceneHelper/*.cpp") + regex_src,
                  "install": {"maya/scripts": glob.glob("maya/AbcShape/*.mel"),
                              "maya/python": [AbcShapeMtoa]},
-                 "custom": [maya.Require, maya.Plugin]}])
+                 "custom": [maya.Require, maya.Plugin] + ([vray.Require] if useVRay else [])}])
 
 excons.DeclareTargets(env, prjs)

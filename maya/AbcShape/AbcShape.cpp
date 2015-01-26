@@ -19,6 +19,7 @@
 #include <maya/MFnCamera.h>
 #include <maya/MSelectionList.h>
 #include <maya/MDGModifier.h>
+#include <maya/MGlobal.h>
 
 #ifdef __APPLE__
 #  include <OpenGL/gl.h>
@@ -60,6 +61,11 @@ MObject AbcShape::aDrawLocators;
 MObject AbcShape::aOutBoxMin;
 MObject AbcShape::aOutBoxMax;
 MObject AbcShape::aAnimated;
+#ifdef ABCSHAPE_VRAY_SUPPORT
+MObject AbcShape::aOutApiType;
+MObject AbcShape::aVRayGeomResult;
+MObject AbcShape::aVRayGeomInfo;
+#endif
 
 void* AbcShape::creator()
 {
@@ -249,6 +255,45 @@ MStatus AbcShape::initialize()
    stat = addAttribute(aAnimated);
    MCHECKERROR(stat, "Could not add 'animated' attribute");
    
+#ifdef ABCSHAPE_VRAY_SUPPORT
+   MFnStringData outApiTypeDefault;
+   MObject outApiTypeDefaultObject = outApiTypeDefault.create("VRayGeometry");
+   aOutApiType = tAttr.create("outApiType", "oat", MFnData::kString, outApiTypeDefaultObject, &stat);
+   MCHECKERROR(stat, "Could not create 'outApiType' attribute");
+   stat = addAttribute(aOutApiType);
+   MCHECKERROR(stat, "Could not add 'outApiType' attribute");
+   
+   aVRayGeomInfo = nAttr.createAddr("vrayGeomInfo", "vgi", &stat);
+   MCHECKERROR(stat, "Could not create 'vrayGeomInfo' attribute");;
+   nAttr.setKeyable(false);
+   nAttr.setStorable(false);
+   nAttr.setReadable(true);
+   nAttr.setWritable(true);
+   nAttr.setHidden(true);
+   stat = addAttribute(aVRayGeomInfo);
+   MCHECKERROR(stat, "Could not add 'vrayGeomInfo' attribute");;
+   
+   aVRayGeomResult = nAttr.create("vrayGeomResult", "vgr", MFnNumericData::kInt, 0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayGeomResult' attribute");
+   nAttr.setKeyable(false);
+   nAttr.setStorable(false);
+   nAttr.setReadable(true);
+   nAttr.setWritable(false);
+   nAttr.setHidden(true);
+   stat = addAttribute(aVRayGeomResult);
+   MCHECKERROR(stat, "Could not add 'vrayGeomResult' attribute");
+   
+   attributeAffects(aVRayGeomInfo, aVRayGeomResult);
+   attributeAffects(aFilePath, aVRayGeomResult);
+   attributeAffects(aObjectExpression, aVRayGeomResult);
+   attributeAffects(aStartFrame, aVRayGeomResult);
+   attributeAffects(aEndFrame, aVRayGeomResult);
+   attributeAffects(aSpeed, aVRayGeomResult);
+   attributeAffects(aOffset, aVRayGeomResult);
+   attributeAffects(aPreserveStartFrame, aVRayGeomResult);
+   attributeAffects(aCycleType, aVRayGeomResult);
+#endif
+
    attributeAffects(aFilePath, aNumShapes);
    attributeAffects(aObjectExpression, aNumShapes);
    attributeAffects(aIgnoreInstances, aNumShapes);
@@ -310,6 +355,21 @@ AbcShape::AbcShape()
    , mDrawTransformBounds(false)
    , mDrawLocators(false)
    , mUpdateLevel(AbcShape::UL_none)
+#ifdef ABCSHAPE_VRAY_SUPPORT
+   , mVRFileName("file", "")
+   , mVRObjectPath("object_path", "")
+   , mVRAnimSpeed("anim_speed", 1.0)
+   , mVRAnimType("anim_type", 1)
+   , mVRAnimOffset("anim_offset", 0.0)
+   , mVRAnimOverride("anim_override", 0)
+   , mVRAnimStart("anim_start", 0)
+   , mVRAnimLength("anim_length", 0)
+   , mVRPrimaryVisibility("primary_visibility", 1)
+   , mVRUseAlembicOffset("use_alembic_offset", 0)
+   , mVRUseFaceSets("use_face_sets", 0)
+   , mVRUseFullNames("use_full_names", 0)
+   , mVRComputeBBox("compute_bbox", 0)
+#endif
 {
 }
 
@@ -400,6 +460,114 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
       
       return MS::kSuccess;
    }
+#ifdef ABCSHAPE_VRAY_SUPPORT
+   else if (plug.attribute() == aVRayGeomResult)
+   {
+      syncInternals(block);
+      
+      MDataHandle hIn = block.inputValue(aVRayGeomInfo);
+      MDataHandle hOut = block.outputValue(plug.attribute());
+      
+      void *ptr = hIn.asAddr();
+      
+      VR::VRayGeomInfo *geomInfo = reinterpret_cast<VR::VRayGeomInfo*>(ptr);
+      
+      if (geomInfo)
+      {
+         PluginManager *plugman = geomInfo->getPluginManager();
+         
+         if (plugman)
+         {
+            PluginDesc *plugdesc = plugman->getPluginDesc("GeomMeshFile");
+            
+            if (plugdesc)
+            {
+               bool existing = false;
+               
+               VR::VRayPlugin *abc = geomInfo->newPlugin("GeomMeshFile", existing);
+               
+               if (abc && !existing)
+               {
+                  // Note: take care that object expression points to a real node as V-Ray GeomMeshFile doesn't support regular expressions
+                  
+                  mVRFileName.setString(mFilePath.asChar(), 0, 0.0);
+                  mVRObjectPath.setString(mObjectExpression.asChar(), 0, 0.0);
+                  mVRAnimSpeed.setFloat(float(mSpeed), 0, 0.0);
+                  mVRAnimStart.setInt(int(floor(mStartFrame)), 0, 0.0);
+                  mVRAnimLength.setInt(int(floor(mEndFrame - mStartFrame)), 0, 0.0);
+                  mVRAnimOverride.setBool(1, 0, 0.0);
+                  mVRUseFaceSets.setBool(0, 0, 0.0);
+                  mVRUseFullNames.setBool(0, 0, 0.0);
+                  mVRPrimaryVisibility.setBool(1, 0, 0.0); // need to check this one
+                  mVRUseAlembicOffset.setBool(0, 0, 0.0);
+                  mVRComputeBBox.setBool(0, 0, 0.0);
+                  
+                  // If 'time' is not connected, set anim_type to 'still' and set anim_offset accordingly
+                  switch (mCycleType)
+                  {
+                  case CT_bounce:
+                     mVRAnimType.setInt(2, 0, 0.0); // 'ping-pong'
+                     break;
+                  case CT_loop:
+                     mVRAnimType.setInt(0, 0, 0.0); // 'loop'
+                     break;
+                  case CT_reverse:
+                     MGlobal::displayWarning(MString("[") + PREFIX_NAME("AbcShape] 'reverse' cycle type not supported by V-Ray GeomMeshFile. Default to 'hold'"));
+                  case CT_hold: // 'once'
+                  default:
+                     mVRAnimType.setInt(1, 0, 0.0);
+                  }
+                  
+                  if (mPreserveStartFrame && fabs(mSpeed) > 0.0001)
+                  {
+                     mVRAnimOffset.setFloat(-mSpeed * mStartFrame, 0, 0.0);
+                  }
+                  else
+                  {
+                     mVRAnimOffset.setFloat(-mStartFrame, 0, 0.0);
+                  }
+                  
+                  abc->setParameter(&mVRFileName);
+                  abc->setParameter(&mVRObjectPath);
+                  abc->setParameter(&mVRAnimType);
+                  abc->setParameter(&mVRAnimOffset);
+                  abc->setParameter(&mVRAnimSpeed);
+                  abc->setParameter(&mVRAnimOverride);
+                  abc->setParameter(&mVRAnimStart);
+                  abc->setParameter(&mVRAnimLength);
+                  abc->setParameter(&mVRUseAlembicOffset);
+                  abc->setParameter(&mVRPrimaryVisibility);
+                  abc->setParameter(&mVRUseFullNames);
+                  abc->setParameter(&mVRUseFaceSets);
+                  abc->setParameter(&mVRComputeBBox);
+                  
+                  hOut.setInt(1);
+               }
+               else
+               {
+                  hOut.setInt(0);
+               }
+            }
+            else
+            {
+               hOut.setInt(0);
+            }
+         }
+         else
+         {
+            hOut.setInt(0);
+         }
+      }
+      else
+      {
+         hOut.setInt(0);
+      }
+      
+      block.setClean(plug);
+      
+      return MS::kSuccess;
+   }
+#endif
    else
    {
       return MS::kUnknownParameter;

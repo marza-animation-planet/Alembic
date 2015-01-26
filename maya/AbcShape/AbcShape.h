@@ -45,6 +45,13 @@ public:
     static MObject aOutBoxMax;
     static MObject aAnimated;
     
+#ifdef ABCSHAPE_VRAY_SUPPORT
+    // V-Ray specific attributes
+    static MObject aOutApiType;
+    static MObject aVRayGeomResult;
+    static MObject aVRayGeomInfo;
+#endif
+    
     static void* creator();
     
     static MStatus initialize();
@@ -156,6 +163,45 @@ private:
     int mUpdateLevel;
     AlembicSceneFilter mSceneFilter;
     bool mAnimated;
+    
+#ifdef ABCSHAPE_VRAY_SUPPORT
+    VR::DefStringParam mVRFileName;                        // [""]
+    VR::DefStringParam mVRObjectPath;                      // [""]
+    VR::DefFloatParam mVRAnimSpeed;                        // [1.0]
+    VR::DefIntParam mVRAnimType;                           // [0, (0: loop, 1: once, 2: ping-ping, 3: still)]
+    VR::DefFloatParam mVRAnimOffset;                       // [0.0]
+    VR::DefBoolParam mVRAnimOverride;                      // [false]
+    VR::DefIntParam mVRAnimStart;                          // [0]
+    VR::DefIntParam mVRAnimLength;                         // [0]
+    VR::DefBoolParam mVRPrimaryVisibility;                 // [true]
+    VR::DefBoolParam mVRUseAlembicOffset;                  // [false]
+    VR::DefBoolParam mVRUseFaceSets;                       // [true]
+    VR::DefBoolParam mVRUseFullNames;                      // [false]
+    VR::DefBoolParam mVRComputeBBox;                       // [false]
+    // VR::DefFloatParam mVRScale;                            // [1.0]
+    // VR::DefBoolParam mVRFlipAxis;                          // [false]
+    // VR::DefBoolParam mVRSmoothUVBorders;                   // [true]
+    // VR::DefBoolParam mVRSmoothUV;                          // [true]
+    // VR::DefBoolParam mVRComputeNormals;                    // [true]
+    // VR::DefFloatParam mVRSmoothAngle;                      // [30.0]
+    // VR::DefBoolParam mVRFlipNormals;                       // [false]
+    // VR::DefIntParam mVRNumPreviewFaces;                    // [10000]
+    // VR::DefFloatParam mVRHairWidthMultiplier;              // [1.0]
+    // VR::DefFloatParam mVRParticleWidthMultiplier;          // [1.0]
+    // VR::DefIntParam mVRVisibilityListType;                 // [0, (0: exclude, 1: include)]
+    // VR::DefStringListParam mVRVisibilityListNames;         // [()]
+    // VR::DefIntListParam mVRVisibilityListIds;              // [()]
+    // VR::DefIntParam mVRHairVisibilityListType;             // [0, (0: exclude, 1: include)]
+    // VR::DefStringListParam mVRHairVisibilityListNames;     // [()]
+    // VR::DefIntListParam mVRHairVisibilityListIds;          // [()]
+    // VR::DefIntParam mVRParticleVisibilityListType;         // [0, (0: exclude, 1: include)]
+    // VR::DefStringListParam mVRParticleVisibilityListNames; // [()]
+    // VR::DefIntListParam mVRParticleVisibilityListIds;      // [()]
+    // VR::DefIntParam mVRSortVoxels;                         // [0]
+    // VR::DefIntParam mVRFirstMapChannel;                    // [1]
+    // VR::DefIntParam mVRParticleRenderMode;                 // [0, (0: spheres, 1: points)]
+    // VR::DefStringParam mVRVelocityColorSet;                // [""]
+#endif
 };
 
 class AbcShapeUI : public MPxSurfaceShapeUI
