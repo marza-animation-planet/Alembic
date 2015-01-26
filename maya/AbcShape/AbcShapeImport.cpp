@@ -163,6 +163,24 @@ struct NumericData<T, 4, TT>
 
 // ---
 
+struct RetimeSample
+{
+   double otime;
+   double ntime;
+};
+
+class RetimeSampleCompare
+{
+public:
+   
+   inline bool operator()(const RetimeSample &s0, const RetimeSample &s1) const
+   {
+      return (s0.otime < s1.otime);
+   }
+};
+
+typedef std::set<RetimeSample, RetimeSampleCompare> RetimeSampleSet;
+
 class CreateTree
 {
 public:
@@ -200,7 +218,7 @@ private:
    bool checkExistingDag(const char *dagType, AlembicNode *node);
    bool createDag(const char *dagType, AlembicNode *node, bool force=false);
    
-   void getTransformSamples(AlembicXform *node, std::set<double> &samples, std::set<double> *rawSamples=0);
+   void getTransformSamples(AlembicXform *node, RetimeSampleSet &samples);
    void getDefaultTransform(AlembicXform *node, bool worldSpace, MMatrix &outM);
    void getTransformAtTime(AlembicXform *node, double t, bool worldSpace, MMatrix &outM);
    
@@ -547,7 +565,7 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicNuPatch &node, AlembicNode *in
    return enterShape(node, instance);
 }
 
-void CreateTree::getTransformSamples(AlembicXform *node, std::set<double> &samples, std::set<double> *rawSamples)
+void CreateTree::getTransformSamples(AlembicXform *node, RetimeSampleSet &samples)
 {
    Alembic::AbcGeom::IXformSchema schema = node->typedObject().getSchema();
    
@@ -570,25 +588,23 @@ void CreateTree::getTransformSamples(AlembicXform *node, std::set<double> &sampl
    {
       Alembic::AbcCoreAbstract::index_t idx = i;
       
-      double t = ts->getSampleTime(idx);
+      RetimeSample rs;
       
-      if (rawSamples)
-      {
-         rawSamples->insert(t);
-      }
+      rs.otime = ts->getSampleTime(idx);
+      rs.ntime = rs.otime;
       
       if (mCycleType == AbcShape::CT_reverse)
       {
-         t = secEnd - (t - secStart);
+         rs.ntime = secEnd - (rs.ntime - secStart);
       }
-      t = offset + invSpeed * t;
+      rs.ntime = offset + invSpeed * rs.ntime;
       
-      samples.insert(t);
+      samples.insert(rs);
    }
    
    if (node->parent() && node->parent()->type() == AlembicNode::TypeXform)
    {
-      getTransformSamples((AlembicXform*) node->parent(), samples, rawSamples);
+      getTransformSamples((AlembicXform*) node->parent(), samples);
    }
 }
 
@@ -700,29 +716,32 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
          if (parent && parent->type() == AlembicNode::TypeXform)
          {
             MMatrix mmat;
-            std::set<double> samples;
-            std::set<double> rawSamples;
+            RetimeSampleSet samples;
             
             AlembicXform *pnode = (AlembicXform*) parent;
             
             MFnTransform xform(getDag(parent->path()));
             MObject xformObj = xform.object();
             
-            getTransformSamples(pnode, samples, &rawSamples);
+            getTransformSamples(pnode, samples);
             
             if (samples.size() >= 2)
             {
                // samples are already remapped
+               RetimeSampleSet::iterator it = samples.begin();
                
-               for (std::set<double>::iterator it=samples.begin(); it!=samples.end(); ++it)
+               double secStart = it->otime;
+               double secEnd = 0.0;
+               
+               for (; it!=samples.end(); ++it)
                {
-                  getTransformAtTime(pnode, *it, true, mmat);
-                  mKeyframer.setCurrentTime(*it);
+                  getTransformAtTime(pnode, it->otime, true, mmat);
+                  mKeyframer.setCurrentTime(it->ntime);
                   mKeyframer.addTransformKey(xformObj, mmat);
+                  
+                  secEnd = it->otime;
                }
                
-               double secStart = *(rawSamples.begin());
-               double secEnd = *(--rawSamples.end());
                double secOffset = MTime(mOffset, MTime::uiUnit()).as(MTime::kSeconds);
                
                mKeyframer.addCurvesImportInfo(xformObj, "", mSpeed, secOffset, secStart, secEnd,
@@ -730,7 +749,7 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
             }
             else if (samples.size() == 1)
             {
-               getTransformAtTime(pnode, *(samples.begin()), true, mmat);
+               getTransformAtTime(pnode, samples.begin()->otime, true, mmat);
                MTransformationMatrix tm(mmat);
                xform.set(tm);
             }
