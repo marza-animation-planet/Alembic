@@ -200,7 +200,7 @@ private:
    bool checkExistingDag(const char *dagType, AlembicNode *node);
    bool createDag(const char *dagType, AlembicNode *node, bool force=false);
    
-   void getTransformSamples(AlembicXform *node, std::set<double> &samples);
+   void getTransformSamples(AlembicXform *node, std::set<double> &samples, std::set<double> *rawSamples=0);
    void getDefaultTransform(AlembicXform *node, bool worldSpace, MMatrix &outM);
    void getTransformAtTime(AlembicXform *node, double t, bool worldSpace, MMatrix &outM);
    
@@ -547,7 +547,7 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicNuPatch &node, AlembicNode *in
    return enterShape(node, instance);
 }
 
-void CreateTree::getTransformSamples(AlembicXform *node, std::set<double> &samples)
+void CreateTree::getTransformSamples(AlembicXform *node, std::set<double> &samples, std::set<double> *rawSamples)
 {
    Alembic::AbcGeom::IXformSchema schema = node->typedObject().getSchema();
    
@@ -571,6 +571,12 @@ void CreateTree::getTransformSamples(AlembicXform *node, std::set<double> &sampl
       Alembic::AbcCoreAbstract::index_t idx = i;
       
       double t = ts->getSampleTime(idx);
+      
+      if (rawSamples)
+      {
+         rawSamples->insert(t);
+      }
+      
       if (mCycleType == AbcShape::CT_reverse)
       {
          t = secEnd - (t - secStart);
@@ -582,7 +588,7 @@ void CreateTree::getTransformSamples(AlembicXform *node, std::set<double> &sampl
    
    if (node->parent() && node->parent()->type() == AlembicNode::TypeXform)
    {
-      getTransformSamples((AlembicXform*) node->parent(), samples);
+      getTransformSamples((AlembicXform*) node->parent(), samples, rawSamples);
    }
 }
 
@@ -695,22 +701,32 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
          {
             MMatrix mmat;
             std::set<double> samples;
+            std::set<double> rawSamples;
             
             AlembicXform *pnode = (AlembicXform*) parent;
             
             MFnTransform xform(getDag(parent->path()));
             MObject xformObj = xform.object();
             
-            getTransformSamples(pnode, samples);
+            getTransformSamples(pnode, samples, &rawSamples);
             
             if (samples.size() >= 2)
             {
+               // samples are already remapped
+               
                for (std::set<double>::iterator it=samples.begin(); it!=samples.end(); ++it)
                {
                   getTransformAtTime(pnode, *it, true, mmat);
                   mKeyframer.setCurrentTime(*it);
                   mKeyframer.addTransformKey(xformObj, mmat);
                }
+               
+               double secStart = *(rawSamples.begin());
+               double secEnd = *(--rawSamples.end());
+               double secOffset = MTime(mOffset, MTime::uiUnit()).as(MTime::kSeconds);
+               
+               mKeyframer.addCurvesImportInfo(xformObj, "", mSpeed, secOffset, secStart, secEnd,
+                                              (mCycleType == AbcShape::CT_reverse), mPreserveStartFrame);
             }
             else if (samples.size() == 1)
             {
