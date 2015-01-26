@@ -820,10 +820,9 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
    
    if (plug == aFilePath)
    {
-      MFileObject file;
-      file.setRawFullName(handle.asString());
-      
-      MString filePath = file.resolvedFullName();
+      // Note: path seems to already be directory mapped when we reach here (consequence of setUsedAsFilename(true) when the attribute is created)
+      //       don't need to use MFileObject to get the resolved path
+      MString filePath = handle.asString();
       
       if (filePath != mFilePath)
       {
