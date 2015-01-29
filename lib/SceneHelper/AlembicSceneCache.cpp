@@ -72,7 +72,7 @@ std::string AlembicSceneCache::formatPath(const std::string &filepath)
    size_t n = rv.length();
    for (size_t i=0; i<n; ++i)
    {
-      if (i == '\\')
+      if (rv[i] == '\\')
       {
          rv[i] = '/';
       }
