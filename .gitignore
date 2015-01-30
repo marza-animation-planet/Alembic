@@ -15,4 +15,5 @@ debug
 *.dblite
 excons.cache
 maya/AbcShape/AE*Template.mel
+maya/AbcShape/*.py
 arnold/abcproc/*.py

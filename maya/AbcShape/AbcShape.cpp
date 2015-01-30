@@ -36,6 +36,8 @@
 #include <maya/MFnSet.h>
 #include <maya/MObjectHandle.h>
 #include <maya/MPlugArray.h>
+#include <maya/MSyntax.h>
+#include <maya/MArgParser.h>
 #include <set>
 
 class MyMFnSet : public MFnSet
@@ -100,6 +102,136 @@ private:
 };
 
 typedef std::set<MyMFnSet> MyMFnSetSet;
+
+// ---
+
+AbcShapeVRayDisp::DispTexMap AbcShapeVRayDisp::DispTexs;
+
+void* AbcShapeVRayDisp::create()
+{
+   return new AbcShapeVRayDisp();
+}
+
+MSyntax AbcShapeVRayDisp::createSyntax()
+{
+   MSyntax syntax;
+   
+   syntax.addFlag("-r", "-reset", MSyntax::kNoArg);
+   syntax.addFlag("-dl", "-displist", MSyntax::kNoArg);
+   syntax.addFlag("-d", "-disp", MSyntax::kString);
+   syntax.addFlag("-f", "-float", MSyntax::kNoArg);
+   syntax.addFlag("-c", "-color", MSyntax::kNoArg);
+   
+   syntax.setMinObjects(0);
+   syntax.setMaxObjects(0);
+   syntax.enableQuery(false);
+   syntax.enableEdit(false);
+   
+   return syntax;
+}
+
+AbcShapeVRayDisp::AbcShapeVRayDisp()
+   : MPxCommand()
+{
+}
+   
+AbcShapeVRayDisp::~AbcShapeVRayDisp()
+{
+}
+
+bool AbcShapeVRayDisp::hasSyntax() const
+{
+   return true;
+}
+   
+bool AbcShapeVRayDisp::isUndoable() const
+{
+   return false;
+}
+
+MStatus AbcShapeVRayDisp::doIt(const MArgList& args)
+{
+   MStatus status;
+   
+   MArgParser argData(syntax(), args, &status);
+   
+   if (argData.isFlagSet("reset"))
+   {
+      DispTexs.clear();
+      return MS::kSuccess;
+   }
+   else
+   {
+      if (argData.isFlagSet("displist"))
+      {
+         MStringArray names;
+         
+         for (DispTexMap::iterator it = DispTexs.begin(); it != DispTexs.end(); ++it)
+         {
+            names.append(it->first.c_str());
+         }
+         
+         setResult(names);
+         
+         return MS::kSuccess;
+      }
+      else if (!argData.isFlagSet("disp"))
+      {
+         MGlobal::displayError("Either -disp or -displist flag must be set");
+         return MS::kFailure;
+      }
+      else if (!argData.isFlagSet("color") && !argData.isFlagSet("float"))
+      {
+         MGlobal::displayError("Either -color or -float flag must be set");
+         return MS::kFailure;
+      }
+      else
+      {
+         MString val;
+         
+         status = argData.getFlagArgument("disp", 0, val);
+         if (status != MS::kSuccess)
+         {
+            MGlobal::displayError("Invalid valud for -disp flag (" + val + ")");
+            return status;
+         }
+         
+         DispTexMap::iterator it = DispTexs.find(val.asChar());
+         
+         MStringArray names;
+         
+         if (it != DispTexs.end())
+         {
+            DispShapes &dispShapes = it->second;
+            
+            if (argData.isFlagSet("color"))
+            {
+               if (argData.isFlagSet("float"))
+               {
+                  MGlobal::displayError("-float/-color cannot be used at the same time");
+                  return MS::kFailure;
+               }
+               
+               for (NameSet::iterator nit = dispShapes.asColor.begin(); nit != dispShapes.asColor.end(); ++nit)
+               {
+                  names.append(nit->c_str());
+               }
+            }
+            else
+            {
+               for (NameSet::iterator nit = dispShapes.asFloat.begin(); nit != dispShapes.asFloat.end(); ++nit)
+               {
+                  names.append(nit->c_str());
+               }
+            }
+         }
+         
+         setResult(names);
+         
+         return MS::kSuccess;
+      }
+   }
+}
 
 #endif
 
@@ -612,6 +744,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                
                // Check for assigned displacement shader
                
+               MPlug pDispSource;
                MyMFnSetSet dispSets;
                MyMFnSetSet::iterator dispSetIt, assignedDisp;
                
@@ -662,6 +795,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                            
                            if (srcs.length() > 0)
                            {
+                              pDispSource = srcs[0];
                               assignedDisp = dispSetIt;
                            }
                         }
@@ -984,6 +1118,8 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                      
                      if (disp)
                      {
+                        bool colorDisp = false;
+                        
                         if (pDispType.asInt() >= 2)
                         {
                            // Vector displacement
@@ -996,6 +1132,8 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                            //    mVRObjectSpaceDisp.setBool(true, 0, 0.0);
                            //    mod->setParameter(&mVRObjectSpaceDisp);
                            // }
+                           
+                           colorDisp = true;
                         }
                         
                         MPlug pUseBounds = thisNode.findPlug("vrayDisplacementUseBounds");
@@ -1075,6 +1213,21 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                         {
                            mVRDispShift.setFloat(pDispShift.asFloat(), 0, 0.0);
                            mod->setParameter(&mVRDispShift);
+                        }
+                        
+                        // Export disp shader
+                        MObject dispObj = pDispSource.node();
+                        MFnDependencyNode dispTex(dispObj);
+                        
+                        AbcShapeVRayDisp::DispShapes &dispShapes = AbcShapeVRayDisp::DispTexs[dispTex.name().asChar()];
+                        
+                        if (colorDisp)
+                        {
+                           dispShapes.asColor.insert(mod->getPluginName());
+                        }
+                        else
+                        {
+                           dispShapes.asFloat.insert(mod->getPluginName());
                         }
                      }
                      

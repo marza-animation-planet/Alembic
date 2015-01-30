@@ -406,15 +406,23 @@ if excons.GetArgument("with-maya", default=None) is not None:
    AbcShapeName = "%sAbcShape" % nameprefix
    AbcShapeMel = "maya/AbcShape/AE%sTemplate.mel" % AbcShapeName
    AbcShapeMtoa = "arnold/abcproc/mtoa_%s.py" % AbcShapeName
+   if useVRay:
+      AbcShapePy = "maya/AbcShape/%sabcshape.py" % nameprefix.lower()
    
    impver = excons.GetArgument("maya-abcimport-version", None)
    expver = excons.GetArgument("maya-abcexport-version", None)
    shpver = excons.GetArgument("maya-abcshape-version", None)
    
-   if not os.path.exists(AbcShapeMel):
+   if not os.path.exists(AbcShapeMel) or os.stat(AbcShapeMel).st_mtime < os.stat("maya/AbcShape/AETemplate.mel.tpl").st_mtime:
       replace_in_file("maya/AbcShape/AETemplate.mel.tpl", AbcShapeMel, "<<NodeName>>", AbcShapeName)
-   if not os.path.exists(AbcShapeMtoa):
+   
+   if not os.path.exists(AbcShapeMtoa) or os.stat(AbcShapeMtoa).st_mtime < os.stat("arnold/abcproc/mtoa.py.tpl").st_mtime:
       replace_in_file("arnold/abcproc/mtoa.py.tpl", AbcShapeMtoa, "<<NodeName>>", AbcShapeName)
+   
+   if useVRay:
+      if not os.path.exists(AbcShapePy) or os.stat(AbcShapePy).st_mtime < os.stat("maya/AbcShape/abcshape.py.tpl").st_mtime:
+         replace_in_file("maya/AbcShape/abcshape.py.tpl", AbcShapePy, "<<NodeName>>", AbcShapeName)
+    
    
    prjs.extend([{"name": "%sAbcImport" % nameprefix,
                  "type": "dynamicmodule",
@@ -451,7 +459,7 @@ if excons.GetArgument("with-maya", default=None) is not None:
                  "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
                  "srcs": glob.glob("maya/AbcShape/*.cpp") + glob.glob("lib/SceneHelper/*.cpp") + regex_src,
                  "install": {"maya/scripts": glob.glob("maya/AbcShape/*.mel"),
-                             "maya/python": [AbcShapeMtoa]},
+                             "maya/python": [AbcShapeMtoa] + ([AbcShapePy] if useVRay else [])},
                  "custom": [maya.Require, maya.Plugin] + ([vray.Require] if useVRay else [])}])
 
 excons.DeclareTargets(env, prjs)

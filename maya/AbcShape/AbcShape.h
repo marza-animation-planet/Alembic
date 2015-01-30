@@ -229,6 +229,40 @@ private:
 #endif
 };
 
+#ifdef ABCSHAPE_VRAY_SUPPORT
+
+#include <maya/MPxCommand.h>
+
+class AbcShapeVRayDisp : public MPxCommand
+{
+public:
+   
+    AbcShapeVRayDisp();
+    ~AbcShapeVRayDisp();
+
+    virtual bool hasSyntax() const;
+    virtual bool isUndoable() const;
+    virtual MStatus doIt(const MArgList& args);
+
+    static MSyntax createSyntax();
+    static void* create();
+    
+     
+    typedef std::set<std::string> NameSet;
+    
+    struct DispShapes
+    {
+        NameSet asFloat;
+        NameSet asColor;
+    };
+    
+    typedef std::map<std::string, DispShapes> DispTexMap;
+     
+    static DispTexMap DispTexs;
+};
+
+#endif
+
 class AbcShapeUI : public MPxSurfaceShapeUI
 {
 public:

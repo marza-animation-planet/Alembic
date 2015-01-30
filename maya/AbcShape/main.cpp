@@ -44,7 +44,21 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
       status.perror("Failed to register command '" + commandName + "'");
       return status;
    }
+
+#ifdef ABCSHAPE_VRAY_SUPPORT
    
+   MString vrayCmdName = PREFIX_NAME("AbcShapeVRayDisp");
+   
+   status = plugin.registerCommand(vrayCmdName, AbcShapeVRayDisp::create, AbcShapeVRayDisp::createSyntax);
+   
+   if (status != MS::kSuccess)
+   {
+      status.perror("Failed to register command '" + vrayCmdName + "'");
+      return status;
+   }
+   
+#endif
+
    return status;
 }
 
@@ -68,6 +82,20 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
       status.perror("Failed to deregister command '" + commandName + "'");
       return status;
    }
+
+#ifdef ABCSHAPE_VRAY_SUPPORT
+   
+   MString vrayCmdName = PREFIX_NAME("AbcShapeVRayDisp");
+   
+   status = plugin.deregisterCommand(vrayCmdName);
+   
+   if (status != MS::kSuccess)
+   {
+      status.perror("Failed to deregister command '" + vrayCmdName + "'");
+      return status;
+   }
+   
+#endif
 
    status = MHWRender::MDrawRegistry::deregisterDrawOverrideCreator(AbcShapeOverride::Classification,
                                                                     AbcShapeOverride::Registrant);
