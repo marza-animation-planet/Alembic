@@ -30,6 +30,78 @@
 #include <vector>
 #include <map>
 
+#ifdef ABCSHAPE_VRAY_SUPPORT
+
+#include <maya/MItDependencyNodes.h>
+#include <maya/MFnSet.h>
+#include <maya/MObjectHandle.h>
+#include <maya/MPlugArray.h>
+#include <set>
+
+class MyMFnSet : public MFnSet
+{
+public:
+   
+   MyMFnSet()
+      : MFnSet()
+   {
+   }
+   
+   MyMFnSet(MObject &object, MStatus *stat=NULL)
+      : MFnSet(object, stat), mHandle(object)
+   {
+   }
+   
+   MyMFnSet(const MObject &object, MStatus *stat=NULL)
+      : MFnSet(object, stat), mHandle(object)
+   {
+   }
+   
+   MyMFnSet(const MyMFnSet &rhs)
+      : MFnSet()
+   {
+      operator=(rhs);
+   }
+   
+   virtual ~MyMFnSet()
+   {
+   }
+   
+   MyMFnSet& operator=(const MyMFnSet &rhs)
+   {
+      if (this != &rhs)
+      {
+         MObject rhsObj = rhs.object();
+         
+         mHandle = rhsObj;
+         setObject(rhsObj);
+      }
+      return *this;
+   }
+   
+   bool operator<(const MyMFnSet &rhs) const
+   {
+      return (mHandle.hashCode() < rhs.mHandle.hashCode());
+   }
+   
+   MyMFnSet* operator&()
+   {
+      return this;
+   }
+   
+   const MyMFnSet* operator&() const
+   {
+      return this;
+   }
+
+private:
+   
+   MObjectHandle mHandle;
+};
+
+typedef std::set<MyMFnSet> MyMFnSetSet;
+
+#endif
 
 #define MCHECKERROR(STAT,MSG)                   \
     if (!STAT) {                                \
@@ -521,16 +593,94 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
 
                Note: No displacement shader assigned qualifies as "No Disp" (TODO)
                */
-               
+     
                bool existing = false;
                
-               MFnDependencyNode thisNode(thisMObject());
+               MObject self = thisMObject();
+               MFnDependencyNode thisNode(self);
+               
+               MDagPath thisPath;
+               MDagPath::getAPathTo(self, thisPath);
+               
+               #ifdef _DEBUG
+               std::cout << "Export to V-Ray: \"" << thisNode.name().asChar() << "\" - \"" << thisPath.fullPathName().asChar() << "\"" << std::endl;
+               #endif
+               
+               // Check for assigned displacement shader
+               
+               MyMFnSetSet dispSets;
+               MyMFnSetSet::iterator dispSetIt, assignedDisp;
+               
+               MItDependencyNodes nodeIt(MFn::kSet);
+               
+               while (!nodeIt.isDone())
+               {
+                  MObject obj = nodeIt.thisNode();
+                  
+                  MyMFnSet set(obj);
+                  
+                  if (set.typeName() == "VRayDisplacement")
+                  {
+                     #ifdef _DEBUG
+                     std::cout << "Found VRayDisplacement: \"" << set.name().asChar() << "\"" << std::endl;
+                     #endif
+                     
+                     dispSets.insert(set);
+                  }
+                  
+                  nodeIt.next();
+               }
+               
+               assignedDisp = dispSets.end();
+               
+               while (thisPath.length() > 0)
+               {
+                  #ifdef _DEBUG
+                  std::cout << "Check displacement for \"" << thisPath.fullPathName().asChar() << "\"" << std::endl;
+                  #endif
+                  
+                  for (dispSetIt = dispSets.begin(); dispSetIt != dispSets.end(); ++dispSetIt)
+                  {
+                     if (dispSetIt->isMember(thisPath))
+                     {
+                        #ifdef _DEBUG
+                        std::cout << "Found displacement: " << dispSetIt->name().asChar() << std::endl;
+                        #endif
+                        
+                        // check for a connection on 
+                        MPlug pDisp = dispSetIt->findPlug("displacement");
+                        
+                        if (!pDisp.isNull())
+                        {
+                           MPlugArray srcs;
+                           
+                           pDisp.connectedTo(srcs, true, false);
+                           
+                           if (srcs.length() > 0)
+                           {
+                              assignedDisp = dispSetIt;
+                           }
+                        }
+                        
+                        break;
+                     }
+                  }
+                  
+                  if (assignedDisp != dispSets.end())
+                  {
+                     break;
+                  }
+                  
+                  thisPath.pop();
+               }
+               
+               // Check subdivision/displacement settings
                MPlug pSubdivEnable = thisNode.findPlug("vraySubdivEnable");
                MPlug pNoDisp = thisNode.findPlug("vrayDisplacementNone");
                MPlug pDispType = thisNode.findPlug("vrayDisplacementType");
                
                bool subdiv = (!pSubdivEnable.isNull() && pSubdivEnable.asBool());
-               bool disp = (!pNoDisp.isNull() && !pNoDisp.asBool());
+               bool disp = ((assignedDisp != dispSets.end()) && (pNoDisp.isNull() || !pNoDisp.asBool()));
                // should set disp to false if shape has no displacement shader assigned
                bool disp2d = (disp && !pDispType.isNull() && pDispType.asInt() == 0);
                
