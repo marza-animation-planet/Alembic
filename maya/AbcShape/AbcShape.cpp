@@ -324,6 +324,7 @@ MStatus AbcShape::initialize()
    MCHECKERROR(stat, "Could not create 'animated' attribute");
    nAttr.setWritable(true);
    nAttr.setStorable(true);
+   nAttr.setHidden(true);
    stat = addAttribute(aAnimated);
    MCHECKERROR(stat, "Could not add 'animated' attribute");
    
@@ -331,6 +332,9 @@ MStatus AbcShape::initialize()
    MFnStringData outApiTypeDefault;
    MObject outApiTypeDefaultObject = outApiTypeDefault.create("VRayGeometry");
    aOutApiType = tAttr.create("outApiType", "oat", MFnData::kString, outApiTypeDefaultObject, &stat);
+   tAttr.setKeyable(false);
+   tAttr.setStorable(true);
+   tAttr.setHidden(true);
    MCHECKERROR(stat, "Could not create 'outApiType' attribute");
    stat = addAttribute(aOutApiType);
    MCHECKERROR(stat, "Could not add 'outApiType' attribute");
@@ -880,7 +884,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                         existing = false;
                         
                         std::string newName = abc->getPluginName();
-                        newName += "@smoothed";
+                        newName += "@subdivGeometry";
                         
                         geomInfo->clearLastPlugin(newName.c_str(), true);
                         
