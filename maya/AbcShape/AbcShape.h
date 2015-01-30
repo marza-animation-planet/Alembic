@@ -181,7 +181,7 @@ private:
     // VR::DefFloatParam mVRScale;                            // [1.0]
     // VR::DefBoolParam mVRFlipAxis;                          // [false]
     // VR::DefBoolParam mVRSmoothUVBorders;                   // [true]
-    // VR::DefBoolParam mVRSmoothUV;                          // [true]
+    VR::DefBoolParam mVRSmoothUV;                          // [true]
     // VR::DefBoolParam mVRComputeNormals;                    // [true]
     // VR::DefFloatParam mVRSmoothAngle;                      // [30.0]
     // VR::DefBoolParam mVRFlipNormals;                       // [false]
@@ -200,7 +200,32 @@ private:
     // VR::DefIntParam mVRSortVoxels;                         // [0]
     // VR::DefIntParam mVRFirstMapChannel;                    // [1]
     // VR::DefIntParam mVRParticleRenderMode;                 // [0, (0: spheres, 1: points)]
-    // VR::DefStringParam mVRVelocityColorSet;                // [""]
+    // VR::DefStringParam mVRVelocityColorSet;                // [""]    
+    VR::DefPluginParam mVRMesh;
+    VR::DefIntParam mVRPreserveMapBorders;
+    VR::DefBoolParam mVRStaticSubdiv;
+    VR::DefBoolParam mVRClassicCatmark;
+    VR::DefBoolParam mVRUseGlobals;
+    VR::DefBoolParam mVRViewDep;
+    VR::DefFloatParam mVREdgeLength;
+    VR::DefIntParam mVRMaxSubdivs;
+    VR::DefBoolParam mVRUseBounds;
+    VR::DefColorParam mVRMinBound;
+    VR::DefColorParam mVRMaxBound;
+    VR::DefBoolParam mVRCacheNormals;
+    VR::DefBoolParam mVRStaticDisp;
+    VR::DefIntParam mVRPrecision;
+    VR::DefBoolParam mVRDisp2D;
+    VR::DefBoolParam mVRTightBounds;
+    VR::DefIntParam mVRResolution;
+    VR::DefBoolParam mVRFilterTexture;
+    VR::DefFloatParam mVRFilterBlur;
+    VR::DefIntParam mVRVectorDisp;
+    // VR::DefBoolParam mVRObjectSpaceDisp;
+    VR::DefBoolParam mVRKeepContinuity;
+    VR::DefFloatParam mVRWaterLevel;
+    VR::DefFloatParam mVRDispAmount;
+    VR::DefFloatParam mVRDispShift;
 #endif
 };
 

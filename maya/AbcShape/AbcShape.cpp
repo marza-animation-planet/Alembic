@@ -369,6 +369,31 @@ AbcShape::AbcShape()
    , mVRUseFaceSets("use_face_sets", 0)
    , mVRUseFullNames("use_full_names", 0)
    , mVRComputeBBox("compute_bbox", 0)
+   , mVRSmoothUV("smooth_uv", true)
+   , mVRMesh("mesh", 0)
+   , mVRPreserveMapBorders("preserve_map_borders", -1)
+   , mVRStaticSubdiv("static_subdiv", false)
+   , mVRClassicCatmark("classic_catmark", false)
+   , mVRUseGlobals("use_globals", true)
+   , mVRViewDep("view_dep", true)
+   , mVREdgeLength("edge_length", 4.0f)
+   , mVRMaxSubdivs("max_subdivs", 256)
+   , mVRUseBounds("use_bounds", false)
+   , mVRMinBound("min_bound", VR::Color(0, 0, 0))
+   , mVRMaxBound("max_bound", VR::Color(1, 1, 1))
+   , mVRCacheNormals("cache_normals", false)
+   , mVRStaticDisp("static_displacement", false)
+   , mVRPrecision("precision", 8)
+   , mVRDisp2D("displace_2d", false)
+   , mVRTightBounds("tight_bounds", false)
+   , mVRResolution("resolution", 256)
+   , mVRFilterTexture("filter_texture", false)
+   , mVRFilterBlur("filter_blur", 0.001f)
+   , mVRVectorDisp("vector_displacement", 0)
+   , mVRKeepContinuity("keep_continuity", false)
+   , mVRWaterLevel("water_level", -1e+30f)
+   , mVRDispAmount("displacement_amount", 1.0f)
+   , mVRDispShift("displacement_shift", 0.0f)
 #endif
 {
 }
@@ -482,9 +507,48 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
             
             if (plugdesc)
             {
+               /*
+               GeomStaticMesh
+                 No Subdiv && No Disp
+
+               GeomStaticMesh + GeomStaticSmoothedMesh
+                 Subdiv && No Disp 2D
+
+               GeomStaticMesh + GeomDisplacedMesh
+                 No Subdiv && Any Disp
+                 Subdiv && Disp 2D
+                 
+
+               Note: No displacement shader assigned qualifies as "No Disp" (TODO)
+               */
+               
                bool existing = false;
                
+               MFnDependencyNode thisNode(thisMObject());
+               MPlug pSubdivEnable = thisNode.findPlug("vraySubdivEnable");
+               MPlug pNoDisp = thisNode.findPlug("vrayDisplacementNone");
+               MPlug pDispType = thisNode.findPlug("vrayDisplacementType");
+               
+               bool subdiv = (!pSubdivEnable.isNull() && pSubdivEnable.asBool());
+               bool disp = (!pNoDisp.isNull() && !pNoDisp.asBool());
+               // should set disp to false if shape has no displacement shader assigned
+               bool disp2d = (disp && !pDispType.isNull() && pDispType.asInt() == 0);
+               
+               #ifdef _DEBUG
+               std::cout << "Export \"" << thisNode.name().asChar() << "\" to vray" << std::endl;
+               #endif
+               
                VR::VRayPlugin *abc = geomInfo->newPlugin("GeomMeshFile", existing);
+               VR::VRayPlugin *mod = 0;
+               
+               #ifdef _DEBUG
+               std::cout << "  " << std::hex << (void*)abc << std::dec << (existing ? " (existing)" : "") << std::endl;
+               if (abc)
+               {
+                  const tchar *name = abc->getPluginName();
+                  std::cout << "  name = \"" << (name ? name : "") << "\"" << std::endl;
+               }
+               #endif
                
                if (abc && !existing)
                {
@@ -540,6 +604,329 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   abc->setParameter(&mVRUseFullNames);
                   abc->setParameter(&mVRUseFaceSets);
                   abc->setParameter(&mVRComputeBBox);
+                  
+                  if (subdiv)
+                  {
+                     MPlug pSubdivUVs = thisNode.findPlug("vraySubdivUVs");
+                     if (!pSubdivUVs.isNull())
+                     {
+                        mVRSmoothUV.setBool(pSubdivUVs.asBool(), 0, 0.0);
+                        abc->setParameter(&mVRSmoothUV);
+                     }
+                  }
+                  
+                  if (disp2d || (disp && !subdiv))
+                  {
+                     #ifdef _DEBUG
+                     std::cout << "  Create additional GeomDisplacedMesh" << std::endl;
+                     #endif
+                     
+                     plugdesc = plugman->getPluginDesc("GeomDisplacedMesh");
+                     
+                     if (plugdesc)
+                     {
+                        existing = false;
+                        
+                        std::string newName = abc->getPluginName();
+                        newName += "@displaced";
+                        
+                        geomInfo->clearLastPlugin(newName.c_str(), true);
+                        
+                        mod = geomInfo->newPlugin("GeomDisplacedMesh", existing);
+                        
+                        #ifdef _DEBUG
+                        std::cout << "    " << std::hex << (void*)mod << std::dec << (existing ? " (existing)" : "") << std::endl;
+                        if (mod)
+                        {
+                           const tchar *name = mod->getPluginName();
+                           std::cout << "    name = \"" << (name ? name : "") << "\"" << std::endl;
+                        }
+                        #endif
+                        
+                        if (mod && !existing)
+                        {
+                           // Process parameters specific to GeomDisplacedMesh here
+                           
+                           MPlug pStaticDisp = thisNode.findPlug("vrayDisplacementStatic");
+                           if (!pStaticDisp.isNull())
+                           {
+                              mVRStaticDisp.setBool(pStaticDisp.asBool(), 0, 0.0);
+                              mod->setParameter(&mVRStaticDisp);
+                           }
+                           
+                           MPlug pPrecision = thisNode.findPlug("vray2dDisplacementPrecision");
+                           if (!pPrecision.isNull())
+                           {
+                              mVRPrecision.setBool(pPrecision.asInt(), 0, 0.0);
+                              mod->setParameter(&mVRPrecision);
+                           }
+                           
+                           if (disp2d)
+                           {
+                              mVRDisp2D.setBool(true, 0, 0.0);
+                              mod->setParameter(&mVRDisp2D);
+                              
+                              MPlug pTightBounds = thisNode.findPlug("vray2dDisplacementTightBounds");
+                              if (!pTightBounds.isNull())
+                              {
+                                 mVRTightBounds.setBool(pTightBounds.asBool(), 0, 0.0);
+                                 mod->setParameter(&mVRTightBounds);
+                              }
+                              
+                              MPlug pResolution = thisNode.findPlug("vray2dDisplacementResolution");
+                              if (!pResolution.isNull())
+                              {
+                                 mVRResolution.setBool(pResolution.asInt(), 0, 0.0);
+                                 mod->setParameter(&mVRResolution);
+                              }
+                              
+                              MPlug pFilterTexture = thisNode.findPlug("vray2dDisplacementFilterTexture");
+                              if (!pFilterTexture.isNull())
+                              {
+                                 mVRFilterTexture.setBool(pFilterTexture.asBool(), 0, 0.0);
+                                 mod->setParameter(&mVRFilterTexture);
+                              }
+                              
+                              MPlug pFilterBlur = thisNode.findPlug("vray2dDisplacementFilterBlur");
+                              if (!pFilterBlur.isNull())
+                              {
+                                 mVRFilterBlur.setFloat(pFilterBlur.asFloat(), 0, 0.0);
+                                 mod->setParameter(&mVRFilterBlur);
+                              }
+                           }
+                        }
+                        else
+                        {
+                           #ifdef _DEBUG
+                           if (existing)
+                           {
+                              std::cout << "    Already exists" << std::endl;
+                           }
+                           else
+                           {
+                              std::cout << "    Failed to create" << std::endl;
+                           }
+                           #endif
+                           mod = 0;
+                        }
+                     }
+                     else
+                     {
+                        #ifdef _DEBUG
+                        std::cout << "    No \"GeomDisplacedMesh\" V-Ray plugin" << std::endl;
+                        #endif
+                     }
+                  }
+                  else if (subdiv)
+                  {
+                     #ifdef _DEBUG
+                     std::cout << "  Create additional GeomStaticSmoothedMesh" << std::endl;
+                     #endif
+                     
+                     plugdesc = plugman->getPluginDesc("GeomStaticSmoothedMesh");
+                     
+                     if (plugdesc)
+                     {
+                        existing = false;
+                        
+                        std::string newName = abc->getPluginName();
+                        newName += "@smoothed";
+                        
+                        geomInfo->clearLastPlugin(newName.c_str(), true);
+                        
+                        mod = geomInfo->newPlugin("GeomStaticSmoothedMesh", existing);
+                        
+                        #ifdef _DEBUG
+                        std::cout << "    " << std::hex << (void*)mod << std::dec << (existing ? " (existing)" : "") << std::endl;
+                        if (mod)
+                        {
+                           const tchar *name = mod->getPluginName();
+                           std::cout << "    name = \"" << (name ? name : "") << "\"" << std::endl;
+                        }
+                        #endif
+                        
+                        if (mod && !existing)
+                        {
+                           // Process parameters specific to GeomStaticSmoothMesh
+                           MPlug pPreserveMapBorder = thisNode.findPlug("vrayPreserveMapBorders");
+                           if (!pPreserveMapBorder.isNull())
+                           {
+                              mVRPreserveMapBorders.setInt(pPreserveMapBorder.asInt(), 0, 0.0);
+                              mod->setParameter(&mVRPreserveMapBorders);
+                           }
+                           
+                           MPlug pStaticSubdiv = thisNode.findPlug("vrayStaticSubdiv");
+                           if (!pStaticSubdiv.isNull())
+                           {
+                              mVRStaticSubdiv.setBool(pStaticSubdiv.asBool(), 0, 0.0);
+                              mod->setParameter(&mVRStaticSubdiv);
+                           }
+                           
+                           MPlug pClassicCatmark = thisNode.findPlug("vrayClassicalCatmark");
+                           if (!pClassicCatmark.isNull())
+                           {
+                              mVRClassicCatmark.setBool(pClassicCatmark.asBool(), 0, 0.0);
+                              mod->setParameter(&mVRClassicCatmark);
+                           }
+                        }
+                        else
+                        {
+                           #ifdef _DEBUG
+                           if (existing)
+                           {
+                              std::cout << "    Already exists" << std::endl;
+                           }
+                           else
+                           {
+                              std::cout << "    Failed to create" << std::endl;
+                           }
+                           #endif
+                           mod = 0;
+                        }
+                     }
+                     else
+                     {
+                        #ifdef _DEBUG
+                        std::cout << "    No 'GeomStaticSmoothedMesh' V-Ray plugin" << std::endl;
+                        #endif
+                     }
+                  }
+                  
+                  if (mod)
+                  {
+                     if (subdiv)
+                     {
+                        MPlug pSubdivOverride = thisNode.findPlug("vrayOverrideGlobalSubQual");
+                        if (!pSubdivOverride.isNull())
+                        {
+                           mVRUseGlobals.setBool(!pSubdivOverride.asBool(), 0, 0.0);
+                           mod->setParameter(&mVRUseGlobals);
+                           
+                           if (pSubdivOverride.asBool())
+                           {
+                              MPlug pViewDep = thisNode.findPlug("vrayViewDep");
+                              if (!pViewDep.isNull())
+                              {
+                                 mVRViewDep.setBool(pViewDep.asBool(), 0, 0.0);
+                                 mod->setParameter(&mVRViewDep);
+                              }
+                              
+                              MPlug pEdgeLength = thisNode.findPlug("vrayEdgeLength");
+                              if (!pEdgeLength.isNull())
+                              {
+                                 mVREdgeLength.setFloat(pEdgeLength.asFloat(), 0, 0.0);
+                                 mod->setParameter(&mVREdgeLength);
+                              }
+                              
+                              MPlug pMaxSubdivs = thisNode.findPlug("vrayMaxSubdivs");
+                              if (!pMaxSubdivs.isNull())
+                              {
+                                 mVRMaxSubdivs.setFloat(pMaxSubdivs.asInt(), 0, 0.0);
+                                 mod->setParameter(&mVRMaxSubdivs);
+                              }
+                           }
+                        }
+                     }
+                     
+                     if (disp)
+                     {
+                        if (pDispType.asInt() >= 2)
+                        {
+                           // Vector displacement
+                           
+                           mVRVectorDisp.setInt(pDispType.asInt() - 1, 0, 0.0);
+                           mod->setParameter(&mVRVectorDisp);
+                           
+                           // if (pDispType.asInt() == 4)
+                           // {
+                           //    mVRObjectSpaceDisp.setBool(true, 0, 0.0);
+                           //    mod->setParameter(&mVRObjectSpaceDisp);
+                           // }
+                        }
+                        
+                        MPlug pUseBounds = thisNode.findPlug("vrayDisplacementUseBounds");
+                        if (!pUseBounds.isNull())
+                        {
+                           mVRUseBounds.setBool(pUseBounds.asBool(), 0, 0.0);
+                           mod->setParameter(&mVRUseBounds);
+                           
+                           if (pUseBounds.asBool())
+                           {
+                              float x, y, z;
+                              MObject dataObj;
+                              MStatus stat;
+                              
+                              MPlug pMinBound = thisNode.findPlug("vrayDisplacementMinValue");
+                              if (!pMinBound.isNull())
+                              {
+                                 dataObj = pMinBound.asMObject();
+                                 MFnNumericData data(dataObj, &stat);
+                                 
+                                 if (stat == MS::kSuccess && data.getData(x, y, z) == MS::kSuccess)
+                                 {
+                                    mVRMinBound.setColor(VR::Color(x, y, z), 0, 0.0);
+                                    mod->setParameter(&mVRMinBound);
+                                 }
+                              }
+                              
+                              MPlug pMaxBound = thisNode.findPlug("vrayDisplacementMaxValue");
+                              if (!pMaxBound.isNull())
+                              {
+                                 dataObj = pMaxBound.asMObject();
+                                 MFnNumericData data(dataObj, &stat);
+                                 
+                                 if (stat == MS::kSuccess && data.getData(x, y, z) == MS::kSuccess)
+                                 {
+                                    mVRMaxBound.setColor(VR::Color(x, y, z), 0, 0.0);
+                                    mod->setParameter(&mVRMaxBound);
+                                 }
+                              }
+                           }
+                        }
+                        
+                        MPlug pCacheNormals = thisNode.findPlug("vrayDisplacementCacheNormals");
+                        if (!pCacheNormals.isNull())
+                        {
+                           mVRCacheNormals.setBool(pCacheNormals.asBool(), 0, 0.0);
+                           mod->setParameter(&mVRCacheNormals);
+                        }
+                        
+                        MPlug pKeepContinuity = thisNode.findPlug("vrayDisplacementKeepContinuity");
+                        if (!pKeepContinuity.isNull())
+                        {
+                           mVRKeepContinuity.setBool(pKeepContinuity.asBool(), 0, 0.0);
+                           mod->setParameter(&mVRKeepContinuity);
+                        }
+                        
+                        MPlug pEnableWaterLevel = thisNode.findPlug("vrayEnableWaterLevel");
+                        if (!pEnableWaterLevel.isNull() && pEnableWaterLevel.asBool())
+                        {
+                           MPlug pWaterLevel = thisNode.findPlug("vrayWaterLevel");
+                           if (!pWaterLevel.isNull())
+                           {
+                              mVRWaterLevel.setFloat(pWaterLevel.asFloat(), 0, 0.0);
+                              mod->setParameter(&mVRWaterLevel);
+                           }
+                        }
+                        
+                        MPlug pDispAmount = thisNode.findPlug("vrayDisplacementAmount");
+                        if (!pDispAmount.isNull())
+                        {
+                           mVRDispAmount.setFloat(pDispAmount.asFloat(), 0, 0.0);
+                           mod->setParameter(&mVRDispAmount);
+                        }
+                        
+                        MPlug pDispShift = thisNode.findPlug("vrayDisplacementShift");
+                        if (!pDispShift.isNull())
+                        {
+                           mVRDispShift.setFloat(pDispShift.asFloat(), 0, 0.0);
+                           mod->setParameter(&mVRDispShift);
+                        }
+                     }
+                     
+                     mVRMesh.setUserObject(abc, 0, 0.0);
+                     mod->setParameter(&mVRMesh);
+                  }
                   
                   hOut.setInt(1);
                }
