@@ -161,6 +161,11 @@ Building ilmbase 1.0.3 as shared libraries
        Deploy/ (output of ilmbase, pyilmbase build)
    Open the "vc/vc9/IlmBase/PyIlmBase.sln" solution and build the "Half", "Iex", "IexMath" and "Imath" targets.
 
+   Special Note:
+     A "stdint.h" file is provided in ilmbase-1.0.3/config.windows directory as microsoft c runtime 9.0 (and below) doesn't provide it, 
+     If you are compiling against a newer version of the runtime, don't forget to remove it.
+
+
 
 Building pyilmbase 1.0.0
    
