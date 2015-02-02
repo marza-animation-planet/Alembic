@@ -407,7 +407,7 @@ if excons.GetArgument("with-maya", default=None) is not None:
    AbcShapeMel = "maya/AbcShape/AE%sTemplate.mel" % AbcShapeName
    AbcShapeMtoa = "arnold/abcproc/mtoa_%s.py" % AbcShapeName
    if useVRay:
-      AbcShapePy = "maya/AbcShape/%sabcshape.py" % nameprefix.lower()
+      AbcShapePy = "maya/AbcShape/%sabcshape4vray.py" % nameprefix.lower()
    
    impver = excons.GetArgument("maya-abcimport-version", None)
    expver = excons.GetArgument("maya-abcexport-version", None)
@@ -420,8 +420,8 @@ if excons.GetArgument("with-maya", default=None) is not None:
       replace_in_file("arnold/abcproc/mtoa.py.tpl", AbcShapeMtoa, "<<NodeName>>", AbcShapeName)
    
    if useVRay:
-      if not os.path.exists(AbcShapePy) or os.stat(AbcShapePy).st_mtime < os.stat("maya/AbcShape/abcshape.py.tpl").st_mtime:
-         replace_in_file("maya/AbcShape/abcshape.py.tpl", AbcShapePy, "<<NodeName>>", AbcShapeName)
+      if not os.path.exists(AbcShapePy) or os.stat(AbcShapePy).st_mtime < os.stat("maya/AbcShape/abcshape4vray.py.tpl").st_mtime:
+         replace_in_file("maya/AbcShape/abcshape4vray.py.tpl", AbcShapePy, "<<NodeName>>", AbcShapeName)
     
    
    prjs.extend([{"name": "%sAbcImport" % nameprefix,
