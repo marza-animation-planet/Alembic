@@ -1535,12 +1535,6 @@ class NuPatch(Object):
     def __init__(self, *args, **kwargs):
         super(NuPatch, self).__init__(*args, **kwargs)
 
-class Points(Object):
-    """Points I/O Object subclass."""
-    __sample_class = alembic.AbcGeom.OPointsSchemaSample
-    def __init__(self, *args, **kwargs):
-        super(Points, self).__init__(*args, **kwargs)
-
 class Material(Object):
     """Material I/O Object subclass."""
     def __init__(self, *args, **kwargs):
@@ -1553,5 +1547,6 @@ class Light(Object):
 
 class Points(Object):
     """Points I/O Object subclass."""
+    __sample_class = alembic.AbcGeom.OPointsSchemaSample
     def __init__(self, *args, **kwargs):
         super(Points, self).__init__(*args, **kwargs)
