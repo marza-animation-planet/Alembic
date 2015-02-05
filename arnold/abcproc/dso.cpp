@@ -1301,14 +1301,27 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       }
       
       std::string cts = args[i];
-      toLower(cts);
       
-      for (size_t j=0; j<=CT_MAX; ++j)
+      int ival = -1;
+      
+      if (sscanf(cts.c_str(), "%d", &ival) == 1)
       {
-         if (cts == CycleTypeNames[j])
+         if (ival >= 0 && ival < CT_MAX)
          {
-            mCommonParams.cycle = (CycleType)j;
-            break;
+            mCommonParams.cycle = (CycleType) ival;
+         }
+      }
+      else
+      {
+         toLower(cts);
+         
+         for (size_t j=0; j<CT_MAX; ++j)
+         {
+            if (cts == CycleTypeNames[j])
+            {
+               mCommonParams.cycle = (CycleType)j;
+               break;
+            }
          }
       }
    }
@@ -1383,14 +1396,27 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       }
       
       std::string afs = args[i];
-      toLower(afs);
       
-      for (size_t j=0; j<AF_MAX; ++j)
+      int ival = -1;
+      
+      if (sscanf(afs.c_str(), "%d", &ival) == 1)
       {
-         if (afs == AttributeFrameNames[j])
+         if (ival >= 0 && ival < AF_MAX)
          {
-            mSingleParams.attribsFrame = (AttributeFrame)j;
-            break;
+            mSingleParams.attribsFrame = (AttributeFrame) ival;
+         }
+      }
+      else
+      {
+         toLower(afs);
+         
+         for (size_t j=0; j<AF_MAX; ++j)
+         {
+            if (afs == AttributeFrameNames[j])
+            {
+               mSingleParams.attribsFrame = (AttributeFrame)j;
+               break;
+            }
          }
       }
    }
