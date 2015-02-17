@@ -1538,7 +1538,8 @@ void AbcShape::updateWorld()
    WorldUpdate visitor(mSampleTime, mIgnoreTransforms, mIgnoreInstances, mIgnoreVisibility);
    mScene->visit(AlembicNode::VisitDepthFirst, visitor);
    
-   mNumShapes = visitor.numShapes();
+   // only get number of visible shapes
+   mNumShapes = visitor.numShapes(true);
    
    #ifdef _DEBUG
    std::cout << "[" << PREFIX_NAME("AbcShape") << "] " << mNumShapes << " shape(s) in scene" << std::endl;

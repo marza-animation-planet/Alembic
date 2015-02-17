@@ -455,10 +455,7 @@ Dso::Dso(AtNode *node)
       mNumShapes = visitor.numShapes();
       setGeneratedNodesCount(mNumShapes);
       
-      if (mNumShapes == 1 &&
-          mCommonParams.ignoreTransforms &&
-          mCommonParams.ignoreVisibility && 
-          mCommonParams.ignoreInstances) // Not sure about the last one
+      if (mNumShapes == 1 && mCommonParams.ignoreTransforms)
       {
          // output a single shape in object space
          if (mCommonParams.verbose)

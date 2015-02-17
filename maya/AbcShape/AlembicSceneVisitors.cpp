@@ -21,6 +21,7 @@ WorldUpdate::WorldUpdate(double t,
    , mIgnoreInstances(ignoreInstances)
    , mIgnoreVisibility(ignoreVisibility)
    , mNumShapes(0)
+   , mNumVisibleShapes(0)
 {
 }
 
@@ -191,6 +192,11 @@ AlembicNode::VisitReturn WorldUpdate::enter(AlembicNode &node, AlembicNode *)
 void WorldUpdate::leave(AlembicXform &node, AlembicNode *)
 {
    node.updateChildBounds();
+   
+   if (!mIgnoreTransforms && !mIgnoreVisibility)
+   {
+      mVisibilityStack.pop_back();
+   }
 }
 
 void WorldUpdate::leave(AlembicNode &node, AlembicNode *)
@@ -374,8 +380,9 @@ bool GetFrameRange::getFrameRange(double &start, double &end) const
 
 // ---
 
-CountShapes::CountShapes(bool ignoreInstances, bool ignoreVisibility)
-   : mNoInstances(ignoreInstances)
+CountShapes::CountShapes(bool ignoreTransforms, bool ignoreInstances, bool ignoreVisibility)
+   : mIgnoreTransforms(ignoreTransforms)
+   , mNoInstances(ignoreInstances)
    , mCheckVisibility(!ignoreVisibility)
    , mCount(0)
 {
@@ -383,7 +390,7 @@ CountShapes::CountShapes(bool ignoreInstances, bool ignoreVisibility)
 
 AlembicNode::VisitReturn CountShapes::enter(AlembicXform &node, AlembicNode *)
 {
-   return ((mCheckVisibility && !node.isVisible()) ? AlembicNode::DontVisitChildren : AlembicNode::ContinueVisit);
+   return ((!mIgnoreTransforms && mCheckVisibility && !node.isVisible()) ? AlembicNode::DontVisitChildren : AlembicNode::ContinueVisit);
 }
 
 AlembicNode::VisitReturn CountShapes::enter(AlembicMesh &node, AlembicNode *instance)

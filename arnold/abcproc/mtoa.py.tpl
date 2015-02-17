@@ -106,63 +106,63 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
       if ignoreVisibility:
          data += " -ignorevisibility"
       
-      val = cmds.getAttr(nodeName+".mtoa_referenceFilename")
+      val = cmds.getAttr(nodeName+".mtoa_abc_referenceFilename")
       if val:
          data += " -referencefilename %s" % val
       
-      val = stu.GetOverrideAttr(nodeName, "mtoa_computeTangents", None)
+      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_computeTangents", None)
       if val:
          data += " -computetangents %s" % val
       
-      val = stu.GetOverrideAttr(nodeName, "mtoa_radiusScale", None)
+      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_radiusScale", None)
       if val is not None:
          data += " -radiusscale %f" % val
       
-      val = stu.GetOverrideAttr(nodeName, "mtoa_radiusMin", None)
+      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_radiusMin", None)
       if val is not None:
          data += " -radiusmin %f" % val
       
-      val = stu.GetOverrideAttr(nodeName, "mtoa_radiusMax", None)
+      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_radiusMax", None)
       if val is not None:
          data += " -radiusmax %f" % val
       
-      val = stu.GetOverrideAttr(nodeName, "mtoa_overrideAttribs", None)
+      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_overrideAttribs", None)
       if val:
          data += " -overrideattribs %s" % val
       
-      val = stu.GetOverrideAttr(nodeName, "mtoa_removeAttribPrefices", None)
+      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_removeAttribPrefices", None)
       if val:
          data += " -removeattribprefices %s" % val
       
-      val = stu.GetOverrideAttr(nodeName, "mtoa_objectAttribs", None)
+      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_objectAttribs", None)
       if val:
          data += " -objectattribs"
    
-      val = stu.GetOverrideAttr(nodeName, "mtoa_primitiveAttribs", None)
+      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_primitiveAttribs", None)
       if val:
          data += " -primitiveattribs"
    
-      val = stu.GetOverrideAttr(nodeName, "mtoa_pointAttribs", None)
+      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_pointAttribs", None)
       if val:
          data += " -pointattribs"
    
-      val = stu.GetOverrideAttr(nodeName, "mtoa_vertexAttribs", None)
+      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_vertexAttribs", None)
       if val:
          data += " -vertexattribs"
       
-      val = stu.GetOverrideAttr(nodeName, "mtoa_attribsFrame", None)
+      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_attribsFrame", None)
       if val and val >= 0 and val < len(AttribFrames):
          data += " -attribsframe %s" % AttribFrames[val]
       
-      val = stu.GetOverrideAttr(nodeName, "mtoa_samplesExpandIterations", None)
+      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_samplesExpandIterations", None)
       if val is not None:
          data += " -samplesexpanditerations %d" % val
-         val = stu.GetOverrideAttr(nodeName, "mtoa_optimizeSamples", None)
+         val = stu.GetOverrideAttr(nodeName, "mtoa_abc_optimizeSamples", None)
          if val:
             data += " -optimizesamples"
       
       if deformationBlur or transformationBlur:
-         relativeSamples = stu.GetOverrideAttr(nodeName, "mtoa_relativeSamples", None)
+         relativeSamples = stu.GetOverrideAttr(nodeName, "mtoa_abc_relativeSamples", None)
          if relativeSamples is None:
             relativeSamples = False
          
@@ -174,7 +174,7 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
       arnold.AiNodeSetStr(node, "data", data)
       
       # This is how abcproc DSO decides wether it should expand into more procedural or the final shape
-      singleShape = (cmds.getAttr(nodeName+".numShapes") == 1 and ignoreTransforms and ignoreVisibility and ignoreInstances)
+      singleShape = (cmds.getAttr(nodeName+".numShapes") == 1 and ignoreTransforms)
       
       if singleShape:
          pad = 0.0
@@ -232,7 +232,7 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
          arnold.AiNodeSetPnt(node, "max", curmax.x, curmax.y, curmax.z)
       
       if deformationBlur or transformationBlur:
-         relativeSamples = stu.GetOverrideAttr(nodeName, "mtoa_relativeSamples", None)
+         relativeSamples = stu.GetOverrideAttr(nodeName, "mtoa_abc_relativeSamples", None)
          if relativeSamples is None:
             relativeSamples = False
          
@@ -260,24 +260,24 @@ def SetupAttrs():
    try:
       attrs.append(stu.AttrData(arnoldNode="box", arnoldAttr="step_size"))
       
-      attrs.append(stu.AttrData(name="mtoa_referenceFilename", shortName="reffp", type=arnold.AI_TYPE_STRING, defaultValue=""))
+      attrs.append(stu.AttrData(name="mtoa_abc_referenceFilename", shortName="reffp", type=arnold.AI_TYPE_STRING, defaultValue=""))
       
-      attrs.append(stu.AttrData(name="mtoa_computeTangents", shortName="cmptan", type=arnold.AI_TYPE_STRING, defaultValue=""))
+      attrs.append(stu.AttrData(name="mtoa_abc_computeTangents", shortName="cmptan", type=arnold.AI_TYPE_STRING, defaultValue=""))
       
-      attrs.append(stu.AttrData(name="mtoa_radiusScale", shortName="radscl", type=arnold.AI_TYPE_FLOAT, defaultValue=1.0, min=0))
-      attrs.append(stu.AttrData(name="mtoa_radiusMin", shortName="radmin", type=arnold.AI_TYPE_FLOAT, defaultValue=0.0, min=0))
-      attrs.append(stu.AttrData(name="mtoa_radiusMax", shortName="radmax", type=arnold.AI_TYPE_FLOAT, defaultValue=1000000.0, min=0))
+      attrs.append(stu.AttrData(name="mtoa_abc_radiusScale", shortName="radscl", type=arnold.AI_TYPE_FLOAT, defaultValue=1.0, min=0))
+      attrs.append(stu.AttrData(name="mtoa_abc_radiusMin", shortName="radmin", type=arnold.AI_TYPE_FLOAT, defaultValue=0.0, min=0))
+      attrs.append(stu.AttrData(name="mtoa_abc_radiusMax", shortName="radmax", type=arnold.AI_TYPE_FLOAT, defaultValue=1000000.0, min=0))
       
-      attrs.append(stu.AttrData(name="mtoa_overrideAttribs", shortname="ovatrs", type=arnold.AI_TYPE_STRING, defaultValue=""))
-      attrs.append(stu.AttrData(name="mtoa_removeAttribPrefices", shortName="rematp", type=arnold.AI_TYPE_STRING, defaultValue=""))
-      attrs.append(stu.AttrData(name="mtoa_objectAttribs", shortName="objatrs", type=arnold.AI_TYPE_BOOLEAN, defaultValue=False))
-      attrs.append(stu.AttrData(name="mtoa_primitiveAttribs", shortName="pratrs", type=arnold.AI_TYPE_BOOLEAN, defaultValue=False))
-      attrs.append(stu.AttrData(name="mtoa_pointAttribs", shortName="ptatrs", type=arnold.AI_TYPE_BOOLEAN, defaultValue=False))
-      attrs.append(stu.AttrData(name="mtoa_vertexAttribs", shortName="vtxatrs", type=arnold.AI_TYPE_BOOLEAN, defaultValue=False))
-      attrs.append(stu.AttrData(name="mtoa_attribsFrame", shortName="atrsfrm", type=arnold.AI_TYPE_ENUM, enums=["render", "shutter", "shutter_open", "shutter_close"], defaultValue=0))
+      attrs.append(stu.AttrData(name="mtoa_abc_overrideAttribs", shortname="ovatrs", type=arnold.AI_TYPE_STRING, defaultValue=""))
+      attrs.append(stu.AttrData(name="mtoa_abc_removeAttribPrefices", shortName="rematp", type=arnold.AI_TYPE_STRING, defaultValue=""))
+      attrs.append(stu.AttrData(name="mtoa_abc_objectAttribs", shortName="objatrs", type=arnold.AI_TYPE_BOOLEAN, defaultValue=False))
+      attrs.append(stu.AttrData(name="mtoa_abc_primitiveAttribs", shortName="pratrs", type=arnold.AI_TYPE_BOOLEAN, defaultValue=False))
+      attrs.append(stu.AttrData(name="mtoa_abc_pointAttribs", shortName="ptatrs", type=arnold.AI_TYPE_BOOLEAN, defaultValue=False))
+      attrs.append(stu.AttrData(name="mtoa_abc_vertexAttribs", shortName="vtxatrs", type=arnold.AI_TYPE_BOOLEAN, defaultValue=False))
+      attrs.append(stu.AttrData(name="mtoa_abc_attribsFrame", shortName="atrsfrm", type=arnold.AI_TYPE_ENUM, enums=["render", "shutter", "shutter_open", "shutter_close"], defaultValue=0))
       
-      attrs.append(stu.AttrData(name="mtoa_samplesExpandIterations", shortName="sampexpiter", type=arnold.AI_TYPE_INT, defaultValue=0, min=0, max=10))
-      attrs.append(stu.AttrData(name="mtoa_optimizeSamples", shortName="optsamp", type=arnold.AI_TYPE_BOOLEAN, defaultValue=False))
+      attrs.append(stu.AttrData(name="mtoa_abc_samplesExpandIterations", shortName="sampexpiter", type=arnold.AI_TYPE_INT, defaultValue=0, min=0, max=10))
+      attrs.append(stu.AttrData(name="mtoa_abc_optimizeSamples", shortName="optsamp", type=arnold.AI_TYPE_BOOLEAN, defaultValue=False))
       
    except Exception, e:
       print("mtoa_<<NodeName>>.SetupAttrs: Failed\n%s" % e)
@@ -302,28 +302,28 @@ def SetupAE(translator):
             self.renderStatsAttributes()
             self.addSeparator()
             
-            self.addControl("mtoa_referenceFilename", label="Reference ABC File")
+            self.addControl("mtoa_abc_referenceFilename", label="Reference ABC File")
             self.addSeparator()
             
-            self.addControl("mtoa_computeTangents", label="Compute Tangents")
+            self.addControl("mtoa_abc_computeTangents", label="Compute Tangents")
             self.addSeparator()
             
-            self.addControl("mtoa_radiusScale", label="Radius Scale")
-            self.addControl("mtoa_radiusMin", label="Min. Radius")
-            self.addControl("mtoa_radiusMax", label="Max. Radius")
+            self.addControl("mtoa_abc_radiusScale", label="Radius Scale")
+            self.addControl("mtoa_abc_radiusMin", label="Min. Radius")
+            self.addControl("mtoa_abc_radiusMax", label="Max. Radius")
             self.addSeparator()
             
-            self.addControl("mtoa_overrideAttribs", label="Override Attributes")
-            self.addControl("mtoa_removeAttribPrefices", label="Remove Attribute Prefices")
-            self.addControl("mtoa_objectAttribs", label="Output Object Attributes")
-            self.addControl("mtoa_primitiveAttribs", label="Output Primitive Attributes")
-            self.addControl("mtoa_pointAttribs", label="Output Point Attributes")
-            self.addControl("mtoa_vertexAttribs", label="Output Vertex Attributes")
-            self.addControl("mtoa_attribsFrame", label="Attributes Frame")
+            self.addControl("mtoa_abc_overrideAttribs", label="Override Attributes")
+            self.addControl("mtoa_abc_removeAttribPrefices", label="Remove Attribute Prefices")
+            self.addControl("mtoa_abc_objectAttribs", label="Output Object Attributes")
+            self.addControl("mtoa_abc_primitiveAttribs", label="Output Primitive Attributes")
+            self.addControl("mtoa_abc_pointAttribs", label="Output Point Attributes")
+            self.addControl("mtoa_abc_vertexAttribs", label="Output Vertex Attributes")
+            self.addControl("mtoa_abc_attribsFrame", label="Attributes Frame")
             self.addSeparator()
             
-            self.addControl("mtoa_samplesExpandIterations", label="Expand Samples Iterations")
-            self.addControl("mtoa_optimizeSamples", label="Optimize Samples")
+            self.addControl("mtoa_abc_samplesExpandIterations", label="Expand Samples Iterations")
+            self.addControl("mtoa_abc_optimizeSamples", label="Optimize Samples")
             self.addSeparator()
             
             self.addControl("aiStepSize", label="Volume Step Size")

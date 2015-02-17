@@ -28,7 +28,7 @@ public:
    void leave(AlembicNode &node, AlembicNode *instance=0);
    
    const Alembic::Abc::Box3d& bounds() const;
-   unsigned int numShapes() const;
+   unsigned int numShapes(bool visibleOnly) const;
    
 private:
    
@@ -46,6 +46,8 @@ private:
    bool mIgnoreVisibility;
    Alembic::Abc::Box3d mBounds;
    unsigned int mNumShapes;
+   unsigned int mNumVisibleShapes;
+   std::vector<bool> mVisibilityStack;
 };
 
 inline const Alembic::Abc::Box3d& WorldUpdate::bounds() const
@@ -53,9 +55,9 @@ inline const Alembic::Abc::Box3d& WorldUpdate::bounds() const
    return mBounds;
 }
 
-inline unsigned int WorldUpdate::numShapes() const
+inline unsigned int WorldUpdate::numShapes(bool visibleOnly) const
 {
-   return mNumShapes;
+   return (visibleOnly ? mNumVisibleShapes : mNumShapes);
 }
 
 template <class T>
@@ -157,6 +159,44 @@ AlembicNode::VisitReturn WorldUpdate::anyEnter(AlembicNodeT<T> &node, AlembicNod
    if (node.type() != AlembicNode::TypeXform)
    {
       ++mNumShapes;
+      
+      // Shape is visible if:
+      //   we ignore visibility information
+      //   OR
+      //   the shape itself is visible AND EITHER we ignore transforms OR its parent (if any) is visible too
+      if (mIgnoreVisibility)
+      {
+         ++mNumVisibleShapes;
+      }
+      else if (visible)
+      {
+         if (mIgnoreTransforms)
+         {
+            ++mNumVisibleShapes;
+         }
+         else if (mVisibilityStack.size() == 0)
+         {
+            ++mNumVisibleShapes;
+         }
+         else if (mVisibilityStack.back())
+         {
+            ++mNumVisibleShapes;
+         }
+      }
+   }
+   else
+   {
+      if (!mIgnoreTransforms && !mIgnoreVisibility)
+      {
+         if (mVisibilityStack.size() == 0)
+         {
+            mVisibilityStack.push_back(visible);
+         }
+         else
+         {
+            mVisibilityStack.push_back(mVisibilityStack.back() && visible);
+         }
+      }
    }
    
    return AlembicNode::ContinueVisit;
@@ -218,7 +258,7 @@ public:
    
    // Note: doesn't count locators as shapes
    
-   CountShapes(bool ignoreInstances, bool ignoreVisibility);
+   CountShapes(bool ignoreTransforms, bool ignoreInstances, bool ignoreVisibility);
    
    AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
@@ -239,6 +279,7 @@ private:
 
 private:
    
+   bool mIgnoreTransforms;
    bool mNoInstances;
    bool mCheckVisibility;
    unsigned int mCount;
