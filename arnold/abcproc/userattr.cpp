@@ -105,6 +105,11 @@ bool ResizeUserAttribute(UserAttribute &ua, unsigned int newSize)
       break;
    }
    
+   if (podSize == 0)
+   {
+      return false;
+   }
+   
    oldBytesize *= podSize;
    newBytesize *= podSize;
    
@@ -132,11 +137,13 @@ bool ResizeUserAttribute(UserAttribute &ua, unsigned int newSize)
       }
       
       unsigned char *newElem = newBytes + oldBytesize;
+      unsigned char *lastElem = newElem + resetSize;
       size_t elemSize = ua.dataDim * podSize;
       
-      for (size_t i=0; i<resetSize; ++i, newElem += elemSize)
+      while (newElem < lastElem)
       {
          memcpy(newElem, defaultValue, elemSize);
+         newElem += elemSize
       }
       
       ua.data = newBytes;
@@ -202,8 +209,10 @@ bool CopyUserAttribute(UserAttribute &src, unsigned int srcIdx, unsigned int cou
    
    if (src.arnoldType == AI_TYPE_STRING)
    {
+      // For strings dataDim should always be 1
+      
       const char** srcStrs = ((const char**) src.data) + (srcIdx * src.dataDim);
-      const char** dstStrs = ((const char**) dst.data) + (dstIdx * src.dataDim);
+      const char** dstStrs = ((const char**) dst.data) + (dstIdx * dst.dataDim);
       
       for (unsigned int i=0; i<count; ++i, ++srcStrs, ++dstStrs)
       {
@@ -215,12 +224,9 @@ bool CopyUserAttribute(UserAttribute &src, unsigned int srcIdx, unsigned int cou
       size_t elemSize = src.dataDim * podSize;
       
       unsigned char *srcBytes = ((unsigned char*) src.data) + srcIdx * elemSize;
-      unsigned char *dstBytes = ((unsigned char*) src.data) + dstIdx * elemSize;
+      unsigned char *dstBytes = ((unsigned char*) dst.data) + dstIdx * elemSize;
       
-      for (unsigned int i=0; i<count; ++i, srcBytes += elemSize, dstBytes += elemSize)
-      {
-         memcpy(dstBytes, srcBytes, elemSize);
-      }
+      memcpy(dstBytes, srcBytes, count * elemSize);
    }
    
    return true;
