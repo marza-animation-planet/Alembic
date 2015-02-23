@@ -143,7 +143,7 @@ bool ResizeUserAttribute(UserAttribute &ua, unsigned int newSize)
       while (newElem < lastElem)
       {
          memcpy(newElem, defaultValue, elemSize);
-         newElem += elemSize
+         newElem += elemSize;
       }
       
       ua.data = newBytes;
