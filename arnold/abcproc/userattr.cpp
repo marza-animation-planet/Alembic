@@ -699,9 +699,32 @@ bool ReadUserAttribute(UserAttribute &ua,
                        bool geoparam,
                        bool interpolate)
 {
-   ua.abcType = header.getDataType();
+   std::string interp = "";
+   
+   if (geoparam && header.isCompound())
+   {
+      // Indexed geo param
+      Alembic::Abc::ICompoundProperty cprop(parent, header.getName());
+      
+      const Alembic::AbcCoreAbstract::PropertyHeader *vh = cprop.getPropertyHeader(".vals");
+      const Alembic::AbcCoreAbstract::PropertyHeader *ih = cprop.getPropertyHeader(".indices");
+      
+      if (!vh || !ih)
+      {
+         AiMsgWarning("[abcproc] Compound attributes not supported");
+         return false;
+      }
+      
+      ua.abcType = vh->getDataType();
+      interp = vh->getMetaData().get("interpretation");
+   }
+   else
+   {
+      ua.abcType = header.getDataType();
+      interp = header.getMetaData().get("interpretation");
+   }
+   
    ua.dataDim = ua.abcType.getExtent();
-   std::string interp = header.getMetaData().get("interpretation");
    
    switch (ua.abcType.getPod())
    {
