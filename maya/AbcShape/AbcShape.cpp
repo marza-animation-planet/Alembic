@@ -33,79 +33,13 @@
 #ifdef ABCSHAPE_VRAY_SUPPORT
 
 #include <maya/MItDependencyNodes.h>
-#include <maya/MFnSet.h>
-#include <maya/MObjectHandle.h>
 #include <maya/MPlugArray.h>
 #include <maya/MSyntax.h>
 #include <maya/MArgParser.h>
-#include <set>
-
-class MyMFnSet : public MFnSet
-{
-public:
-   
-   MyMFnSet()
-      : MFnSet()
-   {
-   }
-   
-   MyMFnSet(MObject &object, MStatus *stat=NULL)
-      : MFnSet(object, stat), mHandle(object)
-   {
-   }
-   
-   MyMFnSet(const MObject &object, MStatus *stat=NULL)
-      : MFnSet(object, stat), mHandle(object)
-   {
-   }
-   
-   MyMFnSet(const MyMFnSet &rhs)
-      : MFnSet()
-   {
-      operator=(rhs);
-   }
-   
-   virtual ~MyMFnSet()
-   {
-   }
-   
-   MyMFnSet& operator=(const MyMFnSet &rhs)
-   {
-      if (this != &rhs)
-      {
-         MObject rhsObj = rhs.object();
-         
-         mHandle = rhsObj;
-         setObject(rhsObj);
-      }
-      return *this;
-   }
-   
-   bool operator<(const MyMFnSet &rhs) const
-   {
-      return (mHandle.hashCode() < rhs.mHandle.hashCode());
-   }
-   
-   MyMFnSet* operator&()
-   {
-      return this;
-   }
-   
-   const MyMFnSet* operator&() const
-   {
-      return this;
-   }
-
-private:
-   
-   MObjectHandle mHandle;
-};
-
-typedef std::set<MyMFnSet> MyMFnSetSet;
-
-// ---
+#include <maya/MFnSet.h>
 
 AbcShapeVRayDisp::DispTexMap AbcShapeVRayDisp::DispTexs;
+AbcShapeVRayDisp::DispSetMap AbcShapeVRayDisp::DispSets;
 
 void* AbcShapeVRayDisp::create()
 {
@@ -116,9 +50,11 @@ MSyntax AbcShapeVRayDisp::createSyntax()
 {
    MSyntax syntax;
    
+   syntax.addFlag("-i", "-init", MSyntax::kNoArg);
    syntax.addFlag("-r", "-reset", MSyntax::kNoArg);
    syntax.addFlag("-dl", "-displist", MSyntax::kNoArg);
    syntax.addFlag("-d", "-disp", MSyntax::kString);
+   syntax.addFlag("-a", "-assigned", MSyntax::kString);
    syntax.addFlag("-f", "-float", MSyntax::kNoArg);
    syntax.addFlag("-c", "-color", MSyntax::kNoArg);
    
@@ -128,6 +64,31 @@ MSyntax AbcShapeVRayDisp::createSyntax()
    syntax.enableEdit(false);
    
    return syntax;
+}
+
+bool AbcShapeVRayDisp::getAssignedDisplacement(const MDagPath &inPath, std::string &setName, std::string &shaderName)
+{
+   DispSetMap::const_iterator it;
+   
+   MDagPath path = inPath;
+     
+   while (path.length() > 0)
+   {
+      it = DispSets.find(path.fullPathName().asChar());
+      
+      if (it != DispSets.end())
+      {
+         setName = it->second.setName;
+         shaderName = it->second.shaderName;
+         return true;
+      }
+      else
+      {
+         path.pop();
+      }
+   }
+   
+   return false;
 }
 
 AbcShapeVRayDisp::AbcShapeVRayDisp()
@@ -155,14 +116,100 @@ MStatus AbcShapeVRayDisp::doIt(const MArgList& args)
    
    MArgParser argData(syntax(), args, &status);
    
-   if (argData.isFlagSet("reset"))
+   if (argData.isFlagSet("init"))
+   {
+      DispSets.clear();
+      
+      MItDependencyNodes nodeIt(MFn::kSet);
+      
+      while (!nodeIt.isDone())
+      {
+         MObject obj = nodeIt.thisNode();
+         
+         MFnSet dispSet(obj);
+         
+         if (dispSet.typeName() == "VRayDisplacement")
+         {
+            MPlug pDisp = dispSet.findPlug("displacement");
+               
+            if (!pDisp.isNull())
+            {
+               MPlugArray srcs;
+               
+               pDisp.connectedTo(srcs, true, false);
+               
+               std::string shaderName;
+               
+               if (srcs.length() > 0)
+               {
+                  MObject shdObj = srcs[0].node();
+                  
+                  shaderName = MFnDependencyNode(shdObj).name().asChar();
+               }
+               
+               MSelectionList members;
+               MDagPath memberPath;
+               
+               dispSet.getMembers(members, false);
+               
+               for (unsigned int i=0; i<members.length(); ++i)
+               {
+                  if (members.getDagPath(i, memberPath) == MS::kSuccess)
+                  {
+                     DispSet &ds = DispSets[memberPath.fullPathName().asChar()];
+                     
+                     ds.setName = dispSet.name().asChar();
+                     ds.shaderName = shaderName;
+                     
+                     // Fully expand children too?
+                     // beware then that deeper level assignment takes precedence
+                  }
+               }
+            }
+         }
+         
+         nodeIt.next();
+      }
+      
+      return MS::kSuccess;
+   }
+   else if (argData.isFlagSet("reset"))
    {
       DispTexs.clear();
+      
       return MS::kSuccess;
    }
    else
    {
-      if (argData.isFlagSet("displist"))
+      if (argData.isFlagSet("assigned"))
+      {
+         MSelectionList sl;
+         MStringArray rv;
+         MString val;
+         MDagPath path;
+         
+         status = argData.getFlagArgument("assigned", 0, val);
+         if (status != MS::kSuccess)
+         {
+            MGlobal::displayError("Invalid valud for -assigned flag (" + val + ")");
+            return status;
+         }
+         
+         if (sl.add(val) == MS::kSuccess && sl.getDagPath(0, path) == MS::kSuccess)
+         {
+            std::string setn, shdn;
+            
+            if (getAssignedDisplacement(path, setn, shdn))
+            {
+               rv.append(setn.c_str());
+               rv.append(shdn.c_str());
+            }
+         }
+         
+         setResult(rv);
+         return MS::kSuccess;
+      }
+      else if (argData.isFlagSet("displist"))
       {
          MStringArray names;
          
@@ -269,6 +316,22 @@ MObject AbcShape::aAnimated;
 MObject AbcShape::aOutApiType;
 MObject AbcShape::aVRayGeomResult;
 MObject AbcShape::aVRayGeomInfo;
+MObject AbcShape::aVRayAbcVerbose;
+MObject AbcShape::aVRayAbcReferenceFilename;
+MObject AbcShape::aVRayAbcParticleType;
+MObject AbcShape::aVRayAbcParticleAttribs;
+MObject AbcShape::aVRayAbcSpriteSizeX;
+MObject AbcShape::aVRayAbcSpriteSizeY;
+MObject AbcShape::aVRayAbcSpriteTwist;
+//MObject AbcShape::aVRayAbcSpriteOrientation;
+MObject AbcShape::aVRayAbcRadius;
+MObject AbcShape::aVRayAbcPointSize;
+//MObject AbcShape::aVRayAbcPointRadii;
+//MObject AbcShape::aVRayAbcPointWorldSize;
+MObject AbcShape::aVRayAbcMultiCount;
+MObject AbcShape::aVRayAbcMultiRadius;
+MObject AbcShape::aVRayAbcLineWidth;
+MObject AbcShape::aVRayAbcTailLength;
 #endif
 
 void* AbcShape::creator()
@@ -491,6 +554,104 @@ MStatus AbcShape::initialize()
    stat = addAttribute(aVRayGeomResult);
    MCHECKERROR(stat, "Could not add 'vrayGeomResult' attribute");
    
+   aVRayAbcVerbose = nAttr.create("vrayAbcVerbose", "vaverb", MFnNumericData::kBoolean, 0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcVerbose' attribute");
+   nAttr.setKeyable(false);
+   stat = addAttribute(aVRayAbcVerbose);
+   MCHECKERROR(stat, "Could not add 'vrayAbcVerbose' attribute");
+   
+   MFnStringData refFileDef;
+   MObject refFileDefObj = refFileDef.create("");
+   aVRayAbcReferenceFilename = tAttr.create("vrayAbcReferenceFilename", "vareff", MFnData::kString, refFileDefObj, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcReferenceFilename' attribute");
+   tAttr.setKeyable(false);
+   tAttr.setUsedAsFilename(true);
+   stat = addAttribute(aVRayAbcReferenceFilename);
+   MCHECKERROR(stat, "Could not add 'vrayAbcReferenceFilename' attribute");
+   
+   aVRayAbcParticleType = eAttr.create("vrayAbcParticleType", "vapart", 6, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcParticleType' attribute");
+   eAttr.addField("multipoints", 3);
+   eAttr.addField("multistreaks", 4);
+   eAttr.addField("points", 6);
+   eAttr.addField("spheres", 7);
+   eAttr.addField("sprites", 8);
+   eAttr.addField("streaks", 9);
+   eAttr.setKeyable(false);
+   stat = addAttribute(aVRayAbcParticleType);
+   MCHECKERROR(stat, "Could not add 'vrayAbcParticleType' attribute");
+   
+   MFnStringData partAttrDef;
+   MObject partAttrDefObj = partAttrDef.create("");
+   aVRayAbcParticleAttribs = tAttr.create("vrayAbcParticleAttribs", "vapara", MFnData::kString, partAttrDefObj, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcParticleAttribs' attribute");
+   tAttr.setKeyable(false);
+   stat = addAttribute(aVRayAbcParticleAttribs);
+   MCHECKERROR(stat, "Could not add 'vrayAbcParticleAttribs' attribute");
+   
+   aVRayAbcRadius = nAttr.create("vrayAbcRadius", "varad", MFnNumericData::kFloat, 1.0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcRadius' attribute");
+   stat = addAttribute(aVRayAbcRadius);
+   MCHECKERROR(stat, "Could not add 'vrayAbcRadius' attribute");
+   
+   aVRayAbcPointSize = nAttr.create("vrayAbcPointSize", "vaptsz", MFnNumericData::kFloat, 1.0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcPointSize' attribute");
+   stat = addAttribute(aVRayAbcPointSize);
+   MCHECKERROR(stat, "Could not add 'vrayAbcPointSize' attribute");
+   
+   // aVRayAbcPointRadii = nAttr.create("vrayAbcPointRadii", "vaptra", MFnNumericData::kBoolean, 0, &stat);
+   // MCHECKERROR(stat, "Could not create 'vrayAbcPointRadii' attribute");
+   // stat = addAttribute(aVRayAbcPointRadii);
+   // MCHECKERROR(stat, "Could not add 'vrayAbcPointRadii' attribute");
+   
+   // aVRayAbcPointWorldSize = nAttr.create("vrayAbcPointWorldSize", "vaptws", MFnNumericData::kBoolean, 0, &stat);
+   // MCHECKERROR(stat, "Could not create 'vrayAbcPointWorldSize' attribute");
+   // stat = addAttribute(aVRayAbcPointWorldSize);
+   // MCHECKERROR(stat, "Could not add 'vrayAbcPointWorldSize' attribute");
+   
+   aVRayAbcSpriteSizeX = nAttr.create("vrayAbcSpriteSizeX", "vaspsx", MFnNumericData::kFloat, 1.0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcSpriteSizeX' attribute");
+   stat = addAttribute(aVRayAbcSpriteSizeX);
+   MCHECKERROR(stat, "Could not add 'vrayAbcSpriteSizeX' attribute");
+   
+   aVRayAbcSpriteSizeY = nAttr.create("vrayAbcSpriteSizeY", "vaspsy", MFnNumericData::kFloat, 1.0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcSpriteSizeY' attribute");
+   stat = addAttribute(aVRayAbcSpriteSizeY);
+   MCHECKERROR(stat, "Could not add 'vrayAbcSpriteSizeY' attribute");
+   
+   aVRayAbcSpriteTwist = nAttr.create("vrayAbcSpriteTwist", "vasptw", MFnNumericData::kFloat, 0.0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcSpriteTwist' attribute");
+   stat = addAttribute(aVRayAbcSpriteTwist);
+   MCHECKERROR(stat, "Could not add 'vrayAbcSpriteTwist' attribute");
+   
+   // aVRayAbcSpriteOrientation = eAttr.create("vrayAbcSpriteOrientation", "vaspor", 0, &stat);
+   // MCHECKERROR(stat, "Could not create 'vrayAbcSpriteOrientation' attribute");
+   // eAttr.addField("Towards camera center", 0);
+   // eAttr.addField("Parallel to camera's image plane", 1);
+   // eAttr.setKeyable(false)
+   // stat = addAttribute(aVRayAbcSpriteOrientation);
+   // MCHECKERROR(stat, "Could not add 'vrayAbcSpriteOrientation' attribute");
+   
+   aVRayAbcMultiCount = nAttr.create("vrayAbcMultiCount", "vamuco", MFnNumericData::kInt, 1, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcMultiCount' attribute");
+   stat = addAttribute(aVRayAbcMultiCount);
+   MCHECKERROR(stat, "Could not add 'vrayAbcMultiCount' attribute");
+   
+   aVRayAbcMultiRadius = nAttr.create("vrayAbcMultiRadius", "vamura", MFnNumericData::kFloat, 0.0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcMultiRadius' attribute");
+   stat = addAttribute(aVRayAbcMultiRadius);
+   MCHECKERROR(stat, "Could not add 'vrayAbcMultiRadius' attribute");
+   
+   aVRayAbcLineWidth = nAttr.create("vrayAbcLineWidth", "valnwi", MFnNumericData::kFloat, 1.0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcLineWidth' attribute");
+   stat = addAttribute(aVRayAbcLineWidth);
+   MCHECKERROR(stat, "Could not add 'vrayAbcLineWidth' attribute");
+   
+   aVRayAbcTailLength = nAttr.create("vrayAbcTailLength", "vatlle", MFnNumericData::kFloat, 1.0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcTailLength' attribute");
+   stat = addAttribute(aVRayAbcTailLength);
+   MCHECKERROR(stat, "Could not add 'vrayAbcTailLength' attribute");
+   
    attributeAffects(aVRayGeomInfo, aVRayGeomResult);
    attributeAffects(aFilePath, aVRayGeomResult);
    attributeAffects(aObjectExpression, aVRayGeomResult);
@@ -500,6 +661,19 @@ MStatus AbcShape::initialize()
    attributeAffects(aOffset, aVRayGeomResult);
    attributeAffects(aPreserveStartFrame, aVRayGeomResult);
    attributeAffects(aCycleType, aVRayGeomResult);
+   
+   attributeAffects(aVRayAbcVerbose, aVRayGeomResult);
+   attributeAffects(aVRayAbcReferenceFilename, aVRayGeomResult);
+   attributeAffects(aVRayAbcParticleType, aVRayGeomResult);
+   attributeAffects(aVRayAbcParticleAttribs, aVRayGeomResult);
+   attributeAffects(aVRayAbcPointSize, aVRayGeomResult);
+   attributeAffects(aVRayAbcSpriteSizeX, aVRayGeomResult);
+   attributeAffects(aVRayAbcSpriteSizeY, aVRayGeomResult);
+   attributeAffects(aVRayAbcSpriteTwist, aVRayGeomResult);
+   attributeAffects(aVRayAbcMultiCount, aVRayGeomResult);
+   attributeAffects(aVRayAbcMultiRadius, aVRayGeomResult);
+   attributeAffects(aVRayAbcLineWidth, aVRayGeomResult);
+   attributeAffects(aVRayAbcTailLength, aVRayGeomResult);
 #endif
 
    attributeAffects(aFilePath, aNumShapes);
@@ -564,44 +738,76 @@ AbcShape::AbcShape()
    , mDrawLocators(false)
    , mUpdateLevel(AbcShape::UL_none)
 #ifdef ABCSHAPE_VRAY_SUPPORT
-   , mVRFileName("file", "")
-   , mVRObjectPath("object_path", "")
-   , mVRAnimSpeed("anim_speed", 1.0)
-   , mVRAnimType("anim_type", 1)
-   , mVRAnimOffset("anim_offset", 0.0)
-   , mVRAnimOverride("anim_override", 0)
-   , mVRAnimStart("anim_start", 0)
-   , mVRAnimLength("anim_length", 0)
-   , mVRPrimaryVisibility("primary_visibility", 1)
-   , mVRUseAlembicOffset("use_alembic_offset", 0)
-   , mVRUseFaceSets("use_face_sets", 0)
-   , mVRUseFullNames("use_full_names", 0)
-   , mVRComputeBBox("compute_bbox", 0)
-   , mVRSmoothUV("smooth_uv", true)
-   , mVRMesh("mesh", 0)
+   , mVRFilename("filename", "")
+   , mVRReferenceFilename("referenceFilename", "")
+   , mVRObjectPath("objectPath", "/")
+   , mVRIgnoreTransforms("ignoreTransforms", false)
+   , mVRIgnoreInstances("ignoreInstances", false)
+   , mVRIgnoreVisibility("ignoreVisibility", false)
+   , mVRIgnoreTransformBlur("ignoreTransformBlur", false)
+   , mVRIgnoreDeformBlur("ignoreDeformBlur", false)
+   , mVRPreserveStartFrame("preserveStartFrame", false)
+   , mVRSpeed("speed", 1.0f)
+   , mVROffset("offset", 0.0f)
+   , mVRStartFrame("startFrame", 0.0f)
+   , mVREndFrame("endFrame", 0.0f)
+   , mVRFps("fps", 24.0f)
+   , mVRCycle("cycle", 0)
+   , mVRVerbose("verbose", false)
+   // Subdivision attributes
+   , mVRSubdivEnable("subdiv_enable", false)
+   , mVRSubdivUVs("subdiv_uvs", true)
    , mVRPreserveMapBorders("preserve_map_borders", -1)
    , mVRStaticSubdiv("static_subdiv", false)
    , mVRClassicCatmark("classic_catmark", false)
+   // Subdivision Quality settings
    , mVRUseGlobals("use_globals", true)
    , mVRViewDep("view_dep", true)
    , mVREdgeLength("edge_length", 4.0f)
-   , mVRMaxSubdivs("max_subdivs", 256)
-   , mVRUseBounds("use_bounds", false)
-   , mVRMinBound("min_bound", VR::Color(0, 0, 0))
-   , mVRMaxBound("max_bound", VR::Color(1, 1, 1))
-   , mVRCacheNormals("cache_normals", false)
-   , mVRStaticDisp("static_displacement", false)
-   , mVRPrecision("precision", 8)
-   , mVRDisp2D("displace_2d", false)
-   , mVRTightBounds("tight_bounds", false)
-   , mVRResolution("resolution", 256)
-   , mVRFilterTexture("filter_texture", false)
-   , mVRFilterBlur("filter_blur", 0.001f)
-   , mVRVectorDisp("vector_displacement", 0)
+   , mVRMaxSubdivs("max_subdivs", 4)
+   // OpenSubdiv attributes
+   , mVROSDSubdivEnable("osd_subdiv_enable", false)
+   , mVROSDSubdivLevel("osd_subdiv_level", 0)
+   , mVROSDSubdivType("osd_subdiv_type", 0)
+   , mVROSDSubdivUVs("osd_subdiv_uvs", true)
+   , mVROSDPreserveMapBorders("osd_preserve_map_borders", 1)
+   , mVROSDPreserveGeometryBorders("osd_preserve_geometry_borders", false)
+   // Displacement attributes
+   , mVRDisplacementType("displacement_type", 0)
+   , mVRDisplacementAmount("displacement_amount", 1.0f)
+   , mVRDisplacementShift("displacement_shift", 0.0f)
    , mVRKeepContinuity("keep_continuity", false)
    , mVRWaterLevel("water_level", -1e+30f)
-   , mVRDispAmount("displacement_amount", 1.0f)
-   , mVRDispShift("displacement_shift", 0.0f)
+   , mVRVectorDisplacement("vector_displacement", 0)
+   , mVRMapChannel("map_channel", 0)
+   , mVRUseBounds("use_bounds", false)
+   , mVRMinBound("min_bound", VR::Color(0.0f, 0.0f, 0.0f))
+   , mVRMaxBound("max_bound", VR::Color(1.0f, 1.0f, 1.0f))
+   , mVRImageWidth("image_width", 0)
+   , mVRCacheNormals("cache_normals", false)
+   , mVRObjectSpaceDisplacement("object_space_displacement", false)
+   , mVRStaticDisplacement("static_displacement", false)
+   , mVRDisplace2d("displace_2d", false)
+   , mVRResolution("resolution", 256)
+   , mVRPrecision("precision", 8)
+   , mVRTightBounds("tight_bounds", false)
+   , mVRFilterTexture("filter_texture", false)
+   , mVRFilterBlur("filter_blur", 0.001)
+   // Particle attributes
+   , mVRParticleType("particle_type", 6)
+   , mVRParticleAttribs("particle_attribs", "")
+   , mVRSpriteSizeX("sprite_size_x", 1.0f)
+   , mVRSpriteSizeY("sprite_size_y", 1.0f)
+   , mVRSpriteTwist("sprite_twist", 0.0f)
+   , mVRSpriteOrientation("sprite_orientation", 0)
+   , mVRRadius("radius", 1.0f)
+   , mVRPointSize("point_size", 1.0f)
+   , mVRPointRadii("point_radii", 0)
+   , mVRPointWorldSize("point_world_size", 0)
+   , mVRMultiCount("multi_count", 1)
+   , mVRMultiRadius("multi_radius", 0.0f)
+   , mVRLineWidth("line_width", 1.0f)
+   , mVRTailLength("tail_length", 1.0f)
 #endif
 {
 }
@@ -624,7 +830,98 @@ AbcShape::~AbcShape()
 
 void AbcShape::postConstructor()
 {
+   static MString _preMel(NAME_PREFIX "AbcShapeVRayDisp -init");
+   static MString _postPython("import " NAME_PREFIX "abcshape4vray; " NAME_PREFIX "abcshape4vray.CreateDispTextures()");
+   
    setRenderable(true);
+   
+   
+   MSelectionList sl;
+   MObject drg, vs, isg;
+   
+   sl.add("defaultRenderGlobals");
+   sl.add("vraySettings");
+   sl.add("initialShadingGroup");
+   
+   if (sl.getDependNode(0, drg) == MS::kSuccess)
+   {
+      MFnDependencyNode nodeFn(drg);
+      
+      MPlug preMel = nodeFn.findPlug("preMel");
+      
+      if (!preMel.isNull())
+      {
+         MString s = preMel.asString();
+         
+         if (s.indexW(_preMel) == -1)
+         {
+            if (s.length() > 0)
+            {
+               if (s.asChar()[s.length()-1] != ';')
+               {
+                  s += "; " + _preMel;
+               }
+               else
+               {
+                  s += " " + _preMel + ";";
+               }
+            }
+            else
+            {
+               s = _preMel;
+            }
+            
+            preMel.setString(s);
+         }
+      }
+   }
+   
+   if (sl.getDependNode(1, vs) == MS::kSuccess)
+   {
+      MFnDependencyNode nodeFn(vs);
+      
+      MPlug postPython = nodeFn.findPlug("postTranslatePython");
+      
+      if (!postPython.isNull())
+      {
+         MString s = postPython.asString();
+         
+         if (s.indexW(_postPython) == -1)
+         {
+            if (s.length() > 0)
+            {
+               s += "\n" + _postPython;
+            }
+            else
+            {
+               s = _postPython;
+            }
+            
+            postPython.setString(s);
+         }
+      }
+   }
+   
+   if (sl.getDependNode(2, isg) == MS::kSuccess)
+   {
+      MFnDependencyNode nodeFn(isg);
+      
+      MPlug dst = nodeFn.findPlug("dagSetMembers");
+      
+      nodeFn.setObject(thisMObject());
+      
+      MPlug src = nodeFn.findPlug("instObjGroups");
+      
+      MDGModifier dgMod;
+      MIntArray indices;
+      
+      dst.getExistingArrayAttributeIndices(indices);
+      
+      unsigned int dstIdx = (indices.length() > 0 ? indices[indices.length()-1] + 1 : 0);
+      
+      dgMod.connect(src.elementByLogicalIndex(0), dst.elementByLogicalIndex(dstIdx));
+      dgMod.doIt();
+   }
 }
 
 bool AbcShape::ignoreCulling() const
@@ -711,25 +1008,10 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
          
          if (plugman)
          {
-            PluginDesc *plugdesc = plugman->getPluginDesc("GeomMeshFile");
+            PluginDesc *plugdesc = plugman->getPluginDesc("AlembicLoader");
             
             if (plugdesc)
             {
-               /*
-               GeomStaticMesh
-                 No Subdiv && No Disp
-
-               GeomStaticMesh + GeomStaticSmoothedMesh
-                 Subdiv && No Disp 2D
-
-               GeomStaticMesh + GeomDisplacedMesh
-                 No Subdiv && Any Disp
-                 Subdiv && Disp 2D
-                 
-
-               Note: No displacement shader assigned qualifies as "No Disp" (TODO)
-               */
-     
                bool existing = false;
                
                MObject self = thisMObject();
@@ -742,498 +1024,513 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                std::cout << "Export to V-Ray: \"" << thisNode.name().asChar() << "\" - \"" << thisPath.fullPathName().asChar() << "\"" << std::endl;
                #endif
                
-               // Check for assigned displacement shader
-               
-               MPlug pDispSource;
-               MyMFnSetSet dispSets;
-               MyMFnSetSet::iterator dispSetIt, assignedDisp;
-               
-               MItDependencyNodes nodeIt(MFn::kSet);
-               
-               while (!nodeIt.isDone())
-               {
-                  MObject obj = nodeIt.thisNode();
-                  
-                  MyMFnSet set(obj);
-                  
-                  if (set.typeName() == "VRayDisplacement")
-                  {
-                     #ifdef _DEBUG
-                     std::cout << "Found VRayDisplacement: \"" << set.name().asChar() << "\"" << std::endl;
-                     #endif
-                     
-                     dispSets.insert(set);
-                  }
-                  
-                  nodeIt.next();
-               }
-               
-               assignedDisp = dispSets.end();
-               
-               while (thisPath.length() > 0)
-               {
-                  #ifdef _DEBUG
-                  std::cout << "Check displacement for \"" << thisPath.fullPathName().asChar() << "\"" << std::endl;
-                  #endif
-                  
-                  for (dispSetIt = dispSets.begin(); dispSetIt != dispSets.end(); ++dispSetIt)
-                  {
-                     if (dispSetIt->isMember(thisPath))
-                     {
-                        #ifdef _DEBUG
-                        std::cout << "Found displacement: " << dispSetIt->name().asChar() << std::endl;
-                        #endif
-                        
-                        // check for a connection on 
-                        MPlug pDisp = dispSetIt->findPlug("displacement");
-                        
-                        if (!pDisp.isNull())
-                        {
-                           MPlugArray srcs;
-                           
-                           pDisp.connectedTo(srcs, true, false);
-                           
-                           if (srcs.length() > 0)
-                           {
-                              pDispSource = srcs[0];
-                              assignedDisp = dispSetIt;
-                           }
-                        }
-                        
-                        break;
-                     }
-                  }
-                  
-                  if (assignedDisp != dispSets.end())
-                  {
-                     break;
-                  }
-                  
-                  thisPath.pop();
-               }
-               
-               // Check subdivision/displacement settings
-               MPlug pSubdivEnable = thisNode.findPlug("vraySubdivEnable");
-               MPlug pNoDisp = thisNode.findPlug("vrayDisplacementNone");
-               MPlug pDispType = thisNode.findPlug("vrayDisplacementType");
-               
-               bool subdiv = (!pSubdivEnable.isNull() && pSubdivEnable.asBool());
-               bool disp = ((assignedDisp != dispSets.end()) && (pNoDisp.isNull() || !pNoDisp.asBool()));
-               // should set disp to false if shape has no displacement shader assigned
-               bool disp2d = (disp && !pDispType.isNull() && pDispType.asInt() == 0);
-               
-               #ifdef _DEBUG
-               std::cout << "Export \"" << thisNode.name().asChar() << "\" to vray" << std::endl;
-               #endif
-               
-               VR::VRayPlugin *abc = geomInfo->newPlugin("GeomMeshFile", existing);
-               VR::VRayPlugin *mod = 0;
-               
-               #ifdef _DEBUG
-               std::cout << "  " << std::hex << (void*)abc << std::dec << (existing ? " (existing)" : "") << std::endl;
-               if (abc)
-               {
-                  const tchar *name = abc->getPluginName();
-                  std::cout << "  name = \"" << (name ? name : "") << "\"" << std::endl;
-               }
-               #endif
+               VR::VRayPlugin *abc = geomInfo->newPlugin("AlembicLoader", existing);
                
                if (abc && !existing)
                {
-                  // Note: take care that object expression points to a real node as V-Ray GeomMeshFile doesn't support regular expressions
-                  
-                  mVRFileName.setString(mFilePath.asChar(), 0, 0.0);
+                  mVRFilename.setString(mFilePath.asChar(), 0, 0.0);
                   mVRObjectPath.setString(mObjectExpression.asChar(), 0, 0.0);
-                  mVRAnimSpeed.setFloat(float(mSpeed), 0, 0.0);
-                  mVRAnimStart.setInt(int(floor(mStartFrame)), 0, 0.0);
-                  mVRAnimLength.setInt(int(floor(mEndFrame - mStartFrame)), 0, 0.0);
-                  mVRAnimOverride.setBool(1, 0, 0.0);
-                  mVRUseFaceSets.setBool(0, 0, 0.0);
-                  mVRUseFullNames.setBool(0, 0, 0.0);
-                  mVRPrimaryVisibility.setBool(1, 0, 0.0); // need to check this one
-                  mVRUseAlembicOffset.setBool(0, 0, 0.0);
-                  mVRComputeBBox.setBool(0, 0, 0.0);
+                  mVRSpeed.setFloat(float(mSpeed), 0, 0.0);
+                  mVROffset.setFloat(float(mOffset), 0, 0.0);
+                  mVRStartFrame.setFloat(float(mStartFrame), 0, 0.0);
+                  mVREndFrame.setFloat(float(mEndFrame), 0, 0.0);
+                  mVRIgnoreTransforms.setBool(mIgnoreTransforms, 0, 0.0);
+                  mVRIgnoreInstances.setBool(mIgnoreInstances, 0, 0.0);
+                  mVRIgnoreVisibility.setBool(mIgnoreVisibility, 0, 0.0);
+                  mVRPreserveStartFrame.setBool(mPreserveStartFrame, 0, 0.0);
+                  mVRCycle.setInt(int(mCycleType), 0, 0.0);
+                  mVRFps.setFloat(float(getFPS()), 0, 0.0);
                   
-                  // If 'time' is not connected, set anim_type to 'still' and set anim_offset accordingly
-                  switch (mCycleType)
+                  MPlug pMotionBlur = thisNode.findPlug("motionBlur");
+                  if (!pMotionBlur.isNull())
                   {
-                  case CT_bounce:
-                     mVRAnimType.setInt(2, 0, 0.0); // 'ping-pong'
-                     break;
-                  case CT_loop:
-                     mVRAnimType.setInt(0, 0, 0.0); // 'loop'
-                     break;
-                  case CT_reverse:
-                     MGlobal::displayWarning(MString("[") + PREFIX_NAME("AbcShape] 'reverse' cycle type not supported by V-Ray GeomMeshFile. Default to 'hold'"));
-                  case CT_hold: // 'once'
-                  default:
-                     mVRAnimType.setInt(1, 0, 0.0);
-                  }
-                  
-                  if (mPreserveStartFrame && fabs(mSpeed) > 0.0001)
-                  {
-                     mVRAnimOffset.setFloat(-mSpeed * mStartFrame, 0, 0.0);
+                     bool singleShape = (mNumShapes == 1 && mIgnoreTransforms);
+                     bool motionBlur = pMotionBlur.asBool();
+                     
+                     mVRIgnoreTransformBlur.setBool((singleShape || !motionBlur), 0, 0.0);
+                     mVRIgnoreDeformBlur.setBool(!motionBlur, 0, 0.0);
                   }
                   else
                   {
-                     mVRAnimOffset.setFloat(-mStartFrame, 0, 0.0);
+                     mVRIgnoreTransformBlur.setBool(false, 0, 0.0);
+                     mVRIgnoreDeformBlur.setBool(false, 0, 0.0);
                   }
                   
-                  abc->setParameter(&mVRFileName);
-                  abc->setParameter(&mVRObjectPath);
-                  abc->setParameter(&mVRAnimType);
-                  abc->setParameter(&mVRAnimOffset);
-                  abc->setParameter(&mVRAnimSpeed);
-                  abc->setParameter(&mVRAnimOverride);
-                  abc->setParameter(&mVRAnimStart);
-                  abc->setParameter(&mVRAnimLength);
-                  abc->setParameter(&mVRUseAlembicOffset);
-                  abc->setParameter(&mVRPrimaryVisibility);
-                  abc->setParameter(&mVRUseFullNames);
-                  abc->setParameter(&mVRUseFaceSets);
-                  abc->setParameter(&mVRComputeBBox);
+                  // MPlug pRefFile = thisNode.findPlug("referenceFilename");
+                  // if (!pRefFile.isNull())
+                  // {
+                  //    mVRReferenceFilename.setString(pRefFile.asString().asChar(), 0, 0.0);
+                  // }
+                  // else
+                  // {
+                  //    mVRReferenceFilename.setString("", 0, 0.0);
+                  // }
+                  MDataHandle hReferenceFilename = block.inputValue(aVRayAbcReferenceFilename);
+                  mVRReferenceFilename.setString(hReferenceFilename.asString().asChar(), 0, 0.0);
                   
-                  if (subdiv)
-                  {
-                     MPlug pSubdivUVs = thisNode.findPlug("vraySubdivUVs");
-                     if (!pSubdivUVs.isNull())
-                     {
-                        mVRSmoothUV.setBool(pSubdivUVs.asBool(), 0, 0.0);
-                        abc->setParameter(&mVRSmoothUV);
-                     }
-                  }
+                  // MPlug pVerbose = thisNode.findPlug("verbose");
+                  // if (!pVerbose.isNull())
+                  // {
+                  //    mVRVerbose.setBool(pVerbose.asBool(), 0, 0.0);
+                  // }
+                  // else
+                  // {
+                  //    mVRVerbose.setBool(false, 0, 0.0);
+                  // }
+                  MDataHandle hVerbose = block.inputValue(aVRayAbcVerbose);
+                  mVRVerbose.setBool(hVerbose.asBool(), 0, 0.0);
                   
-                  if (disp2d || (disp && !subdiv))
+                  // Subdivision / Displacement
+                  
+                  MObject subdivAttrObject = MObject::kNullObj;
+                  MObject dispAttrObject = MObject::kNullObj;
+                  MObject osdAttrObject = MObject::kNullObj;
+                  MObject subdqAttrObject = MObject::kNullObj;
+                  
+                  bool displaced = true;
+                  bool subdivided = false;
+                  bool subdquality = false;
+                  bool osd = false;
+                  
+                  MPlug pDispNone = thisNode.findPlug("vrayDisplacementNone");
+                  if (!pDispNone.isNull())
                   {
-                     #ifdef _DEBUG
-                     std::cout << "  Create additional GeomDisplacedMesh" << std::endl;
-                     #endif
-                     
-                     plugdesc = plugman->getPluginDesc("GeomDisplacedMesh");
-                     
-                     if (plugdesc)
+                     if (pDispNone.asBool())
                      {
-                        existing = false;
-                        
-                        std::string newName = abc->getPluginName();
-                        newName += "@displaced";
-                        
-                        geomInfo->clearLastPlugin(newName.c_str(), true);
-                        
-                        mod = geomInfo->newPlugin("GeomDisplacedMesh", existing);
-                        
-                        #ifdef _DEBUG
-                        std::cout << "    " << std::hex << (void*)mod << std::dec << (existing ? " (existing)" : "") << std::endl;
-                        if (mod)
-                        {
-                           const tchar *name = mod->getPluginName();
-                           std::cout << "    name = \"" << (name ? name : "") << "\"" << std::endl;
-                        }
-                        #endif
-                        
-                        if (mod && !existing)
-                        {
-                           // Process parameters specific to GeomDisplacedMesh here
-                           
-                           MPlug pStaticDisp = thisNode.findPlug("vrayDisplacementStatic");
-                           if (!pStaticDisp.isNull())
-                           {
-                              mVRStaticDisp.setBool(pStaticDisp.asBool(), 0, 0.0);
-                              mod->setParameter(&mVRStaticDisp);
-                           }
-                           
-                           MPlug pPrecision = thisNode.findPlug("vray2dDisplacementPrecision");
-                           if (!pPrecision.isNull())
-                           {
-                              mVRPrecision.setBool(pPrecision.asInt(), 0, 0.0);
-                              mod->setParameter(&mVRPrecision);
-                           }
-                           
-                           if (disp2d)
-                           {
-                              mVRDisp2D.setBool(true, 0, 0.0);
-                              mod->setParameter(&mVRDisp2D);
-                              
-                              MPlug pTightBounds = thisNode.findPlug("vray2dDisplacementTightBounds");
-                              if (!pTightBounds.isNull())
-                              {
-                                 mVRTightBounds.setBool(pTightBounds.asBool(), 0, 0.0);
-                                 mod->setParameter(&mVRTightBounds);
-                              }
-                              
-                              MPlug pResolution = thisNode.findPlug("vray2dDisplacementResolution");
-                              if (!pResolution.isNull())
-                              {
-                                 mVRResolution.setBool(pResolution.asInt(), 0, 0.0);
-                                 mod->setParameter(&mVRResolution);
-                              }
-                              
-                              MPlug pFilterTexture = thisNode.findPlug("vray2dDisplacementFilterTexture");
-                              if (!pFilterTexture.isNull())
-                              {
-                                 mVRFilterTexture.setBool(pFilterTexture.asBool(), 0, 0.0);
-                                 mod->setParameter(&mVRFilterTexture);
-                              }
-                              
-                              MPlug pFilterBlur = thisNode.findPlug("vray2dDisplacementFilterBlur");
-                              if (!pFilterBlur.isNull())
-                              {
-                                 mVRFilterBlur.setFloat(pFilterBlur.asFloat(), 0, 0.0);
-                                 mod->setParameter(&mVRFilterBlur);
-                              }
-                           }
-                        }
-                        else
-                        {
-                           #ifdef _DEBUG
-                           if (existing)
-                           {
-                              std::cout << "    Already exists" << std::endl;
-                           }
-                           else
-                           {
-                              std::cout << "    Failed to create" << std::endl;
-                           }
-                           #endif
-                           mod = 0;
-                        }
+                        displaced = false;
                      }
                      else
                      {
-                        #ifdef _DEBUG
-                        std::cout << "    No \"GeomDisplacedMesh\" V-Ray plugin" << std::endl;
-                        #endif
-                     }
-                  }
-                  else if (subdiv)
-                  {
-                     #ifdef _DEBUG
-                     std::cout << "  Create additional GeomStaticSmoothedMesh" << std::endl;
-                     #endif
-                     
-                     plugdesc = plugman->getPluginDesc("GeomStaticSmoothedMesh");
-                     
-                     if (plugdesc)
-                     {
-                        existing = false;
-                        
-                        std::string newName = abc->getPluginName();
-                        newName += "@subdivGeometry";
-                        
-                        geomInfo->clearLastPlugin(newName.c_str(), true);
-                        
-                        mod = geomInfo->newPlugin("GeomStaticSmoothedMesh", existing);
-                        
-                        #ifdef _DEBUG
-                        std::cout << "    " << std::hex << (void*)mod << std::dec << (existing ? " (existing)" : "") << std::endl;
-                        if (mod)
-                        {
-                           const tchar *name = mod->getPluginName();
-                           std::cout << "    name = \"" << (name ? name : "") << "\"" << std::endl;
-                        }
-                        #endif
-                        
-                        if (mod && !existing)
-                        {
-                           // Process parameters specific to GeomStaticSmoothMesh
-                           MPlug pPreserveMapBorder = thisNode.findPlug("vrayPreserveMapBorders");
-                           if (!pPreserveMapBorder.isNull())
-                           {
-                              mVRPreserveMapBorders.setInt(pPreserveMapBorder.asInt(), 0, 0.0);
-                              mod->setParameter(&mVRPreserveMapBorders);
-                           }
-                           
-                           MPlug pStaticSubdiv = thisNode.findPlug("vrayStaticSubdiv");
-                           if (!pStaticSubdiv.isNull())
-                           {
-                              mVRStaticSubdiv.setBool(pStaticSubdiv.asBool(), 0, 0.0);
-                              mod->setParameter(&mVRStaticSubdiv);
-                           }
-                           
-                           MPlug pClassicCatmark = thisNode.findPlug("vrayClassicalCatmark");
-                           if (!pClassicCatmark.isNull())
-                           {
-                              mVRClassicCatmark.setBool(pClassicCatmark.asBool(), 0, 0.0);
-                              mod->setParameter(&mVRClassicCatmark);
-                           }
-                        }
-                        else
-                        {
-                           #ifdef _DEBUG
-                           if (existing)
-                           {
-                              std::cout << "    Already exists" << std::endl;
-                           }
-                           else
-                           {
-                              std::cout << "    Failed to create" << std::endl;
-                           }
-                           #endif
-                           mod = 0;
-                        }
-                     }
-                     else
-                     {
-                        #ifdef _DEBUG
-                        std::cout << "    No 'GeomStaticSmoothedMesh' V-Ray plugin" << std::endl;
-                        #endif
+                        dispAttrObject = thisMObject();
                      }
                   }
                   
-                  if (mod)
+                  MPlug pSubdivEnable = thisNode.findPlug("vraySubdivEnable");
+                  if (!pSubdivEnable.isNull() && pSubdivEnable.asBool())
                   {
-                     if (subdiv)
+                     subdivAttrObject = thisMObject();
+                     subdivided = true;
+                  }
+                  
+                  MPlug pOSDEnable = thisNode.findPlug("vrayOsdSubdivEnable");
+                  if (!pOSDEnable.isNull() && pOSDEnable.asBool())
+                  {
+                     osdAttrObject = thisMObject();
+                     osd = true;
+                  }
+                  
+                  MPlug pOverrideGlobals = thisNode.findPlug("vrayOverrideGlobalSubQual");
+                  if (!pOverrideGlobals.isNull() && pOverrideGlobals.asBool())
+                  {
+                     subdquality = true;
+                     subdqAttrObject = thisMObject();
+                  }
+                  
+                  std::string dispSetName, dispShaderName;                  
+                  bool hasDispAssigned = AbcShapeVRayDisp::getAssignedDisplacement(thisPath, dispSetName, dispShaderName);
+                  
+                  if (hasDispAssigned)
+                  {
+                     MSelectionList sl;
+                     
+                     if (sl.add(dispSetName.c_str()) == MS::kSuccess)
                      {
-                        MPlug pSubdivOverride = thisNode.findPlug("vrayOverrideGlobalSubQual");
-                        if (!pSubdivOverride.isNull())
+                        MObject dispSetObj;
+                        
+                        sl.getDependNode(0, dispSetObj);
+                        
+                        MFnDependencyNode dispSetFn(dispSetObj);
+                        
+                        if (displaced && dispShaderName.length() > 0)
                         {
-                           mVRUseGlobals.setBool(!pSubdivOverride.asBool(), 0, 0.0);
-                           mod->setParameter(&mVRUseGlobals);
-                           
-                           if (pSubdivOverride.asBool())
+                           MPlug pDispNone = dispSetFn.findPlug("vrayDisplacementNone");
+                           if (!pDispNone.isNull())
                            {
-                              MPlug pViewDep = thisNode.findPlug("vrayViewDep");
-                              if (!pViewDep.isNull())
+                              if (pDispNone.asBool())
                               {
-                                 mVRViewDep.setBool(pViewDep.asBool(), 0, 0.0);
-                                 mod->setParameter(&mVRViewDep);
+                                 displaced = false;
                               }
-                              
-                              MPlug pEdgeLength = thisNode.findPlug("vrayEdgeLength");
-                              if (!pEdgeLength.isNull())
+                              else
                               {
-                                 mVREdgeLength.setFloat(pEdgeLength.asFloat(), 0, 0.0);
-                                 mod->setParameter(&mVREdgeLength);
+                                 if (dispAttrObject == MObject::kNullObj)
+                                 {
+                                    dispAttrObject = dispSetObj;
+                                 }
                               }
-                              
-                              MPlug pMaxSubdivs = thisNode.findPlug("vrayMaxSubdivs");
-                              if (!pMaxSubdivs.isNull())
+                           }
+                        }
+                        
+                        MPlug pSubdivEnable = dispSetFn.findPlug("vraySubdivEnable");
+                        if (!pSubdivEnable.isNull())
+                        {
+                           if (pSubdivEnable.asBool())
+                           {
+                              subdivided = true;
+                              if (subdivAttrObject == MObject::kNullObj)
                               {
-                                 mVRMaxSubdivs.setFloat(pMaxSubdivs.asInt(), 0, 0.0);
-                                 mod->setParameter(&mVRMaxSubdivs);
+                                 subdivAttrObject = dispSetObj;
+                              }
+                           }
+                        }
+                        
+                        MPlug pOSDEnable = dispSetFn.findPlug("vrayOsdSubdivEnable");
+                        if (!pOSDEnable.isNull())
+                        {
+                           if (pOSDEnable.asBool())
+                           {
+                              osd = true;
+                              if (osdAttrObject == MObject::kNullObj)
+                              {
+                                 osdAttrObject = dispSetObj;
+                              }
+                           }
+                        }
+                        
+                        MPlug pOverrideGlobals = dispSetFn.findPlug("vrayOverrideGlobalSubQual");
+                        if (!pOverrideGlobals.isNull())
+                        {
+                           if (pOverrideGlobals.asBool())
+                           {
+                              subdquality = true;
+                              if (subdqAttrObject == MObject::kNullObj)
+                              {
+                                 subdqAttrObject = dispSetObj;
                               }
                            }
                         }
                      }
+                  }
+                  else
+                  {
+                     // No displacement shader assigned
+                     displaced = false;
+                  }
+                  
+                  mVRSubdivEnable.setBool(subdivided, 0, 0.0);
+                  abc->setParameter(&mVRSubdivEnable);
+                  
+                  if (subdivided && subdivAttrObject != MObject::kNullObj)
+                  {
+                     // Subdivision
+                     //
+                     // vraySubdivEnable: bool, 1
+                     // vrayPreserveMapBorders: enum, 1, (None:0, Internal:1, All:2)
+                     // vraySubdivUVs: bool, 1
+                     // vrayStaticSubdiv: bool, 0
+                     // vrayClassicalCatmark: bool, 0
                      
-                     if (disp)
+                     MFnDependencyNode nodeFn(subdivAttrObject);
+                     
+                     MPlug pAttr = nodeFn.findPlug("vraySubdivUVs");
+                     mVRSubdivUVs.setInt(pAttr.asInt(), 0, 0.0);
+                     abc->setParameter(&mVRSubdivUVs);
+                     
+                     if (pAttr.asBool())
                      {
-                        bool colorDisp = false;
+                        pAttr = nodeFn.findPlug("vrayPreserveMapBorders");
+                        mVRPreserveMapBorders.setInt(pAttr.asInt(), 0, 0.0);
+                        abc->setParameter(&mVRPreserveMapBorders);
+                     }
+                     
+                     pAttr = nodeFn.findPlug("vrayStaticSubdiv");
+                     mVRStaticSubdiv.setInt(pAttr.asInt(), 0, 0.0);
+                     abc->setParameter(&mVRStaticSubdiv);
+                     
+                     pAttr = nodeFn.findPlug("vrayClassicalCatmark");
+                     mVRClassicCatmark.setInt(pAttr.asInt(), 0, 0.0);
+                     abc->setParameter(&mVRClassicCatmark);
+                  }
+                  
+                  mVRUseGlobals.setBool((subdquality ? false : true), 0, 0.0);
+                  abc->setParameter(&mVRUseGlobals);
+                  
+                  if (subdquality && subdqAttrObject != MObject::kNullObj)
+                  {
+                     // Subdivision quality attributes
+                     //
+                     // vrayOverrideGlobalSubQual: bool, true
+                     // vrayViewDep: bool, true
+                     // vrayEdgeLength: float, 4.0
+                     // vrayMaxSubdivs: int, 4
+                     
+                     MFnDependencyNode nodeFn(subdqAttrObject);
+                                          
+                     MPlug pAttr = nodeFn.findPlug("vrayViewDep");
+                     mVRViewDep.setBool(pAttr.asBool(), 0, 0.0);
+                     abc->setParameter(&mVRViewDep);
+                     
+                     pAttr = nodeFn.findPlug("vrayEdgeLength");
+                     mVREdgeLength.setFloat(pAttr.asFloat(), 0, 0.0);
+                     abc->setParameter(&mVREdgeLength);
+                     
+                     pAttr = nodeFn.findPlug("vrayMaxSubdivs");
+                     mVRMaxSubdivs.setInt(pAttr.asInt(), 0, 0.0);
+                     abc->setParameter(&mVRMaxSubdivs);
+                  }
+                  
+                  mVROSDSubdivEnable.setBool(osd, 0, 0.0);
+                  abc->setParameter(&mVROSDSubdivEnable);
+                  
+                  if (osd && osdAttrObject != MObject::kNullObj)
+                  {
+                     // OpenSubdiv attributes
+                     //
+                     // vrayOsdSubdivEnable: bool, 1
+                     // vrayOsdSubdivDepth: int, 4, 0-8
+                     // vrayOsdSubdivType: enum, 0, (Catmull-Clark:0, Loop:1)
+                     // vrayOsdPreserveMapBorders: enum, 1, (None:0, Internal:1, All:2)
+                     // vrayOsdSubdivUVs: bool, 1
+                     // vrayOsdPreserveGeomBorders: bool, 0
+                     
+                     MFnDependencyNode nodeFn(osdAttrObject);
+                     
+                     MPlug pAttr = nodeFn.findPlug("vrayOsdSubdivDepth");
+                     mVROSDSubdivLevel.setInt(pAttr.asInt(), 0, 0.0);
+                     abc->setParameter(&mVROSDSubdivLevel);
+                     
+                     pAttr = nodeFn.findPlug("vrayOsdSubdivType");
+                     mVROSDSubdivType.setInt(pAttr.asInt(), 0, 0.0);
+                     abc->setParameter(&mVROSDSubdivType);
+                     
+                     pAttr = nodeFn.findPlug("vrayOsdSubdivUVs");
+                     mVROSDSubdivUVs.setBool(pAttr.asBool(), 0, 0.0);
+                     abc->setParameter(&mVROSDSubdivUVs);
+                     
+                     if (pAttr.asBool())
+                     {
+                        pAttr = nodeFn.findPlug("vrayOsdPreserveMapBorders");
+                        mVROSDPreserveMapBorders.setInt(pAttr.asInt(), 0, 0.0);
+                        abc->setParameter(&mVROSDPreserveMapBorders);
+                     }
+                     
+                     pAttr = nodeFn.findPlug("vrayOsdPreserveGeomBorders");
+                     mVROSDPreserveGeometryBorders.setBool(pAttr.asBool(), 0, 0.0);
+                     abc->setParameter(&mVROSDPreserveGeometryBorders);
+                  }
+                  
+                  mVRDisplacementType.setInt((displaced ? 1 : 0), 0, 0.0);
+                  abc->setParameter(&mVRDisplacementType);
+                  
+                  if (displaced)
+                  {
+                     bool colorDisp = false;
+                     
+                     if (dispAttrObject != MObject::kNullObj)
+                     {
+                        // Displacement attributes
+                        // 
+                        // vrayDisplacementNone: bool, 1
+                        // vrayDisplacementStatic: bool, 0
+                        // vrayDisplacementType: enum, 1, (2D Displacement:0, Normal Displacement:1, Vector displacement:2, Vector displacement (absolute):3, Vector displacement (object):4)
+                        // vrayDisplacementAmount: float, 1, 0-10
+                        // vrayDisplacementShift: float, 0, 0-10
+                        // vrayDisplacementKeepContinuity: bool, 0
+                        // vrayEnableWaterLevel: bool, 0
+                        // vrayWaterLevel: float, 0, 0-10
+                        // vrayDisplacementCacheNormals: bool, off
+                        // vray2dDisplacementResolution: int, 256, 64-1024
+                        // vray2dDisplacementPrecision: int, 8, 1-32
+                        // vray2dDisplacementTightBounds: bool, false
+                        // vray2dDisplacementFilterTexture: bool, off
+                        // vray2dDisplacementFilterBlur: float, 0.003, 0-10
+                        // vrayDisplacementUseBounds: enum, 0, (Automatic:0, Explicit:1)
+                        // vrayDisplacementMinValue: float3, 0,0,0 (color)
+                        // vrayDisplacementMaxValue: float3, 1,1,1 (color)
                         
-                        if (pDispType.asInt() >= 2)
+                        MFnDependencyNode nodeFn(dispAttrObject);
+                        
+                        bool displace2d = false;
+                        
+                        MPlug pAttr = nodeFn.findPlug("vrayDisplacementType");
+                        if (pAttr.asInt() >= 2)
                         {
-                           // Vector displacement
-                           
-                           mVRVectorDisp.setInt(pDispType.asInt() - 1, 0, 0.0);
-                           mod->setParameter(&mVRVectorDisp);
-                           
-                           // if (pDispType.asInt() == 4)
-                           // {
-                           //    mVRObjectSpaceDisp.setBool(true, 0, 0.0);
-                           //    mod->setParameter(&mVRObjectSpaceDisp);
-                           // }
-                           
                            colorDisp = true;
-                        }
-                        
-                        MPlug pUseBounds = thisNode.findPlug("vrayDisplacementUseBounds");
-                        if (!pUseBounds.isNull())
-                        {
-                           mVRUseBounds.setBool(pUseBounds.asBool(), 0, 0.0);
-                           mod->setParameter(&mVRUseBounds);
                            
-                           if (pUseBounds.asBool())
-                           {
-                              float x, y, z;
-                              MObject dataObj;
-                              MStatus stat;
-                              
-                              MPlug pMinBound = thisNode.findPlug("vrayDisplacementMinValue");
-                              if (!pMinBound.isNull())
-                              {
-                                 dataObj = pMinBound.asMObject();
-                                 MFnNumericData data(dataObj, &stat);
-                                 
-                                 if (stat == MS::kSuccess && data.getData(x, y, z) == MS::kSuccess)
-                                 {
-                                    mVRMinBound.setColor(VR::Color(x, y, z), 0, 0.0);
-                                    mod->setParameter(&mVRMinBound);
-                                 }
-                              }
-                              
-                              MPlug pMaxBound = thisNode.findPlug("vrayDisplacementMaxValue");
-                              if (!pMaxBound.isNull())
-                              {
-                                 dataObj = pMaxBound.asMObject();
-                                 MFnNumericData data(dataObj, &stat);
-                                 
-                                 if (stat == MS::kSuccess && data.getData(x, y, z) == MS::kSuccess)
-                                 {
-                                    mVRMaxBound.setColor(VR::Color(x, y, z), 0, 0.0);
-                                    mod->setParameter(&mVRMaxBound);
-                                 }
-                              }
-                           }
-                        }
-                        
-                        MPlug pCacheNormals = thisNode.findPlug("vrayDisplacementCacheNormals");
-                        if (!pCacheNormals.isNull())
-                        {
-                           mVRCacheNormals.setBool(pCacheNormals.asBool(), 0, 0.0);
-                           mod->setParameter(&mVRCacheNormals);
-                        }
-                        
-                        MPlug pKeepContinuity = thisNode.findPlug("vrayDisplacementKeepContinuity");
-                        if (!pKeepContinuity.isNull())
-                        {
-                           mVRKeepContinuity.setBool(pKeepContinuity.asBool(), 0, 0.0);
-                           mod->setParameter(&mVRKeepContinuity);
-                        }
-                        
-                        MPlug pEnableWaterLevel = thisNode.findPlug("vrayEnableWaterLevel");
-                        if (!pEnableWaterLevel.isNull() && pEnableWaterLevel.asBool())
-                        {
-                           MPlug pWaterLevel = thisNode.findPlug("vrayWaterLevel");
-                           if (!pWaterLevel.isNull())
-                           {
-                              mVRWaterLevel.setFloat(pWaterLevel.asFloat(), 0, 0.0);
-                              mod->setParameter(&mVRWaterLevel);
-                           }
-                        }
-                        
-                        MPlug pDispAmount = thisNode.findPlug("vrayDisplacementAmount");
-                        if (!pDispAmount.isNull())
-                        {
-                           mVRDispAmount.setFloat(pDispAmount.asFloat(), 0, 0.0);
-                           mod->setParameter(&mVRDispAmount);
-                        }
-                        
-                        MPlug pDispShift = thisNode.findPlug("vrayDisplacementShift");
-                        if (!pDispShift.isNull())
-                        {
-                           mVRDispShift.setFloat(pDispShift.asFloat(), 0, 0.0);
-                           mod->setParameter(&mVRDispShift);
-                        }
-                        
-                        // Export disp shader
-                        MObject dispObj = pDispSource.node();
-                        MFnDependencyNode dispTex(dispObj);
-                        
-                        AbcShapeVRayDisp::DispShapes &dispShapes = AbcShapeVRayDisp::DispTexs[dispTex.name().asChar()];
-                        
-                        if (colorDisp)
-                        {
-                           dispShapes.asColor.insert(mod->getPluginName());
+                           mVRVectorDisplacement.setInt(pAttr.asInt() - 1, 0, 0.0);
+                           abc->setParameter(&mVRVectorDisplacement);
+                           
+                           // if (pAttr.asInt() == 4)
+                           // {
+                           //    mVRObjectSpaceDisplacement .setBool(true, 0, 0.0);
+                           //    abc->setParameter(&mVRObjectSpaceDisplacement);
+                           // }
                         }
                         else
                         {
-                           dispShapes.asFloat.insert(mod->getPluginName());
+                           displace2d = (pAttr.asInt() == 0);
+                        }
+                        
+                        pAttr = nodeFn.findPlug("vrayDisplacementStatic");
+                        mVRStaticDisplacement.setBool(pAttr.asBool(), 0, 0.0);
+                        abc->setParameter(&mVRStaticDisplacement);
+                        
+                        pAttr = nodeFn.findPlug("vrayDisplacementAmount");
+                        mVRDisplacementAmount.setFloat(pAttr.asFloat(), 0, 0.0);
+                        abc->setParameter(&mVRDisplacementAmount);
+                        
+                        pAttr = nodeFn.findPlug("vrayDisplacementShift");
+                        mVRDisplacementShift.setFloat(pAttr.asFloat(), 0, 0.0);
+                        abc->setParameter(&mVRDisplacementShift);
+                        
+                        pAttr = nodeFn.findPlug("vrayDisplacementKeepContinuity");
+                        mVRKeepContinuity.setBool(pAttr.asBool(), 0, 0.0);
+                        abc->setParameter(&mVRKeepContinuity);
+                        
+                        mVRDisplace2d.setBool(displace2d, 0, 0.0);
+                        abc->setParameter(&mVRDisplace2d);
+                        
+                        pAttr = nodeFn.findPlug("vrayEnableWaterLevel");
+                        if (pAttr.asBool())
+                        {
+                           pAttr = nodeFn.findPlug("vrayWaterLevel");
+                           mVRWaterLevel.setFloat(pAttr.asFloat(), 0, 0.0);
+                           abc->setParameter(&mVRWaterLevel);
+                        }
+                        
+                        pAttr = nodeFn.findPlug("vrayDisplacementCacheNormals");
+                        mVRCacheNormals.setBool(pAttr.asBool(), 0, 0.0);
+                        abc->setParameter(&mVRCacheNormals);
+                        
+                        pAttr = nodeFn.findPlug("vrayDisplacementUseBounds");
+                        mVRUseBounds.setBool(pAttr.asInt() == 1, 0, 0.0);
+                        abc->setParameter(&mVRUseBounds);
+                        
+                        if (pAttr.asInt() == 1)
+                        {
+                           pAttr = nodeFn.findPlug("vrayDisplacementMinValue");
+                           mVRMinBound.setColor(VR::Color(pAttr.child(0).asFloat(),
+                                                          pAttr.child(1).asFloat(),
+                                                          pAttr.child(2).asFloat()), 0, 0.0);
+                           abc->setParameter(&mVRMinBound);
+                           
+                           pAttr = nodeFn.findPlug("vrayDisplacementMaxValue");
+                           mVRMaxBound.setColor(VR::Color(pAttr.child(0).asFloat(),
+                                                          pAttr.child(1).asFloat(),
+                                                          pAttr.child(2).asFloat()), 0, 0.0);
+                           abc->setParameter(&mVRMaxBound);
+                        }
+                        
+                        if (displace2d)
+                        {
+                           pAttr = nodeFn.findPlug("vray2dDisplacementResolution");
+                           mVRResolution.setInt(pAttr.asInt(), 0, 0.0);
+                           abc->setParameter(&mVRResolution);
+                           
+                           pAttr = nodeFn.findPlug("vray2dDisplacementPrecision");
+                           mVRPrecision.setInt(pAttr.asInt(), 0, 0.0);
+                           abc->setParameter(&mVRPrecision);
+                           
+                           pAttr = nodeFn.findPlug("vray2dDisplacementTightBounds");
+                           mVRTightBounds.setBool(pAttr.asBool(), 0, 0.0);
+                           abc->setParameter(&mVRTightBounds);
+                           
+                           pAttr = nodeFn.findPlug("vray2dDisplacementFilterTexture");
+                           mVRFilterTexture.setBool(pAttr.asBool(), 0, 0.0);
+                           abc->setParameter(&mVRFilterTexture);
+                           
+                           if (pAttr.asBool())
+                           {
+                              pAttr = nodeFn.findPlug("vray2dDisplacementFilterBlur");
+                              mVRFilterBlur.setFloat(pAttr.asFloat(), 0, 0.0);
+                              abc->setParameter(&mVRFilterBlur);
+                           }
                         }
                      }
                      
-                     mVRMesh.setUserObject(abc, 0, 0.0);
-                     mod->setParameter(&mVRMesh);
+                     // Track shader to be exported
+                     AbcShapeVRayDisp::DispShapes &dispShapes = AbcShapeVRayDisp::DispTexs[dispShaderName];
+                        
+                     if (colorDisp)
+                     {
+                        dispShapes.asColor.insert(abc->getPluginName());
+                     }
+                     else
+                     {
+                        dispShapes.asFloat.insert(abc->getPluginName());
+                     }
                   }
+                  
+                  // particle attributes
+                  MDataHandle hParticleType = block.inputValue(aVRayAbcParticleType);
+                  mVRParticleType.setInt(hParticleType.asInt(), 0, 0.0);
+                  
+                  MDataHandle hParticleAttribs = block.inputValue(aVRayAbcParticleAttribs);
+                  mVRParticleAttribs.setString(hParticleAttribs.asString().asChar(), 0, 0.0);
+                  
+                  MDataHandle hRadius = block.inputValue(aVRayAbcRadius);
+                  mVRRadius.setFloat(hRadius.asFloat(), 0, 0.0);
+                  
+                  MPlug pPointRadii = thisNode.findPlug("vrayPointSizeRadius");
+                  bool point_radii = (!pPointRadii.isNull() && pPointRadii.asBool());
+                  mVRPointRadii.setBool(point_radii, 0, 0.0);
+                  
+                  MDataHandle hPointSize = block.inputValue(aVRayAbcPointSize);
+                  mVRPointSize.setFloat((point_radii ? hRadius.asFloat() : hPointSize.asFloat()), 0, 0.0);
+                  
+                  MPlug pPointSizePP = thisNode.findPlug("vrayPointSizePP");
+                  if (!pPointSizePP.isNull() && pPointSizePP.asBool())
+                  {
+                     // forces 'point_radii' to true
+                     mVRPointRadii.setBool(1, 0, 0.0);
+                  }
+                  
+                  MPlug pPointSizeWorld = thisNode.findPlug("vrayPointSizeWorld");
+                  mVRPointWorldSize.setBool((!pPointSizeWorld.isNull() && pPointSizeWorld.asBool()), 0, 0.0);
+                  
+                  MDataHandle hSpriteSizeX = block.inputValue(aVRayAbcSpriteSizeX);
+                  mVRSpriteSizeX.setFloat(hSpriteSizeX.asFloat(), 0, 0.0);
+                  
+                  MDataHandle hSpriteSizeY = block.inputValue(aVRayAbcSpriteSizeY);
+                  mVRSpriteSizeX.setFloat(hSpriteSizeY.asFloat(), 0, 0.0);
+                  
+                  MDataHandle hSpriteTwist = block.inputValue(aVRayAbcSpriteTwist);
+                  mVRSpriteTwist.setFloat(hSpriteTwist.asFloat(), 0, 0.0);
+                  
+                  MPlug pSpriteOrient = thisNode.findPlug("vraySpriteOrient");
+                  mVRSpriteOrientation.setInt((pSpriteOrient.isNull() ? 0 : pSpriteOrient.asInt()), 0, 0.0);
+                  
+                  MDataHandle hMultiCount = block.inputValue(aVRayAbcMultiCount);
+                  mVRMultiCount.setInt(hMultiCount.asInt(), 0, 0.0);
+                  
+                  MDataHandle hMultiRadius = block.inputValue(aVRayAbcMultiRadius);
+                  mVRMultiRadius.setFloat(hMultiRadius.asFloat(), 0, 0.0);
+                  
+                  MDataHandle hLineWidth = block.inputValue(aVRayAbcLineWidth);
+                  mVRLineWidth.setFloat(hLineWidth.asFloat(), 0, 0.0);
+                  
+                  MDataHandle hTailLength = block.inputValue(aVRayAbcTailLength);
+                  mVRTailLength.setFloat(hTailLength.asFloat(), 0, 0.0);
+                  
+                  abc->setParameter(&mVRFilename);
+                  abc->setParameter(&mVRObjectPath);
+                  abc->setParameter(&mVRSpeed);
+                  abc->setParameter(&mVROffset);
+                  abc->setParameter(&mVRStartFrame);
+                  abc->setParameter(&mVREndFrame);
+                  abc->setParameter(&mVRIgnoreTransforms);
+                  abc->setParameter(&mVRIgnoreInstances);
+                  abc->setParameter(&mVRIgnoreVisibility);
+                  abc->setParameter(&mVRPreserveStartFrame);
+                  abc->setParameter(&mVRCycle);
+                  abc->setParameter(&mVRFps);
+                  abc->setParameter(&mVRIgnoreTransformBlur);
+                  abc->setParameter(&mVRIgnoreDeformBlur);
+                  abc->setParameter(&mVRReferenceFilename);
+                  abc->setParameter(&mVRVerbose);
+                  abc->setParameter(&mVRParticleType);
+                  abc->setParameter(&mVRParticleAttribs);
+                  abc->setParameter(&mVRRadius);
+                  abc->setParameter(&mVRPointSize);
+                  abc->setParameter(&mVRPointRadii);
+                  abc->setParameter(&mVRPointWorldSize);
+                  abc->setParameter(&mVRSpriteSizeX);
+                  abc->setParameter(&mVRSpriteSizeY);
+                  abc->setParameter(&mVRSpriteTwist);
+                  abc->setParameter(&mVRSpriteOrientation);
+                  abc->setParameter(&mVRMultiCount);
+                  abc->setParameter(&mVRMultiRadius);
+                  abc->setParameter(&mVRLineWidth);
+                  abc->setParameter(&mVRTailLength);
                   
                   hOut.setInt(1);
                }

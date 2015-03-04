@@ -50,6 +50,23 @@ public:
     static MObject aOutApiType;
     static MObject aVRayGeomResult;
     static MObject aVRayGeomInfo;
+    
+    static MObject aVRayAbcVerbose;
+    static MObject aVRayAbcReferenceFilename;
+    static MObject aVRayAbcParticleType;
+    static MObject aVRayAbcParticleAttribs;
+    static MObject aVRayAbcSpriteSizeX;
+    static MObject aVRayAbcSpriteSizeY;
+    static MObject aVRayAbcSpriteTwist;
+    //static MObject aVRayAbcSpriteOrientation;
+    static MObject aVRayAbcRadius;
+    static MObject aVRayAbcPointSize;
+    //static MObject aVRayAbcPointRadii;
+    //static MObject aVRayAbcPointWorldSize;
+    static MObject aVRayAbcMultiCount;
+    static MObject aVRayAbcMultiRadius;
+    static MObject aVRayAbcLineWidth;
+    static MObject aVRayAbcTailLength;
 #endif
     
     static void* creator();
@@ -165,67 +182,80 @@ private:
     bool mAnimated;
     
 #ifdef ABCSHAPE_VRAY_SUPPORT
-    VR::DefStringParam mVRFileName;                        // [""]
-    VR::DefStringParam mVRObjectPath;                      // [""]
-    VR::DefFloatParam mVRAnimSpeed;                        // [1.0]
-    VR::DefIntParam mVRAnimType;                           // [0, (0: loop, 1: once, 2: ping-ping, 3: still)]
-    VR::DefFloatParam mVRAnimOffset;                       // [0.0]
-    VR::DefBoolParam mVRAnimOverride;                      // [false]
-    VR::DefIntParam mVRAnimStart;                          // [0]
-    VR::DefIntParam mVRAnimLength;                         // [0]
-    VR::DefBoolParam mVRPrimaryVisibility;                 // [true]
-    VR::DefBoolParam mVRUseAlembicOffset;                  // [false]
-    VR::DefBoolParam mVRUseFaceSets;                       // [true]
-    VR::DefBoolParam mVRUseFullNames;                      // [false]
-    VR::DefBoolParam mVRComputeBBox;                       // [false]
-    // VR::DefFloatParam mVRScale;                            // [1.0]
-    // VR::DefBoolParam mVRFlipAxis;                          // [false]
-    // VR::DefBoolParam mVRSmoothUVBorders;                   // [true]
-    VR::DefBoolParam mVRSmoothUV;                          // [true]
-    // VR::DefBoolParam mVRComputeNormals;                    // [true]
-    // VR::DefFloatParam mVRSmoothAngle;                      // [30.0]
-    // VR::DefBoolParam mVRFlipNormals;                       // [false]
-    // VR::DefIntParam mVRNumPreviewFaces;                    // [10000]
-    // VR::DefFloatParam mVRHairWidthMultiplier;              // [1.0]
-    // VR::DefFloatParam mVRParticleWidthMultiplier;          // [1.0]
-    // VR::DefIntParam mVRVisibilityListType;                 // [0, (0: exclude, 1: include)]
-    // VR::DefStringListParam mVRVisibilityListNames;         // [()]
-    // VR::DefIntListParam mVRVisibilityListIds;              // [()]
-    // VR::DefIntParam mVRHairVisibilityListType;             // [0, (0: exclude, 1: include)]
-    // VR::DefStringListParam mVRHairVisibilityListNames;     // [()]
-    // VR::DefIntListParam mVRHairVisibilityListIds;          // [()]
-    // VR::DefIntParam mVRParticleVisibilityListType;         // [0, (0: exclude, 1: include)]
-    // VR::DefStringListParam mVRParticleVisibilityListNames; // [()]
-    // VR::DefIntListParam mVRParticleVisibilityListIds;      // [()]
-    // VR::DefIntParam mVRSortVoxels;                         // [0]
-    // VR::DefIntParam mVRFirstMapChannel;                    // [1]
-    // VR::DefIntParam mVRParticleRenderMode;                 // [0, (0: spheres, 1: points)]
-    // VR::DefStringParam mVRVelocityColorSet;                // [""]    
-    VR::DefPluginParam mVRMesh;
+    VR::DefStringParam mVRFilename;
+    VR::DefStringParam mVRReferenceFilename;
+    VR::DefStringParam mVRObjectPath;
+    VR::DefBoolParam mVRIgnoreTransforms;
+    VR::DefBoolParam mVRIgnoreInstances;
+    VR::DefBoolParam mVRIgnoreVisibility;
+    VR::DefBoolParam mVRIgnoreTransformBlur;
+    VR::DefBoolParam mVRIgnoreDeformBlur;
+    VR::DefBoolParam mVRPreserveStartFrame;
+    VR::DefFloatParam mVRSpeed;
+    VR::DefFloatParam mVROffset;
+    VR::DefFloatParam mVRStartFrame;
+    VR::DefFloatParam mVREndFrame;
+    VR::DefFloatParam mVRFps;
+    VR::DefIntParam mVRCycle;
+    VR::DefBoolParam mVRVerbose;
+    
+    // Subdivision attributes
+    VR::DefBoolParam mVRSubdivEnable;
+    VR::DefBoolParam mVRSubdivUVs;
     VR::DefIntParam mVRPreserveMapBorders;
     VR::DefBoolParam mVRStaticSubdiv;
     VR::DefBoolParam mVRClassicCatmark;
+    
+    // Subdivision Quality settings
     VR::DefBoolParam mVRUseGlobals;
     VR::DefBoolParam mVRViewDep;
     VR::DefFloatParam mVREdgeLength;
     VR::DefIntParam mVRMaxSubdivs;
+    
+    // OpenSubdiv attributes
+    VR::DefBoolParam mVROSDSubdivEnable;
+    VR::DefIntParam mVROSDSubdivLevel;
+    VR::DefIntParam mVROSDSubdivType;
+    VR::DefBoolParam mVROSDSubdivUVs;
+    VR::DefIntParam mVROSDPreserveMapBorders;
+    VR::DefBoolParam mVROSDPreserveGeometryBorders;
+    
+    // Displacement attributes
+    VR::DefIntParam mVRDisplacementType;
+    VR::DefFloatParam mVRDisplacementAmount;
+    VR::DefFloatParam mVRDisplacementShift;
+    VR::DefBoolParam mVRKeepContinuity;
+    VR::DefFloatParam mVRWaterLevel;
+    VR::DefIntParam mVRVectorDisplacement;
+    VR::DefIntParam mVRMapChannel;
     VR::DefBoolParam mVRUseBounds;
     VR::DefColorParam mVRMinBound;
     VR::DefColorParam mVRMaxBound;
+    VR::DefIntParam mVRImageWidth;
     VR::DefBoolParam mVRCacheNormals;
-    VR::DefBoolParam mVRStaticDisp;
-    VR::DefIntParam mVRPrecision;
-    VR::DefBoolParam mVRDisp2D;
-    VR::DefBoolParam mVRTightBounds;
+    VR::DefBoolParam mVRObjectSpaceDisplacement;
+    VR::DefBoolParam mVRStaticDisplacement;
+    VR::DefBoolParam mVRDisplace2d;
     VR::DefIntParam mVRResolution;
+    VR::DefIntParam mVRPrecision;
+    VR::DefBoolParam mVRTightBounds;
     VR::DefBoolParam mVRFilterTexture;
     VR::DefFloatParam mVRFilterBlur;
-    VR::DefIntParam mVRVectorDisp;
-    // VR::DefBoolParam mVRObjectSpaceDisp;
-    VR::DefBoolParam mVRKeepContinuity;
-    VR::DefFloatParam mVRWaterLevel;
-    VR::DefFloatParam mVRDispAmount;
-    VR::DefFloatParam mVRDispShift;
+    
+    VR::DefIntParam mVRParticleType;
+    VR::DefStringParam mVRParticleAttribs;
+    VR::DefFloatParam mVRSpriteSizeX;
+    VR::DefFloatParam mVRSpriteSizeY;
+    VR::DefFloatParam mVRSpriteTwist;
+    VR::DefIntParam mVRSpriteOrientation;
+    VR::DefFloatParam mVRRadius;
+    VR::DefFloatParam mVRPointSize;
+    VR::DefIntParam mVRPointRadii;
+    VR::DefIntParam mVRPointWorldSize;
+    VR::DefIntParam mVRMultiCount;
+    VR::DefFloatParam mVRMultiRadius;
+    VR::DefFloatParam mVRLineWidth;
+    VR::DefFloatParam mVRTailLength;
 #endif
 };
 
@@ -246,6 +276,7 @@ public:
 
     static MSyntax createSyntax();
     static void* create();
+    static bool getAssignedDisplacement(const MDagPath &path, std::string &setName, std::string &shaderName);
     
      
     typedef std::set<std::string> NameSet;
@@ -256,9 +287,17 @@ public:
         NameSet asColor;
     };
     
+    struct DispSet
+    {
+        std::string setName;
+        std::string shaderName;
+    };
+    
     typedef std::map<std::string, DispShapes> DispTexMap;
+    typedef std::map<std::string, DispSet> DispSetMap;
      
     static DispTexMap DispTexs;
+    static DispSetMap DispSets;
 };
 
 #endif

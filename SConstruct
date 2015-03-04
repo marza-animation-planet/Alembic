@@ -372,7 +372,10 @@ plugin_defs = defs[:]
 if nameprefix:
    plugin_defs.append("NAME_PREFIX=\"\\\"%s\\\"\"" % nameprefix)
 
-if excons.GetArgument("with-arnold", default=None) is not None:
+withArnold = (excons.GetArgument("with-arnold", default=None) is not None)
+withVray = (excons.GetArgument("with-vray", default=None) is not None)
+
+if withArnold:
    prjs.append({"name": "%sAlembicArnoldProcedural" % nameprefix,
                 "type": "dynamicmodule",
                 "ext": arnold.PluginExt(),
@@ -396,6 +399,19 @@ if excons.GetArgument("with-arnold", default=None) is not None:
                 "srcs": glob.glob("arnold/abcproc/*.cpp") + glob.glob("lib/SceneHelper/*.cpp") + regex_src,
                 "custom": [arnold.Require]})
 
+if withVray:
+  prjs.append({"name": "%svray_AlembicLoader" % ("lib" if sys.platform != "win32" else ""),
+               "type": "dynamicmodule",
+               "ext": vray.PluginExt(),
+               "bldprefix": "vray-%s" % vray.Version(),
+               "prefix": "vray",
+               "defs": plugin_defs + regex_def,
+               "incdirs": incdirs + ["vray"] + ["lib/SceneHelper"] + regex_inc,
+               "libdirs": libdirs,
+               "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
+               "srcs": glob.glob("vray/*.cpp") + glob.glob("lib/SceneHelper/*.cpp") + regex_src,
+               "custom": [vray.Require]})
+
 if excons.GetArgument("with-maya", default=None) is not None:
    def replace_in_file(src, dst, srcStr, dstStr):
       fdst = open(dst, "w")
@@ -405,12 +421,10 @@ if excons.GetArgument("with-maya", default=None) is not None:
       fdst.close()
       fsrc.close()
    
-   useVRay = (excons.GetArgument("with-vray", default=None) is not None)
-   
    AbcShapeName = "%sAbcShape" % nameprefix
    AbcShapeMel = "maya/AbcShape/AE%sTemplate.mel" % AbcShapeName
    AbcShapeMtoa = "arnold/abcproc/mtoa_%s.py" % AbcShapeName
-   if useVRay:
+   if withVray:
       AbcShapePy = "maya/AbcShape/%sabcshape4vray.py" % nameprefix.lower()
    
    impver = excons.GetArgument("maya-abcimport-version", None)
@@ -423,7 +437,7 @@ if excons.GetArgument("with-maya", default=None) is not None:
    if not os.path.exists(AbcShapeMtoa) or os.stat(AbcShapeMtoa).st_mtime < os.stat("arnold/abcproc/mtoa.py.tpl").st_mtime:
       replace_in_file("arnold/abcproc/mtoa.py.tpl", AbcShapeMtoa, "<<NodeName>>", AbcShapeName)
    
-   if useVRay:
+   if withVray:
       if not os.path.exists(AbcShapePy) or os.stat(AbcShapePy).st_mtime < os.stat("maya/AbcShape/abcshape4vray.py.tpl").st_mtime:
          replace_in_file("maya/AbcShape/abcshape4vray.py.tpl", AbcShapePy, "<<NodeName>>", AbcShapeName)
     
@@ -457,16 +471,16 @@ if excons.GetArgument("with-maya", default=None) is not None:
                 {"name": "%sAbcShape" % nameprefix,
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
-                 "bldprefix": "maya-%s" % maya.Version() + ("/vray-%s" % vray.Version() if useVRay else ""),
-                 "prefix": "maya/plug-ins" + ("/vray" if useVRay else ""),
+                 "bldprefix": "maya-%s" % maya.Version() + ("/vray-%s" % vray.Version() if withVray else ""),
+                 "prefix": "maya/plug-ins" + ("/vray" if withVray else ""),
                  "defs": plugin_defs + regex_def + (["ABCSHAPE_VERSION=\"\\\"%s\\\"\"" % shpver] if expver else [])
-                                                 + (["ABCSHAPE_VRAY_SUPPORT"] if useVRay else []),
+                                                 + (["ABCSHAPE_VRAY_SUPPORT"] if withVray else []),
                  "incdirs": incdirs + ["maya/AbcShape", "lib/SceneHelper"] + regex_inc,
                  "libdirs": libdirs,
                  "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
                  "srcs": glob.glob("maya/AbcShape/*.cpp") + glob.glob("lib/SceneHelper/*.cpp") + regex_src,
                  "install": {"maya/scripts": glob.glob("maya/AbcShape/*.mel"),
-                             "maya/python": [AbcShapeMtoa] + ([AbcShapePy] if useVRay else [])},
-                 "custom": [maya.Require, maya.Plugin] + ([vray.Require] if useVRay else [])}])
+                             "maya/python": [AbcShapeMtoa] + ([AbcShapePy] if withVray else [])},
+                 "custom": [maya.Require, maya.Plugin] + ([vray.Require] if withVray else [])}])
 
 excons.DeclareTargets(env, prjs)
