@@ -89,7 +89,7 @@ global proc AE<<NodeName>>Template(string $nodeName)
    
    editorTemplate -beginScrollLayout;
    
-   editorTemplate -beginLayout "Alembic" -collapse 0;
+   
    editorTemplate -callCustom AE<<NodeName>>FileNew AE<<NodeName>>FileReplace "filePath";
    editorTemplate -label "Objects" -addControl "objectExpression";
    editorTemplate -addSeparator;
@@ -135,6 +135,29 @@ global proc AE<<NodeName>>Template(string $nodeName)
    editorTemplate -endLayout;
    
    AEshapeTemplate $nodeName;
+   
+   if (`attributeQuery -node $nodeName -exists "vrayAbcVerbose"`)
+   {
+      editorTemplate -beginLayout "V-Ray Plugin" -collapse 0;
+      editorTemplate -label "Reference File" -addControl "vrayAbcReferenceFilename";
+      editorTemplate -addSeparator;
+      editorTemplate -beginNoOptimize;
+      editorTemplate -label "Particle Type" -addControl "vrayAbcParticleType";
+      editorTemplate -label "Particle Attribs" -addControl "vrayAbcParticleAttribs";
+      editorTemplate -label "Sprite Size X" -addControl "vrayAbcSpriteSizeX";
+      editorTemplate -label "Sprite Size Y" -addControl "vrayAbcSpriteSizeY";
+      editorTemplate -label "Sprite Twist" -addControl "vrayAbcSpriteTwist";
+      editorTemplate -label "Radius" -addControl "vrayAbcRadius";
+      editorTemplate -label "Point Size" -addControl "vrayAbcPointSize";
+      editorTemplate -label "Multi Count" -addControl "vrayAbcMultiCount";
+      editorTemplate -label "Multi Radius" -addControl "vrayAbcMultiRadius";
+      editorTemplate -label "Line Width" -addControl "vrayAbcLineWidth";
+      editorTemplate -label "Tail Length" -addControl "vrayAbcTailLength";
+      editorTemplate -endNoOptimize;
+      editorTemplate -addSeparator;
+      editorTemplate -label "Verbose" -addControl "vrayAbcVerbose";
+      editorTemplate -endLayout;
+   }
    
    editorTemplate -addExtraControls;
    
