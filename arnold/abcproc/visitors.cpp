@@ -1617,18 +1617,6 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    PointsInfo info;
    UserAttributes extraPointAttrs;
    
-   // Collect attributes
-   
-   collectUserAttributes(schema.getUserProperties(),
-                         schema.getArbGeomParams(),
-                         mDso->renderTime(),
-                         false,
-                         &info.objectAttrs,
-                         0,
-                         &info.pointAttrs,
-                         0,
-                         0);
-   
    // Generate base points
    
    TimeSampleList<Alembic::AbcGeom::IPointsSchema> &samples = node.samples().schemaSamples;
@@ -1649,7 +1637,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    }
    
    // renderTime() may not be in the sample list, let's at it just in case
-   node.sampleSchema(mDso->renderTime(), mDso->renderTime(), false);
+   node.sampleSchema(mDso->renderTime(), mDso->renderTime(), true);
    
    if (mDso->verbose())
    {
@@ -1680,6 +1668,18 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    std::map<Alembic::Util::uint64_t, std::pair<size_t, size_t> > idmap1; // ID -> (index in P1/ID1/V1, index in final point list)
    std::map<Alembic::Util::uint64_t, size_t> sharedids; // ID -> index in P1/ID1/V1
    
+   // Collect attributes
+   
+   collectUserAttributes(schema.getUserProperties(),
+                         schema.getArbGeomParams(),
+                         samp0->time(),
+                         false,
+                         &info.objectAttrs,
+                         0,
+                         &info.pointAttrs,
+                         0,
+                         0);
+   
    const float *vel0 = 0;
    const float *vel1 = 0;
    const float *acc0 = 0;
@@ -1693,6 +1693,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    info.pointCount = idmap0.size();
    
    // Get velocities and accelerations
+   std::string vname, aname;
    
    if (V0)
    {
@@ -1715,6 +1716,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
       }
       if (it != info.pointAttrs.end())
       {
+         vname = it->first;
          vel0 = (const float*) it->second.data;
       }
    }
@@ -1742,6 +1744,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
       }
       if (it != info.pointAttrs.end())
       {
+         aname = it->first;
          acc0 = (const float*) it->second.data;
       }
    }
@@ -1773,65 +1776,34 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
          }
       }
       
-      if (idmap1.size() > 0)
+      // Collect point attributes
+      
+      collectUserAttributes(Alembic::Abc::ICompoundProperty(), schema.getArbGeomParams(),
+                            samp1->time(), false, 0, 0, &extraPointAttrs, 0, 0);
+      
+      // Get velocities and accelerations
+      
+      if (V1)
       {
-         // Collect point attributes
-         
-         collectUserAttributes(Alembic::Abc::ICompoundProperty(), schema.getArbGeomParams(),
-                               samp1->time(), false, 0, 0, &extraPointAttrs, 0, 0);
-         
-         // Get velocities and accelerations
-         
-         if (V1)
+         vel1 = (const float*) V1->getData();
+      }
+      else if (vname.length() > 0)
+      {
+         // Don't really have to check it as we are sampling the same schema, just at a different time
+         UserAttributes::iterator it = extraPointAttrs.find(vname);
+         if (it != extraPointAttrs.end())
          {
-            vel1 = (const float*) V1->getData();
+            vel1 = (const float*) it->second.data;
          }
-         else
+      }
+      
+      if (aname.length() > 0)
+      {
+         // Don't really have to check it as we are sampling the same schema, just at a different time
+         UserAttributes::iterator it = extraPointAttrs.find(aname);
+         if (it != extraPointAttrs.end())
          {
-            UserAttributes::iterator it = extraPointAttrs.find("velocity");
-            if (it == extraPointAttrs.end() ||
-                it->second.arnoldType != AI_TYPE_VECTOR ||
-                it->second.dataCount != P1->size())
-            {
-               it = extraPointAttrs.find("v");
-               if (it != extraPointAttrs.end() &&
-                   (it->second.arnoldType != AI_TYPE_VECTOR ||
-                    it->second.dataCount != P1->size()))
-               {
-                  it = extraPointAttrs.end();
-               }
-            }
-            if (it != extraPointAttrs.end())
-            {
-               vel1 = (const float*) it->second.data;
-            }
-         }
-         
-         if (vel1)
-         {
-            UserAttributes::iterator it = extraPointAttrs.find("acceleration");
-            if (it == extraPointAttrs.end() ||
-                it->second.arnoldType != AI_TYPE_VECTOR ||
-                it->second.dataCount != info.pointCount)
-            {
-               it = extraPointAttrs.find("accel");
-               if (it == extraPointAttrs.end() ||
-                   it->second.arnoldType != AI_TYPE_VECTOR ||
-                   it->second.dataCount != info.pointCount)
-               {
-                  it = extraPointAttrs.find("a");
-                  if (it != extraPointAttrs.end() &&
-                      (it->second.arnoldType != AI_TYPE_VECTOR ||
-                       it->second.dataCount != info.pointCount))
-                  {
-                     it = extraPointAttrs.end();
-                  }
-               }
-            }
-            if (it != extraPointAttrs.end())
-            {
-               acc1 = (const float*) it->second.data;
-            }
+            acc1 = (const float*) it->second.data;
          }
       }
    }
@@ -1862,6 +1834,29 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
             pnt.x = P.x;
             pnt.y = P.y;
             pnt.z = P.z;
+            
+            if (vel0 && vel1)
+            {
+               // Note: a * samp0->time() + b * samp1->time() == renderTime
+               double dt = t - mDso->renderTime();
+               
+               size_t off = idit->second * 3;
+               
+               pnt.x += dt * (a * vel0[voff  ] + b * vel1[off  ]);
+               pnt.y += dt * (a * vel0[voff+1] + b * vel1[off+1]);
+               pnt.z += dt * (a * vel0[voff+2] + b * vel1[off+2]);
+               
+               if (acc0 && acc1)
+               {
+                  double hdt2 = 0.5 * dt * dt;
+                  
+                  pnt.x += hdt2 * (a * acc0[voff  ] + b * acc1[off  ]);
+                  pnt.y += hdt2 * (a * acc0[voff+1] + b * acc1[off+1]);
+                  pnt.z += hdt2 * (a * acc0[voff+2] + b * acc1[off+2]);
+               }
+               
+               // Note: should adjust velocity and acceleration attribute values in final output too
+            }
          }
          else
          {
@@ -1874,7 +1869,6 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
             if (vel0)
             {
                double dt = t - samp0->time();
-               double hdt2 = 0.5 * dt * dt;
                
                pnt.x += dt * vel0[voff  ];
                pnt.y += dt * vel0[voff+1];
@@ -1882,6 +1876,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
                
                if (acc0)
                {
+                  double hdt2 = 0.5 * dt * dt;
+                  
                   pnt.x += hdt2 * acc0[voff  ];
                   pnt.y += hdt2 * acc0[voff+1];
                   pnt.z += hdt2 * acc0[voff+2];
@@ -1905,7 +1901,6 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
          if (vel1)
          {
             double dt = t - samp1->time();
-            double hdt2 = 0.5 * dt * dt;
             
             unsigned int voff = 3 * it->second.first;
             
@@ -1915,6 +1910,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
             
             if (acc1)
             {
+               double hdt2 = 0.5 * dt * dt;
+               
                pnt.x += hdt2 * acc1[voff  ];
                pnt.y += hdt2 * acc1[voff+1];
                pnt.z += hdt2 * acc1[voff+2];
