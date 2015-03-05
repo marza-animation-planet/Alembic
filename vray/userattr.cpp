@@ -1187,7 +1187,7 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
          
          if (geom->numPoints != ua.dataCount)
          {
-            std::cout << "[AlembicLoader] SetUserAttribute: Invalid point attribute size (got " << ua.dataCount << " expected " << geom->numPoints << ")" << std::endl;
+            std::cout << "[AlembicLoader] SetUserAttribute: Invalid size for point attribute \"" << name << "\" (got " << ua.dataCount << " expected " << geom->numPoints << ")" << std::endl;
             return false;
          }
          

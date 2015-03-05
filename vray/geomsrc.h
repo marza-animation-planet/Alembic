@@ -68,6 +68,7 @@ struct AlembicGeometrySource : VR::VRayStaticGeometry
       VR::DefIntListParam *constFaceNormals;
       
       // point specific params
+      bool sortIDs;
       Alembic::Util::uint64_t *particleOrder;
       VR::DefVectorListParam *velocities;
       VR::DefColorListParam *accelerations;

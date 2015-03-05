@@ -67,6 +67,7 @@ public:
     static MObject aVRayAbcMultiRadius;
     static MObject aVRayAbcLineWidth;
     static MObject aVRayAbcTailLength;
+    static MObject aVRayAbcSortIDs;
 #endif
     
     static void* creator();
@@ -256,6 +257,7 @@ private:
     VR::DefFloatParam mVRMultiRadius;
     VR::DefFloatParam mVRLineWidth;
     VR::DefFloatParam mVRTailLength;
+    VR::DefIntParam mVRSortIDs;
 #endif
 };
 

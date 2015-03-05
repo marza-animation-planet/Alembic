@@ -108,6 +108,7 @@ AlembicGeometrySource::GeomInfo::GeomInfo()
    , constPositions(0)
    , constNormals(0)
    , constFaceNormals(0)
+   , sortIDs(false)
    , particleOrder(0)
    , velocities(0)
    , accelerations(0)
@@ -210,6 +211,14 @@ void AlembicGeometrySource::GeomInfo::sortParticles(size_t count, const Alembic:
    {
       revParticleOrder[i] = i;
    }
+   
+   if (!sortIDs)
+   {
+      particleOrder = revParticleOrder;
+      return;
+   }
+   
+   // Note: Dead slow!
    
    uint64_t id0, id1, tmp, n = count;
    

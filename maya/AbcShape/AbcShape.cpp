@@ -332,6 +332,7 @@ MObject AbcShape::aVRayAbcMultiCount;
 MObject AbcShape::aVRayAbcMultiRadius;
 MObject AbcShape::aVRayAbcLineWidth;
 MObject AbcShape::aVRayAbcTailLength;
+MObject AbcShape::aVRayAbcSortIDs;
 #endif
 
 void* AbcShape::creator()
@@ -652,6 +653,12 @@ MStatus AbcShape::initialize()
    stat = addAttribute(aVRayAbcTailLength);
    MCHECKERROR(stat, "Could not add 'vrayAbcTailLength' attribute");
    
+   aVRayAbcSortIDs = nAttr.create("vrayAbcSortIDs", "vasids", MFnNumericData::kBoolean, 0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcSortIDs' attribute");
+   nAttr.setKeyable(false);
+   stat = addAttribute(aVRayAbcSortIDs);
+   MCHECKERROR(stat, "Could not add 'vrayAbcSortIDs' attribute");
+   
    attributeAffects(aVRayGeomInfo, aVRayGeomResult);
    attributeAffects(aFilePath, aVRayGeomResult);
    attributeAffects(aObjectExpression, aVRayGeomResult);
@@ -674,6 +681,7 @@ MStatus AbcShape::initialize()
    attributeAffects(aVRayAbcMultiRadius, aVRayGeomResult);
    attributeAffects(aVRayAbcLineWidth, aVRayGeomResult);
    attributeAffects(aVRayAbcTailLength, aVRayGeomResult);
+   attributeAffects(aVRayAbcSortIDs, aVRayGeomResult);
 #endif
 
    attributeAffects(aFilePath, aNumShapes);
@@ -808,6 +816,7 @@ AbcShape::AbcShape()
    , mVRMultiRadius("multi_radius", 0.0f)
    , mVRLineWidth("line_width", 1.0f)
    , mVRTailLength("tail_length", 1.0f)
+   , mVRSortIDs("sort_ids", 0)
 #endif
 {
 }
@@ -1501,6 +1510,9 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   MDataHandle hTailLength = block.inputValue(aVRayAbcTailLength);
                   mVRTailLength.setFloat(hTailLength.asFloat(), 0, 0.0);
                   
+                  MDataHandle hSortIDs = block.inputValue(aVRayAbcSortIDs);
+                  mVRSortIDs.setBool(hSortIDs.asBool(), 0, 0.0);
+                  
                   abc->setParameter(&mVRFilename);
                   abc->setParameter(&mVRObjectPath);
                   abc->setParameter(&mVRSpeed);
@@ -1531,6 +1543,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   abc->setParameter(&mVRMultiRadius);
                   abc->setParameter(&mVRLineWidth);
                   abc->setParameter(&mVRTailLength);
+                  abc->setParameter(&mVRSortIDs);
                   
                   hOut.setInt(1);
                }

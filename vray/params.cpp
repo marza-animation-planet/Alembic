@@ -420,6 +420,7 @@ AlembicLoaderParams::Cache::Cache()
    , multiRadius(0.0f)
    , lineWidth(1.0f)
    , tailLength(1.0f)
+   , sortIDs(0)
 {
 }
 
@@ -497,6 +498,7 @@ void AlembicLoaderParams::Cache::setupCache(VR::VRayParameterList *paramList)
    paramList->setParamCache("multi_radius", &multiRadius);
    paramList->setParamCache("line_width", &lineWidth);
    paramList->setParamCache("tail_length", &tailLength);
+   paramList->setParamCache("sort_ids", &sortIDs);
 }
 
 AlembicLoaderParams::AlembicLoaderParams()
@@ -603,6 +605,7 @@ AlembicLoaderParams::AlembicLoaderParams()
    addParamFloat("multi_radius", 0.0f, -1, "The maximum distance between the original and a generated particle when the render type is multipoints or multistreaks.");
    addParamFloat("line_width", 1.0f, -1, "The width of streak particles, in pixels.");
    addParamFloat("tail_length", 1.0f, -1, "The length of streak particles, in world units, the actual length depends on the particle velocity as well.");
+   addParamBool("sort_ids", 0, -1, "Sort particle ids.");
 }
 
 AlembicLoaderParams::~AlembicLoaderParams()

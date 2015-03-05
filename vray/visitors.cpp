@@ -415,6 +415,8 @@ AlembicNode::VisitReturn BuildPlugins::enter(AlembicPoints &node, AlembicNode *i
          std::cout << "[AlembicLoader] BuildPlugins::enter(AlembicPoints): Set '" << vn << "' parameter from alembic '" << an << "' attribute" << std::endl;
       }
       
+      info->sortIDs = (params->sortIDs != 0);
+      
       points->setParameter(factory->saveInFactory(new VR::DefIntParam("render_type", params->particleType)));
       points->setParameter(factory->saveInFactory(new VR::DefFloatParam("sprite_size_x", params->spriteSizeX)));
       points->setParameter(factory->saveInFactory(new VR::DefFloatParam("sprite_size_y", params->spriteSizeY)));
@@ -1527,30 +1529,20 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                double *times = (singleSample ? &renderTime : mGeoSrc->sampleTimes());
                double *frames = (singleSample ? &renderFrame : mGeoSrc->sampleFrames());
                size_t ntimes = (singleSample ? 1 : mGeoSrc->numTimeSamples());
-               bool hasRenderTimeSample = false;
                double t;
                
                // When sampling the schema, make sure we sample 'renderTime'
-               
+               if (mGeoSrc->params()->verbose)
+               {
+                  std::cout << "[AlembicLoader] UpdateGeometry::enter: Sampling point schema" << std::endl;
+               }
                for (size_t i=0; i<ntimes; ++i)
                {
                   t = times[i];
-                  
-                  if (t > renderTime)
-                  {
-                     if (!hasRenderTimeSample)
-                     {
-                        node.sampleSchema(renderTime, renderTime, i > 0);
-                        hasRenderTimeSample = true;
-                     }
-                  }
-                  else if (t == renderTime)
-                  {
-                     hasRenderTimeSample = true;
-                  }
-                  
-                  node.sampleSchema(t, t, i > 0 || hasRenderTimeSample);
+                  node.sampleSchema(t, t, i > 0);
                }
+               
+               node.sampleSchema(renderTime, renderTime, true);
                
                TimeSampleList<Alembic::AbcGeom::IPointsSchema> &samples = node.samples().schemaSamples;
                TimeSampleList<Alembic::AbcGeom::IPointsSchema>::ConstIterator samp0, samp1; // for animated mesh
@@ -1585,6 +1577,10 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                   std::vector<Alembic::Util::uint64_t> allids;
                   allids.reserve(2 * ID0->size());
                   
+                  if (mGeoSrc->params()->verbose)
+                  {
+                     std::cout << "[AlembicLoader] UpdateGeometry::enter: Collect user attribute at t=" << samp0->time() << std::endl;
+                  }
                   collectUserAttributes(schema.getUserProperties(), schema.getArbGeomParams(),
                                         samp0->time(), false, attrs,
                                         true, false, true, false, false);
@@ -1594,6 +1590,10 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                   const float *acc0 = 0;
                   const float *acc1 = 0;
                   
+                  if (mGeoSrc->params()->verbose)
+                  {
+                     std::cout << "[AlembicLoader] UpdateGeometry::enter: Initialize particle ID list" << std::endl;
+                  }
                   for (size_t i=0; i<ID0->size(); ++i)
                   {
                      Alembic::Util::uint64_t id = ID0->get()[i];
@@ -1606,6 +1606,11 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                   
                   // Get velocities and accelerations
                   // for V-Ray: velocities, acceleration_pp
+                  
+                  if (mGeoSrc->params()->verbose)
+                  {
+                     std::cout << "[AlembicLoader] UpdateGeometry::enter: Looking for velocity and acceleration attributes" << std::endl;
+                  }
                   
                   if (V0)
                   {
@@ -1696,9 +1701,19 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                         }
                      }
                      
+                     if (mGeoSrc->params()->verbose)
+                     {
+                        std::cout << "[AlembicLoader] UpdateGeometry::enter: Collect user point attribute(s) at t=" << samp1->time() << std::endl;
+                     }
+                     
                      collectUserAttributes(Alembic::Abc::ICompoundProperty(), schema.getArbGeomParams(),
                                            samp1->time(), false, extraAttrs,
                                            false, false, true, false, false);
+                     
+                     if (mGeoSrc->params()->verbose)
+                     {
+                        std::cout << "[AlembicLoader] UpdateGeometry::enter: Look for velocity and accelerations" << samp1->time() << std::endl;
+                     }
                      
                      if (V1)
                      {
@@ -1727,6 +1742,11 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                   
                   // Fill points
                   
+                  if (mGeoSrc->params()->verbose)
+                  {
+                     std::cout << "[AlembicLoader] UpdateGeometry::enter: Sort particle IDs" << std::endl;
+                  }
+                  
                   info->sortParticles(allids.size(), &allids[0]);
                   
                   if (!vel0)
@@ -1754,6 +1774,11 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                   for (size_t i=0; i<ntimes; ++i)
                   {
                      t = times[i];
+                     
+                     if (mGeoSrc->params()->verbose)
+                     {
+                        std::cout << "[AlembicLoader] UpdateGeometry::enter: Compute positions for t=" << t << std::endl;
+                     }
                      
                      VR::Table<VR::Vector> &pl = info->positions->at(frames[i]);
                      
@@ -1926,8 +1951,14 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                   }
                   
                   // Adjust attributes
+                  
                   if (idmap1.size() > 0)
                   {
+                     if (mGeoSrc->params()->verbose)
+                     {
+                        std::cout << "[AlembicLoader] UpdateGeometry::enter: Adjust user attributes size" << std::endl;
+                     }
+                     
                      for (UserAttributes::iterator it0 = attrs.point.begin(); it0 != attrs.point.end(); ++it0)
                      {
                         if (it0->first == vname || it0->first == aname)
@@ -1983,8 +2014,24 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                   attrs.point.erase(it);
                }
                
+               if (mGeoSrc->params()->verbose)
+               {
+                  std::cout << "[AlembicLoader] UpdateGeometry::enter: Output user attribute(s)" << std::endl;
+               }
+               
                SetUserAttributes(info, attrs.object, renderFrame);
                SetUserAttributes(info, attrs.point, renderFrame);
+               
+               // Reset particle IDs
+               if (!info->sortIDs)
+               {
+                  VR::IntList il = info->ids->getIntList(renderFrame);
+                  il[0] = 0;
+                  for (int i=1; i<il.count(); ++i)
+                  {
+                     il[i] = i - 1;
+                  }
+               }
                
                info->attachParams(mGeoSrc->factory());
             }

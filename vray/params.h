@@ -475,6 +475,7 @@ struct AlembicLoaderParams : VR::VRayParameterListDesc
       float multiRadius;
       float lineWidth;
       float tailLength;
+      int sortIDs;
       
       Cache();
       void setupCache(VR::VRayParameterList *paramList);
