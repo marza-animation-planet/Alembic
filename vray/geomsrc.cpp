@@ -1,5 +1,6 @@
 #include "geomsrc.h"
 #include "visitors.h"
+#include <algorithm>
 
 // ---
 
@@ -192,6 +193,23 @@ void AlembicGeometrySource::GeomInfo::resetFlags()
    invalidFrame = true;
 }
 
+struct CompareOp
+{
+   inline CompareOp(const Alembic::Util::uint64_t *ids)
+      : _ids(ids)
+   {
+   }
+   
+   inline bool operator()(Alembic::Util::uint64_t i0, Alembic::Util::uint64_t i1) const
+   {
+      return (_ids[i0] < _ids[i1]);
+   }
+   
+   private:
+      
+      const Alembic::Util::uint64_t *_ids;
+};
+
 void AlembicGeometrySource::GeomInfo::sortParticles(size_t count, const Alembic::Util::uint64_t *ids)
 {
    if (particleOrder)
@@ -205,46 +223,21 @@ void AlembicGeometrySource::GeomInfo::sortParticles(size_t count, const Alembic:
       return;
    }
    
-   Alembic::Util::uint64_t *revParticleOrder = new Alembic::Util::uint64_t[count];
+   particleOrder = new Alembic::Util::uint64_t[count];
    
    for (size_t i=0; i<count; ++i)
    {
-      revParticleOrder[i] = i;
+      particleOrder[i] = i;
    }
    
    if (!sortIDs)
    {
-      particleOrder = revParticleOrder;
       return;
    }
    
-   // Note: Dead slow!
+   CompareOp comp(ids);
    
-   uint64_t id0, id1, tmp, n = count;
-   
-   bool swapped = true;
-   
-   while (swapped && n > 0)
-   {
-      swapped = false;
-      
-      --n;
-      
-      for (size_t i=0; i<n; ++i)
-      {
-         id0 = ids[revParticleOrder[i]];
-         id1 = ids[revParticleOrder[i+1]];
-         
-         if (id0 > id1)
-         {
-            swapped = true;
-            
-            tmp = revParticleOrder[i];
-            revParticleOrder[i] = revParticleOrder[i+1];
-            revParticleOrder[i+1] = tmp;
-         }
-      }
-   }
+   std::sort(particleOrder, particleOrder+count, comp);
    
    // As we want to remap the destination index rather than the source one, reverse the mapping
    //  i.e.:
@@ -254,14 +247,16 @@ void AlembicGeometrySource::GeomInfo::sortParticles(size_t count, const Alembic:
    //
    // This is because the source may be splitted into separate arrays
    
-   particleOrder = new Alembic::Util::uint64_t[count];
+   Alembic::Util::uint64_t *inv = new Alembic::Util::uint64_t[count];
    
    for (size_t i=0; i<count; ++i)
    {
-      particleOrder[revParticleOrder[i]] = i;
+      inv[particleOrder[i]] = i;
    }
    
-   delete[] revParticleOrder;
+   delete[] particleOrder;
+   
+   particleOrder = inv;
 }
 
 std::string AlembicGeometrySource::GeomInfo::remapParamName(const std::string &name) const
