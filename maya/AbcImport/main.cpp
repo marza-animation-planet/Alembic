@@ -48,8 +48,13 @@
 #  define ABCIMPORT_VERSION "1.0"
 #endif
 
+#ifdef NAME_PREFIX
+// Avoid node id conflict with maya built-in AbcImport
+const MTypeId AlembicNode::mMayaNodeId(0x00082699);
+#else
 // Interesting trivia: 0x2697 is the unicode character for Alembic
 const MTypeId AlembicNode::mMayaNodeId(0x00082697);
+#endif
 
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
