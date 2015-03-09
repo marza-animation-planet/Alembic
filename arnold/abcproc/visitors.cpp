@@ -1406,10 +1406,10 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
    
    // Output user defined attributes
    
-   SetUserAttributes(mNode, info.objectAttrs);
-   SetUserAttributes(mNode, info.primitiveAttrs);
-   SetUserAttributes(mNode, info.pointAttrs);
-   SetUserAttributes(mNode, info.vertexAttrs, info.arnoldVertexIndex);
+   SetUserAttributes(mNode, info.objectAttrs, 0);
+   SetUserAttributes(mNode, info.primitiveAttrs, info.polygonCount);
+   SetUserAttributes(mNode, info.pointAttrs, info.pointCount);
+   SetUserAttributes(mNode, info.vertexAttrs, info.vertexCount, info.arnoldVertexIndex);
    
    // Make sure we have the 'instance_num' attribute
    
@@ -1591,10 +1591,10 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
    
    // Output user defined attributes
    
-   SetUserAttributes(mNode, info.objectAttrs);
-   SetUserAttributes(mNode, info.primitiveAttrs);
-   SetUserAttributes(mNode, info.pointAttrs);
-   SetUserAttributes(mNode, info.vertexAttrs, info.arnoldVertexIndex);
+   SetUserAttributes(mNode, info.objectAttrs, 0);
+   SetUserAttributes(mNode, info.primitiveAttrs, info.polygonCount);
+   SetUserAttributes(mNode, info.pointAttrs, info.pointCount);
+   SetUserAttributes(mNode, info.vertexAttrs, info.vertexCount, info.arnoldVertexIndex);
    
    // Make sure we have the 'instance_num' attribute
    
@@ -2139,8 +2139,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
       it->second.arnoldCategory = AI_USERDEF_UNIFORM;
    }
    
-   SetUserAttributes(mNode, info.objectAttrs);
-   SetUserAttributes(mNode, info.pointAttrs);
+   SetUserAttributes(mNode, info.objectAttrs, 0);
+   SetUserAttributes(mNode, info.pointAttrs, info.pointCount);
    
    // Make sure we have the 'instance_num' attribute
    

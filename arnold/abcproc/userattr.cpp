@@ -1470,11 +1470,13 @@ void _SetUserAttribute(AtNode *node, const std::string &valName, const std::stri
    }
 }
 
-void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigned int *remapIndices)
+void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigned int count, unsigned int *remapIndices)
 {
    std::string decl;
    std::string valsName = name;
    std::string idxsName = "";
+   
+   unsigned int cnt = count;
    
    if (ua.arnoldCategory == AI_USERDEF_CONSTANT)
    {
@@ -1488,15 +1490,24 @@ void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigne
    else if (ua.arnoldCategory == AI_USERDEF_UNIFORM)
    {
       decl = "uniform " + ua.arnoldTypeStr;
+      cnt = ua.dataCount;
    }
    else if (ua.arnoldCategory == AI_USERDEF_VARYING)
    {
       decl = "varying " + ua.arnoldTypeStr;
+      cnt = ua.dataCount;
    }
    else
    {
       decl = "indexed " + ua.arnoldTypeStr;
       idxsName = valsName + "idxs";
+      cnt = (ua.indices ? ua.indicesCount : ua.dataCount);
+   }
+   
+   if (count != cnt)
+   {
+      AiMsgWarning("[abcproc] Invalid user attribute \"%s\" size: got %u, expected %u", name, cnt, count);
+      return;
    }
    
    const AtParamEntry *pe = AiNodeEntryLookUpParameter(AiNodeGetNodeEntry(node), name);
@@ -1565,13 +1576,13 @@ void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigne
    }
 }
 
-void SetUserAttributes(AtNode *node, UserAttributes &attribs, unsigned int *remapIndices)
+void SetUserAttributes(AtNode *node, UserAttributes &attribs, unsigned int count, unsigned int *remapIndices)
 {
    UserAttributes::iterator it = attribs.begin();
    
    while (it != attribs.end())
    {
-      SetUserAttribute(node, it->first.c_str(), it->second, remapIndices);
+      SetUserAttribute(node, it->first.c_str(), it->second, count, remapIndices);
       ++it;
    }
 }

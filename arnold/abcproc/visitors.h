@@ -411,6 +411,7 @@ private:
       bool varyingTopology;
       unsigned int polygonCount;
       unsigned int pointCount;
+      unsigned int vertexCount;
       unsigned int *polygonVertexCount;
       unsigned int *vertexPointIndex;
       // map alembic vertex index to arnold vertex index
@@ -426,6 +427,7 @@ private:
          : varyingTopology(false)
          , polygonCount(0)
          , pointCount(0)
+         , vertexCount(0)
          , polygonVertexCount(0)
          , vertexPointIndex(0)
          , arnoldVertexIndex(0)
@@ -618,6 +620,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
 {
    info.pointCount = 0;
    info.polygonCount = 0;
+   info.vertexCount = 0;
    info.polygonVertexCount = 0;
    info.vertexPointIndex = 0;
    info.arnoldVertexIndex = 0;
@@ -667,7 +670,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
    
    AtPoint pnt;
    
-   if (meshSamples.size() == 1)
+   if (meshSamples.size() == 1 && !info.varyingTopology)
    {
       samp0 = meshSamples.begin();
       
@@ -676,6 +679,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
       Alembic::Abc::Int32ArraySamplePtr FI = samp0->data().getFaceIndices();
       
       info.pointCount = P->size();
+      info.vertexCount = FI->size();
       info.polygonCount = FC->size();
       info.polygonVertexCount = (unsigned int*) AiMalloc(sizeof(unsigned int) * FC->size());
       info.vertexPointIndex = (unsigned int*) AiMalloc(sizeof(unsigned int) * FI->size());
@@ -753,6 +757,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
          
          info.polygonCount = FC->size();
          info.pointCount = P->size();
+         info.vertexCount = FI->size();
          info.polygonVertexCount = (unsigned int*) AiMalloc(sizeof(unsigned int) * FC->size());
          info.vertexPointIndex = (unsigned int*) AiMalloc(sizeof(unsigned int) * FI->size());
          info.arnoldVertexIndex = (unsigned int*) AiMalloc(sizeof(unsigned int) * FI->size());
@@ -963,6 +968,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
                Alembic::Abc::Int32ArraySamplePtr FI = samp0->data().getFaceIndices();
                
                info.polygonCount = FC->size();
+               info.vertexCount = FI->size();
                info.polygonVertexCount = (unsigned int*) AiMalloc(sizeof(unsigned int) * FC->size());
                info.vertexPointIndex = (unsigned int*) AiMalloc(sizeof(unsigned int) * FI->size());
                info.arnoldVertexIndex = (unsigned int*) AiMalloc(sizeof(unsigned int) * FI->size());

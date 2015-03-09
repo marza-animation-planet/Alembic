@@ -39,9 +39,9 @@ bool ResizeUserAttribute(UserAttribute &ua, unsigned int newSize);
 
 bool CopyUserAttribute(UserAttribute &src, unsigned int srcIdx, unsigned int count, UserAttribute &dst, unsigned int dstIdx);
 
-void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigned int *remapIndices=0);
+void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigned int count, unsigned int *remapIndices=0);
 
-void SetUserAttributes(AtNode *node, UserAttributes &attribs, unsigned int *remapIndices=0);
+void SetUserAttributes(AtNode *node, UserAttributes &attribs, unsigned int count, unsigned int *remapIndices=0);
 
 void DestroyUserAttribute(UserAttribute &);
 
