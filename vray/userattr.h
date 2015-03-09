@@ -62,19 +62,17 @@ bool ReadUserAttribute(UserAttribute &ua,
                        const Alembic::AbcCoreAbstract::PropertyHeader &header,
                        double t,
                        bool geoparam,
-                       bool interpolate);
+                       bool interpolate,
+                       bool verbose=false);
 
 bool ResizeUserAttribute(UserAttribute &ua, unsigned int newSize);
 
 bool CopyUserAttribute(UserAttribute &src, unsigned int srcIdx, unsigned int count, UserAttribute &dst, unsigned int dstIdx);
 
 void DestroyUserAttribute(UserAttribute &);
-
 void DestroyUserAttributes(UserAttributes &);
 
-void SetUserAttributes(AlembicGeometrySource::GeomInfo *geom, UserAttributes &attribs, double t);
-
-bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, UserAttribute &ua, double t, std::set<std::string> &usedNames);
-
+bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, UserAttribute &ua, double t, std::set<std::string> &usedNames, bool verbose=false);
+void SetUserAttributes(AlembicGeometrySource::GeomInfo *geom, UserAttributes &attribs, double t, bool verbose=false);
 
 #endif

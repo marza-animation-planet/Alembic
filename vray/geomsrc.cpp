@@ -1,5 +1,6 @@
 #include "geomsrc.h"
 #include "visitors.h"
+#include "plugin.h"
 #include <algorithm>
 
 // ---
@@ -95,6 +96,8 @@ AlembicGeometrySource::GeomInfo::GeomInfo()
    , matrices(0)
    , numMatrices(0)
    , numPoints(0)
+   , numFaces(0)
+   , numFaceVertices(0)
    , numTriangles(0)
    , toVertexIndex(0)
    , toPointIndex(0)
@@ -150,6 +153,8 @@ void AlembicGeometrySource::GeomInfo::clear()
    
    numPoints = 0;
    numTriangles = 0;
+   numFaces = 0;
+   numFaceVertices = 0;
    numMatrices = 0;
    userAttr = "";
    
@@ -375,13 +380,15 @@ void AlembicGeometrySource::GeomInfo::attachParams(Factory *f)
 // ---
 
 AlembicGeometrySource::AlembicGeometrySource(VR::VRayRenderer *vray,
-                                             AlembicLoaderParams::Cache *params)
+                                             AlembicLoaderParams::Cache *params,
+                                             AlembicLoader *loader)
    : mParams(params)
    , mPluginMgr(0)
    , mScene(0)
    , mRefScene(0)
    , mRenderTime(0)
    , mRenderFrame(0)
+   , mLoader(loader)
 {
    TRACEM(AlembicGeometrySource, AlembicGeometrySource);
    
@@ -435,6 +442,14 @@ AlembicGeometrySource::AlembicGeometrySource(VR::VRayRenderer *vray,
             mScene->visit(AlembicNode::VisitDepthFirst, bldplg);
          }
       }
+   }
+}
+
+void AlembicGeometrySource::dumpVRScene(const char *path)
+{
+   if (mLoader)
+   {
+      mLoader->dumpVRScene(path);
    }
 }
 

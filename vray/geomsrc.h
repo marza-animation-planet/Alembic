@@ -46,6 +46,8 @@ struct AlembicGeometrySource : VR::VRayStaticGeometry
       
       // mesh vertex index remapping
       size_t numTriangles;
+      size_t numFaces;
+      size_t numFaceVertices;
       unsigned int *toVertexIndex;
       unsigned int *toPointIndex;
       unsigned int *toFaceIndex;
@@ -85,7 +87,8 @@ struct AlembicGeometrySource : VR::VRayStaticGeometry
    
    
    AlembicGeometrySource(VR::VRayRenderer *vray,
-                         AlembicLoaderParams::Cache *params);
+                         AlembicLoaderParams::Cache *params,
+                         class AlembicLoader *loader);
    
    virtual ~AlembicGeometrySource();
    
@@ -148,6 +151,8 @@ struct AlembicGeometrySource : VR::VRayStaticGeometry
    GeomInfo* addInfo(const std::string &path, VR::VRayPlugin *geom, VR::VRayPlugin *mod=0);
    void removeInfo(const std::string &path);
    
+   void dumpVRScene(const char *path=0);
+   
 private:
   
    bool compileMatrices(GeomInfo &info, VR::TraceTransform* &tm, double* &times, int &tmCount);
@@ -170,6 +175,8 @@ private:
    std::map<std::string, GeomInfo> mGeoms;
    
    std::map<std::string, Alembic::Abc::M44d> mRefMatrices;
+   
+   class AlembicLoader *mLoader;
 };
 
 #endif

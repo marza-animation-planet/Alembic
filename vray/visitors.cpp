@@ -602,7 +602,7 @@ void UpdateGeometry::collectUserAttributes(Alembic::Abc::ICompoundProperty userP
          // mGeoSrc->cleanAttribName(ua.first);
          InitUserAttribute(ua.second);
          
-         if (ReadUserAttribute(ua.second, userProps, header, t, false, interpolate))
+         if (ReadUserAttribute(ua.second, userProps, header, t, false, interpolate, mGeoSrc->params()->verbose))
          {
             attrs.object.insert(ua);
          }
@@ -676,7 +676,7 @@ void UpdateGeometry::collectUserAttributes(Alembic::Abc::ICompoundProperty userP
             
             if (targetAttrs)
             {
-               if (ReadUserAttribute(ua.second, geomParams, header, t, true, interpolate))
+               if (ReadUserAttribute(ua.second, geomParams, header, t, true, interpolate, mGeoSrc->params()->verbose))
                {
                   targetAttrs->insert(ua);
                }
@@ -1135,10 +1135,10 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicMesh &node, AlembicNode *i
                readMeshUVs(node, info, attrs, false);
                
                // Output user attributes (as color channels)
-               SetUserAttributes(info, attrs.object, renderFrame);
-               SetUserAttributes(info, attrs.primitive, renderFrame);
-               SetUserAttributes(info, attrs.point, renderFrame);
-               SetUserAttributes(info, attrs.vertex, renderFrame);
+               SetUserAttributes(info, attrs.object, renderFrame, mGeoSrc->params()->verbose);
+               SetUserAttributes(info, attrs.primitive, renderFrame, mGeoSrc->params()->verbose);
+               SetUserAttributes(info, attrs.point, renderFrame, mGeoSrc->params()->verbose);
+               SetUserAttributes(info, attrs.vertex, renderFrame, mGeoSrc->params()->verbose);
             }
             
             // Clear user attributes
@@ -1271,10 +1271,10 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicSubD &node, AlembicNode *i
                readMeshUVs(node, info, attrs, false);
                
                // Output user attributes (as color channels)
-               SetUserAttributes(info, attrs.object, renderFrame);
-               SetUserAttributes(info, attrs.primitive, renderFrame);
-               SetUserAttributes(info, attrs.point, renderFrame);
-               SetUserAttributes(info, attrs.vertex, renderFrame);
+               SetUserAttributes(info, attrs.object, renderFrame, mGeoSrc->params()->verbose);
+               SetUserAttributes(info, attrs.primitive, renderFrame, mGeoSrc->params()->verbose);
+               SetUserAttributes(info, attrs.point, renderFrame, mGeoSrc->params()->verbose);
+               SetUserAttributes(info, attrs.vertex, renderFrame, mGeoSrc->params()->verbose);
             }
             
             // Clear user attributes
@@ -2019,8 +2019,8 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                   std::cout << "[AlembicLoader] UpdateGeometry::enter: Output user attribute(s)" << std::endl;
                }
                
-               SetUserAttributes(info, attrs.object, renderFrame);
-               SetUserAttributes(info, attrs.point, renderFrame);
+               SetUserAttributes(info, attrs.object, renderFrame, mGeoSrc->params()->verbose);
+               SetUserAttributes(info, attrs.point, renderFrame, mGeoSrc->params()->verbose);
                
                // Reset particle IDs
                if (!info->sortIDs)

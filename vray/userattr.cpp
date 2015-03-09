@@ -319,7 +319,7 @@ const T* GetPODPtr(const Imath::Matrix44<T> &v)
 
 
 template <typename SrcT, typename DstT, class ScalarProperty>
-bool ReadScalarProperty(ScalarProperty prop, UserAttribute &ua, double t, bool interpolate)
+bool ReadScalarProperty(ScalarProperty prop, UserAttribute &ua, double t, bool interpolate, bool verbose=false)
 {
    TimeSampleList<ScalarProperty> sampler; 
    typename TimeSampleList<ScalarProperty>::ConstIterator samp0, samp1;
@@ -371,7 +371,7 @@ bool ReadScalarProperty(ScalarProperty prop, UserAttribute &ua, double t, bool i
 }
 
 template <typename SrcT, typename DstT, class ArrayProperty>
-bool ReadArrayProperty(ArrayProperty prop, UserAttribute &ua, double t, bool interpolate)
+bool ReadArrayProperty(ArrayProperty prop, UserAttribute &ua, double t, bool interpolate, bool verbose=false)
 {
    TimeSampleList<ArrayProperty> sampler;
    typename TimeSampleList<ArrayProperty>::ConstIterator samp0, samp1;
@@ -403,6 +403,11 @@ bool ReadArrayProperty(ArrayProperty prop, UserAttribute &ua, double t, bool int
    {
       ua.isArray = true;
       ua.dataCount = samp0->data()->size();
+   }
+   
+   if (verbose)
+   {
+      std::cout << "[AlembicLoader] ReadArrayProperty: " << ua.dataCount << " value(s)" << std::endl;
    }
    
    TypeHelper<SrcT, DstT>::Alloc(ua);
@@ -441,7 +446,7 @@ bool ReadArrayProperty(ArrayProperty prop, UserAttribute &ua, double t, bool int
 }
 
 template <typename SrcT, typename DstT, class GeomParam>
-bool ReadGeomParam(GeomParam param, UserAttribute &ua, double t, bool interpolate)
+bool ReadGeomParam(GeomParam param, UserAttribute &ua, double t, bool interpolate, bool verbose=false)
 {
    TimeSampleList<GeomParam> sampler; 
    typename TimeSampleList<GeomParam>::ConstIterator samp0, samp1;
@@ -462,22 +467,43 @@ bool ReadGeomParam(GeomParam param, UserAttribute &ua, double t, bool interpolat
    switch (param.getScope())
    {
    case Alembic::AbcGeom::kFacevaryingScope:
+      if (verbose)
+      {
+         std::cout << "[AlembicLoader] ReadGeomParam: Per vertex" << std::endl;
+      }
       ua.scope = FaceVarying_Scope;
       break;
    case Alembic::AbcGeom::kVertexScope:
    case Alembic::AbcGeom::kVaryingScope:
+      if (verbose)
+      {
+         std::cout << "[AlembicLoader] ReadGeomParam: Per point" << std::endl;
+      }
       ua.scope = Varying_Scope;
       break;
    case Alembic::AbcGeom::kUniformScope:
+      if (verbose)
+      {
+         std::cout << "[AlembicLoader] ReadGeomParam: Per face" << std::endl;
+      }
       ua.scope = Uniform_Scope;
       break;
    default:
+      if (verbose)
+      {
+         std::cout << "[AlembicLoader] ReadGeomParam: Constant" << std::endl;
+      }
       ua.scope = Constant_Scope;
       break;
    }
    
    ua.dataCount = (unsigned int) samp0->data().getVals()->size();
    ua.isArray = (ua.scope != Constant_Scope ? true : ua.dataCount > 1);
+   
+   if (verbose)
+   {
+      std::cout << "[AlembicLoader] ReadGeomParam: " << ua.dataCount << " value(s)" << std::endl;
+   }
    
    TypeHelper<SrcT, DstT>::Alloc(ua);
    
@@ -487,6 +513,11 @@ bool ReadGeomParam(GeomParam param, UserAttribute &ua, double t, bool interpolat
    
    if (blend > 0.0 && interpolate && ua.dataCount == samp1->data().getVals()->size())
    {
+      if (verbose)
+      {
+         std::cout << "[AlembicLoader] ReadGeomParam: Interpolate values: t0=" << samp0->time() << ", t1=" << samp1->time() << ", blend=" << blend << std::endl;
+      }
+      
       vals1 = (const SrcT *) samp1->data().getVals()->getData();
       
       double a = 1.0 - blend;
@@ -502,6 +533,11 @@ bool ReadGeomParam(GeomParam param, UserAttribute &ua, double t, bool interpolat
    }
    else
    {
+      if (verbose)
+      {
+         std::cout << "[AlembicLoader] ReadGeomParam: Use values at t=" << samp0->time() << std::endl;
+      }
+      
       for (unsigned int i=0, k=0; i<ua.dataCount; ++i)
       {
          for (unsigned int j=0; j<ua.dataDim; ++j, ++k)
@@ -519,7 +555,7 @@ bool ReadGeomParam(GeomParam param, UserAttribute &ua, double t, bool interpolat
    {
       if (param.getScope() != Alembic::AbcGeom::kFacevaryingScope)
       {
-         std::cout << "[AlembicLoader] Ignore non facevarying geo param using indices \"" << param.getName() << "\"" << std::endl;
+         std::cout << "[AlembicLoader] ReadGeomParam: Ignore non facevarying geo param using indices \"" << param.getName() << "\"" << std::endl;
          
          free(ua.data);
          ua.data = 0;
@@ -527,6 +563,11 @@ bool ReadGeomParam(GeomParam param, UserAttribute &ua, double t, bool interpolat
          ua.isArray = false;
          
          return false;
+      }
+      
+      if (verbose)
+      {
+         std::cout << "[AlembicLoader] ReadGeomParam: " << idxs->size() << " indices" << std::endl;
       }
       
       ua.indicesCount = idxs->size();
@@ -549,7 +590,8 @@ bool _ReadUserAttribute(UserAttribute &ua,
                         const Alembic::AbcCoreAbstract::PropertyHeader &header,
                         double t,
                         bool geoparam,
-                        bool interpolate)
+                        bool interpolate,
+                        bool verbose)
 {
    if (geoparam)
    {
@@ -560,7 +602,12 @@ bool _ReadUserAttribute(UserAttribute &ua,
          return false;
       }
       
-      return ReadGeomParam<SrcT, DstT>(param, ua, t, interpolate);
+      if (verbose)
+      {
+         std::cout << "[AlembicLoader] ReadUserAttribute: Read geometry param \"" << header.getName() << "\"..." << std::endl;
+      }
+      
+      return ReadGeomParam<SrcT, DstT>(param, ua, t, interpolate, verbose);
    }
    else
    {
@@ -573,7 +620,12 @@ bool _ReadUserAttribute(UserAttribute &ua,
             return false;
          }
          
-         return ReadScalarProperty<SrcT, DstT>(prop, ua, t, interpolate);
+         if (verbose)
+         {
+            std::cout << "[AlembicLoader] ReadUserAttribute: Read scalar property \"" << header.getName() << "\"..." << std::endl;
+         }
+         
+         return ReadScalarProperty<SrcT, DstT>(prop, ua, t, interpolate, verbose);
       }
       else if (header.isArray())
       {
@@ -584,7 +636,12 @@ bool _ReadUserAttribute(UserAttribute &ua,
             return false;
          }
          
-         return ReadArrayProperty<SrcT, DstT>(prop, ua, t, interpolate);
+         if (verbose)
+         {
+            std::cout << "[AlembicLoader] ReadUserAttribute: Read array property \"" << header.getName() << "\"..." << std::endl;
+         }
+         
+         return ReadArrayProperty<SrcT, DstT>(prop, ua, t, interpolate, verbose);
       }
       else
       {
@@ -598,7 +655,8 @@ bool ReadUserAttribute(UserAttribute &ua,
                        const Alembic::AbcCoreAbstract::PropertyHeader &header,
                        double t,
                        bool geoparam,
-                       bool interpolate)
+                       bool interpolate,
+                       bool verbose)
 {
    std::string interp = "";
    
@@ -632,59 +690,59 @@ bool ReadUserAttribute(UserAttribute &ua,
    case Alembic::Util::kBooleanPOD:
       if (ua.dataDim != 1) return false;
       ua.dataType = Bool_Type;
-      return _ReadUserAttribute<Alembic::Abc::BooleanTPTraits, Alembic::Util::bool_t, bool>(ua, parent, header, t, geoparam, interpolate);
+      return _ReadUserAttribute<Alembic::Abc::BooleanTPTraits, Alembic::Util::bool_t, bool>(ua, parent, header, t, geoparam, interpolate, verbose);
    
    case Alembic::Util::kUint8POD:
       if (ua.dataDim != 1) return false;
       ua.dataType = Uint_Type;
-      return _ReadUserAttribute<Alembic::Abc::Uint8TPTraits, Alembic::Util::uint8_t, unsigned int>(ua, parent, header, t, geoparam, interpolate);
+      return _ReadUserAttribute<Alembic::Abc::Uint8TPTraits, Alembic::Util::uint8_t, unsigned int>(ua, parent, header, t, geoparam, interpolate, verbose);
       
    case Alembic::Util::kUint16POD:
       if (ua.dataDim != 1) return false;
       ua.dataType = Uint_Type;
-      return _ReadUserAttribute<Alembic::Abc::Uint16TPTraits, Alembic::Util::uint16_t, unsigned int>(ua, parent, header, t, geoparam, interpolate);
+      return _ReadUserAttribute<Alembic::Abc::Uint16TPTraits, Alembic::Util::uint16_t, unsigned int>(ua, parent, header, t, geoparam, interpolate, verbose);
       
    case Alembic::Util::kUint32POD:
       if (ua.dataDim != 1) return false;
       ua.dataType = Uint_Type;
-      return _ReadUserAttribute<Alembic::Abc::Uint32TPTraits, Alembic::Util::uint32_t, unsigned int>(ua, parent, header, t, geoparam, interpolate);
+      return _ReadUserAttribute<Alembic::Abc::Uint32TPTraits, Alembic::Util::uint32_t, unsigned int>(ua, parent, header, t, geoparam, interpolate, verbose);
       
    case Alembic::Util::kUint64POD:
       if (ua.dataDim != 1) return false;
       ua.dataType = Uint_Type;
-      return _ReadUserAttribute<Alembic::Abc::Uint64TPTraits, Alembic::Util::uint64_t, unsigned int>(ua, parent, header, t, geoparam, interpolate);
+      return _ReadUserAttribute<Alembic::Abc::Uint64TPTraits, Alembic::Util::uint64_t, unsigned int>(ua, parent, header, t, geoparam, interpolate, verbose);
    
    case Alembic::Util::kInt8POD:
       if (ua.dataDim != 1) return false;
       ua.dataType = Int_Type;
-      return _ReadUserAttribute<Alembic::Abc::Int8TPTraits, Alembic::Util::int8_t, int>(ua, parent, header, t, geoparam, interpolate);
+      return _ReadUserAttribute<Alembic::Abc::Int8TPTraits, Alembic::Util::int8_t, int>(ua, parent, header, t, geoparam, interpolate, verbose);
    
    case Alembic::Util::kInt16POD:
       if (ua.dataDim != 1) return false;
       ua.dataType = Int_Type;
-      return _ReadUserAttribute<Alembic::Abc::Int16TPTraits, Alembic::Util::int16_t, int>(ua, parent, header, t, geoparam, interpolate);
+      return _ReadUserAttribute<Alembic::Abc::Int16TPTraits, Alembic::Util::int16_t, int>(ua, parent, header, t, geoparam, interpolate, verbose);
       
    case Alembic::Util::kInt32POD:
       if (ua.dataDim != 1) return false;
       ua.dataType = Int_Type;
-      return _ReadUserAttribute<Alembic::Abc::Int32TPTraits, Alembic::Util::int32_t, int>(ua, parent, header, t, geoparam, interpolate);
+      return _ReadUserAttribute<Alembic::Abc::Int32TPTraits, Alembic::Util::int32_t, int>(ua, parent, header, t, geoparam, interpolate, verbose);
       
    case Alembic::Util::kInt64POD:
       if (ua.dataDim != 1) return false;
       ua.dataType = Int_Type;
-      return _ReadUserAttribute<Alembic::Abc::Int64TPTraits, Alembic::Util::int64_t, int>(ua, parent, header, t, geoparam, interpolate);
+      return _ReadUserAttribute<Alembic::Abc::Int64TPTraits, Alembic::Util::int64_t, int>(ua, parent, header, t, geoparam, interpolate, verbose);
    
    case Alembic::Util::kFloat16POD:
       ua.dataType = Float_Type;
       switch (ua.dataDim)
       {
       case 1:
-         return _ReadUserAttribute<Alembic::Abc::Float16TPTraits, Alembic::Util::float16_t, float>(ua, parent, header, t, geoparam, interpolate);   
+         return _ReadUserAttribute<Alembic::Abc::Float16TPTraits, Alembic::Util::float16_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);   
       case 3:
          if (interp.find("rgb") != std::string::npos)
          {
             ua.usage = Use_As_Color;
-            return _ReadUserAttribute<Alembic::Abc::C3hTPTraits, Alembic::Util::float16_t, float>(ua, parent, header, t, geoparam, interpolate);   
+            return _ReadUserAttribute<Alembic::Abc::C3hTPTraits, Alembic::Util::float16_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);   
          }
          else
          {
@@ -695,7 +753,7 @@ bool ReadUserAttribute(UserAttribute &ua,
          if (interp.find("rgba") != std::string::npos)
          {
             ua.usage = Use_As_Color;
-            return _ReadUserAttribute<Alembic::Abc::C4hTPTraits, Alembic::Util::float16_t, float>(ua, parent, header, t, geoparam, interpolate);   
+            return _ReadUserAttribute<Alembic::Abc::C4hTPTraits, Alembic::Util::float16_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);   
          }
          else
          {
@@ -713,22 +771,22 @@ bool ReadUserAttribute(UserAttribute &ua,
       switch (ua.dataDim)
       {
       case 1:
-         return _ReadUserAttribute<Alembic::Abc::Float32TPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
+         return _ReadUserAttribute<Alembic::Abc::Float32TPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);
       case 2:
          if (interp.find("point") != std::string::npos)
          {
             ua.usage = Use_As_Point;
-            return _ReadUserAttribute<Alembic::Abc::P2fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
+            return _ReadUserAttribute<Alembic::Abc::P2fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);
          }
          else if (interp.find("normal") != std::string::npos)
          {
             ua.usage = Use_As_Normal;
-            return _ReadUserAttribute<Alembic::Abc::N2fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
+            return _ReadUserAttribute<Alembic::Abc::N2fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);
          }
          else if (interp.find("vector") != std::string::npos)
          {
             ua.usage = Use_As_Vector;
-            return _ReadUserAttribute<Alembic::Abc::V2fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
+            return _ReadUserAttribute<Alembic::Abc::V2fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);
          }
          else
          {
@@ -739,24 +797,24 @@ bool ReadUserAttribute(UserAttribute &ua,
          if (interp.find("point") != std::string::npos)
          {
             ua.usage = Use_As_Point;
-            return _ReadUserAttribute<Alembic::Abc::P3fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
+            return _ReadUserAttribute<Alembic::Abc::P3fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);
          }
          else if (interp.find("rgb") != std::string::npos)
          {
             ua.usage = Use_As_Color;
-            return _ReadUserAttribute<Alembic::Abc::C3fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
+            return _ReadUserAttribute<Alembic::Abc::C3fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);
          }
          else
          {
             if (interp.find("normal") != std::string::npos)
             {
                ua.usage = Use_As_Normal;
-               return _ReadUserAttribute<Alembic::Abc::N3fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
+               return _ReadUserAttribute<Alembic::Abc::N3fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);
             }
             else if (interp.find("vector") != std::string::npos)
             {
                ua.usage = Use_As_Vector;
-               return _ReadUserAttribute<Alembic::Abc::V3fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
+               return _ReadUserAttribute<Alembic::Abc::V3fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);
             }
             else
             {
@@ -768,7 +826,7 @@ bool ReadUserAttribute(UserAttribute &ua,
          if (interp.find("rgba") != std::string::npos)
          {
             ua.usage = Use_As_Color;
-            return _ReadUserAttribute<Alembic::Abc::C4fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
+            return _ReadUserAttribute<Alembic::Abc::C4fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);
          }
          else
          {
@@ -777,7 +835,7 @@ bool ReadUserAttribute(UserAttribute &ua,
          }
       case 16:
          ua.usage = Use_As_Matrix;
-         return _ReadUserAttribute<Alembic::Abc::M44fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
+         return _ReadUserAttribute<Alembic::Abc::M44fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);
       default:
          std::cout << "[AlembicLoader] ReadUserAttribute: Unhandled dimension " << ua.dataDim << " for Float32 POD data for \"" << header.getName() << "\" attribute" << std::endl;
          return false;
@@ -789,22 +847,22 @@ bool ReadUserAttribute(UserAttribute &ua,
       switch (ua.dataDim)
       {
       case 1:
-         return _ReadUserAttribute<Alembic::Abc::Float64TPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
+         return _ReadUserAttribute<Alembic::Abc::Float64TPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);
       case 2:
          if (interp.find("point") != std::string::npos)
          {
             ua.usage = Use_As_Point;
-            return _ReadUserAttribute<Alembic::Abc::P2dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
+            return _ReadUserAttribute<Alembic::Abc::P2dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);
          }
          else if (interp.find("normal") != std::string::npos)
          {
             ua.usage = Use_As_Normal;
-            return _ReadUserAttribute<Alembic::Abc::N2dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
+            return _ReadUserAttribute<Alembic::Abc::N2dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);
          }
          else if (interp.find("vector") != std::string::npos)
          {
             ua.usage = Use_As_Vector;
-            return _ReadUserAttribute<Alembic::Abc::V2dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
+            return _ReadUserAttribute<Alembic::Abc::V2dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);
          }
          else
          {
@@ -816,19 +874,19 @@ bool ReadUserAttribute(UserAttribute &ua,
          if (interp.find("point") != std::string::npos)
          {
             ua.usage = Use_As_Point;
-            return _ReadUserAttribute<Alembic::Abc::P3dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
+            return _ReadUserAttribute<Alembic::Abc::P3dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);
          }
          else
          {
             if (interp.find("normal") != std::string::npos)
             {
                ua.usage = Use_As_Normal;
-               return _ReadUserAttribute<Alembic::Abc::N3dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
+               return _ReadUserAttribute<Alembic::Abc::N3dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);
             }
             else if (interp.find("vector") != std::string::npos)
             {
                ua.usage = Use_As_Vector;
-               return _ReadUserAttribute<Alembic::Abc::V3dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
+               return _ReadUserAttribute<Alembic::Abc::V3dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);
             }
             else
             {
@@ -838,7 +896,7 @@ bool ReadUserAttribute(UserAttribute &ua,
          }
       case 16:
          ua.usage = Use_As_Matrix;
-         return _ReadUserAttribute<Alembic::Abc::M44dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
+         return _ReadUserAttribute<Alembic::Abc::M44dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate, verbose);
       case 4:
          // QuatdTPTraits no supported
          // no C4dTPTraits
@@ -851,7 +909,7 @@ bool ReadUserAttribute(UserAttribute &ua,
    case Alembic::Util::kStringPOD:
       if (ua.dataDim != 1) return false;
       ua.dataType = String_Type;
-      return _ReadUserAttribute<Alembic::Abc::StringTPTraits, std::string, const char*>(ua, parent, header, t, geoparam, interpolate);
+      return _ReadUserAttribute<Alembic::Abc::StringTPTraits, std::string, const char*>(ua, parent, header, t, geoparam, interpolate, verbose);
    
    default:
       std::cout << "[AlembicLoader] ReadUserAttribute: Unhandled POD type (" << ua.abcType.getPod() << ") for \"" << header.getName() << "\" attribute" << std::endl;
@@ -861,7 +919,7 @@ bool ReadUserAttribute(UserAttribute &ua,
    return false;
 }
 
-void SetUserAttributes(AlembicGeometrySource::GeomInfo *geom, UserAttributes &attribs, double t)
+void SetUserAttributes(AlembicGeometrySource::GeomInfo *geom, UserAttributes &attribs, double t, bool verbose)
 {
    //if (!geom || !geom->channelNames)
    if (!geom)
@@ -893,7 +951,7 @@ void SetUserAttributes(AlembicGeometrySource::GeomInfo *geom, UserAttributes &at
          continue;
       }
       
-      if (SetUserAttribute(geom, it->first.c_str(), it->second, t, usedNames) && it->second.scope != Constant_Scope)
+      if (SetUserAttribute(geom, it->first.c_str(), it->second, t, usedNames, verbose) && it->second.scope != Constant_Scope)
       {
          if (geom->channelNames)
          {
@@ -902,9 +960,10 @@ void SetUserAttributes(AlembicGeometrySource::GeomInfo *geom, UserAttributes &at
             geom->channelNames->setCount(idx+1, t);
             geom->channelNames->setString(it->first.c_str(), idx, t);
             
-            #ifdef _DEBUG
-            std::cout << "[AlembicLoader] SetUserAttribtues: Added user defined channel \"" << it->first << "\"" << std::endl;
-            #endif
+            if (verbose)
+            {
+               std::cout << "[AlembicLoader] SetUserAttribtues: Added user defined channel \"" << it->first << "\"" << std::endl;
+            }
          }
          
          usedNames.insert(it->first.c_str());
@@ -914,7 +973,7 @@ void SetUserAttributes(AlembicGeometrySource::GeomInfo *geom, UserAttributes &at
    }
 }
 
-bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, UserAttribute &ua, double t, std::set<std::string> &usedNames)
+bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, UserAttribute &ua, double t, std::set<std::string> &usedNames, bool verbose)
 {
    if (!geom || !ua.data)
    {
@@ -924,12 +983,12 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
    // Type check
    if (ua.dataType < 0 || ua.dataType > String_Type)
    {
-      std::cout << "[AlembicLoader] SetUserAttribute: Undefined user attribute type" << std::endl;
+      std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Undefined user attribute type" << std::endl;
       return false;
    }
    else if (ua.dataType == String_Type)
    {
-      std::cout << "[AlembicLoader] SetUserAttribute: String user attribute not supported by V-Ray" << std::endl;
+      std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" String user attribute not supported by V-Ray" << std::endl;
       return false;
    }
    
@@ -938,7 +997,7 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
    {
       if (ua.dataDim != 1)
       {
-         std::cout << "[AlembicLoader] SetUserAttribute: Unsupported data dimension" << std::endl;
+         std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Unsupported data dimension" << std::endl;
          return false;
       }
    }
@@ -946,7 +1005,7 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
    {
       if (ua.dataDim < 1 || ua.dataDim > 4)
       {
-         std::cout << "[AlembicLoader] SetUserAttribute: Unsupported data dimension" << std::endl;
+         std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Unsupported data dimension" << std::endl;
          return false;
       }  
    }
@@ -1030,12 +1089,12 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
          }
          break;
       default:
-         std::cerr << "[AlembicLoader] SetUserAttribute: Unsupported data type" << std::endl;
+         std::cerr << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Unsupported data type" << std::endl;
          return false;
       }
       
       #ifdef _DEBUG
-      std::cout << "[AlembicLoader] SetUserAttribute: Updated user attribute string to \"" << geom->userAttr << "\"" << std::endl;
+      std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Updated user attribute string to \"" << geom->userAttr << "\"" << std::endl;
       #endif
       
       return true;
@@ -1044,6 +1103,42 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
    {
       if (geom->channels)
       {
+         if (ua.scope == Uniform_Scope)
+         {
+            if (ua.dataCount != geom->numFaces)
+            {
+               std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Invalid values count (" << ua.dataCount << ", expected " << geom->numFaces << ")" << std::endl;
+               return false;
+            }
+         }
+         else if (ua.scope == Varying_Scope)
+         {
+            if (ua.dataCount != geom->numPoints)
+            {
+               std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Invalid values count (" << ua.dataCount << ", expected " << geom->numPoints << ")" << std::endl;
+               return false;
+            }
+         }
+         else
+         {
+            if (ua.indices)
+            {
+               if (ua.indicesCount != geom->numFaceVertices)
+               {
+                  std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Invalid indices count (" << ua.indicesCount << ", expected " << geom->numFaceVertices << ")" << std::endl;
+                  return false;
+               }
+            }
+            else
+            {
+               if (ua.dataCount != geom->numFaceVertices)
+               {
+                  std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Invalid values count (" << ua.dataCount << ", expected " << geom->numFaceVertices << ")" << std::endl;
+                  return false;
+               }
+            }
+         }
+         
          // mesh / subd
          VR::DefMapChannelsParam::MapChannelList &channels = geom->channels->getMapChannels();
          
@@ -1119,7 +1214,7 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
             }
             break;
          default:
-            std::cerr << "[AlembicLoader] SetUserAttribute: Unsupported data type" << std::endl;
+            std::cerr << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Unsupported data type" << std::endl;
             return false;
          }
          
@@ -1181,19 +1276,19 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
          // particles
          if (ua.scope != Varying_Scope)
          {
-            std::cout << "[AlembicLoader] SetUserAttribute: Only constant and varying attributes supported on points primitives" << std::endl;
+            std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Only constant and varying attributes supported on points primitives" << std::endl;
             return false;
          }
          
          if (geom->numPoints != ua.dataCount)
          {
-            std::cout << "[AlembicLoader] SetUserAttribute: Invalid size for point attribute \"" << name << "\" (got " << ua.dataCount << " expected " << geom->numPoints << ")" << std::endl;
+            std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Invalid size for point attribute \"" << name << "\" (got " << ua.dataCount << " expected " << geom->numPoints << ")" << std::endl;
             return false;
          }
          
          if (!geom->particleOrder)
          {
-            std::cout << "[AlembicLoader] SetUserAttribute: No particle order defined" << std::endl;
+            std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" No particle order defined" << std::endl;
             return false;
          }
          
@@ -1368,19 +1463,19 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
             }
             break;
          default:
-            std::cerr << "[AlembicLoader] SetUserAttribute: Unsupported data type" << std::endl;
+            std::cerr << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Unsupported data type" << std::endl;
             return false;
          }
       }
       else
       {
-         std::cerr << "[AlembicLoader] SetUserAttributes: Unsupported target primitive" << std::endl;
+         std::cerr << "[AlembicLoader] SetUserAttributes: \"" << name << "\" Unsupported target primitive" << std::endl;
          return false;
       }
    }
    else
    {
-      std::cerr << "[AlembicLoader] SetUserAttribute: Invalid user attribute scope" << std::endl;
+      std::cerr << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Invalid user attribute scope" << std::endl;
       return false;
    }
 }

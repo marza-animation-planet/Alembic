@@ -39,7 +39,7 @@ void AlembicLoader::preRenderBegin(VR::VRayRenderer *vray)
    
    paramList->cacheParams();
    
-   mGeoSrc = new AlembicGeometrySource(vray, &mParams);
+   mGeoSrc = new AlembicGeometrySource(vray, &mParams, this);
    
    if (!mGeoSrc->isValid())
    {
