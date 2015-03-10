@@ -98,6 +98,576 @@ double getWeightIndexAndTime(double iFrame,
     }
 }
 
+template <typename MayaArrayType> struct MayaArrayElementType
+{
+    typedef void* T;
+};
+
+template <> struct MayaArrayElementType<MDoubleArray>
+{
+    typedef double T;
+};
+
+template <> struct MayaArrayElementType<MVectorArray>
+{
+    typedef MVector T;
+};
+
+template <typename AbcType, typename MayaType> struct AbcToMaya
+{
+    static void Set(const AbcType &src, MayaType &dst)
+    {
+    }
+    
+    static void Reset(MayaType &dst)
+    {
+    }
+    
+    static void Blend(const AbcType &src0, const AbcType &src1, double b, MayaType &dst)
+    {
+    }
+};
+
+template <typename AbcType> struct AbcToMaya<AbcType, double>
+{
+    static void Set(const AbcType &src, double &dst)
+    {
+        dst = double(src);
+    }
+    
+    static void Reset(double &dst)
+    {
+        dst = 0.0;
+    }
+    
+    static void Blend(const AbcType &src0, const AbcType &src1, double b, double &dst)
+    {
+        dst = (1.0 - b) * double(src0) + b * double(src1);
+    }
+};
+
+template <typename AbcType> struct AbcToMaya<AbcType, MVector>
+{
+    static void Set(const AbcType &src, MVector &dst)
+    {
+        dst.x = double(src);
+        dst.y = dst.x;
+        dst.z = dst.x;
+    }
+    
+    static void Reset(MVector &dst)
+    {
+        dst.x = 0.0;
+        dst.y = 0.0;
+        dst.z = 0.0;
+    }
+    
+    static void Blend(const AbcType &src0, const AbcType &src1, double b, MVector &dst)
+    {
+        dst.x = (1.0 - b) * double(src0) + b * double(src1);
+        dst.y = dst.x;
+        dst.z = dst.x;
+    }
+};
+
+template <> struct AbcToMaya<Alembic::Abc::bool_t, double>
+{
+    static void Set(const Alembic::Util::bool_t &src, double &dst)
+    {
+        dst = (src ? 1.0 : 0.0);
+    }
+    
+    static void Reset(double &dst)
+    {
+        dst = 0.0;
+    }
+    
+    static void Blend(const Alembic::Util::bool_t &src0, const Alembic::Util::bool_t &src1, double b, double &dst)
+    {
+        dst = (b > 0.5 ? (src1 ? 1.0 : 0.0) : (src0 ? 1.0 : 0.0));
+    }
+};
+
+template <> struct AbcToMaya<Alembic::Abc::C3h, MVector>
+{
+    static void Set(const Alembic::Abc::C3h &src, MVector &dst)
+    {
+        dst.x = src.x;
+        dst.y = src.y;
+        dst.z = src.z;
+    }
+    
+    static void Reset(MVector &dst)
+    {
+        dst.x = 0.0;
+        dst.y = 0.0;
+        dst.z = 0.0;
+    }
+    
+    static void Blend(const Alembic::Abc::C3h &src0, const Alembic::Abc::C3h &src1, double b, MVector &dst)
+    {
+        MVector v0(src0.x, src0.y, src0.z);
+        MVector v1(src1.x, src1.y, src1.z);
+        
+        dst = (1.0 - b) * v0 + b * v1;
+    }
+};
+
+template <> struct AbcToMaya<Alembic::Abc::V3f, MVector>
+{
+    static void Set(const Alembic::Abc::V3f &src, MVector &dst)
+    {
+        dst.x = src.x;
+        dst.y = src.y;
+        dst.z = src.z;
+    }
+    
+    static void Reset(MVector &dst)
+    {
+        dst.x = 0.0;
+        dst.y = 0.0;
+        dst.z = 0.0;
+    }
+    
+    static void Blend(const Alembic::Abc::V3f &src0, const Alembic::Abc::V3f &src1, double b, MVector &dst)
+    {
+        MVector v0(src0.x, src0.y, src0.z);
+        MVector v1(src1.x, src1.y, src1.z);
+        
+        dst = (1.0 - b) * v0 + b * v1;
+    }
+};
+
+template <> struct AbcToMaya<Alembic::Abc::V3d, MVector>
+{
+    static void Set(const Alembic::Abc::V3d &src, MVector &dst)
+    {
+        dst.x = src.x;
+        dst.y = src.y;
+        dst.z = src.z;
+    }
+    
+    static void Reset(MVector &dst)
+    {
+        dst.x = 0.0;
+        dst.y = 0.0;
+        dst.z = 0.0;
+    }
+    
+    static void Blend(const Alembic::Abc::V3d &src0, const Alembic::Abc::V3d &src1, double b, MVector &dst)
+    {
+        MVector v0(src0.x, src0.y, src0.z);
+        MVector v1(src1.x, src1.y, src1.z);
+        
+        dst = (1.0 - b) * v0 + b * v1;
+    }
+};
+
+template <typename Traits, typename MayaArrayType>
+void FillValues(Alembic::Abc::ICompoundProperty geomParams, const std::string &name, double t, MayaArrayType &out,
+                size_t sz0, size_t sz1=0, const Alembic::Abc::uint64_t *ids0=0, const std::map<size_t, size_t> *idmap=0)
+{
+    Alembic::AbcGeom::ITypedGeomParam<Traits> prop(geomParams, name);
+    
+    Alembic::AbcCoreAbstract::index_t iprev = 0;
+    Alembic::AbcCoreAbstract::index_t inext = 0;
+    double tprev = 0.0;
+    double tnext = 0.0;
+    
+    double blend = getWeightIndexAndTime(t, prop.getTimeSampling(), prop.getNumSamples(), iprev, inext, tprev, tnext);
+    
+    if (blend > 0.0)
+    {
+        typename Alembic::AbcGeom::ITypedGeomParam<Traits>::Sample samp0 = prop.getExpandedValue(iprev);
+        typename Alembic::AbcGeom::ITypedGeomParam<Traits>::Sample samp1 = prop.getExpandedValue(inext);
+        
+        size_t count = samp0.getVals()->size();
+        
+        if (count != sz0)
+        {
+            for (size_t i=0; i<sz0; ++i)
+            {
+                AbcToMaya<typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type, typename MayaArrayElementType<MayaArrayType>::T>::Reset(out[i]);
+            }
+        }
+        else
+        {
+            const typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type *vptr0 = samp0.getVals()->get();
+            
+            if (samp1.getVals()->size() != sz1 || !ids0 || !idmap)
+            {
+                for (size_t i=0; i<sz0; ++i)
+                {
+                    AbcToMaya<typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type, typename MayaArrayElementType<MayaArrayType>::T>::Set(vptr0[i], out[i]);
+                }
+            }
+            else
+            {
+                const typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type *vptr1 = samp1.getVals()->get();
+                
+                std::map<size_t, size_t>::const_iterator idit;
+                
+                for (size_t i=0; i<sz0; ++i)
+                {
+                    idit = idmap->find(ids0[i]);
+                    
+                    if (idit != idmap->end())
+                    {
+                        AbcToMaya<typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type, typename MayaArrayElementType<MayaArrayType>::T>::Blend(vptr0[i], vptr1[idit->second], blend, out[i]);
+                    }
+                    else
+                    {
+                        AbcToMaya<typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type, typename MayaArrayElementType<MayaArrayType>::T>::Set(vptr0[i], out[i]);
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        typename Alembic::AbcGeom::ITypedGeomParam<Traits>::Sample samp = prop.getExpandedValue(iprev);
+        
+        size_t count = samp.getVals()->size();
+        
+        if (count != sz0)
+        {
+            for (size_t i=0; i<sz0; ++i)
+            {
+                AbcToMaya<typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type, typename MayaArrayElementType<MayaArrayType>::T>::Reset(out[i]);
+            }
+        }
+        else
+        {
+            const typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type *vptr = samp.getVals()->get();
+            
+            for (size_t i=0; i<sz0; ++i)
+            {
+                AbcToMaya<typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type, typename MayaArrayElementType<MayaArrayType>::T>::Set(vptr[i], out[i]);
+            }
+        }
+    }
+}
+
+void ReadAttributes(double t, const Alembic::AbcGeom::IPoints & iNode, MFnArrayAttrsData & fnAttrs,
+                    size_t sz0, size_t sz1=0, const Alembic::Abc::uint64_t *ids0=0, const std::map<size_t, size_t> *idmap=0)
+{
+    Alembic::AbcGeom::IPointsSchema schema = iNode.getSchema();
+    
+    Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
+    
+    Alembic::AbcCoreAbstract::index_t iprev, inext;
+    double tprev, tnext, blend;
+    MStatus stat;
+    
+    for (size_t i=0; i<geomParams.getNumProperties(); ++i)
+    {
+        const Alembic::AbcCoreAbstract::PropertyHeader &header = geomParams.getPropertyHeader(i);
+        
+        Alembic::AbcGeom::GeometryScope scope = Alembic::AbcGeom::GetGeometryScope(header.getMetaData());
+        
+        if (scope != Alembic::AbcGeom::kVaryingScope)
+        {
+            continue;
+        }
+        
+        Alembic::AbcCoreAbstract::DataType abcType = header.getDataType();
+        std::string usage = header.getMetaData().get("interpretation");
+        unsigned int dim = abcType.getExtent();
+        
+        MString attrName = header.getName().c_str();
+        MFnArrayAttrsData::Type attrType;
+        
+        switch (abcType.getPod())
+        {
+        case Alembic::Util::kBooleanPOD:
+            if (dim == 1)
+            {
+                MDoubleArray dArray = fnAttrs.doubleArray(attrName);
+                dArray.setLength(sz0);
+                FillValues<Alembic::Abc::BooleanTPTraits>(geomParams, header.getName(), t, dArray, sz0, sz1, ids0, idmap);
+            }
+            break;
+        case Alembic::Util::kInt8POD:
+            if (dim == 1)
+            {
+                MDoubleArray dArray = fnAttrs.doubleArray(attrName);
+                dArray.setLength(sz0);
+                FillValues<Alembic::Abc::Int8TPTraits>(geomParams, header.getName(), t, dArray, sz0, sz1, ids0, idmap);
+            }
+            break;
+        case Alembic::Util::kInt16POD:
+            if (dim == 1)
+            {
+                MDoubleArray dArray = fnAttrs.doubleArray(attrName);
+                dArray.setLength(sz0);
+                FillValues<Alembic::Abc::Int16TPTraits>(geomParams, header.getName(), t, dArray, sz0, sz1, ids0, idmap);
+            }
+            break;
+        case Alembic::Util::kInt32POD:
+            if (dim == 1)
+            {
+                MDoubleArray dArray = fnAttrs.doubleArray(attrName);
+                dArray.setLength(sz0);
+                FillValues<Alembic::Abc::Int32TPTraits>(geomParams, header.getName(), t, dArray, sz0, sz1, ids0, idmap);
+            }
+            break;
+        case Alembic::Util::kInt64POD:
+            if (dim == 1)
+            {
+                MDoubleArray dArray = fnAttrs.doubleArray(attrName);
+                dArray.setLength(sz0);
+                FillValues<Alembic::Abc::Int64TPTraits>(geomParams, header.getName(), t, dArray, sz0, sz1, ids0, idmap);
+            }
+            break;
+        case Alembic::Util::kUint8POD:
+            if (dim == 1)
+            {
+                MDoubleArray dArray = fnAttrs.doubleArray(attrName);
+                dArray.setLength(sz0);
+                FillValues<Alembic::Abc::Uint8TPTraits>(geomParams, header.getName(), t, dArray, sz0, sz1, ids0, idmap);
+            }
+            break;
+        case Alembic::Util::kUint16POD:
+            if (dim == 1)
+            {
+                MDoubleArray dArray = fnAttrs.doubleArray(attrName);
+                dArray.setLength(sz0);
+                FillValues<Alembic::Abc::Uint16TPTraits>(geomParams, header.getName(), t, dArray, sz0, sz1, ids0, idmap);
+            }
+            break;
+        case Alembic::Util::kUint32POD:
+            if (dim == 1)
+            {
+                MDoubleArray dArray = fnAttrs.doubleArray(attrName);
+                dArray.setLength(sz0);
+                FillValues<Alembic::Abc::Uint32TPTraits>(geomParams, header.getName(), t, dArray, sz0, sz1, ids0, idmap);
+            }
+            break;
+        case Alembic::Util::kUint64POD:
+            if (dim == 1)
+            {
+                MDoubleArray dArray = fnAttrs.doubleArray(attrName);
+                dArray.setLength(sz0);
+                FillValues<Alembic::Abc::Uint64TPTraits>(geomParams, header.getName(), t, dArray, sz0, sz1, ids0, idmap);
+            }
+            break;
+        case Alembic::Util::kFloat16POD:
+            if (dim == 1)
+            {
+                MDoubleArray dArray = fnAttrs.doubleArray(attrName);
+                dArray.setLength(sz0);
+                FillValues<Alembic::Abc::Float16TPTraits>(geomParams, header.getName(), t, dArray, sz0, sz1, ids0, idmap);
+            }
+            else if (dim == 3)
+            {
+                MVectorArray vArray = fnAttrs.vectorArray(attrName);
+                vArray.setLength(sz0);
+                FillValues<Alembic::Abc::C3hTPTraits>(geomParams, header.getName(), t, vArray, sz0, sz1, ids0, idmap);
+            }
+            break;
+        case Alembic::Util::kFloat32POD:
+            if (dim == 1)
+            {
+                MDoubleArray dArray = fnAttrs.doubleArray(attrName);
+                dArray.setLength(sz0);
+                FillValues<Alembic::Abc::Float32TPTraits>(geomParams, header.getName(), t, dArray, sz0, sz1, ids0, idmap);
+            }
+            else if (dim == 3)
+            {
+                MVectorArray vArray = fnAttrs.vectorArray(attrName);
+                vArray.setLength(sz0);
+                FillValues<Alembic::Abc::V3fTPTraits>(geomParams, header.getName(), t, vArray, sz0, sz1, ids0, idmap);
+            }
+            break;
+        case Alembic::Util::kFloat64POD:
+            if (dim == 1)
+            {
+                MDoubleArray dArray = fnAttrs.doubleArray(attrName);
+                dArray.setLength(sz0);
+                FillValues<Alembic::Abc::Float64TPTraits>(geomParams, header.getName(), t, dArray, sz0, sz1, ids0, idmap);
+            }
+            else if (dim == 3)
+            {
+                MVectorArray vArray = fnAttrs.vectorArray(attrName);
+                vArray.setLength(sz0);
+                FillValues<Alembic::Abc::V3dTPTraits>(geomParams, header.getName(), t, vArray, sz0, sz1, ids0, idmap);
+            }
+            break;
+        default:
+            break;
+        }   
+    }
+}
+
+void CreateArrayAttr(const MString &nodeName, const MString &attrType, const MString &attrName)
+{
+    MString scr;
+    
+    scr += "if (!`attributeExists " + attrName + " " + nodeName + "`) {\n";
+    scr += "  addAttr -ln " + attrName + "0 -dt " + attrType + "Array " + nodeName + ";\n";
+    scr += "  addAttr -ln " + attrName + " -dt " + attrType + "Array " + nodeName + ";\n";
+    scr += "  setAttr -e -keyable true " + nodeName + "." + attrName + ";\n";
+    scr += "}";
+    
+    MGlobal::executeCommand(scr);
+}
+
+void CreateAttributes(double t, const Alembic::AbcGeom::IPoints & iNode, MFnParticleSystem & fnParticle, size_t sz)
+{
+    Alembic::AbcGeom::IPointsSchema schema = iNode.getSchema();
+    
+    Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
+    
+    MDoubleArray dArray;
+    MVectorArray vArray;
+    Alembic::AbcCoreAbstract::index_t iprev, inext;
+    double tprev, tnext, blend;
+    MStatus stat;
+    
+    dArray.setLength(sz);
+    vArray.setLength(sz);
+    
+    MString nodeName = fnParticle.name();
+    
+    for (size_t i=0; i<geomParams.getNumProperties(); ++i)
+    {
+        const Alembic::AbcCoreAbstract::PropertyHeader &header = geomParams.getPropertyHeader(i);
+        
+        Alembic::AbcGeom::GeometryScope scope = Alembic::AbcGeom::GetGeometryScope(header.getMetaData());
+        
+        if (scope != Alembic::AbcGeom::kVaryingScope)
+        {
+            continue;
+        }
+        
+        Alembic::AbcCoreAbstract::DataType abcType = header.getDataType();
+        std::string usage = header.getMetaData().get("interpretation");
+        unsigned int dim = abcType.getExtent();
+        
+        MString attrName = header.getName().c_str();
+        
+        switch (abcType.getPod())
+        {
+        case Alembic::Util::kBooleanPOD:
+            if (dim == 1)
+            {
+                FillValues<Alembic::Abc::BooleanTPTraits>(geomParams, header.getName(), t, dArray, sz);
+                CreateArrayAttr(nodeName, "double", attrName);
+                fnParticle.setPerParticleAttribute(attrName, dArray);
+            }
+            break;
+        case Alembic::Util::kInt8POD:
+            if (dim == 1)
+            {
+                FillValues<Alembic::Abc::Int8TPTraits>(geomParams, header.getName(), t, dArray, sz);
+                CreateArrayAttr(nodeName, "double", attrName);
+                fnParticle.setPerParticleAttribute(attrName, dArray);
+            }
+            break;
+        case Alembic::Util::kInt16POD:
+            if (dim == 1)
+            {
+                FillValues<Alembic::Abc::Int16TPTraits>(geomParams, header.getName(), t, dArray, sz);
+                CreateArrayAttr(nodeName, "double", attrName);
+                fnParticle.setPerParticleAttribute(attrName, dArray);
+            }
+            break;
+        case Alembic::Util::kInt32POD:
+            if (dim == 1)
+            {
+                FillValues<Alembic::Abc::Int32TPTraits>(geomParams, header.getName(), t, dArray, sz);
+                CreateArrayAttr(nodeName, "double", attrName);
+                fnParticle.setPerParticleAttribute(attrName, dArray);
+            }
+            break;
+        case Alembic::Util::kInt64POD:
+            if (dim == 1)
+            {
+                FillValues<Alembic::Abc::Int64TPTraits>(geomParams, header.getName(), t, dArray, sz);
+                CreateArrayAttr(nodeName, "double", attrName);
+                fnParticle.setPerParticleAttribute(attrName, dArray);
+            }
+            break;
+        case Alembic::Util::kUint8POD:
+            if (dim == 1)
+            {
+                FillValues<Alembic::Abc::Uint8TPTraits>(geomParams, header.getName(), t, dArray, sz);
+                CreateArrayAttr(nodeName, "double", attrName);
+                fnParticle.setPerParticleAttribute(attrName, dArray);
+            }
+            break;
+        case Alembic::Util::kUint16POD:
+            if (dim == 1)
+            {
+                FillValues<Alembic::Abc::Uint16TPTraits>(geomParams, header.getName(), t, dArray, sz);
+                CreateArrayAttr(nodeName, "double", attrName);
+                fnParticle.setPerParticleAttribute(attrName, dArray);
+            }
+            break;
+        case Alembic::Util::kUint32POD:
+            if (dim == 1)
+            {
+                FillValues<Alembic::Abc::Uint32TPTraits>(geomParams, header.getName(), t, dArray, sz);
+                CreateArrayAttr(nodeName, "double", attrName);
+                fnParticle.setPerParticleAttribute(attrName, dArray);
+            }
+            break;
+        case Alembic::Util::kUint64POD:
+            if (dim == 1)
+            {
+                FillValues<Alembic::Abc::Uint64TPTraits>(geomParams, header.getName(), t, dArray, sz);
+                CreateArrayAttr(nodeName, "double", attrName);
+                fnParticle.setPerParticleAttribute(attrName, dArray);
+            }
+            break;
+        case Alembic::Util::kFloat16POD:
+            if (dim == 1)
+            {
+                FillValues<Alembic::Abc::Float16TPTraits>(geomParams, header.getName(), t, dArray, sz);
+                CreateArrayAttr(nodeName, "double", attrName);
+                fnParticle.setPerParticleAttribute(attrName, dArray);
+            }
+            else if (dim == 3)
+            {
+                FillValues<Alembic::Abc::C3hTPTraits>(geomParams, header.getName(), t, vArray, sz);
+                CreateArrayAttr(nodeName, "vector", attrName);
+                fnParticle.setPerParticleAttribute(attrName, vArray);
+            }
+            break;
+        case Alembic::Util::kFloat32POD:
+            if (dim == 1)
+            {
+                FillValues<Alembic::Abc::Float32TPTraits>(geomParams, header.getName(), t, dArray, sz);
+                CreateArrayAttr(nodeName, "double", attrName);
+                fnParticle.setPerParticleAttribute(attrName, dArray);
+            }
+            else if (dim == 3)
+            {
+                FillValues<Alembic::Abc::V3fTPTraits>(geomParams, header.getName(), t, vArray, sz);
+                CreateArrayAttr(nodeName, "vector", attrName);
+                fnParticle.setPerParticleAttribute(attrName, vArray);
+            }
+            break;
+        case Alembic::Util::kFloat64POD:
+            if (dim == 1)
+            {
+                FillValues<Alembic::Abc::Float64TPTraits>(geomParams, header.getName(), t, dArray, sz);
+                CreateArrayAttr(nodeName, "double", attrName);
+                fnParticle.setPerParticleAttribute(attrName, dArray);
+            }
+            else if (dim == 3)
+            {
+                FillValues<Alembic::Abc::V3dTPTraits>(geomParams, header.getName(), t, vArray, sz);
+                CreateArrayAttr(nodeName, "vector", attrName);
+                fnParticle.setPerParticleAttribute(attrName, vArray);
+            }
+            break;
+        default:
+            break;
+        }   
+    }
+}
+
 MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & iObject )
 {
     MStatus status = MS::kSuccess;
@@ -134,13 +704,17 @@ MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & i
     
     MVectorArray outPos = fnAttrs.vectorArray("position", &status);
     MVectorArray outVel = fnAttrs.vectorArray("velocity", &status);
-    MIntArray outId = fnAttrs.intArray("particleId", &status);
+    MDoubleArray outId = fnAttrs.doubleArray("particleId", &status);
     MDoubleArray outCount = fnAttrs.doubleArray("count", &status);
     
     size_t pSize = inFloorPos->size();
     
     outCount.setLength(1);
     outCount[0] = double(pSize);
+    
+    outPos.setLength(pSize);
+    outVel.setLength(pSize);
+    outId.setLength(pSize);
     
     if (blend > 0.0)
     {
@@ -159,10 +733,6 @@ MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & i
         }
         
         double dt = blend * (ceilTime - floorTime);
-            
-        outPos.setLength(pSize);
-        outVel.setLength(pSize);
-        outId.setLength(pSize);
         
         for (unsigned int pId = 0; pId < pSize; pId++)
         {
@@ -197,13 +767,11 @@ MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & i
                 outVel[pId] = (1.0 - blend) * v0 + blend * v1;
             }
         }
+        
+        ReadAttributes(iFrame, iNode, fnAttrs, pSize, inCeilPos->size(), inFloorId->get(), &idmap);
     }
     else
     {
-        outPos.setLength(pSize);
-        outVel.setLength(pSize);
-        outId.setLength(pSize);
-        
         for (unsigned int pId = 0; pId < pSize; pId++)
         {
             outPos[pId] = MVector((*inFloorPos)[pId].x,
@@ -216,6 +784,8 @@ MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & i
             
             outId[pId] = (*inFloorId)[pId];
         }
+        
+        ReadAttributes(iFrame, iNode, fnAttrs, inFloorPos->size());
     }
 
     return status;
@@ -287,6 +857,8 @@ MStatus create(double iFrame, const Alembic::AbcGeom::IPoints & iNode,
         status = fnParticle.emit(pArray, vArray);
         fnParticle.setPerParticleAttribute("particleId", iArray, &status);
     }
+    
+    CreateAttributes(iFrame, iNode, fnParticle, pSize);
     
     status = fnParticle.saveInitialState();
     

@@ -1004,7 +1004,6 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPoints& iNode)
 
     bool isConstant = iNode.getSchema().isConstant();
     
-    Alembic::Abc::ICompoundProperty arbProp = iNode.getSchema().getArbGeomParams();
     Alembic::Abc::ICompoundProperty userProp = iNode.getSchema().getUserProperties();
     
     if (!isConstant)
@@ -1012,7 +1011,6 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPoints& iNode)
 
     std::size_t firstProp = mData.mPropList.size();
 
-    getAnimatedProps(arbProp, mData.mPropList, false, false);
     getAnimatedProps(userProp, mData.mPropList, false, false);
     
     Alembic::Abc::IScalarProperty visProp = getVisible(iNode, isConstant,
@@ -1044,7 +1042,6 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPoints& iNode)
     if (particleObj != MObject::kNullObj)
     {
         setConstantVisibility(visProp, particleObj);
-        addProps(arbProp, particleObj, false, false);
         addProps(userProp, particleObj, false, false);
         mImportedObjects[iNode.getHeader().getFullName()] = particleObj;
     }
