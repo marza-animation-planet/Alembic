@@ -23,8 +23,8 @@ public:
    void reset();
    bool isSet() const;
    
-   bool isIncluded(const char *path) const;
-   bool isIncluded(const AlembicNode *node) const;
+   bool isIncluded(const char *path, bool strict=false) const;
+   bool isIncluded(const AlembicNode *node, bool strict=false) const;
    bool isExcluded(const char *path) const;
    bool isExcluded(const AlembicNode *node) const;
    

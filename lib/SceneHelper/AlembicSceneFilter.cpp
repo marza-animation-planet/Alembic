@@ -145,16 +145,27 @@ bool AlembicSceneFilter::keep(Alembic::Abc::IObject iObj) const
       {
          size_t n = iObj.getNumChildren();
          size_t c = 0;
+         size_t fsc = 0;
          
          for (size_t i=0; i<n; ++i)
          {
-            if (keep(iObj.getChild(i)))
+            Alembic::Abc::IObject iChild = iObj.getChild(i);
+            
+            if (Alembic::AbcGeom::IFaceSet::matches(iChild.getMetaData()))
+            {
+               ++fsc;
+            }
+            
+            if (keep(iChild))
             {
                ++c;
             }
          }
          
-         rv = (c > 0 || isIncluded(path.c_str()));
+         bool isLeaf = (n == 0 || n == fsc);
+         
+         //rv = (c > 0 || isIncluded(path.c_str()));
+         rv = (c > 0 || isIncluded(path.c_str(), !isLeaf));
       }
       
       mCache[path] = rv;
@@ -163,9 +174,16 @@ bool AlembicSceneFilter::keep(Alembic::Abc::IObject iObj) const
    }
 }
 
-bool AlembicSceneFilter::isIncluded(const char *path) const
+bool AlembicSceneFilter::isIncluded(const char *path, bool strict) const
 {
-   return (path && (!mIncludeFilter || regexec(mIncludeFilter, path, 0, NULL, 0) == 0));
+   if (!strict)
+   {
+      return (path && (!mIncludeFilter || regexec(mIncludeFilter, path, 0, NULL, 0) == 0));
+   }
+   else
+   {
+      return (path && mIncludeFilter && regexec(mIncludeFilter, path, 0, NULL, 0) == 0);
+   }
 }
 
 bool AlembicSceneFilter::isExcluded(const char *path) const
@@ -174,9 +192,16 @@ bool AlembicSceneFilter::isExcluded(const char *path) const
 }
 
 
-bool AlembicSceneFilter::isIncluded(const AlembicNode *node) const
+bool AlembicSceneFilter::isIncluded(const AlembicNode *node, bool strict) const
 {
-   return (node && (!mIncludeFilter || regexec(mIncludeFilter, node->path().c_str(), 0, NULL, 0) == 0));
+   if (!strict)
+   {
+      return (node && (!mIncludeFilter || regexec(mIncludeFilter, node->path().c_str(), 0, NULL, 0) == 0));
+   }
+   else
+   {
+      return (node && mIncludeFilter && regexec(mIncludeFilter, node->path().c_str(), 0, NULL, 0) == 0);
+   }
 }
 
 bool AlembicSceneFilter::isExcluded(const AlembicNode *node) const
