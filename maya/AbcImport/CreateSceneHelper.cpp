@@ -288,29 +288,29 @@ namespace
         }
     }
 
-    bool matchesNameWithRegex (const MString& iName,
-                               const MStringArray & iPatterns)
-    {
-        unsigned int length = iPatterns.length();
-        if (length == 0)
-            return true;
-
-        for (unsigned int i=0; i<length; ++i)
-        {
-            // use 'match' function provided in the maya mel script.
-            MString scriptStr, result;
-            scriptStr.format("match \"^1s\" \"^2s\";", iPatterns[i], iName);
-            MGlobal::executeCommand(scriptStr, result);
-
-            // found a match!
-            if (result.length() > 0)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
+    // bool matchesNameWithRegex (const MString& iName,
+    //                            const MStringArray & iPatterns)
+    // {
+    //     unsigned int length = iPatterns.length();
+    //     if (length == 0)
+    //         return true;
+    //     
+    //     for (unsigned int i=0; i<length; ++i)
+    //     {
+    //         // use 'match' function provided in the maya mel script.
+    //         MString scriptStr, result;
+    //         scriptStr.format("match \"^1s\" \"^2s\";", iPatterns[i], iName);
+    //         MGlobal::executeCommand(scriptStr, result);
+    //     
+    //         // found a match!
+    //         if (result.length() > 0)
+    //         {
+    //             return true;
+    //         }
+    //     }
+    //     
+    //     return false;
+    // }
 }
 
 
@@ -322,7 +322,7 @@ CreateSceneVisitor::CreateSceneVisitor(double iFrame,
     mFrame(iFrame), mParent(iParent),
     mUnmarkedFaceVaryingColors(iUnmarkedFaceVaryingColors),
     mUnmarkedFaceVaryingUVs(iUnmarkedFaceVaryingUVs),
-    mAction(iAction), mCreateInstances(createInstances)
+    mAction(iAction), mOnlyPattern(0), mExceptPattern(0), mCreateInstances(createInstances)
 {
     mAnyRoots = false;
 
@@ -359,18 +359,86 @@ CreateSceneVisitor::CreateSceneVisitor(double iFrame,
         mAnyRoots = true;
     }
 
-    mOnlyPatterns.clear();
+    // mOnlyPatterns.clear();
     if (iIncludeFilterString != MString() &&
         iIncludeFilterString != MString("*"))
     {
-        iIncludeFilterString.split(' ', mOnlyPatterns);
+        // iIncludeFilterString.split(' ', mOnlyPatterns);
+        std::string includePattern;
+        
+        std::string tmp = iIncludeFilterString.asChar();
+        
+        size_t p0, p1;
+        
+        p0 = tmp.find_first_not_of(" \t\n");
+        
+        while (p0 != std::string::npos)
+        {
+            if (includePattern.length() > 0)
+            {
+                includePattern += "|";
+            }
+            
+            p1 = tmp.find_first_of(" \t\n", p0);
+            
+            if (p1 == std::string::npos)
+            {
+                includePattern += tmp.substr(p0);
+                break;
+            }
+            else
+            {
+                includePattern += tmp.substr(p0, p1-p0);
+                p0 = tmp.find_first_not_of(" \t\n", p1);
+            }
+        }
+        
+        if (includePattern.length() > 0 &&
+            regcomp(&mOnlyPattern_, includePattern.c_str(), REG_EXTENDED|REG_NOSUB) == 0)
+        {
+            mOnlyPattern = &mOnlyPattern_;
+        }
     }
 
-    mExceptPatterns.clear();
+    // mExceptPatterns.clear();
     if (iExcludeFilterString != MString() &&
         iExcludeFilterString != MString("*"))
     {
-        iExcludeFilterString.split(' ', mExceptPatterns);
+        // iExcludeFilterString.split(' ', mExceptPatterns);
+        std::string excludePattern;
+        
+        std::string tmp = iExcludeFilterString.asChar();
+        
+        size_t p0, p1;
+        
+        p0 = tmp.find_first_not_of(" \t\n");
+        
+        while (p0 != std::string::npos)
+        {
+            if (excludePattern.length() > 0)
+            {
+                excludePattern += "|";
+            }
+            
+            p1 = tmp.find_first_of(" \t\n", p0);
+            
+            if (p1 == std::string::npos)
+            {
+                excludePattern += tmp.substr(p0);
+                break;
+            }
+            else
+            {
+                excludePattern += tmp.substr(p0, p1-p0);
+                p0 = tmp.find_first_not_of(" \t\n", p1);
+            }
+        }
+        
+        if (excludePattern.length() > 0 &&
+            regcomp(&mExceptPattern_, excludePattern.c_str(), REG_EXTENDED|REG_NOSUB) == 0)
+        {
+            mExceptPattern = &mExceptPattern_;
+        }
     }
     
     MString curNs = MNamespace::currentNamespace();
@@ -394,6 +462,17 @@ CreateSceneVisitor::CreateSceneVisitor(double iFrame,
 
 CreateSceneVisitor::~CreateSceneVisitor()
 {
+    if (mOnlyPattern)
+    {
+        regfree(mOnlyPattern);
+        mOnlyPattern = 0;
+    }
+    
+    if (mExceptPattern)
+    {
+        regfree(mExceptPattern);
+        mExceptPattern = 0;
+    }
 }
 
 void CreateSceneVisitor::getData(WriterData & oData)
@@ -543,8 +622,10 @@ AlembicObjectPtr CreateSceneVisitor::previsit(AlembicObjectPtr iParentObject)
     const size_t numChildren = parent.getNumChildren();
 
     // Apply exclude filters first as a preorder traversal.
-    if (mExceptPatterns.length() > 0 &&
-        matchesNameWithRegex(name, mExceptPatterns))
+    // if (mExceptPatterns.length() > 0 &&
+    //     matchesNameWithRegex(name, mExceptPatterns))
+    if (mExceptPattern &&
+        regexec(mExceptPattern, name.asChar(), 0, NULL, 0) == 0)
     {
         return AlembicObjectPtr();
     }
@@ -565,7 +646,8 @@ AlembicObjectPtr CreateSceneVisitor::previsit(AlembicObjectPtr iParentObject)
     // will have no child unless any descendent of it has the matching name.
     if (iParentObject->getNumChildren() == 0)
     {
-        if (!matchesNameWithRegex(name, mOnlyPatterns))
+        //if (!matchesNameWithRegex(name, mOnlyPatterns))
+        if (mOnlyPattern && regexec(mOnlyPattern, name.asChar(), 0, NULL, 0) != 0)
         {
             return AlembicObjectPtr();
         }

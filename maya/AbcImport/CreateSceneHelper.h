@@ -56,6 +56,7 @@
 #include <set>
 #include <map>
 #include <vector>
+#include <regex.h>
 
 struct ltMObj
 {
@@ -173,8 +174,12 @@ private:
     WriterData  mData;
 
     // regular expression strings for filtering the input cache.
-    MStringArray mOnlyPatterns;
-    MStringArray mExceptPatterns;
+    // MStringArray mOnlyPatterns;
+    // MStringArray mExceptPatterns;
+    regex_t *mOnlyPattern;
+    regex_t *mExceptPattern;
+    regex_t mOnlyPattern_;
+    regex_t mExceptPattern_;
 
     bool mCreateInstances;
 
