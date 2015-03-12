@@ -301,10 +301,7 @@ AlembicNode* AlembicNode::filteredClone(const AlembicSceneFilter &filter, Alembi
    {
       rv = new AlembicNode(*this, filter, parent);
       
-      bool isLeaf = (type() >= TypeMesh && type() <= TypeCurves);
-      
-      //if (rv && rv->childCount() == 0 && !filter.isIncluded(rv))
-      if (rv && rv->childCount() == 0 && !filter.isIncluded(rv, !isLeaf))
+      if (rv && rv->childCount() == 0 && !filter.isIncluded(rv))
       {
          delete rv;
          rv = 0;
@@ -1013,11 +1010,8 @@ AlembicNode* AlembicNode::FilteredWrap(Alembic::Abc::IObject iObj, const Alembic
       // seems not to get the right obj then...
    }
    
-   bool isLeaf = true;
-   
    if (Alembic::AbcGeom::IXform::matches(iObj.getHeader()))
    {
-      isLeaf = false;
       rv = new AlembicXform(iObj, filter, iParent);
    }
    else if (Alembic::AbcGeom::IPoints::matches(iObj.getHeader()))
@@ -1041,8 +1035,7 @@ AlembicNode* AlembicNode::FilteredWrap(Alembic::Abc::IObject iObj, const Alembic
       rv = new AlembicCurves(iObj, filter, iParent);
    }
    
-   //if (rv && rv->childCount() == 0 && !filter.isIncluded(rv))
-   if (rv && rv->childCount() == 0 && !filter.isIncluded(rv, !isLeaf))
+   if (rv && rv->childCount() == 0 && !filter.isIncluded(rv))
    {
       delete rv;
       rv = 0;
