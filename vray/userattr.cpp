@@ -1315,7 +1315,7 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
                
                if (pit == geom->floatParams.end())
                {
-                  param = new VR::DefFloatListParam(paramName.c_str());
+                  param = new VR::DefFloatListParam(paramName.c_str(), 1);
                   geom->floatParams[paramName] = param;
                }
                else
@@ -1347,7 +1347,7 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
                
                if (pit == geom->floatParams.end())
                {
-                  param = new VR::DefFloatListParam(paramName.c_str());
+                  param = new VR::DefFloatListParam(paramName.c_str(), 1);
                   geom->floatParams[paramName] = param;
                }
                else
@@ -1379,7 +1379,7 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
                
                if (pit == geom->floatParams.end())
                {
-                  param = new VR::DefFloatListParam(paramName.c_str());
+                  param = new VR::DefFloatListParam(paramName.c_str(), 1);
                   geom->floatParams[paramName] = param;
                }
                else
@@ -1412,7 +1412,7 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
                
                if (pit == geom->colorParams.end())
                {
-                  param = new VR::DefColorListParam(paramName.c_str());
+                  param = new VR::DefColorListParam(paramName.c_str(), 1);
                   geom->colorParams[paramName] = param;
                }
                else
@@ -1443,7 +1443,7 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
                
                if (pit == geom->floatParams.end())
                {
-                  param = new VR::DefFloatListParam(paramName.c_str());
+                  param = new VR::DefFloatListParam(paramName.c_str(), 1);
                   geom->floatParams[paramName] = param;
                }
                else

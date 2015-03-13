@@ -2120,14 +2120,14 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                               
                               for (idit1 = idmap1.begin(); idit1 != idmap1.end(); ++idit1)
                               {
-                                 fl[idit1->second.second] = std::max(std::min(R1->get()[idit1->second.first] * pscale, pmax), pmin);;
+                                 fl[idit1->second.second] = std::max(std::min(R1->get()[idit1->second.first] * pscale, pmax), pmin);
                               }
                            }
                            else
                            {
                               for (size_t i=0; i<R0->size(); ++i)
                               {
-                                 fl[i] = std::max(std::min(R0->get()[i] * pscale, pmax), pmin);;
+                                 fl[i] = std::max(std::min(R0->get()[i] * pscale, pmax), pmin);
                               }
                            }
                         }
