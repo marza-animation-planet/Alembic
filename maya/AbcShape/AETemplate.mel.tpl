@@ -145,6 +145,9 @@ global proc AE<<NodeName>>Template(string $nodeName)
       editorTemplate -label "Particle Type" -addControl "vrayAbcParticleType";
       editorTemplate -label "Particle Attribs" -addControl "vrayAbcParticleAttribs";
       editorTemplate -label "Sort IDs" -addControl "vrayAbcSortIDs";
+      editorTemplate -label "Size Scale" -addControl "vrayAbcPsizeScale";
+      editorTemplate -label "Min Size" -addControl "vrayAbcPsizeMin";
+      editorTemplate -label "Max Size" -addControl "vrayAbcPsizeMax";
       editorTemplate -addSeparator;
       editorTemplate -label "Sprite Size X" -addControl "vrayAbcSpriteSizeX";
       editorTemplate -label "Sprite Size Y" -addControl "vrayAbcSpriteSizeY";

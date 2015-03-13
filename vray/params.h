@@ -477,6 +477,10 @@ struct AlembicLoaderParams : VR::VRayParameterListDesc
       float tailLength;
       int sortIDs;
       
+      float psizeScale;
+      float psizeMin;
+      float psizeMax;
+      
       Cache();
       void setupCache(VR::VRayParameterList *paramList);
    };

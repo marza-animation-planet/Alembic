@@ -417,6 +417,11 @@ AlembicNode::VisitReturn BuildPlugins::enter(AlembicPoints &node, AlembicNode *i
       
       info->sortIDs = (params->sortIDs != 0);
       
+      params->spriteSizeX = std::min(std::max(params->spriteSizeX * params->psizeScale, params->psizeMin), params->psizeMax);
+      params->spriteSizeY = std::min(std::max(params->spriteSizeY * params->psizeScale, params->psizeMin), params->psizeMax);
+      params->radius = std::min(std::max(params->radius * params->psizeScale, params->psizeMin), params->psizeMax);
+      params->pointSize = std::min(std::max(params->pointSize * params->psizeScale, params->psizeMin), params->psizeMax);
+      
       points->setParameter(factory->saveInFactory(new VR::DefIntParam("render_type", params->particleType)));
       points->setParameter(factory->saveInFactory(new VR::DefFloatParam("sprite_size_x", params->spriteSizeX)));
       points->setParameter(factory->saveInFactory(new VR::DefFloatParam("sprite_size_y", params->spriteSizeY)));
@@ -1391,6 +1396,19 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
             std::string vname = "";
             std::string aname = "";
             
+            // First and second sample IDs
+            Alembic::Abc::UInt64ArraySamplePtr ID0, ID1;
+            // First sample ID to first sample index mapping (size() == 0 if only 1 sample required)
+            std::map<Alembic::Util::uint64_t, size_t> idmap0;
+            std::map<Alembic::Util::uint64_t, size_t>::iterator idit;
+            // Second sample ID to (second sample index, global index) mapping (size() == 0 if only 1 sample required)
+            std::map<Alembic::Util::uint64_t, std::pair<size_t, size_t> > idmap1;
+            std::map<Alembic::Util::uint64_t, std::pair<size_t, size_t> >::iterator idit1;
+            // Second sample ID to second sample index mapping for IDs also present in first sample (size() == 0 if only 1 sample required)
+            std::map<Alembic::Util::uint64_t, size_t> sharedids;
+            // List of all ids (size() == numPoints, 0 if only 1 sample required)
+            std::vector<Alembic::Util::uint64_t> allids;
+            
             // collectUserAttributes(schema.getUserProperties(), schema.getArbGeomParams(),
             //                       renderTime, false, attrs,
             //                       true, false, true, false, false);
@@ -1405,6 +1423,8 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                Alembic::Abc::P3fArraySamplePtr P = theSample.getPositions();
                Alembic::Abc::V3fArraySamplePtr V = theSample.getVelocities();
                Alembic::Abc::UInt64ArraySamplePtr ID = theSample.getIds();
+               
+               ID0 = ID;
                
                info->numPoints = P->size();
                info->sortParticles(ID->size(), ID->get());
@@ -1563,18 +1583,12 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                {
                   Alembic::Abc::P3fArraySamplePtr P0 = samp0->data().getPositions();
                   Alembic::Abc::V3fArraySamplePtr V0 = samp0->data().getVelocities();
-                  Alembic::Abc::UInt64ArraySamplePtr ID0 = samp0->data().getIds();
+                  ID0 = samp0->data().getIds();
                   
                   Alembic::Abc::P3fArraySamplePtr P1;
                   Alembic::Abc::V3fArraySamplePtr V1;
-                  Alembic::Abc::UInt64ArraySamplePtr ID1;
                   
                   // Build ID mappings
-                  std::map<Alembic::Util::uint64_t, size_t> idmap0; // ID -> index in P0/ID0/V0
-                  std::map<Alembic::Util::uint64_t, std::pair<size_t, size_t> > idmap1; // ID -> (index in P1/ID1/V1, index in final point list)
-                  std::map<Alembic::Util::uint64_t, size_t> sharedids; // ID -> index in P1/ID1/V1
-                  
-                  std::vector<Alembic::Util::uint64_t> allids;
                   allids.reserve(2 * ID0->size());
                   
                   if (mGeoSrc->params()->verbose)
@@ -1768,8 +1782,6 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                   il[0] = 0;
                   vl[0].set(0.0f, 0.0f, 0.0f);
                   al[0].set(0.0f, 0.0f, 0.0f);
-                  
-                  std::map<Alembic::Util::uint64_t, size_t>::iterator idit;
                   
                   for (size_t i=0; i<ntimes; ++i)
                   {
@@ -1972,12 +1984,10 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                         
                         if (it1 != extraAttrs.point.end())
                         {
-                           std::map<Alembic::Util::uint64_t, std::pair<size_t, size_t> >::iterator idit;
-                           
-                           for (idit = idmap1.begin(); idit != idmap1.end(); ++idit)
+                           for (idit1 = idmap1.begin(); idit1 != idmap1.end(); ++idit1)
                            {
-                              if (!CopyUserAttribute(it1->second, idit->second.first, 1,
-                                                     it0->second, idit->second.second))
+                              if (!CopyUserAttribute(it1->second, idit1->second.first, 1,
+                                                     it0->second, idit1->second.second))
                               {
                                  std::cerr << "[AlembicLoader] Failed to copy extended user attribute data" << std::endl;
                               }
@@ -2017,6 +2027,112 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                if (mGeoSrc->params()->verbose)
                {
                   std::cout << "[AlembicLoader] UpdateGeometry::enter: Output user attribute(s)" << std::endl;
+               }
+               
+               // Apply particle size scale and range
+               float pscale = mGeoSrc->params()->psizeScale;
+               float pmin = mGeoSrc->params()->psizeMin;
+               float pmax = mGeoSrc->params()->psizeMax;
+               bool hasSize = false;
+               
+               for (UserAttributes::iterator it = attrs.point.begin(); it != attrs.point.end(); ++it)
+               {
+                  if (info->remapParamName(it->first) == "radii")
+                  {
+                     UserAttribute &radii = it->second;
+                     
+                     if (radii.dataType == Float_Type && radii.dataDim == 1)
+                     {
+                        float *values = (float*) radii.data;
+                        
+                        for (unsigned int i=0; i<radii.dataCount; ++i)
+                        {
+                           values[i] = std::max(std::min(values[i] * pscale, pmax), pmin);
+                        }
+                     }
+                     
+                     hasSize = true;
+                     
+                     break;
+                  }
+               }
+               
+               if (!hasSize)
+               {
+                  Alembic::AbcGeom::IFloatGeomParam widths = schema.getWidthsParam();
+                   
+                  if (widths.valid())
+                  {
+                     TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> wsamples;
+                     TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator wsamp0, wsamp1;
+                     
+                     double br = 0.0;
+                     
+                     wsamples.update(widths, renderTime, renderTime, false);
+                     
+                     if (wsamples.getSamples(renderTime, wsamp0, wsamp1, br))
+                     {
+                        Alembic::Abc::FloatArraySamplePtr R0 = wsamp0->data().getVals();
+                        Alembic::Abc::FloatArraySamplePtr R1;
+                        bool process = false;
+                        
+                        if (br > 0.0)
+                        {
+                           R1 = wsamp1->data().getVals();
+                           process = ( ID1 && R0->size() == ID0->size() && R1->size() == ID1->size());
+                        }
+                        else
+                        {
+                           process = (!ID1 && R0->size() == ID0->size());
+                        }
+                        
+                        if (process)
+                        {
+                           if (mGeoSrc->params()->verbose)
+                           {
+                              std::cout << "[AlembicLoader] UpdateGeometry::enter: Read particle size from alembic 'widths' parameter" << std::endl;
+                           }
+                           
+                           VR::DefFloatListParam *radii = new VR::DefFloatListParam("radii");
+                           info->floatParams["radii"] = radii;
+                           
+                           radii->setCount(info->numPoints + 1);
+                           VR::FloatList fl = radii->getFloatList(renderTime);
+                           fl[0] = 0.0f;
+                           
+                           if (R1)
+                           {
+                              for (size_t i=0; i<R0->size(); ++i)
+                              {
+                                 Alembic::Util::uint64_t id = ID0->get()[i];
+                                 
+                                 idit = sharedids.find(id);
+                                 
+                                 float r = R0->get()[i];
+                                 
+                                 if (idit != sharedids.end())
+                                 {
+                                    r = (1 - br) * r + br * R1->get()[idit->second];
+                                 }
+                                 
+                                 fl[i] = std::max(std::min(r * pscale, pmax), pmin);
+                              }
+                              
+                              for (idit1 = idmap1.begin(); idit1 != idmap1.end(); ++idit1)
+                              {
+                                 fl[idit1->second.second] = std::max(std::min(R1->get()[idit1->second.first] * pscale, pmax), pmin);;
+                              }
+                           }
+                           else
+                           {
+                              for (size_t i=0; i<R0->size(); ++i)
+                              {
+                                 fl[i] = std::max(std::min(R0->get()[i] * pscale, pmax), pmin);;
+                              }
+                           }
+                        }
+                     }
+                  }
                }
                
                SetUserAttributes(info, attrs.object, renderFrame, mGeoSrc->params()->verbose);

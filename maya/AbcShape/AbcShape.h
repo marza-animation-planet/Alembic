@@ -68,6 +68,9 @@ public:
     static MObject aVRayAbcLineWidth;
     static MObject aVRayAbcTailLength;
     static MObject aVRayAbcSortIDs;
+    static MObject aVRayAbcPsizeScale;
+    static MObject aVRayAbcPsizeMin;
+    static MObject aVRayAbcPsizeMax;
 #endif
     
     static void* creator();
@@ -258,6 +261,9 @@ private:
     VR::DefFloatParam mVRLineWidth;
     VR::DefFloatParam mVRTailLength;
     VR::DefIntParam mVRSortIDs;
+    VR::DefFloatParam mVRPsizeScale;
+    VR::DefFloatParam mVRPsizeMin;
+    VR::DefFloatParam mVRPsizeMax;
 #endif
 };
 

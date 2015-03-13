@@ -333,6 +333,9 @@ MObject AbcShape::aVRayAbcMultiRadius;
 MObject AbcShape::aVRayAbcLineWidth;
 MObject AbcShape::aVRayAbcTailLength;
 MObject AbcShape::aVRayAbcSortIDs;
+MObject AbcShape::aVRayAbcPsizeScale;
+MObject AbcShape::aVRayAbcPsizeMin;
+MObject AbcShape::aVRayAbcPsizeMax;
 #endif
 
 void* AbcShape::creator()
@@ -659,6 +662,21 @@ MStatus AbcShape::initialize()
    stat = addAttribute(aVRayAbcSortIDs);
    MCHECKERROR(stat, "Could not add 'vrayAbcSortIDs' attribute");
    
+   aVRayAbcPsizeScale = nAttr.create("vrayAbcPsizeScale", "vapss", MFnNumericData::kFloat, 1.0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcPsizeScale' attribute");
+   stat = addAttribute(aVRayAbcPsizeScale);
+   MCHECKERROR(stat, "Could not add 'vrayAbcPsizeScale' attribute");
+   
+   aVRayAbcPsizeMin = nAttr.create("vrayAbcPsizeMin", "vapmi", MFnNumericData::kFloat, 0.0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcPsizeMin' attribute");
+   stat = addAttribute(aVRayAbcPsizeMin);
+   MCHECKERROR(stat, "Could not add 'vrayAbcPsizeMin' attribute");
+   
+   aVRayAbcPsizeMax = nAttr.create("vrayAbcPsizeMax", "vapma", MFnNumericData::kFloat, 1000000.0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcPsizeMax' attribute");
+   stat = addAttribute(aVRayAbcPsizeMax);
+   MCHECKERROR(stat, "Could not add 'vrayAbcPsizeMax' attribute");
+   
    attributeAffects(aVRayGeomInfo, aVRayGeomResult);
    attributeAffects(aFilePath, aVRayGeomResult);
    attributeAffects(aObjectExpression, aVRayGeomResult);
@@ -682,6 +700,9 @@ MStatus AbcShape::initialize()
    attributeAffects(aVRayAbcLineWidth, aVRayGeomResult);
    attributeAffects(aVRayAbcTailLength, aVRayGeomResult);
    attributeAffects(aVRayAbcSortIDs, aVRayGeomResult);
+   attributeAffects(aVRayAbcPsizeScale, aVRayGeomResult);
+   attributeAffects(aVRayAbcPsizeMin, aVRayGeomResult);
+   attributeAffects(aVRayAbcPsizeMax, aVRayGeomResult);
 #endif
 
    attributeAffects(aFilePath, aNumShapes);
@@ -817,6 +838,9 @@ AbcShape::AbcShape()
    , mVRLineWidth("line_width", 1.0f)
    , mVRTailLength("tail_length", 1.0f)
    , mVRSortIDs("sort_ids", 0)
+   , mVRPsizeScale("psize_scale", 1.0f)
+   , mVRPsizeMin("psize_min", 0.0f)
+   , mVRPsizeMax("psize_max", 1e+30f)
 #endif
 {
 }
@@ -1513,6 +1537,15 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   MDataHandle hSortIDs = block.inputValue(aVRayAbcSortIDs);
                   mVRSortIDs.setBool(hSortIDs.asBool(), 0, 0.0);
                   
+                  MDataHandle hPsizeScale = block.inputValue(aVRayAbcPsizeScale);
+                  mVRPsizeScale.setFloat(hPsizeScale.asFloat(), 0, 0.0);
+                  
+                  MDataHandle hPsizeMin = block.inputValue(aVRayAbcPsizeMin);
+                  mVRPsizeMin.setFloat(hPsizeMin.asFloat(), 0, 0.0);
+                  
+                  MDataHandle hPsizeMax = block.inputValue(aVRayAbcPsizeMax);
+                  mVRPsizeMax.setFloat(hPsizeMax.asFloat(), 0, 0.0);
+                  
                   abc->setParameter(&mVRFilename);
                   abc->setParameter(&mVRObjectPath);
                   abc->setParameter(&mVRSpeed);
@@ -1544,6 +1577,9 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   abc->setParameter(&mVRLineWidth);
                   abc->setParameter(&mVRTailLength);
                   abc->setParameter(&mVRSortIDs);
+                  abc->setParameter(&mVRPsizeScale);
+                  abc->setParameter(&mVRPsizeMin);
+                  abc->setParameter(&mVRPsizeMax);
                   
                   hOut.setInt(1);
                }

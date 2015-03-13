@@ -421,6 +421,9 @@ AlembicLoaderParams::Cache::Cache()
    , lineWidth(1.0f)
    , tailLength(1.0f)
    , sortIDs(0)
+   , psizeScale(1.0f)
+   , psizeMin(0.0f)
+   , psizeMax(1e+30f)
 {
 }
 
@@ -499,6 +502,10 @@ void AlembicLoaderParams::Cache::setupCache(VR::VRayParameterList *paramList)
    paramList->setParamCache("line_width", &lineWidth);
    paramList->setParamCache("tail_length", &tailLength);
    paramList->setParamCache("sort_ids", &sortIDs);
+   
+   paramList->setParamCache("psize_scale", &psizeScale);
+   paramList->setParamCache("psize_min", &psizeMin);
+   paramList->setParamCache("psize_max", &psizeMax);
 }
 
 AlembicLoaderParams::AlembicLoaderParams()
@@ -606,6 +613,10 @@ AlembicLoaderParams::AlembicLoaderParams()
    addParamFloat("line_width", 1.0f, -1, "The width of streak particles, in pixels.");
    addParamFloat("tail_length", 1.0f, -1, "The length of streak particles, in world units, the actual length depends on the particle velocity as well.");
    addParamBool("sort_ids", 0, -1, "Sort particle ids.");
+   
+   addParamFloat("psize_scale", 1.0f, -1, "Particle size scale");
+   addParamFloat("psize_min", 0.0f, -1, "Minimum particle size");
+   addParamFloat("psize_max", 1e+30f, -1, "Maximum particle size");
 }
 
 AlembicLoaderParams::~AlembicLoaderParams()
