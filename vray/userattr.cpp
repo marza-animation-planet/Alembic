@@ -1466,6 +1466,8 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
             std::cerr << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Unsupported data type" << std::endl;
             return false;
          }
+         
+         return true;
       }
       else
       {
