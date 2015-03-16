@@ -17,7 +17,7 @@ struct AlembicGeometrySource : VR::VRayStaticGeometry
       
       // for points primitives
       void sortParticles(size_t n, const Alembic::Util::uint64_t *ids);
-      void attachParams(Factory*);
+      void attachParams(Factory*, bool verbose=false);
       std::string remapParamName(const std::string &name) const;
       bool isValidParamName(const std::string &name) const;
       bool isFloatParam(const std::string &name) const;

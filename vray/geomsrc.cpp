@@ -341,7 +341,7 @@ bool AlembicGeometrySource::GeomInfo::isColorParam(const std::string &name) cons
    return (sValidNames.find(name) != sValidNames.end());
 }
 
-void AlembicGeometrySource::GeomInfo::attachParams(Factory *f)
+void AlembicGeometrySource::GeomInfo::attachParams(Factory *f, bool verbose)
 {
    if (!out)
    {
@@ -357,7 +357,10 @@ void AlembicGeometrySource::GeomInfo::attachParams(Factory *f)
             f->saveInFactory(it->second);
             attachedParams.insert(it->second);
             
-            std::cout << "[AlembicLoader] AlembicGeometrySource::GeomInfo::attachParams: Float parameter \"" << it->first << "\" attached" << std::endl;
+            if (verbose)
+            {
+               std::cout << "[AlembicLoader] AlembicGeometrySource::GeomInfo::attachParams: Float parameter \"" << it->first << "\" attached" << std::endl;
+            }
          }
       }
    }
@@ -371,7 +374,10 @@ void AlembicGeometrySource::GeomInfo::attachParams(Factory *f)
             f->saveInFactory(it->second);
             attachedParams.insert(it->second);
             
-            std::cout << "[AlembicLoader] AlembicGeometrySource::GeomInfo::attachParams: Color parameter \"" << it->first << "\" attached" << std::endl;
+            if (verbose)
+            {
+               std::cout << "[AlembicLoader] AlembicGeometrySource::GeomInfo::attachParams: Color parameter \"" << it->first << "\" attached" << std::endl;
+            }
          }
       }
    }

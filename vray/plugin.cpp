@@ -1,8 +1,6 @@
 #include "plugin.h"
 #include <cstdlib>
 
-static long gsCount = 0;
-
 AlembicLoader::AlembicLoader(VR::VRayPluginDesc *desc)
    : VR::VRayStaticGeomSource(desc)
    , mGeoSrc(0)
@@ -46,10 +44,6 @@ void AlembicLoader::preRenderBegin(VR::VRayRenderer *vray)
       std::cerr << "[AlembicLoader] AlembicLoader::preRenderBegin: Invalid source" << std::endl;
       delete mGeoSrc;
       mGeoSrc = 0;
-   }
-   else
-   {
-      ++gsCount;
    }
 }
 

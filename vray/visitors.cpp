@@ -2149,7 +2149,7 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                   }
                }
                
-               info->attachParams(mGeoSrc->factory());
+               info->attachParams(mGeoSrc->factory(), mGeoSrc->params()->verbose);
             }
             
             // Clear user attributes
