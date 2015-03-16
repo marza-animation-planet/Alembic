@@ -1,6 +1,5 @@
 #include "userattr.h"
-
-#include "userattr.h"
+#include "plugin.h"
 #include <SampleUtils.h>
 
 static size_t DataTypeByteSize[Undefined_Type+1] = {sizeof(bool),
@@ -919,7 +918,7 @@ bool ReadUserAttribute(UserAttribute &ua,
    return false;
 }
 
-void SetUserAttributes(AlembicGeometrySource::GeomInfo *geom, UserAttributes &attribs, double t, bool verbose)
+void SetUserAttributes(AbcVRayGeom *geom, UserAttributes &attribs, double t, bool verbose)
 {
    //if (!geom || !geom->channelNames)
    if (!geom)
@@ -973,7 +972,7 @@ void SetUserAttributes(AlembicGeometrySource::GeomInfo *geom, UserAttributes &at
    }
 }
 
-bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, UserAttribute &ua, double t, std::set<std::string> &usedNames, bool verbose)
+bool SetUserAttribute(AbcVRayGeom *geom, const char *name, UserAttribute &ua, double t, std::set<std::string> &usedNames, bool verbose)
 {
    if (!geom || !ua.data)
    {

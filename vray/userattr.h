@@ -7,7 +7,6 @@
 #include <string>
 #include <map>
 #include <set>
-#include "geomsrc.h"
 
 enum Usage
 {
@@ -72,7 +71,7 @@ bool CopyUserAttribute(UserAttribute &src, unsigned int srcIdx, unsigned int cou
 void DestroyUserAttribute(UserAttribute &);
 void DestroyUserAttributes(UserAttributes &);
 
-bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, UserAttribute &ua, double t, std::set<std::string> &usedNames, bool verbose=false);
-void SetUserAttributes(AlembicGeometrySource::GeomInfo *geom, UserAttributes &attribs, double t, bool verbose=false);
+bool SetUserAttribute(class AbcVRayGeom *geom, const char *name, UserAttribute &ua, double t, std::set<std::string> &usedNames, bool verbose=false);
+void SetUserAttributes(class AbcVRayGeom *geom, UserAttributes &attribs, double t, bool verbose=false);
 
 #endif

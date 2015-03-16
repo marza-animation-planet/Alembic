@@ -80,11 +80,11 @@ AlembicNode::VisitReturn BuildPlugins::enter(AlembicXform &node, AlembicNode *in
 }
 
 template <class Schema>
-static AlembicGeometrySource::GeomInfo* BuildMeshPlugins(AlembicGeometrySource *src, AlembicNodeT<Schema> &node, AlembicNode *instance)
+static AbcVRayGeom* BuildMeshPlugins(AlembicGeometrySource *src, AlembicNodeT<Schema> &node, AlembicNode *instance)
 {
-   AlembicGeometrySource::GeomInfo *info = src->getInfo(node.path());
+   AbcVRayGeom *geom = src->getGeometry(node.path());
    
-   if (!info)
+   if (!geom)
    {
       Factory *factory = src->factory();
       AlembicLoaderParams::Cache* params = src->params();
@@ -175,38 +175,38 @@ static AlembicGeometrySource::GeomInfo* BuildMeshPlugins(AlembicGeometrySource *
          mod->setParameter(factory->saveInFactory(new VR::DefIntParam("max_subdivs", params->maxSubdivs)));
       }
       
-      info = src->addInfo(node.path(), mesh, mod);
+      geom = src->addGeometry(node.path(), mesh, mod);
       
       if (node.typedObject().getSchema().isConstant())
       {
-         info->constPositions = factory->saveInFactory(new VR::DefVectorListParam("vertices"));
-         info->constNormals = factory->saveInFactory(new VR::DefVectorListParam("normals"));
-         info->constFaceNormals = factory->saveInFactory(new VR::DefIntListParam("faceNormals"));
+         geom->constPositions = factory->saveInFactory(new VR::DefVectorListParam("vertices"));
+         geom->constNormals = factory->saveInFactory(new VR::DefVectorListParam("normals"));
+         geom->constFaceNormals = factory->saveInFactory(new VR::DefIntListParam("faceNormals"));
          
-         mesh->setParameter(info->constPositions);
-         mesh->setParameter(info->constNormals);
-         mesh->setParameter(info->constFaceNormals);
+         mesh->setParameter(geom->constPositions);
+         mesh->setParameter(geom->constNormals);
+         mesh->setParameter(geom->constFaceNormals);
       }
       else
       {
-         info->positions = factory->saveInFactory(new VectorListParam("vertices"));
-         info->normals = factory->saveInFactory(new VectorListParam("normals"));
-         info->faceNormals = factory->saveInFactory(new IntListParam("faceNormals"));
+         geom->positions = factory->saveInFactory(new VectorListParam("vertices"));
+         geom->normals = factory->saveInFactory(new VectorListParam("normals"));
+         geom->faceNormals = factory->saveInFactory(new IntListParam("faceNormals"));
          
-         mesh->setParameter(info->positions);
-         mesh->setParameter(info->normals);
-         mesh->setParameter(info->faceNormals);
+         mesh->setParameter(geom->positions);
+         mesh->setParameter(geom->normals);
+         mesh->setParameter(geom->faceNormals);
       }
       
-      info->faces = factory->saveInFactory(new VR::DefIntListParam("faces"));
-      info->channels = factory->saveInFactory(new VR::DefMapChannelsParam("map_channels"));
-      info->channelNames = factory->saveInFactory(new VR::DefStringListParam("map_channels_names"));
-      info->edgeVisibility = factory->saveInFactory(new VR::DefIntListParam("edge_visibility"));
+      geom->faces = factory->saveInFactory(new VR::DefIntListParam("faces"));
+      geom->channels = factory->saveInFactory(new VR::DefMapChannelsParam("map_channels"));
+      geom->channelNames = factory->saveInFactory(new VR::DefStringListParam("map_channels_names"));
+      geom->edgeVisibility = factory->saveInFactory(new VR::DefIntListParam("edge_visibility"));
       
-      mesh->setParameter(info->faces);
-      mesh->setParameter(info->channels);
-      mesh->setParameter(info->channelNames);
-      mesh->setParameter(info->edgeVisibility);
+      mesh->setParameter(geom->faces);
+      mesh->setParameter(geom->channels);
+      mesh->setParameter(geom->channelNames);
+      mesh->setParameter(geom->edgeVisibility);
       
       // Read reference mesh here
       if (src->referenceScene())
@@ -224,41 +224,41 @@ static AlembicGeometrySource::GeomInfo* BuildMeshPlugins(AlembicGeometrySource *
                
                refPlugin->setPluginName((node.path()+"@reference").c_str());
                
-               std::string infoKey = node.path() + "@reference";
+               std::string geomKey = node.path() + "@reference";
                
-               AlembicGeometrySource::GeomInfo *refInfo = src->addInfo(infoKey, refPlugin);
+               AbcVRayGeom *refGeom = src->addGeometry(geomKey, refPlugin);
                
-               if (refInfo)
+               if (refGeom)
                {
-                  refInfo->constPositions = factory->saveInFactory(new VR::DefVectorListParam("vertices"));
-                  refInfo->faces = factory->saveInFactory(new VR::DefIntListParam("faces"));
-                  refInfo->constNormals = factory->saveInFactory(new VR::DefVectorListParam("normals"));
-                  refInfo->constFaceNormals = factory->saveInFactory(new VR::DefIntListParam("faceNormals"));
-                  refInfo->channels = factory->saveInFactory(new VR::DefMapChannelsParam("map_channels"));
-                  refInfo->channelNames = factory->saveInFactory(new VR::DefStringListParam("map_channels_names"));
-                  refInfo->edgeVisibility = factory->saveInFactory(new VR::DefIntListParam("edge_visibility"));
+                  refGeom->constPositions = factory->saveInFactory(new VR::DefVectorListParam("vertices"));
+                  refGeom->faces = factory->saveInFactory(new VR::DefIntListParam("faces"));
+                  refGeom->constNormals = factory->saveInFactory(new VR::DefVectorListParam("normals"));
+                  refGeom->constFaceNormals = factory->saveInFactory(new VR::DefIntListParam("faceNormals"));
+                  refGeom->channels = factory->saveInFactory(new VR::DefMapChannelsParam("map_channels"));
+                  refGeom->channelNames = factory->saveInFactory(new VR::DefStringListParam("map_channels_names"));
+                  refGeom->edgeVisibility = factory->saveInFactory(new VR::DefIntListParam("edge_visibility"));
                   
                   refPlugin->setParameter(factory->saveInFactory(new VR::DefIntParam("dynamic_geometry", 1)));
                   //refPlugin->setParameter(src->factory()->saveInFactory(new VR::DefIntParam("primary_visibility", 1)));
-                  refPlugin->setParameter(refInfo->constPositions);
-                  refPlugin->setParameter(refInfo->constNormals);
-                  refPlugin->setParameter(refInfo->faces);
-                  refPlugin->setParameter(refInfo->constFaceNormals);
-                  refPlugin->setParameter(refInfo->channels);
-                  refPlugin->setParameter(refInfo->channelNames);
-                  refPlugin->setParameter(refInfo->edgeVisibility);
+                  refPlugin->setParameter(refGeom->constPositions);
+                  refPlugin->setParameter(refGeom->constNormals);
+                  refPlugin->setParameter(refGeom->faces);
+                  refPlugin->setParameter(refGeom->constFaceNormals);
+                  refPlugin->setParameter(refGeom->channels);
+                  refPlugin->setParameter(refGeom->channelNames);
+                  refPlugin->setParameter(refGeom->edgeVisibility);
                   
                   UpdateGeometry geoup(src);
                   
-                  if (!geoup.readBaseMesh(node, refInfo))
+                  if (!geoup.readBaseMesh(node, refGeom))
                   {
-                     factory->removeVRayPluginParameter(refInfo->constPositions);
-                     factory->removeVRayPluginParameter(refInfo->faces);
-                     factory->removeVRayPluginParameter(refInfo->constNormals);
-                     factory->removeVRayPluginParameter(refInfo->constFaceNormals);
-                     factory->removeVRayPluginParameter(refInfo->channels);
-                     factory->removeVRayPluginParameter(refInfo->channelNames);
-                     factory->removeVRayPluginParameter(refInfo->edgeVisibility);
+                     factory->removeVRayPluginParameter(refGeom->constPositions);
+                     factory->removeVRayPluginParameter(refGeom->faces);
+                     factory->removeVRayPluginParameter(refGeom->constNormals);
+                     factory->removeVRayPluginParameter(refGeom->constFaceNormals);
+                     factory->removeVRayPluginParameter(refGeom->channels);
+                     factory->removeVRayPluginParameter(refGeom->channelNames);
+                     factory->removeVRayPluginParameter(refGeom->edgeVisibility);
                      
                      src->deletePlugin(refPlugin);
                      
@@ -268,12 +268,12 @@ static AlembicGeometrySource::GeomInfo* BuildMeshPlugins(AlembicGeometrySource *
                   {
                      if (refMesh)
                      {
-                        geoup.readMeshNormals(*refMesh, refInfo);
+                        geoup.readMeshNormals(*refMesh, refGeom);
                      }
-                     geoup.readMeshUVs(node, refInfo);
+                     geoup.readMeshUVs(node, refGeom);
                   }
                   
-                  src->removeInfo(infoKey);
+                  src->removeGeometry(geomKey);
                   
                   if (refPlugin)
                   {
@@ -305,21 +305,21 @@ static AlembicGeometrySource::GeomInfo* BuildMeshPlugins(AlembicGeometrySource *
       }
    }
    
-   if (instance && info)
+   if (instance && geom)
    {
-      AlembicGeometrySource::GeomInfo *iinfo = src->getInfo(instance->path());
+      AbcVRayGeom *igeom = src->getGeometry(instance->path());
       
-      if (!iinfo)
+      if (!igeom)
       {
-         iinfo = src->addInfo(instance->path(), info->out);
+         igeom = src->addGeometry(instance->path(), geom->out);
       }
       
-      // do not return info pointer for instances
+      // do not return geom pointer for instances
       return 0;
    }
    else
    {
-      return info;
+      return geom;
    }
 }
 
@@ -332,9 +332,9 @@ AlembicNode::VisitReturn BuildPlugins::enter(AlembicMesh &node, AlembicNode *ins
 
 AlembicNode::VisitReturn BuildPlugins::enter(AlembicSubD &node, AlembicNode *instance)
 {
-   AlembicGeometrySource::GeomInfo *info = BuildMeshPlugins(mGeoSrc, node, instance);
+   AbcVRayGeom *geom = BuildMeshPlugins(mGeoSrc, node, instance);
    
-   if (info)
+   if (geom)
    {
       // Additionaly setup crease parameters...
       //   edge_creases_vertices
@@ -348,9 +348,9 @@ AlembicNode::VisitReturn BuildPlugins::enter(AlembicSubD &node, AlembicNode *ins
 
 AlembicNode::VisitReturn BuildPlugins::enter(AlembicPoints &node, AlembicNode *instance)
 {
-   AlembicGeometrySource::GeomInfo *info = mGeoSrc->getInfo(node.path());
+   AbcVRayGeom *geom = mGeoSrc->getGeometry(node.path());
    
-   if (!info)
+   if (!geom)
    {
       Factory *factory = mGeoSrc->factory();
       AlembicLoaderParams::Cache* params = mGeoSrc->params();
@@ -359,34 +359,34 @@ AlembicNode::VisitReturn BuildPlugins::enter(AlembicPoints &node, AlembicNode *i
       
       points->setPluginName(node.path().c_str());
       
-      info = mGeoSrc->addInfo(node.path(), points);
+      geom = mGeoSrc->addGeometry(node.path(), points);
       
       if (node.typedObject().getSchema().isConstant())
       {
-         info->constPositions = factory->saveInFactory(new VR::DefVectorListParam("positions"));
+         geom->constPositions = factory->saveInFactory(new VR::DefVectorListParam("positions"));
          
-         points->setParameter(info->constPositions);
+         points->setParameter(geom->constPositions);
       }
       else
       {
-         info->positions = factory->saveInFactory(new VectorListParam("positions"));
+         geom->positions = factory->saveInFactory(new VectorListParam("positions"));
          
-         points->setParameter(info->positions);
+         points->setParameter(geom->positions);
       }
       
-      info->velocities = factory->saveInFactory(new VR::DefVectorListParam("velocities"));
-      points->setParameter(info->velocities);
+      geom->velocities = factory->saveInFactory(new VR::DefVectorListParam("velocities"));
+      points->setParameter(geom->velocities);
       
-      info->accelerations = factory->saveInFactory(new VR::DefColorListParam("acceleration_pp"));
-      points->setParameter(info->accelerations);
+      geom->accelerations = factory->saveInFactory(new VR::DefColorListParam("acceleration_pp"));
+      points->setParameter(geom->accelerations);
       
-      info->ids = factory->saveInFactory(new VR::DefIntListParam("ids"));
-      points->setParameter(info->ids);
+      geom->ids = factory->saveInFactory(new VR::DefIntListParam("ids"));
+      points->setParameter(geom->ids);
       
       std::string tmp0, tmp1, an, vn;
       size_t p0, p1, p2;
       
-      info->remapParamNames.clear();
+      geom->remapParamNames.clear();
       
       tmp0 = (params->particleAttribs.ptr() ? params->particleAttribs.ptr() : "");
       p0 = 0;
@@ -399,7 +399,7 @@ AlembicNode::VisitReturn BuildPlugins::enter(AlembicPoints &node, AlembicNode *i
          {
             vn = tmp1.substr(0, p2);
             an = tmp1.substr(p2+1);
-            info->remapParamNames[an] = vn;
+            geom->remapParamNames[an] = vn;
             std::cout << "[AlembicLoader] BuildPlugins::enter(AlembicPoints): Set '" << vn << "' parameter from alembic '" << an << "' attribute" << std::endl;
          }
          p0 = p1 + 1;
@@ -411,11 +411,11 @@ AlembicNode::VisitReturn BuildPlugins::enter(AlembicPoints &node, AlembicNode *i
       {
          vn = tmp1.substr(0, p2);
          an = tmp1.substr(p2+1);
-         info->remapParamNames[an] = vn;
+         geom->remapParamNames[an] = vn;
          std::cout << "[AlembicLoader] BuildPlugins::enter(AlembicPoints): Set '" << vn << "' parameter from alembic '" << an << "' attribute" << std::endl;
       }
       
-      info->sortIDs = (params->sortIDs != 0);
+      geom->sortIDs = (params->sortIDs != 0);
       
       params->spriteSizeX = std::min(std::max(params->spriteSizeX * params->psizeScale, params->psizeMin), params->psizeMax);
       params->spriteSizeY = std::min(std::max(params->spriteSizeY * params->psizeScale, params->psizeMin), params->psizeMax);
@@ -437,13 +437,13 @@ AlembicNode::VisitReturn BuildPlugins::enter(AlembicPoints &node, AlembicNode *i
       points->setParameter(factory->saveInFactory(new VR::DefFloatParam("tail_length", params->tailLength)));
    }
    
-   if (instance && info)
+   if (instance && geom)
    {
-      AlembicGeometrySource::GeomInfo *iinfo = mGeoSrc->getInfo(instance->path());
+      AbcVRayGeom *igeom = mGeoSrc->getGeometry(instance->path());
       
-      if (!iinfo)
+      if (!igeom)
       {
-         mGeoSrc->addInfo(instance->path(), info->out);
+         mGeoSrc->addGeometry(instance->path(), geom->out);
       }
    }
    
@@ -880,11 +880,11 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicXform &node, AlembicNode *
    return AlembicNode::ContinueVisit;
 }
 
-void UpdateGeometry::readMeshNormals(AlembicMesh &node, AlembicGeometrySource::GeomInfo *info)
+void UpdateGeometry::readMeshNormals(AlembicMesh &node, AbcVRayGeom *geom)
 {
    Alembic::AbcGeom::IPolyMeshSchema &schema = node.typedObject().getSchema();
    
-   bool isConst = (info->constNormals != 0);
+   bool isConst = (geom->constNormals != 0);
    double renderFrame = mGeoSrc->renderFrame();
    
    TimeSampleList<Alembic::AbcGeom::IN3fGeomParam> Nsamples;
@@ -901,11 +901,11 @@ void UpdateGeometry::readMeshNormals(AlembicMesh &node, AlembicGeometrySource::G
          
          Alembic::Abc::UInt32ArraySamplePtr I = theSample.getIndices();
          
-         info->constNormals->setCount(N->size(), renderFrame);
-         VR::VectorList nl = info->constNormals->getVectorList(renderFrame);
+         geom->constNormals->setCount(N->size(), renderFrame);
+         VR::VectorList nl = geom->constNormals->getVectorList(renderFrame);
          
-         info->constFaceNormals->setCount(info->numTriangles * 3, renderFrame);
-         VR::IntList il = info->constFaceNormals->getIntList(renderFrame);
+         geom->constFaceNormals->setCount(geom->numTriangles * 3, renderFrame);
+         VR::IntList il = geom->constFaceNormals->getIntList(renderFrame);
          
          for (size_t i=0; i<N->size(); ++i)
          {
@@ -913,18 +913,18 @@ void UpdateGeometry::readMeshNormals(AlembicMesh &node, AlembicGeometrySource::G
             nl[i].set(n.x, n.y, n.z);
          }
          
-         for (size_t i=0, k=0; i<info->numTriangles; ++i)
+         for (size_t i=0, k=0; i<geom->numTriangles; ++i)
          {
             for (size_t j=0; j<3; ++j, ++k)
             {
-               il[k] = I->get()[info->toVertexIndex[k]];
+               il[k] = I->get()[geom->toVertexIndex[k]];
             }
          }
       }
       else
       {
-         info->constNormals->setCount(0, renderFrame);
-         info->constFaceNormals->setCount(0, renderFrame);
+         geom->constNormals->setCount(0, renderFrame);
+         geom->constFaceNormals->setCount(0, renderFrame);
       }
    }
    else
@@ -937,8 +937,8 @@ void UpdateGeometry::readMeshNormals(AlembicMesh &node, AlembicGeometrySource::G
       size_t ntimes = (singleSample ? 1 : mGeoSrc->numTimeSamples());
       double t;
       
-      info->normals->clear();
-      info->faceNormals->clear();
+      geom->normals->clear();
+      geom->faceNormals->clear();
       
       if (Nparam.valid())
       {
@@ -959,11 +959,11 @@ void UpdateGeometry::readMeshNormals(AlembicMesh &node, AlembicGeometrySource::G
             
             Alembic::Abc::UInt32ArraySamplePtr I = Nsamp0->data().getIndices();
             
-            VR::Table<VR::Vector> &nl = info->normals->at(renderFrame);
+            VR::Table<VR::Vector> &nl = geom->normals->at(renderFrame);
             nl.setCount(N->size(), true);
             
-            VR::Table<int> &il = info->faceNormals->at(renderFrame);
-            il.setCount(info->numTriangles * 3, true);
+            VR::Table<int> &il = geom->faceNormals->at(renderFrame);
+            il.setCount(geom->numTriangles * 3, true);
             
             for (size_t i=0; i<N->size(); ++i)
             {
@@ -971,11 +971,11 @@ void UpdateGeometry::readMeshNormals(AlembicMesh &node, AlembicGeometrySource::G
                nl[i].set(n.x, n.y, n.z);
             }
             
-            for (size_t i=0, k=0; i<info->numTriangles; ++i)
+            for (size_t i=0, k=0; i<geom->numTriangles; ++i)
             {
                for (size_t j=0; j<3; ++j, ++k)
                {
-                  il[k] = I->get()[info->toVertexIndex[k]];
+                  il[k] = I->get()[geom->toVertexIndex[k]];
                }
             }
          }
@@ -990,11 +990,11 @@ void UpdateGeometry::readMeshNormals(AlembicMesh &node, AlembicGeometrySource::G
                Alembic::Abc::N3fArraySamplePtr N0 = Nsamp0->data().getVals();
                Alembic::Abc::UInt32ArraySamplePtr I0 = Nsamp0->data().getIndices();
                
-               VR::Table<VR::Vector> &nl = info->normals->at(frames[s]);
-               nl.setCount(info->numTriangles * 3, true);
+               VR::Table<VR::Vector> &nl = geom->normals->at(frames[s]);
+               nl.setCount(geom->numTriangles * 3, true);
                
-               VR::Table<int> &il = info->faceNormals->at(frames[s]);
-               il.setCount(info->numTriangles * 3, true);
+               VR::Table<int> &il = geom->faceNormals->at(frames[s]);
+               il.setCount(geom->numTriangles * 3, true);
                
                if (Nb > 0.0)
                {
@@ -1003,12 +1003,12 @@ void UpdateGeometry::readMeshNormals(AlembicMesh &node, AlembicGeometrySource::G
                   
                   double Na = 1.0 - Nb;
                   
-                  for (size_t i=0, k=0; i<info->numTriangles; ++i)
+                  for (size_t i=0, k=0; i<geom->numTriangles; ++i)
                   {
                      for (size_t j=0; j<3; ++j, ++k)
                      {
-                        unsigned int i0 = I0->get()[info->toVertexIndex[k]];
-                        unsigned int i1 = I1->get()[info->toVertexIndex[k]];
+                        unsigned int i0 = I0->get()[geom->toVertexIndex[k]];
+                        unsigned int i1 = I1->get()[geom->toVertexIndex[k]];
                         
                         Alembic::Abc::N3f n0 = N0->get()[i0];
                         Alembic::Abc::N3f n1 = N1->get()[i1];
@@ -1022,11 +1022,11 @@ void UpdateGeometry::readMeshNormals(AlembicMesh &node, AlembicGeometrySource::G
                }
                else
                {
-                  for (size_t i=0, k=0; i<info->numTriangles; ++i)
+                  for (size_t i=0, k=0; i<geom->numTriangles; ++i)
                   {
                      for (size_t j=0; j<3; ++j, ++k)
                      {
-                        Alembic::Abc::N3f n = N0->get()[I0->get()[info->toVertexIndex[k]]];
+                        Alembic::Abc::N3f n = N0->get()[I0->get()[geom->toVertexIndex[k]]];
                         
                         nl[k].set(n.x, n.y, n.z);
                         il[k] = k;
@@ -1065,12 +1065,12 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicMesh &node, AlembicNode *i
       ignore = !node.isVisible(true);
    }
    
-   AlembicGeometrySource::GeomInfo *info = mGeoSrc->getInfo(node.path());
-   AlembicGeometrySource::GeomInfo *instInfo = mGeoSrc->getInfo(instance ? instance->path() : node.path());
+   AbcVRayGeom *geom = mGeoSrc->getGeometry(node.path());
+   AbcVRayGeom *instGeom = mGeoSrc->getGeometry(instance ? instance->path() : node.path());
    
-   if (instInfo && !ignore)
+   if (instGeom && !ignore)
    {
-      instInfo->ignore = false;
+      instGeom->ignore = false;
       
       // Setup matrices (instance specific)
       
@@ -1078,25 +1078,25 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicMesh &node, AlembicNode *i
       {
          std::vector<Alembic::Abc::M44d> &matrices = mMatrixSamplesStack.back();
          
-         instInfo->numMatrices = int(matrices.size());
-         instInfo->matrices = new VR::TraceTransform[instInfo->numMatrices];
+         instGeom->numMatrices = int(matrices.size());
+         instGeom->matrices = new VR::TraceTransform[instGeom->numMatrices];
          
-         for (int i=0; i<instInfo->numMatrices; ++i)
+         for (int i=0; i<instGeom->numMatrices; ++i)
          {
             Alembic::Abc::M44d &M = matrices[i];
             
-            instInfo->matrices[i].m = VR::Matrix(VR::Vector(M[0][0], M[0][1], M[0][2]),
+            instGeom->matrices[i].m = VR::Matrix(VR::Vector(M[0][0], M[0][1], M[0][2]),
                                                  VR::Vector(M[1][0], M[1][1], M[1][2]),
                                                  VR::Vector(M[2][0], M[2][1], M[2][2]));
-            instInfo->matrices[i].offs = VR::Vector(M[3][0], M[3][1], M[3][2]);
+            instGeom->matrices[i].offs = VR::Vector(M[3][0], M[3][1], M[3][2]);
          }
       }
       
       // Setup geometry (once for all instances)
       
-      if (info)
+      if (geom)
       {
-         if (!info->updatedFrameGeometry)
+         if (!geom->updatedFrameGeometry)
          {
             Alembic::AbcGeom::IPolyMeshSchema &schema = node.typedObject().getSchema();
             
@@ -1116,34 +1116,34 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicMesh &node, AlembicNode *i
                                   renderTime, interpolateAttribs, attrs,
                                   true, true, true, true, true);
             
-            info->invalidFrame = !readBaseMesh(node, info, attrs);
+            geom->invalidFrame = !readBaseMesh(node, geom, attrs);
             
-            if (info->invalidFrame)
+            if (geom->invalidFrame)
             {
-               instInfo->ignore = true;
+               instGeom->ignore = true;
             }
             else
             {
                // Output normals
-               readMeshNormals(node, info);
+               readMeshNormals(node, geom);
                
                // Clear current channels
-               info->channels->setCount(0, renderFrame);
-               info->channelNames->setCount(0, renderFrame);
+               geom->channels->setCount(0, renderFrame);
+               geom->channelNames->setCount(0, renderFrame);
                
                // Reserve enough channels for UVs and user defined channels
                size_t maxChannels = 1 + attrs.uvs.size() + attrs.primitive.size() + attrs.point.size() + attrs.vertex.size();
-               info->channels->reserve(maxChannels, renderFrame);
-               info->channelNames->reserve(maxChannels, renderFrame);
+               geom->channels->reserve(maxChannels, renderFrame);
+               geom->channelNames->reserve(maxChannels, renderFrame);
                
                // Ouptut UVs
-               readMeshUVs(node, info, attrs, false);
+               readMeshUVs(node, geom, attrs, false);
                
                // Output user attributes (as color channels)
-               SetUserAttributes(info, attrs.object, renderFrame, mGeoSrc->params()->verbose);
-               SetUserAttributes(info, attrs.primitive, renderFrame, mGeoSrc->params()->verbose);
-               SetUserAttributes(info, attrs.point, renderFrame, mGeoSrc->params()->verbose);
-               SetUserAttributes(info, attrs.vertex, renderFrame, mGeoSrc->params()->verbose);
+               SetUserAttributes(geom, attrs.object, renderFrame, mGeoSrc->params()->verbose);
+               SetUserAttributes(geom, attrs.primitive, renderFrame, mGeoSrc->params()->verbose);
+               SetUserAttributes(geom, attrs.point, renderFrame, mGeoSrc->params()->verbose);
+               SetUserAttributes(geom, attrs.vertex, renderFrame, mGeoSrc->params()->verbose);
             }
             
             // Clear user attributes
@@ -1153,23 +1153,23 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicMesh &node, AlembicNode *i
             DestroyUserAttributes(attrs.vertex);
             attrs.uvs.clear();
             
-            info->updatedFrameGeometry = true;
+            geom->updatedFrameGeometry = true;
          }
-         else if (info->invalidFrame)
+         else if (geom->invalidFrame)
          {
             // No valid source geometry for instance
-            instInfo->ignore = true;
+            instGeom->ignore = true;
          }
       }
       else
       {
          // No source geometry for instance
-         instInfo->ignore = true;
+         instGeom->ignore = true;
       }
    }
-   else if (instInfo)
+   else if (instGeom)
    {
-      instInfo->ignore = true;
+      instGeom->ignore = true;
    }
    
    return AlembicNode::ContinueVisit;
@@ -1201,12 +1201,12 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicSubD &node, AlembicNode *i
       ignore = !node.isVisible(true);
    }
    
-   AlembicGeometrySource::GeomInfo *info = mGeoSrc->getInfo(node.path());
-   AlembicGeometrySource::GeomInfo *instInfo = mGeoSrc->getInfo(instance ? instance->path() : node.path());
+   AbcVRayGeom *geom = mGeoSrc->getGeometry(node.path());
+   AbcVRayGeom *instGeom = mGeoSrc->getGeometry(instance ? instance->path() : node.path());
    
-   if (instInfo && !ignore)
+   if (instGeom && !ignore)
    {
-      instInfo->ignore = false;
+      instGeom->ignore = false;
       
       // Setup matrices (instance specific)
       
@@ -1214,25 +1214,25 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicSubD &node, AlembicNode *i
       {
          std::vector<Alembic::Abc::M44d> &matrices = mMatrixSamplesStack.back();
          
-         instInfo->numMatrices = int(matrices.size());
-         instInfo->matrices = new VR::TraceTransform[instInfo->numMatrices];
+         instGeom->numMatrices = int(matrices.size());
+         instGeom->matrices = new VR::TraceTransform[instGeom->numMatrices];
          
-         for (int i=0; i<instInfo->numMatrices; ++i)
+         for (int i=0; i<instGeom->numMatrices; ++i)
          {
             Alembic::Abc::M44d &M = matrices[i];
             
-            instInfo->matrices[i].m = VR::Matrix(VR::Vector(M[0][0], M[0][1], M[0][2]),
+            instGeom->matrices[i].m = VR::Matrix(VR::Vector(M[0][0], M[0][1], M[0][2]),
                                                  VR::Vector(M[1][0], M[1][1], M[1][2]),
                                                  VR::Vector(M[2][0], M[2][1], M[2][2]));
-            instInfo->matrices[i].offs = VR::Vector(M[3][0], M[3][1], M[3][2]);
+            instGeom->matrices[i].offs = VR::Vector(M[3][0], M[3][1], M[3][2]);
          }
       }
       
       // Setup geometry (once for all instances)
       
-      if (info)
+      if (geom)
       {
-         if (!info->updatedFrameGeometry)
+         if (!geom->updatedFrameGeometry)
          {
             Alembic::AbcGeom::ISubDSchema &schema = node.typedObject().getSchema();
             
@@ -1252,11 +1252,11 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicSubD &node, AlembicNode *i
                                   renderTime, interpolateAttribs, attrs,
                                   true, true, true, true, true);
             
-            info->invalidFrame = !readBaseMesh(node, info, attrs);
+            geom->invalidFrame = !readBaseMesh(node, geom, attrs);
             
-            if (info->invalidFrame)
+            if (geom->invalidFrame)
             {
-               instInfo->ignore = true;
+               instGeom->ignore = true;
             }
             else
             {
@@ -1264,22 +1264,22 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicSubD &node, AlembicNode *i
                // TODO
                
                // Clear current channels
-               info->channels->setCount(0, renderFrame);
-               info->channelNames->setCount(0, renderFrame);
+               geom->channels->setCount(0, renderFrame);
+               geom->channelNames->setCount(0, renderFrame);
                
                // Reserve enough channels for UVs and user defined channels
                size_t maxChannels = 1 + attrs.uvs.size() + attrs.primitive.size() + attrs.point.size() + attrs.vertex.size();
-               info->channels->reserve(maxChannels, renderFrame);
-               info->channelNames->reserve(maxChannels, renderFrame);
+               geom->channels->reserve(maxChannels, renderFrame);
+               geom->channelNames->reserve(maxChannels, renderFrame);
                
                // Ouptut UVs
-               readMeshUVs(node, info, attrs, false);
+               readMeshUVs(node, geom, attrs, false);
                
                // Output user attributes (as color channels)
-               SetUserAttributes(info, attrs.object, renderFrame, mGeoSrc->params()->verbose);
-               SetUserAttributes(info, attrs.primitive, renderFrame, mGeoSrc->params()->verbose);
-               SetUserAttributes(info, attrs.point, renderFrame, mGeoSrc->params()->verbose);
-               SetUserAttributes(info, attrs.vertex, renderFrame, mGeoSrc->params()->verbose);
+               SetUserAttributes(geom, attrs.object, renderFrame, mGeoSrc->params()->verbose);
+               SetUserAttributes(geom, attrs.primitive, renderFrame, mGeoSrc->params()->verbose);
+               SetUserAttributes(geom, attrs.point, renderFrame, mGeoSrc->params()->verbose);
+               SetUserAttributes(geom, attrs.vertex, renderFrame, mGeoSrc->params()->verbose);
             }
             
             // Clear user attributes
@@ -1289,23 +1289,23 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicSubD &node, AlembicNode *i
             DestroyUserAttributes(attrs.vertex);
             attrs.uvs.clear();
             
-            info->updatedFrameGeometry = true;
+            geom->updatedFrameGeometry = true;
          }
-         else if (info->invalidFrame)
+         else if (geom->invalidFrame)
          {
             // No valid source geometry for instance
-            instInfo->ignore = true;
+            instGeom->ignore = true;
          }
       }
       else
       {
          // No source geometry for instance
-         instInfo->ignore = true;
+         instGeom->ignore = true;
       }
    }
-   else if (instInfo)
+   else if (instGeom)
    {
-      instInfo->ignore = true;
+      instGeom->ignore = true;
    }
    
    return AlembicNode::ContinueVisit;
@@ -1337,12 +1337,12 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
       ignore = !node.isVisible(true);
    }
    
-   AlembicGeometrySource::GeomInfo *info = mGeoSrc->getInfo(node.path());
-   AlembicGeometrySource::GeomInfo *instInfo = mGeoSrc->getInfo(instance ? instance->path() : node.path());
+   AbcVRayGeom *geom = mGeoSrc->getGeometry(node.path());
+   AbcVRayGeom *instGeom = mGeoSrc->getGeometry(instance ? instance->path() : node.path());
    
-   if (instInfo && !ignore)
+   if (instGeom && !ignore)
    {
-      instInfo->ignore = false;
+      instGeom->ignore = false;
       
       // Setup matrices (instance specific)
       
@@ -1350,30 +1350,30 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
       {
          std::vector<Alembic::Abc::M44d> &matrices = mMatrixSamplesStack.back();
          
-         instInfo->numMatrices = int(matrices.size());
-         instInfo->matrices = new VR::TraceTransform[instInfo->numMatrices];
+         instGeom->numMatrices = int(matrices.size());
+         instGeom->matrices = new VR::TraceTransform[instGeom->numMatrices];
          
-         for (int i=0; i<instInfo->numMatrices; ++i)
+         for (int i=0; i<instGeom->numMatrices; ++i)
          {
             Alembic::Abc::M44d &M = matrices[i];
             
-            instInfo->matrices[i].m = VR::Matrix(VR::Vector(M[0][0], M[0][1], M[0][2]),
+            instGeom->matrices[i].m = VR::Matrix(VR::Vector(M[0][0], M[0][1], M[0][2]),
                                                  VR::Vector(M[1][0], M[1][1], M[1][2]),
                                                  VR::Vector(M[2][0], M[2][1], M[2][2]));
-            instInfo->matrices[i].offs = VR::Vector(M[3][0], M[3][1], M[3][2]);
+            instGeom->matrices[i].offs = VR::Vector(M[3][0], M[3][1], M[3][2]);
          }
       }
       
       // Setup geometry
       
-      if (info)
+      if (geom)
       {
-         if (!info->updatedFrameGeometry)
+         if (!geom->updatedFrameGeometry)
          {
             // Read points
             Alembic::AbcGeom::IPointsSchema &schema = node.typedObject().getSchema();
             
-            bool isConst = (info->constPositions != 0);
+            bool isConst = (geom->constPositions != 0);
             double renderTime = mGeoSrc->renderTime();
             double renderFrame = mGeoSrc->renderFrame();
             
@@ -1413,7 +1413,7 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
             //                       renderTime, false, attrs,
             //                       true, false, true, false, false);
             
-            info->invalidFrame = false;
+            geom->invalidFrame = false;
             
             // Read position, velocity and id
             if (isConst)
@@ -1426,18 +1426,18 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                
                ID0 = ID;
                
-               info->numPoints = P->size();
-               info->sortParticles(ID->size(), ID->get());
+               geom->numPoints = P->size();
+               geom->sortParticles(ID->size(), ID->get());
                
-               info->constPositions->setCount(info->numPoints + 1, renderFrame);
-               info->velocities->setCount(info->numPoints + 1, renderFrame);
-               info->accelerations->setCount(info->numPoints + 1, renderFrame);
-               info->ids->setCount(info->numPoints + 1, renderFrame);
+               geom->constPositions->setCount(geom->numPoints + 1, renderFrame);
+               geom->velocities->setCount(geom->numPoints + 1, renderFrame);
+               geom->accelerations->setCount(geom->numPoints + 1, renderFrame);
+               geom->ids->setCount(geom->numPoints + 1, renderFrame);
                
-               VR::VectorList pl = info->constPositions->getVectorList(renderFrame);
-               VR::VectorList vl = info->velocities->getVectorList(renderFrame);
-               VR::ColorList al = info->accelerations->getColorList(renderFrame);
-               VR::IntList il = info->ids->getIntList(renderFrame);
+               VR::VectorList pl = geom->constPositions->getVectorList(renderFrame);
+               VR::VectorList vl = geom->velocities->getVectorList(renderFrame);
+               VR::ColorList al = geom->accelerations->getColorList(renderFrame);
+               VR::IntList il = geom->ids->getIntList(renderFrame);
                
                collectUserAttributes(schema.getUserProperties(), schema.getArbGeomParams(),
                                      renderTime, false, attrs,
@@ -1459,13 +1459,13 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                   if (it == attrs.point.end() ||
                       it->second.dataType != Float_Type ||
                       it->second.dataDim != 3 ||
-                      it->second.dataCount != info->numPoints)
+                      it->second.dataCount != geom->numPoints)
                   {
                      it = attrs.point.find("v");
                      if (it != attrs.point.end() &&
                          (it->second.dataType != Float_Type ||
                           it->second.dataDim != 3 ||
-                          it->second.dataCount != info->numPoints))
+                          it->second.dataCount != geom->numPoints))
                      {
                         it = attrs.point.end();
                      }
@@ -1484,19 +1484,19 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                   if (it == attrs.point.end() ||
                       it->second.dataType != Float_Type ||
                       it->second.dataDim != 3 ||
-                      it->second.dataCount != info->numPoints)
+                      it->second.dataCount != geom->numPoints)
                   {
                      it = attrs.point.find("accel");
                      if (it == attrs.point.end() ||
                          it->second.dataType != Float_Type ||
                          it->second.dataDim != 3 ||
-                         it->second.dataCount != info->numPoints)
+                         it->second.dataCount != geom->numPoints)
                      {
                         it = attrs.point.find("a");
                         if (it != attrs.point.end() &&
                             (it->second.dataType != Float_Type ||
                              it->second.dataDim != 3 ||
-                             it->second.dataCount != info->numPoints))
+                             it->second.dataCount != geom->numPoints))
                         {
                            it = attrs.point.end();
                         }
@@ -1514,9 +1514,9 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                al[0].set(0.0f, 0.0f, 0.0f);
                il[0] = 0;
                
-               for (size_t i=0, j=0; i<info->numPoints; ++i, j+=3)
+               for (size_t i=0, j=0; i<geom->numPoints; ++i, j+=3)
                {
-                  size_t k = 1 + info->particleOrder[i];
+                  size_t k = 1 + geom->particleOrder[i];
                   
                   Alembic::Abc::V3f p = P->get()[i];
                   Alembic::Abc::uint64_t id = ID->get()[i];
@@ -1569,15 +1569,15 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                double a = 1.0;
                double b = 0.0;
                
-               info->positions->clear();
+               geom->positions->clear();
                
                if (samples.size() == 0 || !samples.getSamples(renderTime, samp0, samp1, b))
                {
-                  info->invalidFrame = true;
+                  geom->invalidFrame = true;
                   
-                  info->ids->setCount(0, renderFrame);
-                  info->velocities->setCount(0, renderFrame);
-                  info->accelerations->setCount(0, renderFrame);
+                  geom->ids->setCount(0, renderFrame);
+                  geom->velocities->setCount(0, renderFrame);
+                  geom->accelerations->setCount(0, renderFrame);
                }
                else
                {
@@ -1616,7 +1616,7 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                      allids.push_back(id);
                   }
                   
-                  info->numPoints = P0->size();
+                  geom->numPoints = P0->size();
                   
                   // Get velocities and accelerations
                   // for V-Ray: velocities, acceleration_pp
@@ -1637,13 +1637,13 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                      if (it == attrs.point.end() ||
                          it->second.dataType != Float_Type ||
                          it->second.dataDim != 3 ||
-                         it->second.dataCount != info->numPoints)
+                         it->second.dataCount != geom->numPoints)
                      {
                         it = attrs.point.find("v");
                         if (it != attrs.point.end() &&
                             (it->second.dataType != Float_Type ||
                              it->second.dataDim != 3 ||
-                             it->second.dataCount != info->numPoints))
+                             it->second.dataCount != geom->numPoints))
                         {
                            it = attrs.point.end();
                         }
@@ -1662,19 +1662,19 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                      if (it == attrs.point.end() ||
                          it->second.dataType != Float_Type ||
                          it->second.dataDim != 3 ||
-                         it->second.dataCount != info->numPoints)
+                         it->second.dataCount != geom->numPoints)
                      {
                         it = attrs.point.find("accel");
                         if (it == attrs.point.end() ||
                             it->second.dataType != Float_Type ||
                             it->second.dataDim != 3 ||
-                            it->second.dataCount != info->numPoints)
+                            it->second.dataCount != geom->numPoints)
                         {
                            it = attrs.point.find("a");
                            if (it != attrs.point.end() &&
                                (it->second.dataType != Float_Type ||
                                 it->second.dataDim != 3 ||
-                                it->second.dataCount != info->numPoints))
+                                it->second.dataCount != geom->numPoints))
                            {
                               it = attrs.point.end();
                            }
@@ -1708,7 +1708,7 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                            std::pair<size_t, size_t> idxs;
                            
                            idxs.first = i;
-                           idxs.second = info->numPoints++;
+                           idxs.second = geom->numPoints++;
                            
                            idmap1[id] = idxs;
                            allids.push_back(id);
@@ -1761,7 +1761,7 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                      std::cout << "[AlembicLoader] UpdateGeometry::enter: Sort particle IDs" << std::endl;
                   }
                   
-                  info->sortParticles(allids.size(), &allids[0]);
+                  geom->sortParticles(allids.size(), &allids[0]);
                   
                   if (!vel0)
                   {
@@ -1771,13 +1771,13 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                      frames = &renderFrame;
                   }
                   
-                  info->ids->setCount(info->numPoints + 1, renderFrame);
-                  info->velocities->setCount(info->numPoints + 1, renderFrame);
-                  info->accelerations->setCount(info->numPoints + 1, renderFrame);
+                  geom->ids->setCount(geom->numPoints + 1, renderFrame);
+                  geom->velocities->setCount(geom->numPoints + 1, renderFrame);
+                  geom->accelerations->setCount(geom->numPoints + 1, renderFrame);
                   
-                  VR::IntList il = info->ids->getIntList(renderFrame);
-                  VR::VectorList vl = info->velocities->getVectorList(renderFrame);
-                  VR::ColorList al = info->accelerations->getColorList(renderFrame);
+                  VR::IntList il = geom->ids->getIntList(renderFrame);
+                  VR::VectorList vl = geom->velocities->getVectorList(renderFrame);
+                  VR::ColorList al = geom->accelerations->getColorList(renderFrame);
                   
                   il[0] = 0;
                   vl[0].set(0.0f, 0.0f, 0.0f);
@@ -1792,16 +1792,16 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                         std::cout << "[AlembicLoader] UpdateGeometry::enter: Compute positions for t=" << t << std::endl;
                      }
                      
-                     VR::Table<VR::Vector> &pl = info->positions->at(frames[i]);
+                     VR::Table<VR::Vector> &pl = geom->positions->at(frames[i]);
                      
-                     pl.setCount(info->numPoints + 1, true);
+                     pl.setCount(geom->numPoints + 1, true);
                      
                      pl[0].set(0.0f, 0.0f, 0.0f);
                      
                      for (size_t j=0, voff=0; j<P0->size(); ++j, voff+=3)
                      {
                         // size_t k = 1 + j;
-                        size_t k = 1 + info->particleOrder[j];
+                        size_t k = 1 + geom->particleOrder[j];
                         
                         Alembic::Util::uint64_t id = ID0->get()[j];
                         
@@ -1912,7 +1912,7 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                      for (it=idmap1.begin(); it!=idmap1.end(); ++it)
                      {
                         //size_t k = 1 + it->second.second;
-                        size_t k = 1 + info->particleOrder[it->second.second];
+                        size_t k = 1 + geom->particleOrder[it->second.second];
                         
                         // Extrapolate using velocity and acceleration
                         
@@ -1978,7 +1978,7 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                            continue;
                         }
                         
-                        ResizeUserAttribute(it0->second, info->numPoints);
+                        ResizeUserAttribute(it0->second, geom->numPoints);
                         
                         UserAttributes::iterator it1 = extraAttrs.point.find(it0->first);
                         
@@ -2000,9 +2000,9 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                }
             }
             
-            if (info->invalidFrame)
+            if (geom->invalidFrame)
             {
-               instInfo->ignore = true;
+               instGeom->ignore = true;
             }
             else
             {
@@ -2037,7 +2037,7 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                
                for (UserAttributes::iterator it = attrs.point.begin(); it != attrs.point.end(); ++it)
                {
-                  if (info->remapParamName(it->first) == "radii")
+                  if (geom->remapParamName(it->first) == "radii")
                   {
                      UserAttribute &radii = it->second;
                      
@@ -2094,9 +2094,9 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                            }
                            
                            VR::DefFloatListParam *radii = new VR::DefFloatListParam("radii");
-                           info->floatParams["radii"] = radii;
+                           geom->floatParams["radii"] = radii;
                            
-                           radii->setCount(info->numPoints + 1);
+                           radii->setCount(geom->numPoints + 1);
                            VR::FloatList fl = radii->getFloatList(renderTime);
                            fl[0] = 0.0f;
                            
@@ -2135,13 +2135,13 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                   }
                }
                
-               SetUserAttributes(info, attrs.object, renderFrame, mGeoSrc->params()->verbose);
-               SetUserAttributes(info, attrs.point, renderFrame, mGeoSrc->params()->verbose);
+               SetUserAttributes(geom, attrs.object, renderFrame, mGeoSrc->params()->verbose);
+               SetUserAttributes(geom, attrs.point, renderFrame, mGeoSrc->params()->verbose);
                
                // Reset particle IDs
-               if (!info->sortIDs)
+               if (!geom->sortIDs)
                {
-                  VR::IntList il = info->ids->getIntList(renderFrame);
+                  VR::IntList il = geom->ids->getIntList(renderFrame);
                   il[0] = 0;
                   for (int i=1; i<il.count(); ++i)
                   {
@@ -2149,30 +2149,30 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                   }
                }
                
-               info->attachParams(mGeoSrc->factory(), mGeoSrc->params()->verbose);
+               geom->attachParams(mGeoSrc->factory(), mGeoSrc->params()->verbose);
             }
             
             // Clear user attributes
             DestroyUserAttributes(attrs.object);
             DestroyUserAttributes(attrs.point);
             
-            info->updatedFrameGeometry = true;
+            geom->updatedFrameGeometry = true;
          }
-         else if (info->invalidFrame)
+         else if (geom->invalidFrame)
          {
             // No valid source geometry for instance
-            instInfo->ignore = true;
+            instGeom->ignore = true;
          }
       }
       else
       {
          // No source geometry for instance
-         instInfo->ignore = true;
+         instGeom->ignore = true;
       }
    }
-   else if (instInfo)
+   else if (instGeom)
    {
-      instInfo->ignore = true;
+      instGeom->ignore = true;
    }
    
    return AlembicNode::ContinueVisit;
