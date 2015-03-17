@@ -921,8 +921,11 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
    
    TimeSampleList<Alembic::AbcGeom::IN3fGeomParam> Nsamples;
    Alembic::AbcGeom::IN3fGeomParam N = schema.getNormalsParam();
+   bool NperPoint = false;
    
-   if (readNormals && N.valid())
+   if (readNormals && N.valid() &&
+       (N.getScope() == Alembic::AbcGeom::kFacevaryingScope ||
+        N.getScope() == Alembic::AbcGeom::kVaryingScope))
    {
       if (info.varyingTopology)
       {
@@ -942,6 +945,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
             Nsamples.update(N, t, t, i>0);
          }
       }
+      
+      NperPoint = (N.getScope() == Alembic::AbcGeom::kVaryingScope);
    }
    
    if (Nsamples.size() > 0)
@@ -977,34 +982,62 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
             AiMsgInfo("[abcproc] Read %lu normals", vals->size());
          }
          
-         if (idxs)
+         if (NperPoint)
          {
-            nidxs = AiArrayAllocate(idxs->size(), 1, AI_TYPE_UINT);
-            
-            for (size_t i=0; i<idxs->size(); ++i)
+            if (idxs)
             {
-               AiArraySetUInt(nidxs, info.arnoldVertexIndex[i], idxs->get()[i]);
+               nidxs = AiArrayAllocate(info.vertexCount, 1, AI_TYPE_UINT);
+               
+               for (unsigned int i=0; i<info.vertexCount; ++i)
+               {
+                  unsigned int vidx = info.arnoldVertexIndex[i];
+                  unsigned int pidx = info.vertexPointIndex[vidx];
+                  
+                  if (pidx >= idxs->size())
+                  {
+                     AiMsgWarning("[abcproc] Invalid normal index");
+                     AiArraySetUInt(nidxs, vidx, 0);
+                  }
+                  else
+                  {
+                     AiArraySetUInt(nidxs, vidx, idxs->get()[pidx]);
+                  }
+               }
             }
-            
-            if (mDso->verbose())
+            else
             {
-               AiMsgInfo("[abcproc] Read %lu normal indices", idxs->size());
+               nidxs = AiArrayCopy(AiNodeGetArray(mNode, "vidxs"));
             }
          }
          else
-         {
-            nidxs = AiArrayAllocate(vals->size(), 1, AI_TYPE_UINT);
-            
-            for (size_t i=0; i<vals->size(); ++i)
+         {     
+            if (idxs)
             {
-               AiArraySetUInt(nidxs, info.arnoldVertexIndex[i], i);
+               nidxs = AiArrayAllocate(idxs->size(), 1, AI_TYPE_UINT);
+               
+               for (size_t i=0; i<idxs->size(); ++i)
+               {
+                  AiArraySetUInt(nidxs, info.arnoldVertexIndex[i], idxs->get()[i]);
+               }
+               
+               if (mDso->verbose())
+               {
+                  AiMsgInfo("[abcproc] Read %lu normal indices", idxs->size());
+               }
+            }
+            else
+            {
+               nidxs = AiArrayAllocate(vals->size(), 1, AI_TYPE_UINT);
+               
+               for (size_t i=0; i<vals->size(); ++i)
+               {
+                  AiArraySetUInt(nidxs, info.arnoldVertexIndex[i], i);
+               }
             }
          }
       }
       else
       {
-         size_t numNormals = 0;
-         
          for (size_t i=0, j=0; i<mDso->numMotionSamples(); ++i)
          {
             double t = mDso->motionSampleTime(i);
@@ -1015,6 +1048,11 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
             }
             
             Nsamples.getSamples(t, n0, n1, blend);
+            
+            if (!nlist)
+            {
+               nlist = AiArrayAllocate(info.vertexCount, mDso->numMotionSamples(), AI_TYPE_VECTOR);
+            }
             
             if (blend > 0.0)
             {
@@ -1044,7 +1082,9 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
                         AiMsgInfo("[abcproc] Read %lu normal indices", idxs0->size());
                      }
                      
-                     if (idxs1->size() != idxs0->size() || (numNormals > 0 && idxs0->size() != numNormals))
+                     if (idxs0->size() != idxs1->size() ||
+                         ( NperPoint && idxs0->size() != info.pointCount) ||
+                         (!NperPoint && idxs0->size() != info.vertexCount))
                      {
                         if (nidxs) AiArrayDestroy(nidxs);
                         if (nlist) AiArrayDestroy(nlist);
@@ -1054,28 +1094,51 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
                         break;
                      }
                      
-                     numNormals = idxs0->size();
-                     
-                     if (!nlist)
+                     if (NperPoint)
                      {
-                        nlist = AiArrayAllocate(numNormals, mDso->numMotionSamples(), AI_TYPE_VECTOR);
+                        for (unsigned int k=0; k<info.vertexCount; ++k)
+                        {
+                           unsigned int vidx = info.arnoldVertexIndex[k];
+                           unsigned int pidx = info.vertexPointIndex[vidx];
+                           
+                           if (pidx >= idxs0->size() || pidx >= idxs1->size())
+                           {
+                              AiMsgWarning("[abcproc] Invalid normal index");
+                              AiArraySetVec(nlist, j + vidx, AI_V3_ZERO);
+                           }
+                           else
+                           {
+                              Alembic::Abc::N3f val0 = vals0->get()[idxs0->get()[pidx]];
+                              Alembic::Abc::N3f val1 = vals1->get()[idxs1->get()[pidx]];
+                              
+                              vec.x = a * val0.x + blend * val1.x;
+                              vec.y = a * val0.y + blend * val1.y;
+                              vec.z = a * val0.z + blend * val1.z;
+                              
+                              AiArraySetVec(nlist, j + vidx, vec);
+                           }
+                        }
                      }
-                     
-                     for (size_t k=0; k<numNormals; ++k)
+                     else
                      {
-                        Alembic::Abc::N3f val0 = vals0->get()[idxs0->get()[k]];
-                        Alembic::Abc::N3f val1 = vals1->get()[idxs1->get()[k]];
-                        
-                        vec.x = a * val0.x + blend * val1.x;
-                        vec.y = a * val0.y + blend * val1.y;
-                        vec.z = a * val0.z + blend * val1.z;
-                        
-                        AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                        for (unsigned int k=0; k<info.vertexCount; ++k)
+                        {
+                           Alembic::Abc::N3f val0 = vals0->get()[idxs0->get()[k]];
+                           Alembic::Abc::N3f val1 = vals1->get()[idxs1->get()[k]];
+                           
+                           vec.x = a * val0.x + blend * val1.x;
+                           vec.y = a * val0.y + blend * val1.y;
+                           vec.z = a * val0.z + blend * val1.z;
+                           
+                           AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                        }
                      }
                   }
                   else
                   {
-                     if (vals1->size() != idxs0->size() || (numNormals > 0 && idxs0->size() != numNormals))
+                     if (vals1->size() != idxs0->size() ||
+                         ( NperPoint && vals1->size() != info.pointCount) ||
+                         (!NperPoint && vals1->size() != info.vertexCount))
                      {
                         if (nidxs) AiArrayDestroy(nidxs);
                         if (nlist) AiArrayDestroy(nlist);
@@ -1085,23 +1148,44 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
                         break;
                      }
                      
-                     numNormals = idxs0->size();
-                     
-                     if (!nlist)
+                     if (NperPoint)
                      {
-                        nlist = AiArrayAllocate(numNormals, mDso->numMotionSamples(), AI_TYPE_VECTOR);
+                        for (unsigned int k=0; k<info.vertexCount; ++k)
+                        {
+                           unsigned int vidx = info.arnoldVertexIndex[k];
+                           unsigned int pidx = info.vertexPointIndex[vidx];
+                           
+                           if (pidx >= vals1->size() || pidx >= idxs0->size())
+                           {
+                              AiMsgWarning("[abcproc] Invalid normal index");
+                              AiArraySetVec(nlist, j + vidx, AI_V3_ZERO);
+                           }
+                           else
+                           {
+                              Alembic::Abc::N3f val0 = vals0->get()[idxs0->get()[pidx]];
+                              Alembic::Abc::N3f val1 = vals1->get()[pidx];
+                              
+                              vec.x = a * val0.x + blend * val1.x;
+                              vec.y = a * val0.y + blend * val1.y;
+                              vec.z = a * val0.z + blend * val1.z;
+                              
+                              AiArraySetVec(nlist, j + vidx, vec);
+                           }
+                        }
                      }
-                     
-                     for (size_t k=0; k<numNormals; ++k)
+                     else
                      {
-                        Alembic::Abc::N3f val0 = vals0->get()[idxs0->get()[k]];
-                        Alembic::Abc::N3f val1 = vals1->get()[k];
-                        
-                        vec.x = a * val0.x + blend * val1.x;
-                        vec.y = a * val0.y + blend * val1.y;
-                        vec.z = a * val0.z + blend * val1.z;
-                        
-                        AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                        for (unsigned int k=0; k<info.vertexCount; ++k)
+                        {
+                           Alembic::Abc::N3f val0 = vals0->get()[idxs0->get()[k]];
+                           Alembic::Abc::N3f val1 = vals1->get()[k];
+                           
+                           vec.x = a * val0.x + blend * val1.x;
+                           vec.y = a * val0.y + blend * val1.y;
+                           vec.z = a * val0.z + blend * val1.z;
+                           
+                           AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                        }
                      }
                   }
                }
@@ -1114,7 +1198,9 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
                         AiMsgInfo("[abcproc] Read %lu normal indices", idxs1->size());
                      }
                      
-                     if (idxs1->size() != vals0->size() || (numNormals > 0 && vals0->size() != numNormals))
+                     if (vals0->size() != idxs1->size() ||
+                         ( NperPoint && vals0->size() != info.pointCount) ||
+                         (!NperPoint && vals0->size() != info.vertexCount))
                      {
                         if (nidxs) AiArrayDestroy(nidxs);
                         if (nlist) AiArrayDestroy(nlist);
@@ -1124,28 +1210,51 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
                         break;
                      }
                      
-                     numNormals = vals0->size();
-                     
-                     if (!nlist)
+                     if (NperPoint)
                      {
-                        nlist = AiArrayAllocate(numNormals, mDso->numMotionSamples(), AI_TYPE_VECTOR);
+                        for (unsigned int k=0; k<info.vertexCount; ++k)
+                        {
+                           unsigned int vidx = info.arnoldVertexIndex[k];
+                           unsigned int pidx = info.vertexPointIndex[vidx];
+                           
+                           if (pidx >= vals0->size() || pidx >= idxs1->size())
+                           {
+                              AiMsgWarning("[abcproc] Invalid normal index");
+                              AiArraySetVec(nlist, j + vidx, AI_V3_ZERO);
+                           }
+                           else
+                           {
+                              Alembic::Abc::N3f val0 = vals0->get()[pidx];
+                              Alembic::Abc::N3f val1 = vals1->get()[idxs1->get()[pidx]];
+                              
+                              vec.x = a * val0.x + blend * val1.x;
+                              vec.y = a * val0.y + blend * val1.y;
+                              vec.z = a * val0.z + blend * val1.z;
+                              
+                              AiArraySetVec(nlist, j + vidx, vec);
+                           }
+                        }
                      }
-                     
-                     for (size_t k=0; k<numNormals; ++k)
+                     else
                      {
-                        Alembic::Abc::N3f val0 = vals0->get()[k];
-                        Alembic::Abc::N3f val1 = vals1->get()[idxs1->get()[k]];
-                        
-                        vec.x = a * val0.x + blend * val1.x;
-                        vec.y = a * val0.y + blend * val1.y;
-                        vec.z = a * val0.z + blend * val1.z;
-                        
-                        AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                        for (unsigned int k=0; k<info.vertexCount; ++k)
+                        {
+                           Alembic::Abc::N3f val0 = vals0->get()[k];
+                           Alembic::Abc::N3f val1 = vals1->get()[idxs1->get()[k]];
+                           
+                           vec.x = a * val0.x + blend * val1.x;
+                           vec.y = a * val0.y + blend * val1.y;
+                           vec.z = a * val0.z + blend * val1.z;
+                           
+                           AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                        }
                      }
                   }
                   else
                   {
-                     if (vals1->size() != vals0->size() || (numNormals > 0 && vals0->size() != numNormals))
+                     if (vals1->size() != vals0->size() ||
+                         ( NperPoint && vals0->size() != info.pointCount) ||
+                         (!NperPoint && vals0->size() != info.vertexCount))
                      {
                         if (nidxs) AiArrayDestroy(nidxs);
                         if (nlist) AiArrayDestroy(nlist);
@@ -1155,23 +1264,44 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
                         break;
                      }
                      
-                     numNormals = vals0->size();
-                     
-                     if (!nlist)
+                     if (NperPoint)
                      {
-                        nlist = AiArrayAllocate(numNormals, mDso->numMotionSamples(), AI_TYPE_VECTOR);
+                        for (unsigned int k=0; k<info.vertexCount; ++k)
+                        {
+                           unsigned int vidx = info.arnoldVertexIndex[k];
+                           unsigned int pidx = info.vertexPointIndex[vidx];
+                           
+                           if (pidx >= vals0->size())
+                           {
+                              AiMsgWarning("[abcproc] Invalid normal index");
+                              AiArraySetVec(nlist, j + vidx, AI_V3_ZERO);
+                           }
+                           else
+                           {
+                              Alembic::Abc::N3f val0 = vals0->get()[pidx];
+                              Alembic::Abc::N3f val1 = vals1->get()[pidx];
+                              
+                              vec.x = a * val0.x + blend * val1.x;
+                              vec.y = a * val0.y + blend * val1.y;
+                              vec.z = a * val0.z + blend * val1.z;
+                              
+                              AiArraySetVec(nlist, j + vidx, vec);
+                           }
+                        }
                      }
-                     
-                     for (size_t k=0; k<numNormals; ++k)
+                     else
                      {
-                        Alembic::Abc::N3f val0 = vals0->get()[k];
-                        Alembic::Abc::N3f val1 = vals1->get()[k];
-                        
-                        vec.x = a * val0.x + blend * val1.x;
-                        vec.y = a * val0.y + blend * val1.y;
-                        vec.z = a * val0.z + blend * val1.z;
-                        
-                        AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                        for (unsigned int k=0; k<info.vertexCount; ++k)
+                        {
+                           Alembic::Abc::N3f val0 = vals0->get()[k];
+                           Alembic::Abc::N3f val1 = vals1->get()[k];
+                           
+                           vec.x = a * val0.x + blend * val1.x;
+                           vec.y = a * val0.y + blend * val1.y;
+                           vec.z = a * val0.z + blend * val1.z;
+                           
+                           AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                        }
                      }
                   }
                }
@@ -1185,7 +1315,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
                {
                   AiMsgInfo("[abcproc] Read %lu normals", vals->size());
                }
-            
+               
                if (idxs)
                {
                   if (mDso->verbose())
@@ -1193,7 +1323,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
                      AiMsgInfo("[abcproc] Read %lu normal indices", idxs->size());
                   }
                   
-                  if (numNormals > 0 && idxs->size() != numNormals)
+                  if (( NperPoint && idxs->size() != info.pointCount ) ||
+                      (!NperPoint && idxs->size() != info.vertexCount))
                   {
                      AiArrayDestroy(nidxs);
                      AiArrayDestroy(nlist);
@@ -1203,27 +1334,48 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
                      break;
                   }
                   
-                  numNormals = idxs->size();
-                  
-                  if (!nlist)
+                  if (NperPoint)
                   {
-                     nlist = AiArrayAllocate(numNormals, mDso->numMotionSamples(), AI_TYPE_VECTOR);
+                     for (unsigned int k=0; k<info.vertexCount; ++k)
+                     {
+                        unsigned int vidx = info.arnoldVertexIndex[k];
+                        unsigned int pidx = info.vertexPointIndex[vidx];
+                        
+                        if (pidx >= idxs->size())
+                        {
+                           AiMsgWarning("[abcproc] Invalid normal index");
+                           AiArraySetVec(nlist, j + vidx, AI_V3_ZERO);
+                        }
+                        else
+                        {
+                           Alembic::Abc::N3f val = vals->get()[idxs->get()[pidx]];
+                           
+                           vec.x = val.x;
+                           vec.y = val.y;
+                           vec.z = val.z;
+                           
+                           AiArraySetVec(nlist, j + vidx, vec);
+                        }
+                     }
                   }
-                  
-                  for (size_t k=0; k<idxs->size(); ++k)
+                  else
                   {
-                     Alembic::Abc::N3f val = vals->get()[idxs->get()[k]];
-                     
-                     vec.x = val.x;
-                     vec.y = val.y;
-                     vec.z = val.z;
-                     
-                     AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                     for (unsigned int k=0; k<info.vertexCount; ++k)
+                     {
+                        Alembic::Abc::N3f val = vals->get()[idxs->get()[k]];
+                        
+                        vec.x = val.x;
+                        vec.y = val.y;
+                        vec.z = val.z;
+                        
+                        AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                     }
                   }
                }
                else
                {
-                  if (numNormals > 0 && vals->size() != numNormals)
+                  if (( NperPoint && vals->size() != info.pointCount ) ||
+                      (!NperPoint && vals->size() != info.vertexCount))
                   {
                      AiArrayDestroy(nidxs);
                      if (nlist) AiArrayDestroy(nlist);
@@ -1233,22 +1385,42 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
                      break;
                   }
                   
-                  numNormals = vals->size();
-                  
-                  if (!nlist)
+                  if (NperPoint)
                   {
-                     nlist = AiArrayAllocate(numNormals, mDso->numMotionSamples(), AI_TYPE_VECTOR);
+                     for (unsigned int k=0; k<info.vertexCount; ++k)
+                     {
+                        unsigned int vidx = info.arnoldVertexIndex[k];
+                        unsigned int pidx = info.vertexPointIndex[vidx];
+                        
+                        if (pidx >= vals->size())
+                        {
+                           AiMsgWarning("[abcproc] Invalid normal index");
+                           AiArraySetVec(nlist, j + vidx, AI_V3_ZERO);
+                        }
+                        else
+                        {
+                           Alembic::Abc::N3f val = vals->get()[pidx];
+                        
+                           vec.x = val.x;
+                           vec.y = val.y;
+                           vec.z = val.z;
+                           
+                           AiArraySetVec(nlist, j + vidx, vec);
+                        }
+                     }
                   }
-                  
-                  for (size_t k=0; k<vals->size(); ++k)
+                  else
                   {
-                     Alembic::Abc::N3f val = vals->get()[k];
-                     
-                     vec.x = val.x;
-                     vec.y = val.y;
-                     vec.z = val.z;
-                     
-                     AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                     for (unsigned int k=0; k<info.vertexCount; ++k)
+                     {
+                        Alembic::Abc::N3f val = vals->get()[k];
+                        
+                        vec.x = val.x;
+                        vec.y = val.y;
+                        vec.z = val.z;
+                        
+                        AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                     }
                   }
                }
             }
@@ -1256,15 +1428,15 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
             if (!nidxs)
             {
                // vertex remapping already happened at values level
-               nidxs = AiArrayAllocate(numNormals, 1, AI_TYPE_UINT);
+               nidxs = AiArrayAllocate(info.vertexCount, 1, AI_TYPE_UINT);
                
-               for (size_t k=0; k<numNormals; ++k)
+               for (unsigned int k=0; k<info.vertexCount; ++k)
                {
                   AiArraySetUInt(nidxs, k, k);
                }
             }
             
-            j += numNormals;
+            j += info.vertexCount;
          }
       }
       
