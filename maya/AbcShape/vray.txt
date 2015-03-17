@@ -1,0 +1,30 @@
+- Append:
+
+   '''
+   Node AbcShape {
+      group_0 = vray_subdivision
+      group_1 = vray_subquality
+      group_2 = vray_displacement
+      group_3 = vray_opensubdiv
+      group_4 = vray_point_size
+      group_5 = vray_sprite_orient
+      group_6 = vray_objectID
+      group_7 = vray_user_attributes
+   }
+   '''
+   
+  to attributeNodes.txt file in V-Ray for Maya scripts folder.
+
+
+- Replace:
+
+   string $cmd = ("vray createAEMenu " + $selected);
+   
+  By:
+   
+   string $cmd = "if (!python(\"import abcshape4vray; abcshape4vray.BuildAEMenuForNode('" + $selected + "')\")) { vray createAEMenu " + $selected + "; } ";
+
+  in buildVRayAEAttributesSubMenu.mel file in V-Ray for Maya scripts folder.
+  
+
+- Make sure that the abcshape4vray.py file appears somewhere in your PYTHONPATH

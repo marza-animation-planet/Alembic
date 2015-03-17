@@ -891,40 +891,53 @@ void UpdateGeometry::readMeshNormals(AlembicMesh &node, AbcVRayGeom *geom)
          
    Alembic::AbcGeom::IN3fGeomParam Nparam = schema.getNormalsParam();
    
-   if (isConst)
+   bool NperPoint = false;
+   unsigned int *remapIndex = 0;
+   
+   if (!Nparam.valid() || 
+       (Nparam.getScope() != Alembic::AbcGeom::kVaryingScope &&
+        Nparam.getScope() != Alembic::AbcGeom::kFacevaryingScope))
    {
-      if (Nparam.valid())
-      {
-         Alembic::AbcGeom::IN3fGeomParam::Sample theSample = Nparam.getIndexedValue();
-         
-         Alembic::Abc::N3fArraySamplePtr N = theSample.getVals();
-         
-         Alembic::Abc::UInt32ArraySamplePtr I = theSample.getIndices();
-         
-         geom->constNormals->setCount(N->size(), renderFrame);
-         VR::VectorList nl = geom->constNormals->getVectorList(renderFrame);
-         
-         geom->constFaceNormals->setCount(geom->numTriangles * 3, renderFrame);
-         VR::IntList il = geom->constFaceNormals->getIntList(renderFrame);
-         
-         for (size_t i=0; i<N->size(); ++i)
-         {
-            Alembic::Abc::N3f n = N->get()[i];
-            nl[i].set(n.x, n.y, n.z);
-         }
-         
-         for (size_t i=0, k=0; i<geom->numTriangles; ++i)
-         {
-            for (size_t j=0; j<3; ++j, ++k)
-            {
-               il[k] = I->get()[geom->toVertexIndex[k]];
-            }
-         }
-      }
-      else
+      if (isConst)
       {
          geom->constNormals->setCount(0, renderFrame);
          geom->constFaceNormals->setCount(0, renderFrame);
+      }
+      
+      return;
+   }
+   else
+   {
+      NperPoint = (Nparam.getScope() != Alembic::AbcGeom::kFacevaryingScope);
+      remapIndex = (NperPoint ? geom->toPointIndex : geom->toVertexIndex);
+   }
+   
+   if (isConst)
+   {
+      Alembic::AbcGeom::IN3fGeomParam::Sample theSample = Nparam.getIndexedValue();
+      
+      Alembic::Abc::N3fArraySamplePtr N = theSample.getVals();
+      
+      Alembic::Abc::UInt32ArraySamplePtr I = theSample.getIndices();
+      
+      geom->constNormals->setCount(N->size(), renderFrame);
+      VR::VectorList nl = geom->constNormals->getVectorList(renderFrame);
+      
+      geom->constFaceNormals->setCount(geom->numTriangles * 3, renderFrame);
+      VR::IntList il = geom->constFaceNormals->getIntList(renderFrame);
+      
+      for (size_t i=0; i<N->size(); ++i)
+      {
+         Alembic::Abc::N3f n = N->get()[i];
+         nl[i].set(n.x, n.y, n.z);
+      }
+      
+      for (size_t i=0, k=0; i<geom->numTriangles; ++i)
+      {
+         for (size_t j=0; j<3; ++j, ++k)
+         {
+            il[k] = I->get()[remapIndex[k]];
+         }
       }
    }
    else
@@ -940,97 +953,94 @@ void UpdateGeometry::readMeshNormals(AlembicMesh &node, AbcVRayGeom *geom)
       geom->normals->clear();
       geom->faceNormals->clear();
       
-      if (Nparam.valid())
+      TimeSampleList<Alembic::AbcGeom::IN3fGeomParam>::ConstIterator Nsamp0, Nsamp1;
+      double Nb = 0.0;
+      
+      for (size_t i=0; i<ntimes; ++i)
       {
-         TimeSampleList<Alembic::AbcGeom::IN3fGeomParam>::ConstIterator Nsamp0, Nsamp1;
-         double Nb = 0.0;
+         t = times[i];
+         Nsamples.update(Nparam, t, t, i > 0);
+      }
+      
+      if (Nsamples.size() == 1 || varyingTopology)
+      {
+         Nsamples.getSamples(renderTime, Nsamp0, Nsamp1, Nb);
          
-         for (size_t i=0; i<ntimes; ++i)
+         Alembic::Abc::N3fArraySamplePtr N = Nsamp0->data().getVals();
+         
+         Alembic::Abc::UInt32ArraySamplePtr I = Nsamp0->data().getIndices();
+         
+         VR::Table<VR::Vector> &nl = geom->normals->at(renderFrame);
+         nl.setCount(N->size(), true);
+         
+         VR::Table<int> &il = geom->faceNormals->at(renderFrame);
+         il.setCount(geom->numTriangles * 3, true);
+         
+         for (size_t i=0; i<N->size(); ++i)
          {
-            t = times[i];
-            Nsamples.update(Nparam, t, t, i > 0);
+            Alembic::Abc::N3f n = N->get()[i];
+            nl[i].set(n.x, n.y, n.z);
          }
          
-         if (Nsamples.size() == 1 || varyingTopology)
+         for (size_t i=0, k=0; i<geom->numTriangles; ++i)
          {
-            Nsamples.getSamples(renderTime, Nsamp0, Nsamp1, Nb);
+            for (size_t j=0; j<3; ++j, ++k)
+            {
+               il[k] = I->get()[remapIndex[k]];
+            }
+         }
+      }
+      else
+      {
+         for (size_t s=0; s<ntimes; ++s)
+         {
+            t = times[s];
             
-            Alembic::Abc::N3fArraySamplePtr N = Nsamp0->data().getVals();
+            Nsamples.getSamples(t, Nsamp0, Nsamp1, Nb);
             
-            Alembic::Abc::UInt32ArraySamplePtr I = Nsamp0->data().getIndices();
+            Alembic::Abc::N3fArraySamplePtr N0 = Nsamp0->data().getVals();
+            Alembic::Abc::UInt32ArraySamplePtr I0 = Nsamp0->data().getIndices();
             
-            VR::Table<VR::Vector> &nl = geom->normals->at(renderFrame);
-            nl.setCount(N->size(), true);
+            VR::Table<VR::Vector> &nl = geom->normals->at(frames[s]);
+            nl.setCount(geom->numTriangles * 3, true);
             
-            VR::Table<int> &il = geom->faceNormals->at(renderFrame);
+            VR::Table<int> &il = geom->faceNormals->at(frames[s]);
             il.setCount(geom->numTriangles * 3, true);
             
-            for (size_t i=0; i<N->size(); ++i)
+            if (Nb > 0.0)
             {
-               Alembic::Abc::N3f n = N->get()[i];
-               nl[i].set(n.x, n.y, n.z);
-            }
-            
-            for (size_t i=0, k=0; i<geom->numTriangles; ++i)
-            {
-               for (size_t j=0; j<3; ++j, ++k)
+               Alembic::Abc::N3fArraySamplePtr N1 = Nsamp1->data().getVals();
+               Alembic::Abc::UInt32ArraySamplePtr I1 = Nsamp1->data().getIndices();
+               
+               double Na = 1.0 - Nb;
+               
+               for (size_t i=0, k=0; i<geom->numTriangles; ++i)
                {
-                  il[k] = I->get()[geom->toVertexIndex[k]];
-               }
-            }
-         }
-         else
-         {
-            for (size_t s=0; s<ntimes; ++s)
-            {
-               t = times[s];
-               
-               Nsamples.getSamples(t, Nsamp0, Nsamp1, Nb);
-               
-               Alembic::Abc::N3fArraySamplePtr N0 = Nsamp0->data().getVals();
-               Alembic::Abc::UInt32ArraySamplePtr I0 = Nsamp0->data().getIndices();
-               
-               VR::Table<VR::Vector> &nl = geom->normals->at(frames[s]);
-               nl.setCount(geom->numTriangles * 3, true);
-               
-               VR::Table<int> &il = geom->faceNormals->at(frames[s]);
-               il.setCount(geom->numTriangles * 3, true);
-               
-               if (Nb > 0.0)
-               {
-                  Alembic::Abc::N3fArraySamplePtr N1 = Nsamp1->data().getVals();
-                  Alembic::Abc::UInt32ArraySamplePtr I1 = Nsamp1->data().getIndices();
-                  
-                  double Na = 1.0 - Nb;
-                  
-                  for (size_t i=0, k=0; i<geom->numTriangles; ++i)
+                  for (size_t j=0; j<3; ++j, ++k)
                   {
-                     for (size_t j=0; j<3; ++j, ++k)
-                     {
-                        unsigned int i0 = I0->get()[geom->toVertexIndex[k]];
-                        unsigned int i1 = I1->get()[geom->toVertexIndex[k]];
-                        
-                        Alembic::Abc::N3f n0 = N0->get()[i0];
-                        Alembic::Abc::N3f n1 = N1->get()[i1];
-                        
-                        nl[k].set(Na * n0.x + Nb * n1.x,
-                                  Na * n0.y + Nb * n1.y,
-                                  Na * n0.z + Nb * n1.z);
-                        il[k] = k;
-                     }
+                     unsigned int i0 = I0->get()[remapIndex[k]];
+                     unsigned int i1 = I1->get()[remapIndex[k]];
+                     
+                     Alembic::Abc::N3f n0 = N0->get()[i0];
+                     Alembic::Abc::N3f n1 = N1->get()[i1];
+                     
+                     nl[k].set(Na * n0.x + Nb * n1.x,
+                               Na * n0.y + Nb * n1.y,
+                               Na * n0.z + Nb * n1.z);
+                     il[k] = k;
                   }
                }
-               else
+            }
+            else
+            {
+               for (size_t i=0, k=0; i<geom->numTriangles; ++i)
                {
-                  for (size_t i=0, k=0; i<geom->numTriangles; ++i)
+                  for (size_t j=0; j<3; ++j, ++k)
                   {
-                     for (size_t j=0; j<3; ++j, ++k)
-                     {
-                        Alembic::Abc::N3f n = N0->get()[I0->get()[geom->toVertexIndex[k]]];
-                        
-                        nl[k].set(n.x, n.y, n.z);
-                        il[k] = k;
-                     }
+                     Alembic::Abc::N3f n = N0->get()[I0->get()[remapIndex[k]]];
+                     
+                     nl[k].set(n.x, n.y, n.z);
+                     il[k] = k;
                   }
                }
             }
