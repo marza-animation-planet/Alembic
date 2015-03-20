@@ -134,27 +134,77 @@ def BuildAEMenuForNode(name):
    
    return added
 
+
+def SetupUvChoosers():
+   PostTranslate(disp=False, multiuv=True)
+
 def CreateDispTextures():
+   PostTranslate(disp=True, multiuv=False)
+
+def PostTranslate(disp=True, multiuv=True):
    try:
       import vray.utils
+      import maya.cmds
    except:
       return
    
-   import maya.cmds
+   # Setup uv switch nodes
+   shapes = (maya.cmds.<<NodeName>>VRayInfo(multiuvlist=1) if multiuv else None)
    
-   disps = maya.cmds.<<NodeName>>VRayDisp(displist=1)
+   if shapes:
+      
+      for shape in map(str, shapes):
+         
+         shapenode = vray.utils.findByName(shape)
+         
+         if not shapenode:
+            continue
+         
+         node = vray.utils.findByName(shapenode[0].name().split('@')[0] + "@node")
+         if not node:
+            continue
+         
+         node = node[0]
+         
+         uvswitchs = maya.cmds.<<NodeName>>VRayInfo(multiuv=shape, uvswitchlist=1)
+         
+         if uvswitchs:
+            
+            for name in map(str, uvswitchs):
+               
+               switcher = vray.utils.findByName(name)
+               if not switcher:
+                  continue
+               
+               switcher = switcher[0]
+               
+               index = maya.cmds.<<NodeName>>VRayInfo(multiuv=shape, uvindex=name)
+               
+               if index < 0:
+                  continue
+               
+               nodes = switcher.get("nodes")
+               values = switcher.get("values")
+               
+               nodes.append(node)
+               values.append(index)
+               
+               switcher.set("nodes", nodes)
+               switcher.set("values", values)
+   
+   # Setup subdivision/displacement nodes
+   disps = (maya.cmds.<<NodeName>>VRayInfo(displist=1) if disp else None)
    
    if disps:
       
       for disp in map(str, disps):
-         print("Export disp texture \"%s\"" % disp)
          
          dispnode = vray.utils.exportTexture(str(disp))
          
          if not dispnode:
             continue
          
-         shapes = maya.cmds.<<NodeName>>VRayDisp(disp=disp, f=1)
+         shapes = maya.cmds.<<NodeName>>VRayInfo(disp=disp, f=1)
          
          if shapes:
             """
@@ -188,7 +238,7 @@ def CreateDispTextures():
                
                shapenode[0].set("displacement_tex_float", texfnode)
          
-         shapes = maya.cmds.<<NodeName>>VRayDisp(disp=disp, c=1)
+         shapes = maya.cmds.<<NodeName>>VRayInfo(disp=disp, c=1)
          if shapes:
             for shape in map(str, shapes):
                # connect to 'displacement_tex_color'
@@ -197,5 +247,6 @@ def CreateDispTextures():
                   continue
                
                shapenode[0].set("displacement_tex_color", dispnode)
-      
-      maya.cmds.<<NodeName>>VRayDisp(reset=1)
+   
+   # Clear post translate information cache
+   maya.cmds.<<NodeName>>VRayInfo(reset=1)

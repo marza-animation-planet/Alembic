@@ -276,12 +276,12 @@ private:
 
 #include <maya/MPxCommand.h>
 
-class AbcShapeVRayDisp : public MPxCommand
+class AbcShapeVRayInfo : public MPxCommand
 {
 public:
    
-    AbcShapeVRayDisp();
-    ~AbcShapeVRayDisp();
+    AbcShapeVRayInfo();
+    ~AbcShapeVRayInfo();
 
     virtual bool hasSyntax() const;
     virtual bool isUndoable() const;
@@ -290,7 +290,7 @@ public:
     static MSyntax createSyntax();
     static void* create();
     static bool getAssignedDisplacement(const MDagPath &path, std::string &setName, std::string &shaderName);
-    
+    static void fillMultiUVs(const MDagPath &path);
      
     typedef std::set<std::string> NameSet;
     
@@ -306,11 +306,15 @@ public:
         std::string shaderName;
     };
     
+    typedef std::map<std::string, int> MultiUv;
+    
     typedef std::map<std::string, DispShapes> DispTexMap;
     typedef std::map<std::string, DispSet> DispSetMap;
+    typedef std::map<std::string, MultiUv> MultiUvMap;
      
     static DispTexMap DispTexs;
     static DispSetMap DispSets;
+    static MultiUvMap MultiUVs;
 };
 
 #endif

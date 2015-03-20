@@ -38,25 +38,34 @@
 #include <maya/MArgParser.h>
 #include <maya/MFnSet.h>
 
-AbcShapeVRayDisp::DispTexMap AbcShapeVRayDisp::DispTexs;
-AbcShapeVRayDisp::DispSetMap AbcShapeVRayDisp::DispSets;
+AbcShapeVRayInfo::DispTexMap AbcShapeVRayInfo::DispTexs;
+AbcShapeVRayInfo::DispSetMap AbcShapeVRayInfo::DispSets;
+AbcShapeVRayInfo::MultiUvMap AbcShapeVRayInfo::MultiUVs;
 
-void* AbcShapeVRayDisp::create()
+void* AbcShapeVRayInfo::create()
 {
-   return new AbcShapeVRayDisp();
+   return new AbcShapeVRayInfo();
 }
 
-MSyntax AbcShapeVRayDisp::createSyntax()
+MSyntax AbcShapeVRayInfo::createSyntax()
 {
    MSyntax syntax;
    
    syntax.addFlag("-i", "-init", MSyntax::kNoArg);
    syntax.addFlag("-r", "-reset", MSyntax::kNoArg);
+   
+   // Displacement informations
+   syntax.addFlag("-ad", "-assigneddisp", MSyntax::kString);
    syntax.addFlag("-dl", "-displist", MSyntax::kNoArg);
    syntax.addFlag("-d", "-disp", MSyntax::kString);
-   syntax.addFlag("-a", "-assigned", MSyntax::kString);
    syntax.addFlag("-f", "-float", MSyntax::kNoArg);
    syntax.addFlag("-c", "-color", MSyntax::kNoArg);
+   
+   // Multi-uv informations
+   syntax.addFlag("-mul", "-multiuvlist", MSyntax::kNoArg);
+   syntax.addFlag("-muv", "-multiuv", MSyntax::kString);
+   syntax.addFlag("-usl", "-uvswitchlist", MSyntax::kNoArg);
+   syntax.addFlag("-uvi", "-uvindex", MSyntax::kString);
    
    syntax.setMinObjects(0);
    syntax.setMaxObjects(0);
@@ -66,7 +75,7 @@ MSyntax AbcShapeVRayDisp::createSyntax()
    return syntax;
 }
 
-bool AbcShapeVRayDisp::getAssignedDisplacement(const MDagPath &inPath, std::string &setName, std::string &shaderName)
+bool AbcShapeVRayInfo::getAssignedDisplacement(const MDagPath &inPath, std::string &setName, std::string &shaderName)
 {
    DispSetMap::const_iterator it;
    
@@ -91,26 +100,103 @@ bool AbcShapeVRayDisp::getAssignedDisplacement(const MDagPath &inPath, std::stri
    return false;
 }
 
-AbcShapeVRayDisp::AbcShapeVRayDisp()
+static void ToVRayName(std::string &n, const char *suffix=0)
+{
+   size_t p;
+   
+   p = n.find(':');
+   while (p != std::string::npos)
+   {
+      n.replace(p, 1, "__");
+      p = n.find(':', p + 2);
+   }
+   
+   if (suffix)
+   {
+      n += suffix;
+   }
+}
+
+void AbcShapeVRayInfo::fillMultiUVs(const MDagPath &path)
+{
+   std::string key = path.partialPathName().asChar();
+   
+   ToVRayName(key, "@node");
+   
+   MFnDagNode dag(path);
+   
+   MPlug pUvSet = dag.findPlug("uvSet");
+   MObject oUvSetName = dag.attribute("uvSetName");
+   MPlugArray conns;
+   MPlugArray conns2;
+   
+   for (unsigned int i=0; i<pUvSet.numElements(); ++i)
+   {
+      MPlug pElem = pUvSet.elementByPhysicalIndex(i);
+      
+      int idx = pElem.logicalIndex();
+      
+      MPlug pUvSetName = pElem.child(oUvSetName);
+      
+      if (pUvSetName.connectedTo(conns, false, true) && conns.length() > 0)
+      {
+         for (unsigned int j=0; j<conns.length(); ++j)
+         {
+            MObject obj = conns[j].node();
+            
+            if (obj.hasFn(MFn::kUvChooser))
+            {
+               MultiUv &muv = MultiUVs[key];
+               
+               MFnDependencyNode uvc(obj);
+               
+               MPlug pOutUv = uvc.findPlug("outUv");
+               
+               if (pOutUv.connectedTo(conns2, false, true) && conns2.length() > 0)
+               {
+                  for (unsigned int k=0; k<conns2.length(); ++k)
+                  {
+                     MObject obj2 = conns2[k].node();
+                     
+                     MFnDependencyNode shd(obj2);
+                     
+                     std::string vrn = shd.name().asChar();
+                     
+                     ToVRayName(vrn, "@uvIndexSwitch");
+                     
+                     muv[vrn] = idx;
+                     
+                     #ifdef _DEBUG
+                     std::cout << "Add multi uv info: " << key << " - " << vrn << " - " << idx << std::endl;
+                     #endif
+                  }
+               }
+            }
+         }
+      }
+   }
+}
+
+AbcShapeVRayInfo::AbcShapeVRayInfo()
    : MPxCommand()
 {
 }
    
-AbcShapeVRayDisp::~AbcShapeVRayDisp()
+AbcShapeVRayInfo::~AbcShapeVRayInfo()
 {
 }
 
-bool AbcShapeVRayDisp::hasSyntax() const
+bool AbcShapeVRayInfo::hasSyntax() const
 {
    return true;
 }
    
-bool AbcShapeVRayDisp::isUndoable() const
+bool AbcShapeVRayInfo::isUndoable() const
 {
    return false;
 }
 
-MStatus AbcShapeVRayDisp::doIt(const MArgList& args)
+MStatus AbcShapeVRayInfo::doIt(const MArgList& args)
 {
    MStatus status;
    
@@ -176,22 +262,23 @@ MStatus AbcShapeVRayDisp::doIt(const MArgList& args)
    else if (argData.isFlagSet("reset"))
    {
       DispTexs.clear();
+      MultiUVs.clear();
       
       return MS::kSuccess;
    }
    else
    {
-      if (argData.isFlagSet("assigned"))
+      if (argData.isFlagSet("assigneddisp"))
       {
          MSelectionList sl;
          MStringArray rv;
          MString val;
          MDagPath path;
          
-         status = argData.getFlagArgument("assigned", 0, val);
+         status = argData.getFlagArgument("assigneddisp", 0, val);
          if (status != MS::kSuccess)
          {
-            MGlobal::displayError("Invalid valud for -assigned flag (" + val + ")");
+            MGlobal::displayError("Invalid valud for -assigneddisp flag (" + val + ")");
             return status;
          }
          
@@ -222,60 +309,135 @@ MStatus AbcShapeVRayDisp::doIt(const MArgList& args)
          
          return MS::kSuccess;
       }
-      else if (!argData.isFlagSet("disp"))
+      else if (argData.isFlagSet("disp"))
       {
-         MGlobal::displayError("Either -disp or -displist flag must be set");
-         return MS::kFailure;
-      }
-      else if (!argData.isFlagSet("color") && !argData.isFlagSet("float"))
-      {
-         MGlobal::displayError("Either -color or -float flag must be set");
-         return MS::kFailure;
-      }
-      else
-      {
-         MString val;
-         
-         status = argData.getFlagArgument("disp", 0, val);
-         if (status != MS::kSuccess)
+         if (!argData.isFlagSet("color") && !argData.isFlagSet("float"))
          {
-            MGlobal::displayError("Invalid valud for -disp flag (" + val + ")");
-            return status;
+            MGlobal::displayError("Either -color or -float flag must be set");
+            return MS::kFailure;
          }
-         
-         DispTexMap::iterator it = DispTexs.find(val.asChar());
-         
+         else
+         {
+            MString val;
+            
+            status = argData.getFlagArgument("disp", 0, val);
+            if (status != MS::kSuccess)
+            {
+               MGlobal::displayError("Invalid value for -disp flag (" + val + ")");
+               return status;
+            }
+            
+            DispTexMap::iterator it = DispTexs.find(val.asChar());
+            
+            MStringArray names;
+            
+            if (it != DispTexs.end())
+            {
+               DispShapes &dispShapes = it->second;
+               
+               if (argData.isFlagSet("color"))
+               {
+                  if (argData.isFlagSet("float"))
+                  {
+                     MGlobal::displayError("-float/-color cannot be used at the same time");
+                     return MS::kFailure;
+                  }
+                  
+                  for (NameSet::iterator nit = dispShapes.asColor.begin(); nit != dispShapes.asColor.end(); ++nit)
+                  {
+                     names.append(nit->c_str());
+                  }
+               }
+               else
+               {
+                  for (NameSet::iterator nit = dispShapes.asFloat.begin(); nit != dispShapes.asFloat.end(); ++nit)
+                  {
+                     names.append(nit->c_str());
+                  }
+               }
+            }
+            
+            setResult(names);
+            
+            return MS::kSuccess;
+         }
+      }
+      else if (argData.isFlagSet("multiuvlist"))
+      {
          MStringArray names;
          
-         if (it != DispTexs.end())
+         for (MultiUvMap::iterator it = MultiUVs.begin(); it != MultiUVs.end(); ++it)
          {
-            DispShapes &dispShapes = it->second;
-            
-            if (argData.isFlagSet("color"))
-            {
-               if (argData.isFlagSet("float"))
-               {
-                  MGlobal::displayError("-float/-color cannot be used at the same time");
-                  return MS::kFailure;
-               }
-               
-               for (NameSet::iterator nit = dispShapes.asColor.begin(); nit != dispShapes.asColor.end(); ++nit)
-               {
-                  names.append(nit->c_str());
-               }
-            }
-            else
-            {
-               for (NameSet::iterator nit = dispShapes.asFloat.begin(); nit != dispShapes.asFloat.end(); ++nit)
-               {
-                  names.append(nit->c_str());
-               }
-            }
+            names.append(it->first.c_str());
          }
          
          setResult(names);
          
          return MS::kSuccess;
+      }
+      else if (argData.isFlagSet("multiuv"))
+      {
+         MString val;
+         
+         status = argData.getFlagArgument("multiuv", 0, val);
+         if (status != MS::kSuccess)
+         {
+            MGlobal::displayError("Invalid value for -multiuv flag (" + val + ")");
+            return status;
+         }
+         
+         MultiUvMap::iterator it = MultiUVs.find(val.asChar());
+            
+         if (it != MultiUVs.end())
+         {
+            MultiUv &multiUv = it->second;
+               
+            if (argData.isFlagSet("uvswitchlist"))
+            {
+               MStringArray names;
+               
+               for (std::map<std::string, int>::iterator it2 = multiUv.begin(); it2 != multiUv.end(); ++it2)
+               {
+                  names.append(it2->first.c_str());
+               }
+               
+               setResult(names);
+            }
+            else if (argData.isFlagSet("uvindex"))
+            {
+               MString val2;
+               
+               status = argData.getFlagArgument("uvindex", 0, val2);
+               if (status != MS::kSuccess)
+               {
+                   MGlobal::displayError("Invalid value for -uvindex flag (" + val2 + ")");
+                  return status;
+               }
+               
+               std::map<std::string, int>::iterator it2 = multiUv.find(val2.asChar());
+               
+               if (it2 != multiUv.end())
+               {
+                  setResult(it2->second);
+               }
+               else
+               {
+                  setResult(-1);
+               }
+            }
+            else
+            {
+               MGlobal::displayError("Missing -uvswitchlist or -uvindex flag");
+               return MS::kFailure;
+            }
+         }
+         
+         return MS::kSuccess;
+      }
+      else
+      {
+         MGlobal::displayError("Invalid flags");
+         return MS::kFailure;
       }
    }
 }
@@ -905,86 +1067,6 @@ void AbcShape::postConstructor()
    
    aUvSet = fn.attribute("uvSet");
    aUvSetName = fn.attribute("uvSetName");
-   
-#ifdef ABCSHAPE_VRAY_SUPPORT
-   static MString _preMel(NAME_PREFIX "AbcShapeVRayDisp -init");
-   static MString _postPython("import " NAME_PREFIX "abcshape4vray; " NAME_PREFIX "abcshape4vray.CreateDispTextures()");
-      
-   MSelectionList sl;
-   MObject drg, vs;
-   
-   int drgIdx = -1;
-   int vsIdx = -1;
-   
-   if (sl.add("defaultRenderGlobals") == MS::kSuccess)
-   {
-      drgIdx = int(sl.length()) - 1;
-   }
-   
-   if (sl.add("vraySettings") == MS::kSuccess)
-   {
-      vsIdx = int(sl.length()) - 1;
-   }
-   
-   if (drgIdx >= 0 && sl.getDependNode(drgIdx, drg) == MS::kSuccess)
-   {
-      MFnDependencyNode nodeFn(drg);
-      
-      MPlug preMel = nodeFn.findPlug("preMel");
-      
-      if (!preMel.isNull())
-      {
-         MString s = preMel.asString();
-         
-         if (s.indexW(_preMel) == -1)
-         {
-            if (s.length() > 0)
-            {
-               if (s.asChar()[s.length()-1] != ';')
-               {
-                  s += "; " + _preMel;
-               }
-               else
-               {
-                  s += " " + _preMel + ";";
-               }
-            }
-            else
-            {
-               s = _preMel;
-            }
-            
-            preMel.setString(s);
-         }
-      }
-   }
-   
-   if (vsIdx >= 0 && sl.getDependNode(vsIdx, vs) == MS::kSuccess)
-   {
-      MFnDependencyNode nodeFn(vs);
-      
-      MPlug postPython = nodeFn.findPlug("postTranslatePython");
-      
-      if (!postPython.isNull())
-      {
-         MString s = postPython.asString();
-         
-         if (s.indexW(_postPython) == -1)
-         {
-            if (s.length() > 0)
-            {
-               s += "\n" + _postPython;
-            }
-            else
-            {
-               s = _postPython;
-            }
-            
-            postPython.setString(s);
-         }
-      }
-   }
-#endif
 }
 
 bool AbcShape::ignoreCulling() const
@@ -1056,6 +1138,91 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
 #ifdef ABCSHAPE_VRAY_SUPPORT
    else if (plug.attribute() == aVRayGeomResult)
    {
+      static bool sFirstExport = true;
+      
+      if (sFirstExport)
+      {
+         static MString _preMel(NAME_PREFIX "AbcShapeVRayInfo -init");
+         static MString _postPython("import " NAME_PREFIX "abcshape4vray; " NAME_PREFIX "abcshape4vray.PostTranslate()");
+            
+         MSelectionList sl;
+         MObject drg, vs;
+         
+         int drgIdx = -1;
+         int vsIdx = -1;
+         
+         if (sl.add("defaultRenderGlobals") == MS::kSuccess)
+         {
+            drgIdx = int(sl.length()) - 1;
+         }
+         
+         if (sl.add("vraySettings") == MS::kSuccess)
+         {
+            vsIdx = int(sl.length()) - 1;
+         }
+         
+         if (drgIdx >= 0 && sl.getDependNode(drgIdx, drg) == MS::kSuccess)
+         {
+            MFnDependencyNode nodeFn(drg);
+            
+            MPlug preMel = nodeFn.findPlug("preMel");
+            
+            if (!preMel.isNull())
+            {
+               MString s = preMel.asString();
+               
+               if (s.indexW(_preMel) == -1)
+               {
+                  if (s.length() > 0)
+                  {
+                     if (s.asChar()[s.length()-1] != ';')
+                     {
+                        s += "; " + _preMel;
+                     }
+                     else
+                     {
+                        s += " " + _preMel + ";";
+                     }
+                  }
+                  else
+                  {
+                     s = _preMel;
+                  }
+                  
+                  preMel.setString(s);
+               }
+            }
+         }
+         
+         if (vsIdx >= 0 && sl.getDependNode(vsIdx, vs) == MS::kSuccess)
+         {
+            MFnDependencyNode nodeFn(vs);
+            
+            MPlug postPython = nodeFn.findPlug("postTranslatePython");
+            
+            if (!postPython.isNull())
+            {
+               MString s = postPython.asString();
+               
+               if (s.indexW(_postPython) == -1)
+               {
+                  if (s.length() > 0)
+                  {
+                     s += "\n" + _postPython;
+                  }
+                  else
+                  {
+                     s = _postPython;
+                  }
+                  
+                  postPython.setString(s);
+               }
+            }
+         }
+         
+         sFirstExport = false;
+      }
+      
       syncInternals(block);
       
       MDataHandle hIn = block.inputValue(aVRayGeomInfo);
@@ -1190,7 +1357,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   }
                   
                   std::string dispSetName, dispShaderName;                  
-                  bool hasDispAssigned = AbcShapeVRayDisp::getAssignedDisplacement(thisPath, dispSetName, dispShaderName);
+                  bool hasDispAssigned = AbcShapeVRayInfo::getAssignedDisplacement(thisPath, dispSetName, dispShaderName);
                   
                   if (hasDispAssigned)
                   {
@@ -1501,7 +1668,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                      }
                      
                      // Track shader to be exported
-                     AbcShapeVRayDisp::DispShapes &dispShapes = AbcShapeVRayDisp::DispTexs[dispShaderName];
+                     AbcShapeVRayInfo::DispShapes &dispShapes = AbcShapeVRayInfo::DispTexs[dispShaderName];
                         
                      if (colorDisp)
                      {
@@ -1575,6 +1742,8 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   
                   MDataHandle hPsizeMax = block.inputValue(aVRayAbcPsizeMax);
                   mVRPsizeMax.setFloat(hPsizeMax.asFloat(), 0, 0.0);
+                  
+                  AbcShapeVRayInfo::fillMultiUVs(thisPath);
                   
                   abc->setParameter(&mVRFilename);
                   abc->setParameter(&mVRObjectPath);

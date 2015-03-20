@@ -47,9 +47,9 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 
 #ifdef ABCSHAPE_VRAY_SUPPORT
    
-   MString vrayCmdName = PREFIX_NAME("AbcShapeVRayDisp");
+   MString vrayCmdName = PREFIX_NAME("AbcShapeVRayInfo");
    
-   status = plugin.registerCommand(vrayCmdName, AbcShapeVRayDisp::create, AbcShapeVRayDisp::createSyntax);
+   status = plugin.registerCommand(vrayCmdName, AbcShapeVRayInfo::create, AbcShapeVRayInfo::createSyntax);
    
    if (status != MS::kSuccess)
    {
@@ -85,7 +85,7 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
 
 #ifdef ABCSHAPE_VRAY_SUPPORT
    
-   MString vrayCmdName = PREFIX_NAME("AbcShapeVRayDisp");
+   MString vrayCmdName = PREFIX_NAME("AbcShapeVRayInfo");
    
    status = plugin.deregisterCommand(vrayCmdName);
    
