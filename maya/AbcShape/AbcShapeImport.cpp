@@ -453,6 +453,11 @@ bool CreateTree::createDag(const char *dagType, AlembicNode *node, bool force)
          
          mDags[node->path()] = dagPath;
          
+         if (dagType == PREFIX_NAME("AbcShape"))
+         {
+            AbcShape::AssignDefaultShader(obj);
+         }
+         
          return true;
       }
       else

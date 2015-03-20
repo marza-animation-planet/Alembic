@@ -30,6 +30,9 @@ public:
    const Alembic::Abc::Box3d& bounds() const;
    unsigned int numShapes(bool visibleOnly) const;
    
+   // Non-empty for a single mesh/subd scene
+   const std::vector<std::string>& uvSetNames() const;
+   
 private:
    
    template <class T>
@@ -48,6 +51,7 @@ private:
    unsigned int mNumShapes;
    unsigned int mNumVisibleShapes;
    std::vector<bool> mVisibilityStack;
+   std::vector<std::string> mUvSetNames;
 };
 
 inline const Alembic::Abc::Box3d& WorldUpdate::bounds() const
@@ -58,6 +62,11 @@ inline const Alembic::Abc::Box3d& WorldUpdate::bounds() const
 inline unsigned int WorldUpdate::numShapes(bool visibleOnly) const
 {
    return (visibleOnly ? mNumVisibleShapes : mNumShapes);
+}
+
+inline const std::vector<std::string>& WorldUpdate::uvSetNames() const
+{
+   return mUvSetNames;
 }
 
 template <class T>

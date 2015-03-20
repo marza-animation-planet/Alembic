@@ -746,6 +746,41 @@ MStatus AbcShape::initialize()
    return MS::kSuccess;
 }
 
+void AbcShape::AssignDefaultShader(MObject &obj)
+{
+   static MObject sDefaultShader = MObject::kNullObj;
+   
+   if (sDefaultShader.isNull())
+   {
+      MSelectionList sl;
+      
+      sl.add("initialShadingGroup");
+      
+      sl.getDependNode(0, sDefaultShader);
+   }
+   
+   if (!obj.isNull() && !sDefaultShader.isNull())
+   {
+      MFnDependencyNode fn(sDefaultShader);
+      
+      MPlug dst = fn.findPlug("dagSetMembers");
+      
+      fn.setObject(obj);
+      
+      MPlug src = fn.findPlug("instObjGroups");
+      
+      MDGModifier dgMod;
+      MIntArray indices;
+      
+      dst.getExistingArrayAttributeIndices(indices);
+      
+      unsigned int dstIdx = (indices.length() > 0 ? indices[indices.length()-1] + 1 : 0);
+      
+      dgMod.connect(src.elementByLogicalIndex(0), dst.elementByLogicalIndex(dstIdx));
+      dgMod.doIt();
+   }
+}
+
 AbcShape::AbcShape()
    : MPxSurfaceShape()
    , mOffset(0.0)
@@ -863,20 +898,35 @@ AbcShape::~AbcShape()
 
 void AbcShape::postConstructor()
 {
-   static MString _preMel(NAME_PREFIX "AbcShapeVRayDisp -init");
-   static MString _postPython("import " NAME_PREFIX "abcshape4vray; " NAME_PREFIX "abcshape4vray.CreateDispTextures()");
-   
    setRenderable(true);
    
+   MObject self = thisMObject();
+   MFnDependencyNode fn(self);
    
+   aUvSet = fn.attribute("uvSet");
+   aUvSetName = fn.attribute("uvSetName");
+   
+#ifdef ABCSHAPE_VRAY_SUPPORT
+   static MString _preMel(NAME_PREFIX "AbcShapeVRayDisp -init");
+   static MString _postPython("import " NAME_PREFIX "abcshape4vray; " NAME_PREFIX "abcshape4vray.CreateDispTextures()");
+      
    MSelectionList sl;
-   MObject drg, vs, isg;
+   MObject drg, vs;
    
-   sl.add("defaultRenderGlobals");
-   sl.add("vraySettings");
-   sl.add("initialShadingGroup");
+   int drgIdx = -1;
+   int vsIdx = -1;
    
-   if (sl.getDependNode(0, drg) == MS::kSuccess)
+   if (sl.add("defaultRenderGlobals") == MS::kSuccess)
+   {
+      drgIdx = int(sl.length()) - 1;
+   }
+   
+   if (sl.add("vraySettings") == MS::kSuccess)
+   {
+      vsIdx = int(sl.length()) - 1;
+   }
+   
+   if (drgIdx >= 0 && sl.getDependNode(drgIdx, drg) == MS::kSuccess)
    {
       MFnDependencyNode nodeFn(drg);
       
@@ -909,7 +959,7 @@ void AbcShape::postConstructor()
       }
    }
    
-   if (sl.getDependNode(1, vs) == MS::kSuccess)
+   if (vsIdx >= 0 && sl.getDependNode(vsIdx, vs) == MS::kSuccess)
    {
       MFnDependencyNode nodeFn(vs);
       
@@ -934,27 +984,7 @@ void AbcShape::postConstructor()
          }
       }
    }
-   
-   if (sl.getDependNode(2, isg) == MS::kSuccess)
-   {
-      MFnDependencyNode nodeFn(isg);
-      
-      MPlug dst = nodeFn.findPlug("dagSetMembers");
-      
-      nodeFn.setObject(thisMObject());
-      
-      MPlug src = nodeFn.findPlug("instObjGroups");
-      
-      MDGModifier dgMod;
-      MIntArray indices;
-      
-      dst.getExistingArrayAttributeIndices(indices);
-      
-      unsigned int dstIdx = (indices.length() > 0 ? indices[indices.length()-1] + 1 : 0);
-      
-      dgMod.connect(src.elementByLogicalIndex(0), dst.elementByLogicalIndex(dstIdx));
-      dgMod.doIt();
-   }
+#endif
 }
 
 bool AbcShape::ignoreCulling() const
@@ -1886,6 +1916,33 @@ void AbcShape::updateWorld()
    
    // only get number of visible shapes
    mNumShapes = visitor.numShapes(true);
+   
+   MObject self = thisMObject();
+   
+   // Reset existing UV set names
+   MPlug pUvSet(self, aUvSet);
+   
+   for (unsigned int i=0; i<pUvSet.numElements(); ++i)
+   {
+      pUvSet.elementByPhysicalIndex(i).child(aUvSetName).setString("");
+   }
+   
+   if (visitor.numShapes(false) == 1)
+   {
+      mUvSetNames = visitor.uvSetNames();
+      
+      MPlug pUvSetName(self, aUvSetName);
+      
+      for (size_t i=0; i<mUvSetNames.size(); ++i)
+      {
+         pUvSetName.selectAncestorLogicalIndex(i, aUvSet);
+         pUvSetName.setString(mUvSetNames[i].c_str());
+      }
+   }
+   else
+   {
+      mUvSetNames.clear();
+   }
    
    #ifdef _DEBUG
    std::cout << "[" << PREFIX_NAME("AbcShape") << "] " << mNumShapes << " shape(s) in scene" << std::endl;

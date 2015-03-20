@@ -92,6 +92,46 @@ public:
    
    bool isValid() const;
    void clear();
+   
+public:
+   
+   template <class IObject>
+   static size_t GetUvSetNames(const AlembicNodeT<IObject> &node, std::vector<std::string> &names)
+   {
+      typename IObject::schema_type schema = node.typedObject().getSchema();
+      
+      names.clear();
+      
+      Alembic::AbcGeom::IV2fGeomParam masterUv = schema.getUVsParam();
+      if (masterUv.valid())
+      {
+         std::string masterUvName = Alembic::AbcGeom::GetSourceName(masterUv.getMetaData());
+         if (masterUvName.length() == 0)
+         {
+            masterUvName = "map1";
+         }
+         
+         names.push_back(masterUvName);
+      }
+      
+      Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
+      if (geomParams.valid())
+      {
+         for (size_t i=0; i<geomParams.getNumProperties(); ++i)
+         {
+            const Alembic::AbcCoreAbstract::PropertyHeader &header = geomParams.getPropertyHeader(i);
+            
+            if (Alembic::AbcGeom::IV2fGeomParam::matches(header) &&
+                Alembic::AbcGeom::GetGeometryScope(header.getMetaData()) == Alembic::AbcGeom::kFacevaryingScope &&
+                header.getMetaData().get("notUV") != "1")
+            {
+               names.push_back(header.getName());
+            }
+         }
+      }
+      
+      return names.size();
+   }
 
 private:
    

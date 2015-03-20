@@ -130,7 +130,9 @@ public:
     inline bool isAnimated() const { return mAnimated; }
     
     bool ignoreCulling() const;
-
+    
+    static void AssignDefaultShader(MObject &obj);
+    
 private:
     
     double getFPS() const;
@@ -184,6 +186,9 @@ private:
     int mUpdateLevel;
     AlembicSceneFilter mSceneFilter;
     bool mAnimated;
+    MObject aUvSet;
+    MObject aUvSetName;
+    std::vector<std::string> mUvSetNames;
     
 #ifdef ABCSHAPE_VRAY_SUPPORT
     VR::DefStringParam mVRFilename;
