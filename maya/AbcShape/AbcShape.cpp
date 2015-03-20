@@ -1173,7 +1173,13 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                
                if (s.indexW(_preMel) == -1)
                {
-                  if (s.length() > 0)
+                  int idx = s.indexW("AbcShapeVRayDisp");
+                  
+                  if (idx != -1)
+                  {
+                     s = s.substringW(0, idx - 1) + "AbcShapeVRayInfo" + s.substringW(idx + 16, s.length() - 1);
+                  }
+                  else if (s.length() > 0)
                   {
                      if (s.asChar()[s.length()-1] != ';')
                      {
@@ -1206,7 +1212,13 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                
                if (s.indexW(_postPython) == -1)
                {
-                  if (s.length() > 0)
+                  int idx = s.indexW("abcshape4vray.CreateDispTextures");
+                  
+                  if (idx != -1)
+                  {
+                     s = s.substringW(0, idx - 1) + "abcshape4vray.PostTranslate" + s.substringW(idx + 32, s.length() - 1);
+                  }
+                  else if (s.length() > 0)
                   {
                      s += "\n" + _postPython;
                   }

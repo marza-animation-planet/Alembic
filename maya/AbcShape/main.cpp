@@ -57,6 +57,10 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
       return status;
    }
    
+   // For backward compatibility
+   MString oldVrayCmdName = PREFIX_NAME("AbcShapeVRayDisp");
+   plugin.registerCommand(oldVrayCmdName, AbcShapeVRayInfo::create, AbcShapeVRayInfo::createSyntax);
+   
 #endif
 
    return status;
@@ -94,6 +98,9 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
       status.perror("Failed to deregister command '" + vrayCmdName + "'");
       return status;
    }
+   
+   MString oldVrayCmdName = PREFIX_NAME("AbcShapeVRayDisp");
+   plugin.deregisterCommand(oldVrayCmdName);
    
 #endif
 
