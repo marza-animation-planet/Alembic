@@ -628,8 +628,9 @@ void UpdateGeometry::collectUserAttributes(Alembic::Abc::ICompoundProperty userP
          
          if (uvs &&
              scope == Alembic::AbcGeom::kFacevaryingScope &&
-             Alembic::AbcGeom::IV3fGeomParam::matches(header) &&
-             Alembic::AbcGeom::isUV(header))
+             Alembic::AbcGeom::IV2fGeomParam::matches(header) &&
+             header.getMetaData().get("notUV") != "1")
+             //Alembic::AbcGeom::isUV(header))
          {
             std::pair<std::string, Alembic::AbcGeom::IV2fGeomParam> UV;
             

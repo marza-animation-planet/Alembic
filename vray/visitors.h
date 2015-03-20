@@ -728,8 +728,14 @@ size_t UpdateGeometry::readMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<Mesh
    if (uvParam.valid())
    {
       char tmp[128];
-      int isuffix = 0;
-      std::string name = "master_uv";
+      int isuffix = 1;
+      
+      std::string name = Alembic::AbcGeom::GetSourceName(uvParam.getMetaData());
+      
+      if (name.length() == 0)
+      {
+         name = "map1";
+      }
       
       // Make sure we have a 'valid' name for master uv set (i.e. non conflicting with any other user attribute)
       while (uvNames.find(name) != uvNames.end() ||
@@ -739,7 +745,7 @@ size_t UpdateGeometry::readMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<Mesh
              attrs.vertex.find(name) != attrs.vertex.end())
       {
          ++isuffix;
-         sprintf(tmp, "master_uv_%d", isuffix);
+         sprintf(tmp, "map%d", isuffix);
          name = tmp;
       }
       
