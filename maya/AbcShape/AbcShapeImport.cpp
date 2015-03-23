@@ -530,6 +530,13 @@ AlembicNode::VisitReturn CreateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
    plug.setString(mAbcPath.c_str());
    
    // Only connect time if animated
+   // Note: On first evaluation, plug.asXXX doesn't seem to return valid values
+   //       though everything is correct within the compute method
+   //       Trigger a dummy evaluation before querying the value we're interested in
+   //       Internally, AbcShape will handle that nicely so that no un-necessary computations happen
+   plug = dagNode.findPlug("numShapes");
+   plug.asInt();
+   
    plug = dagNode.findPlug("animated");
    if (plug.asBool())
    {
