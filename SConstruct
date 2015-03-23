@@ -101,57 +101,57 @@ hdf5_libs.extend([hdf5_libname+"_hl", hdf5_libname])
 
 h5conf = os.path.join(hdf5_inc, "H5pubconf.h")
 if os.path.isfile(h5conf):
-  print("[HDF5] Reading configuration header...")
-  f = open(h5conf, "r")
-  tse = re.compile(r"^\s*#define\s+H5_HAVE_THREADSAFE\s+1")
-  sze = re.compile(r"^\s*#define\s+H5_HAVE_SZLIB_H\s+1")
-  zle = re.compile(r"^\s*#define\s+H5_HAVE_ZLIB_H\s+1")
-  for l in f.readlines():
-    l = l.strip()
-    if tse.match(l):
-      print("[HDF5] Thread safe")
-      hdf5_threadsafe = True
-    elif sze.match(l):
-      print("[HDF5] Using szip")
-      hdf5_szip = True
-    elif zle.match(l):
-      print("[HDF5] Using zlib")
-      hdf5_zlib = True
-  f.close()
+   print("[HDF5] Reading configuration header...")
+   f = open(h5conf, "r")
+   tse = re.compile(r"^\s*#define\s+H5_HAVE_THREADSAFE\s+1")
+   sze = re.compile(r"^\s*#define\s+H5_HAVE_SZLIB_H\s+1")
+   zle = re.compile(r"^\s*#define\s+H5_HAVE_ZLIB_H\s+1")
+   for l in f.readlines():
+      l = l.strip()
+      if tse.match(l):
+         print("[HDF5] Thread safe")
+         hdf5_threadsafe = True
+      elif sze.match(l):
+         print("[HDF5] Using szip")
+         hdf5_szip = True
+      elif zle.match(l):
+         print("[HDF5] Using zlib")
+         hdf5_zlib = True
+   f.close()
 
 if hdf5_static:
-  print("[HDF5] Static build")
-  if hdf5_threadsafe and sys.platform != "win32":
-    hdf5_libs.append("pthread")
-
-  if hdf5_zlib:
-    zlib_inc, zlib_lib = excons.GetDirsWithDefault("zlib", incdirdef=deps_inc, libdirdef=deps_lib)
-    AddDirectories(zlib_inc, zlib_lib)
-    zlib_libname = excons.GetArgument("zlib-libname", ("z" if sys.platform != "win32" else "zlib"))
-    hdf5_libs.append(zlib_libname)
-
-  if hdf5_szip:
-    szip_inc, szip_lib = excons.GetDirsWithDefault("szip", incdirdef=deps_inc, libdirdef=deps_lib)
-    AddDirectories(szip_inc, szip_lib)
-    szip_libname = excons.GetArgument("szip-libname", ("sz" if sys.platform != "win32" else "libszip"))
-    hdf5_libs.append(szip_libname)
+   print("[HDF5] Static build")
+   if hdf5_threadsafe and sys.platform != "win32":
+      hdf5_libs.append("pthread")
+   
+   if hdf5_zlib:
+      zlib_inc, zlib_lib = excons.GetDirsWithDefault("zlib", incdirdef=deps_inc, libdirdef=deps_lib)
+      AddDirectories(zlib_inc, zlib_lib)
+      zlib_libname = excons.GetArgument("zlib-libname", ("z" if sys.platform != "win32" else "zlib"))
+      hdf5_libs.append(zlib_libname)
+   
+   if hdf5_szip:
+      szip_inc, szip_lib = excons.GetDirsWithDefault("szip", incdirdef=deps_inc, libdirdef=deps_lib)
+      AddDirectories(szip_inc, szip_lib)
+      szip_libname = excons.GetArgument("szip-libname", ("sz" if sys.platform != "win32" else "libszip"))
+      hdf5_libs.append(szip_libname)
 
 # IlmBase library setup
 ilmbase_inc, ilmbase_lib = excons.GetDirsWithDefault("ilmbase", incdirdef=deps_inc, libdirdef=deps_lib)
 ilmbase_libsuffix = excons.GetArgument("ilmbase-libsuffix", "")
 if ilmbase_inc and not ilmbase_inc.endswith("OpenEXR"):
-  ilmbase_inc += "/OpenEXR"
+   ilmbase_inc += "/OpenEXR"
 if ilmbase_libsuffix:
-  ilmbase_libs = map(lambda x: x+ilmbase_libsuffix, ilmbase_libs)
+   ilmbase_libs = map(lambda x: x+ilmbase_libsuffix, ilmbase_libs)
 AddDirectories(ilmbase_inc, ilmbase_lib)
 
 # IlmBase python setup
 ilmbasepy_inc, ilmbasepy_lib = excons.GetDirsWithDefault("ilmbase-python", incdirdef=deps_inc, libdirdef=deps_lib)
 ilmbasepy_libsuffix = excons.GetArgument("ilmbase-python-libsuffix", ilmbase_libsuffix)
 if ilmbasepy_inc and not ilmbasepy_inc.endswith("OpenEXR"):
-  ilmbasepy_inc += "/OpenEXR"
+   ilmbasepy_inc += "/OpenEXR"
 if ilmbasepy_libsuffix:
-  ilmbasepy_libs = map(lambda x: x+ilmbasepy_libsuffix, ilmbasepy_libs)
+   ilmbasepy_libs = map(lambda x: x+ilmbasepy_libsuffix, ilmbasepy_libs)
 AddDirectories(ilmbasepy_inc, ilmbasepy_lib)
 
 # Others
@@ -423,6 +423,8 @@ if excons.GetArgument("with-maya", default=None) is not None:
    
    AbcShapeName = "%sAbcShape" % nameprefix
    AbcShapeMel = "maya/AbcShape/AE%sTemplate.mel" % AbcShapeName
+   AbcMatEditPy = "maya/AbcShape/%sAbcMaterialEditor.py" % nameprefix
+   AbcMatEditMel = "maya/AbcShape/%sAbcMaterialEditor.mel" % nameprefix
    AbcShapeMtoa = "arnold/abcproc/mtoa_%s.py" % AbcShapeName
    if withVray:
       AbcShapePy = "maya/AbcShape/%sabcshape4vray.py" % nameprefix.lower()
@@ -436,6 +438,12 @@ if excons.GetArgument("with-maya", default=None) is not None:
    
    if not os.path.exists(AbcShapeMtoa) or os.stat(AbcShapeMtoa).st_mtime < os.stat("arnold/abcproc/mtoa.py.tpl").st_mtime:
       replace_in_file("arnold/abcproc/mtoa.py.tpl", AbcShapeMtoa, "<<NodeName>>", AbcShapeName)
+   
+   if not os.path.exists(AbcMatEditMel) or os.stat(AbcMatEditMel).st_mtime < os.stat("maya/AbcShape/AbcMaterialEditor.mel.tpl").st_mtime:
+      replace_in_file("maya/AbcShape/AbcMaterialEditor.mel.tpl", AbcMatEditMel, "<<Prefix>>", nameprefix)
+   
+   if not os.path.exists(AbcMatEditPy) or os.stat(AbcMatEditPy).st_mtime < os.stat("maya/AbcShape/AbcMaterialEditor.py.tpl").st_mtime:
+      replace_in_file("maya/AbcShape/AbcMaterialEditor.py.tpl", AbcMatEditPy, "<<NodeName>>", AbcShapeName)
    
    if withVray:
       if not os.path.exists(AbcShapePy) or os.stat(AbcShapePy).st_mtime < os.stat("maya/AbcShape/abcshape4vray.py.tpl").st_mtime:
@@ -480,7 +488,7 @@ if excons.GetArgument("with-maya", default=None) is not None:
                  "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
                  "srcs": glob.glob("maya/AbcShape/*.cpp") + glob.glob("lib/SceneHelper/*.cpp") + regex_src,
                  "install": {"maya/scripts": glob.glob("maya/AbcShape/*.mel"),
-                             "maya/python": [AbcShapeMtoa] + ([AbcShapePy] if withVray else [])},
+                             "maya/python": [AbcShapeMtoa, AbcMatEditPy] + ([AbcShapePy] if withVray else [])},
                  "custom": [maya.Require, maya.Plugin] + ([vray.Require] if withVray else [])}])
 
 excons.DeclareTargets(env, prjs)
