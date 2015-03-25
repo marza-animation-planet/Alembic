@@ -291,6 +291,7 @@ public:
     static void* create();
     static bool getAssignedDisplacement(const MDagPath &path, std::string &setName, std::string &shaderName);
     static void fillMultiUVs(const MDagPath &path);
+    static void initDispSets();
      
     typedef std::set<std::string> NameSet;
     

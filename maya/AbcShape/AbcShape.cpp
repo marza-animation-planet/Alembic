@@ -177,6 +177,62 @@ void AbcShapeVRayInfo::fillMultiUVs(const MDagPath &path)
    }
 }
 
+void AbcShapeVRayInfo::initDispSets()
+{
+   DispSets.clear();
+      
+   MItDependencyNodes nodeIt(MFn::kSet);
+   
+   while (!nodeIt.isDone())
+   {
+      MObject obj = nodeIt.thisNode();
+      
+      MFnSet dispSet(obj);
+      
+      if (dispSet.typeName() == "VRayDisplacement")
+      {
+         MPlug pDisp = dispSet.findPlug("displacement");
+            
+         if (!pDisp.isNull())
+         {
+            MPlugArray srcs;
+            
+            pDisp.connectedTo(srcs, true, false);
+            
+            std::string shaderName;
+            
+            if (srcs.length() > 0)
+            {
+               MObject shdObj = srcs[0].node();
+               
+               shaderName = MFnDependencyNode(shdObj).name().asChar();
+            }
+            
+            MSelectionList members;
+            MDagPath memberPath;
+            
+            dispSet.getMembers(members, false);
+            
+            for (unsigned int i=0; i<members.length(); ++i)
+            {
+               if (members.getDagPath(i, memberPath) == MS::kSuccess)
+               {
+                  DispSet &ds = DispSets[memberPath.fullPathName().asChar()];
+                  
+                  ds.setName = dispSet.name().asChar();
+                  ds.shaderName = shaderName;
+                  
+                  // Fully expand children too?
+                  // beware then that deeper level assignment takes precedence
+               }
+            }
+         }
+      }
+      
+      nodeIt.next();
+   }
+}
+
 AbcShapeVRayInfo::AbcShapeVRayInfo()
    : MPxCommand()
 {
@@ -204,58 +260,7 @@ MStatus AbcShapeVRayInfo::doIt(const MArgList& args)
    
    if (argData.isFlagSet("init"))
    {
-      DispSets.clear();
-      
-      MItDependencyNodes nodeIt(MFn::kSet);
-      
-      while (!nodeIt.isDone())
-      {
-         MObject obj = nodeIt.thisNode();
-         
-         MFnSet dispSet(obj);
-         
-         if (dispSet.typeName() == "VRayDisplacement")
-         {
-            MPlug pDisp = dispSet.findPlug("displacement");
-               
-            if (!pDisp.isNull())
-            {
-               MPlugArray srcs;
-               
-               pDisp.connectedTo(srcs, true, false);
-               
-               std::string shaderName;
-               
-               if (srcs.length() > 0)
-               {
-                  MObject shdObj = srcs[0].node();
-                  
-                  shaderName = MFnDependencyNode(shdObj).name().asChar();
-               }
-               
-               MSelectionList members;
-               MDagPath memberPath;
-               
-               dispSet.getMembers(members, false);
-               
-               for (unsigned int i=0; i<members.length(); ++i)
-               {
-                  if (members.getDagPath(i, memberPath) == MS::kSuccess)
-                  {
-                     DispSet &ds = DispSets[memberPath.fullPathName().asChar()];
-                     
-                     ds.setName = dispSet.name().asChar();
-                     ds.shaderName = shaderName;
-                     
-                     // Fully expand children too?
-                     // beware then that deeper level assignment takes precedence
-                  }
-               }
-            }
-         }
-         
-         nodeIt.next();
-      }
+      initDispSets();
       
       return MS::kSuccess;
    }
@@ -1189,10 +1194,16 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                      {
                         s += " " + _preMel + ";";
                      }
+                     
+                     // 'AbcShapeVRayInfo -init' wasn't found in pre-render MEL, call it now
+                     AbcShapeVRayInfo::initDispSets();
                   }
                   else
                   {
                      s = _preMel;
+                     
+                     // 'AbcShapeVRayInfo -init' wasn't found in pre-render MEL, call it now
+                     AbcShapeVRayInfo::initDispSets();
                   }
                   
                   preMel.setString(s);
