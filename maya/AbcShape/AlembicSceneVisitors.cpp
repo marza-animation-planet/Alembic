@@ -144,11 +144,29 @@ AlembicNode::VisitReturn WorldUpdate::enter(AlembicXform &node, AlembicNode *ins
 
 AlembicNode::VisitReturn WorldUpdate::enter(AlembicMesh &node, AlembicNode *instance)
 {
+   if (mNumShapes == 0)
+   {
+      MeshData::GetUvSetNames(node, mUvSetNames);
+   }
+   else
+   {
+      mUvSetNames.clear();
+   }
+   
    return shapeEnter(node, instance);
 }
 
 AlembicNode::VisitReturn WorldUpdate::enter(AlembicSubD &node, AlembicNode *instance)
 {
+   if (mNumShapes == 0)
+   {
+      MeshData::GetUvSetNames(node, mUvSetNames);
+   }
+   else
+   {
+      mUvSetNames.clear();
+   }
+   
    return shapeEnter(node, instance);
 }
 

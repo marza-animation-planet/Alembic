@@ -130,7 +130,9 @@ public:
     inline bool isAnimated() const { return mAnimated; }
     
     bool ignoreCulling() const;
-
+    
+    static void AssignDefaultShader(MObject &obj);
+    
 private:
     
     double getFPS() const;
@@ -184,6 +186,9 @@ private:
     int mUpdateLevel;
     AlembicSceneFilter mSceneFilter;
     bool mAnimated;
+    MObject aUvSet;
+    MObject aUvSetName;
+    std::vector<std::string> mUvSetNames;
     
 #ifdef ABCSHAPE_VRAY_SUPPORT
     VR::DefStringParam mVRFilename;
@@ -271,12 +276,12 @@ private:
 
 #include <maya/MPxCommand.h>
 
-class AbcShapeVRayDisp : public MPxCommand
+class AbcShapeVRayInfo : public MPxCommand
 {
 public:
    
-    AbcShapeVRayDisp();
-    ~AbcShapeVRayDisp();
+    AbcShapeVRayInfo();
+    ~AbcShapeVRayInfo();
 
     virtual bool hasSyntax() const;
     virtual bool isUndoable() const;
@@ -284,8 +289,9 @@ public:
 
     static MSyntax createSyntax();
     static void* create();
-    static bool getAssignedDisplacement(const MDagPath &path, std::string &setName, std::string &shaderName);
-    
+    static bool getAssignedDisplacement(const MDagPath &path, std::string &setName, std::string &shaderName, std::string &stdDispName);
+    static void fillMultiUVs(const MDagPath &path);
+    static void initDispSets();
      
     typedef std::set<std::string> NameSet;
     
@@ -301,11 +307,15 @@ public:
         std::string shaderName;
     };
     
+    typedef std::map<std::string, int> MultiUv;
+    
     typedef std::map<std::string, DispShapes> DispTexMap;
     typedef std::map<std::string, DispSet> DispSetMap;
+    typedef std::map<std::string, MultiUv> MultiUvMap;
      
     static DispTexMap DispTexs;
     static DispSetMap DispSets;
+    static MultiUvMap MultiUVs;
 };
 
 #endif

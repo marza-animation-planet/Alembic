@@ -16,4 +16,6 @@ debug
 excons.cache
 maya/AbcShape/AE*Template.mel
 maya/AbcShape/*.py
+maya/AbcShape/*AbcMaterialEditor.mel
+maya/AbcShape/*AbcMaterialEditor.py
 arnold/abcproc/*.py

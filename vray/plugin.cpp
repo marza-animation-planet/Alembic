@@ -214,6 +214,13 @@ void AbcVRayGeom::cleanGeometryTemporaries()
          ++cit;
       }
    }
+   
+   for (size_t i=0; i<smoothNormals.size(); ++i)
+   {
+      free(smoothNormals[i]);
+   }
+   
+   smoothNormals.clear();
 }
 
 void AbcVRayGeom::clear()
