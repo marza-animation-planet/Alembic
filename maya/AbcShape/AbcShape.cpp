@@ -42,6 +42,28 @@ AbcShapeVRayInfo::DispTexMap AbcShapeVRayInfo::DispTexs;
 AbcShapeVRayInfo::DispSetMap AbcShapeVRayInfo::DispSets;
 AbcShapeVRayInfo::MultiUvMap AbcShapeVRayInfo::MultiUVs;
 
+static MObject GetShadingGroup(const MDagPath &path)
+{
+   MPlugArray conns;
+   MFnDagNode dagNode(path);
+   
+   MPlug plug = dagNode.findPlug("instObjGroups");
+
+   plug.elementByLogicalIndex(path.instanceNumber()).connectedTo(conns, false, true);
+
+   for (unsigned int k=0; k<conns.length(); ++k)
+   {
+      MObject oNode = conns[k].node();
+      
+      if (oNode.apiType() == MFn::kShadingEngine)
+      {
+         return oNode;
+      }
+   }
+   
+   return MObject::kNullObj;
+}
+
 void* AbcShapeVRayInfo::create()
 {
    return new AbcShapeVRayInfo();
@@ -75,8 +97,55 @@ MSyntax AbcShapeVRayInfo::createSyntax()
    return syntax;
 }
 
-bool AbcShapeVRayInfo::getAssignedDisplacement(const MDagPath &inPath, std::string &setName, std::string &shaderName)
+bool AbcShapeVRayInfo::getAssignedDisplacement(const MDagPath &inPath, std::string &setName, std::string &shaderName, std::string &stdDispName)
 {
+   setName = "";
+   shaderName = "";
+   stdDispName = "";
+   
+   // Lookup for maya standard displacement
+   
+   MPlugArray conns;
+   
+   MObject oSG = GetShadingGroup(inPath);
+   
+   if (oSG != MObject::kNullObj)
+   {
+      MFnDependencyNode nSG(oSG);
+      
+      // MGlobal::displayInfo("[AbcShape] " + inPath.fullPathName() + " : shagine engine " + nSG.name());
+      
+      MPlug pDisp = nSG.findPlug("displacementShader");
+      
+      if (!pDisp.isNull() && pDisp.connectedTo(conns, true, false) && conns.length() == 1)
+      {
+         MObject oDisp = conns[0].node();
+         MFnDependencyNode nDisp(oDisp);
+         
+         // MGlobal::displayInfo("[AbcShape] " + inPath.fullPathName() + " : displacement shader " + nDisp.name() + " (" + nDisp.typeName() + ")");
+         
+         if (nDisp.typeName() == "displacementShader")
+         {
+            // MGlobal::displayInfo("[AbcShape] " + inPath.fullPathName() + " : shagine engine " + nSG.name());
+            
+            // V-Ray only looks for 'displacement' input
+            pDisp = nDisp.findPlug("displacement");
+            
+            if (!pDisp.isNull() && pDisp.connectedTo(conns, true, false) && conns.length() == 1)
+            {
+               oDisp = conns[0].node();
+               nDisp.setObject(oDisp);
+               
+               // MGlobal::displayInfo("[AbcShape] " + inPath.fullPathName() + " : displacement texture " + nDisp.name());
+               
+               stdDispName = nDisp.name().asChar();
+            }
+         }
+      }
+   }
+   
+   // Now lookup in VRayDisplacement sets
+      
    DispSetMap::const_iterator it;
    
    MDagPath path = inPath;
@@ -97,7 +166,7 @@ bool AbcShapeVRayInfo::getAssignedDisplacement(const MDagPath &inPath, std::stri
       }
    }
    
-   return false;
+   return (stdDispName.length() > 0);
 }
 
 static void ToVRayName(std::string &n, const char *suffix=0)
@@ -289,12 +358,13 @@ MStatus AbcShapeVRayInfo::doIt(const MArgList& args)
          
          if (sl.add(val) == MS::kSuccess && sl.getDagPath(0, path) == MS::kSuccess)
          {
-            std::string setn, shdn;
+            std::string setn, shdn, stdshdn;
             
-            if (getAssignedDisplacement(path, setn, shdn))
+            if (getAssignedDisplacement(path, setn, shdn, stdshdn))
             {
                rv.append(setn.c_str());
                rv.append(shdn.c_str());
+               rv.append(stdshdn.c_str());
             }
          }
          
@@ -1379,11 +1449,19 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                      subdqAttrObject = thisMObject();
                   }
                   
-                  std::string dispSetName, dispShaderName;                  
-                  bool hasDispAssigned = AbcShapeVRayInfo::getAssignedDisplacement(thisPath, dispSetName, dispShaderName);
+                  std::string dispSetName, dispShaderName, stdDispShaderName;                  
+                  bool hasDispAssigned = AbcShapeVRayInfo::getAssignedDisplacement(thisPath, dispSetName, dispShaderName, stdDispShaderName);
                   
                   if (hasDispAssigned)
                   {
+                     // MGlobal::displayInfo("[AbcShape] VRayDisplacement: " + MString(dispSetName.c_str()));
+                     // MGlobal::displayInfo("[AbcShape] VRayDisplacement shader: " + MString(dispShaderName.c_str()));
+                     // MGlobal::displayInfo("[AbcShape] shadingEngine displacement shader: " + MString(stdDispShaderName.c_str()));
+                     
+                     // hasDispAssigned will return true if standard displacement was found or object is in a VRayDisplacement set
+                     // Note the displacement shader on the VRayDisplacement set may not be set, and this is accepted because we
+                     //   may also wan't to pull subdivision related attributes from this set
+                     // 
                      MSelectionList sl;
                      
                      if (sl.add(dispSetName.c_str()) == MS::kSuccess)
@@ -1394,7 +1472,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                         
                         MFnDependencyNode dispSetFn(dispSetObj);
                         
-                        if (displaced && dispShaderName.length() > 0)
+                        if (displaced)
                         {
                            MPlug pDispNone = dispSetFn.findPlug("vrayDisplacementNone");
                            if (!pDispNone.isNull())
@@ -1407,6 +1485,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                               {
                                  if (dispAttrObject == MObject::kNullObj)
                                  {
+                                    // use displacement parameters from VRayDisplacement set as they are not defined on object
                                     dispAttrObject = dispSetObj;
                                  }
                               }
@@ -1452,10 +1531,19 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                            }
                         }
                      }
+                     
+                     if (stdDispShaderName.length() == 0 && dispShaderName.length() == 0)
+                     {
+                        displaced = false;
+                     }
+                     else if (stdDispShaderName.length() > 0)
+                     {
+                        dispShaderName = stdDispShaderName;
+                     }
                   }
                   else
                   {
-                     // No displacement shader assigned
+                     // No displacement shader assigned at all
                      displaced = false;
                   }
                   

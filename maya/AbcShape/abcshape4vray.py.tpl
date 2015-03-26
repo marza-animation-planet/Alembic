@@ -210,12 +210,22 @@ def PostTranslate(disp=True, multiuv=True):
             """
             # Per-shape (why?)
             TexFloat cubeShape1@displTexFloat {
-              input=checker1_luminance@luminance::luminance;
+              input=checker1@luminance::luminance;
             }
             
             # Shared
-            TexLuminance checker1_luminance@luminance {
+            TexLuminance checker1@luminance {
               input=checker1;
+            }
+            
+            or
+            
+            TexFloat cubeShape1@displTexFloat {
+              input=checker1@color::alpha;
+            }
+            
+            TexAColorOp checker1@color {
+               color_a=checker1;
             }
             """
             
