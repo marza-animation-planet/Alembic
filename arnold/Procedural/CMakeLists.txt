@@ -1,6 +1,6 @@
 ##-*****************************************************************************
 ##
-## Copyright (c) 2009-2013, Industrial Light & Magic,
+## Copyright (c) 2009-2015, Industrial Light & Magic,
 ##   a division of Lucasfilm Entertainment Company Ltd.
 ##
 ## All rights reserved.
@@ -58,7 +58,10 @@ SET( CORE_LIBS
   AlembicAbcGeom
   AlembicAbc
   AlembicAbcCoreHDF5
+  AlembicAbcCoreOgawa
   AlembicAbcCoreAbstract
+  AlembicAbcCoreFactory
+  AlembicOgawa
   AlembicUtil )
 
 ADD_ARNOLD_CXX_PLUGIN( AlembicArnoldProcedural ProcMain.cpp ${H_FILES} ${CXX_FILES} )
