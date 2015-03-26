@@ -181,15 +181,22 @@ public:
    template <class MeshSchema>
    bool readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
                      AlembicGeometrySource::GeomInfo *info,
-                     const UserAttrsSet &attrs);
+                     const UserAttrsSet &attrs,
+                     bool computeNormals);
    
    template <class MeshSchema>
    inline bool readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
-                            AlembicGeometrySource::GeomInfo *info)
+                            AlembicGeometrySource::GeomInfo *info,
+                            bool computeNormals)
    {
       UserAttrsSet attrs;
-      return readBaseMesh(node, info, attrs);
+      return readBaseMesh(node, info, attrs, computeNormals);
    }
+   
+   float* computeMeshSmoothNormals(AlembicGeometrySource::GeomInfo *info,
+                                   const float *P0,
+                                   const float *P1,
+                                   float blend);
    
    void readMeshNormals(AlembicMesh &mesh,
                         AlembicGeometrySource::GeomInfo *info);
@@ -216,7 +223,8 @@ protected:
 template <class MeshSchema>
 bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
                                   AlembicGeometrySource::GeomInfo *info,
-                                  const UserAttrsSet &attrs)
+                                  const UserAttrsSet &attrs,
+                                  bool computeNormals)
 {
    MeshSchema &schema = node.typedObject().getSchema();
    
@@ -429,6 +437,11 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
          
          vl[i].set(p.x, p.y, p.z);
       }
+      
+      if (computeNormals)
+      {
+         info->smoothNormals.push_back(computeMeshSmoothNormals(info, (const float*) P->getData(), 0, 0.0f));
+      }
    }
    else
    {
@@ -465,6 +478,11 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
                Alembic::Abc::V3f p = P->get()[j];
                
                vl[j].set(p.x, p.y, p.z);
+            }
+            
+            if (computeNormals)
+            {
+               info->smoothNormals.push_back(computeMeshSmoothNormals(info, (const float*) P->getData(), 0, 0.0f));
             }
          }
       }
@@ -584,10 +602,17 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
                      
                      vl[j].set(p.x, p.y, p.z);
                   }
+                  
+                  if (computeNormals)
+                  {
+                     info->smoothNormals.push_back(computeMeshSmoothNormals(info, (const float*) P->getData(), 0, 0.0f));
+                  }
                }
             }
             else
             {
+               float *Pm = (float*) malloc(3 * P->size() * sizeof(float));
+               
                for (size_t i=0; i<ntimes; ++i)
                {
                   if (mGeoSrc->params()->verbose)
@@ -600,34 +625,47 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
                   VR::Table<VR::Vector> &vl = info->positions->at(frames[i]);
                   vl.setCount(P->size(), true);
                   
+                  float *cPm = Pm;
+                  
                   if (acc)
                   {
                      const float *vvel = vel;
                      const float *vacc = acc;
                      
-                     for (size_t k=0; k<P->size(); ++k, vvel+=3, vacc+=3)
+                     for (size_t k=0; k<P->size(); ++k, vvel+=3, vacc+=3, cPm+=3)
                      {
                         Alembic::Abc::V3f p = P->get()[k];
                         
-                        vl[k].set(p.x + dt * (vvel[0] + 0.5 * dt * vacc[0]),
-                                  p.y + dt * (vvel[1] + 0.5 * dt * vacc[1]),
-                                  p.z + dt * (vvel[2] + 0.5 * dt * vacc[2]));
+                        cPm[0] = p.x + dt * (vvel[0] + 0.5 * dt * vacc[0]);
+                        cPm[1] = p.y + dt * (vvel[1] + 0.5 * dt * vacc[1]);
+                        cPm[2] = p.z + dt * (vvel[2] + 0.5 * dt * vacc[2]);
+                        
+                        vl[k].set(cPm[0], cPm[1], cPm[2]);
                      }
                   }
                   else
                   {
                      const float *vvel = vel;
                      
-                     for (size_t k=0; k<P->size(); ++k, vvel+=3)
+                     for (size_t k=0; k<P->size(); ++k, vvel+=3, cPm+=3)
                      {
                         Alembic::Abc::V3f p = P->get()[k];
                         
-                        vl[k].set(p.x + dt * vvel[0],
-                                  p.y + dt * vvel[1],
-                                  p.z + dt * vvel[2]);
+                        cPm[0] = p.x + dt * vvel[0];
+                        cPm[1] = p.y + dt * vvel[1];
+                        cPm[2] = p.z + dt * vvel[2];
+                        
+                        vl[k].set(cPm[0], cPm[1], cPm[2]);
                      }
                   }
+                  
+                  if (computeNormals)
+                  {
+                     info->smoothNormals.push_back(computeMeshSmoothNormals(info, Pm, 0, 0.0f));
+                  }
                }
+               
+               free(Pm);
             }
          }
          else
@@ -684,6 +722,11 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
                                a * p0.y + b * p1.y,
                                a * p0.z + b * p1.z);
                   }
+                  
+                  if (computeNormals)
+                  {
+                     info->smoothNormals.push_back(computeMeshSmoothNormals(info, (const float*) P0->getData(), (const float*) P1->getData(), b));
+                  }
                }
                else
                {
@@ -697,6 +740,11 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
                      Alembic::Abc::V3f p = P0->get()[k];
                      
                      vl[k].set(p.x, p.y, p.z);
+                  }
+                  
+                  if (computeNormals)
+                  {
+                     info->smoothNormals.push_back(computeMeshSmoothNormals(info, (const float*) P0->getData(), 0, 0.0f));
                   }
                }
             }

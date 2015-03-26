@@ -151,6 +151,12 @@ void AlembicGeometrySource::GeomInfo::clear()
       toFaceIndex = 0;
    }
    
+   for (size_t i=0; i<smoothNormals.size(); ++i)
+   {
+      free(smoothNormals[i]);
+   }
+   smoothNormals.clear();
+   
    numPoints = 0;
    numTriangles = 0;
    numFaces = 0;

@@ -63,6 +63,7 @@ struct AlembicGeometrySource : VR::VRayStaticGeometry
       VR::DefStringListParam *channelNames;
       VR::DefIntListParam *edgeVisibility;
       // creases
+      std::vector<float*> smoothNormals;
       
       // reference mesh parameters
       VR::DefVectorListParam *constPositions;

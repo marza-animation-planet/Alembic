@@ -250,7 +250,23 @@ static AlembicGeometrySource::GeomInfo* BuildMeshPlugins(AlembicGeometrySource *
                   
                   UpdateGeometry geoup(src);
                   
-                  if (!geoup.readBaseMesh(node, refInfo))
+                  bool computeNormals = false;
+                  
+                  if (refSubd)
+                  {
+                     computeNormals = true;
+                  }
+                  else
+                  {
+                     Alembic::AbcGeom::IPolyMeshSchema &schema = refMesh->typedObject().getSchema();
+                     
+                     Alembic::AbcGeom::IN3fGeomParam Nparam = schema.getNormalsParam();
+                     
+                     computeNormals = (!Nparam.valid() ||  (Nparam.getScope() != Alembic::AbcGeom::kVaryingScope &&
+                                                            Nparam.getScope() != Alembic::AbcGeom::kFacevaryingScope));
+                  }
+                  
+                  if (!geoup.readBaseMesh(node, refInfo, computeNormals))
                   {
                      factory->removeVRayPluginParameter(refInfo->constPositions);
                      factory->removeVRayPluginParameter(refInfo->faces);
@@ -270,6 +286,7 @@ static AlembicGeometrySource::GeomInfo* BuildMeshPlugins(AlembicGeometrySource *
                      {
                         geoup.readMeshNormals(*refMesh, refInfo);
                      }
+                     // -> what about SUBD
                      geoup.readMeshUVs(node, refInfo);
                   }
                   
@@ -881,6 +898,90 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicXform &node, AlembicNode *
    return AlembicNode::ContinueVisit;
 }
 
+float* UpdateGeometry::computeMeshSmoothNormals(AlembicGeometrySource::GeomInfo *info,
+                                                const float *P0,
+                                                const float *P1,
+                                                float blend)
+{
+   float iblend = 1.0f - blend;
+   
+   size_t bytesize = 3 * info->numPoints * sizeof(float);
+   
+   float *smoothNormals = (float*) malloc(bytesize);
+   
+   memset(smoothNormals, 0, bytesize);
+   
+   Alembic::Abc::V3f fN, p0, p1, p2, e0, e1;
+   
+   for (unsigned int t=0, v=0; t<info->numTriangles; ++t, v+=3)
+   {
+      unsigned int pi[3] = { 3 * info->toPointIndex[v  ],
+                             3 * info->toPointIndex[v+1],
+                             3 * info->toPointIndex[v+2] };
+      
+      if (P1 && blend > 0.0001f)
+      {
+         p0.x = iblend * P0[pi[0]+0] + blend * P1[pi[0]+0];
+         p0.y = iblend * P0[pi[0]+1] + blend * P1[pi[0]+1];
+         p0.z = iblend * P0[pi[0]+2] + blend * P1[pi[0]+2];
+         
+         p1.x = iblend * P0[pi[1]+0] + blend * P1[pi[1]+0];
+         p1.y = iblend * P0[pi[1]+1] + blend * P1[pi[1]+1];
+         p1.z = iblend * P0[pi[1]+2] + blend * P1[pi[1]+2];
+         
+         p2.x = iblend * P0[pi[2]+0] + blend * P1[pi[2]+0];
+         p2.y = iblend * P0[pi[2]+1] + blend * P1[pi[2]+1];
+         p2.z = iblend * P0[pi[2]+2] + blend * P1[pi[2]+2];
+      }
+      else
+      {
+         p0.x = P0[pi[0]+0];
+         p0.y = P0[pi[0]+1];
+         p0.z = P0[pi[0]+2];
+         
+         p1.x = P0[pi[1]+0];
+         p1.y = P0[pi[1]+1];
+         p1.z = P0[pi[1]+2];
+         
+         p2.x = P0[pi[2]+0];
+         p2.y = P0[pi[2]+1];
+         p2.z = P0[pi[2]+2];
+      }
+      
+      e0 = p1 - p0;
+      e1 = p2 - p1;
+      
+      // e1.cross(e2)
+      fN = e0.cross(e1);
+      fN.normalize();
+      
+      for (int i=0; i<3; ++i)
+      {
+         smoothNormals[pi[i]+0] += fN.x;
+         smoothNormals[pi[i]+1] += fN.y;
+         smoothNormals[pi[i]+2] += fN.z;
+      }
+   }
+   
+   for (unsigned int p=0, off=0; p<info->numPoints; ++p, off+=3)
+   {
+      float l = smoothNormals[off  ] * smoothNormals[off  ] +
+                smoothNormals[off+1] * smoothNormals[off+1] +
+                smoothNormals[off+2] * smoothNormals[off+2];
+      
+      if (l > 0.0f)
+      {
+         l = 1.0f / sqrtf(l);
+         
+         smoothNormals[off  ] *= l;
+         smoothNormals[off+1] *= l;
+         smoothNormals[off+2] *= l;
+      }
+   }
+   
+   return smoothNormals;
+}
+
 void UpdateGeometry::readMeshNormals(AlembicMesh &node, AlembicGeometrySource::GeomInfo *info)
 {
    Alembic::AbcGeom::IPolyMeshSchema &schema = node.typedObject().getSchema();
@@ -903,6 +1004,14 @@ void UpdateGeometry::readMeshNormals(AlembicMesh &node, AlembicGeometrySource::G
       {
          info->constNormals->setCount(0, renderFrame);
          info->constFaceNormals->setCount(0, renderFrame);
+         
+         // info->constNormals->setCount(info->numPoints, renderFrame);
+         // info->smoothNormals[0] 
+         // float *N = computeMeshSmoothNormals(schema)
+      }
+      else
+      {
+         
       }
       
       return;
@@ -1127,7 +1236,12 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicMesh &node, AlembicNode *i
                                   renderTime, interpolateAttribs, attrs,
                                   true, true, true, true, true);
             
-            info->invalidFrame = !readBaseMesh(node, info, attrs);
+            Alembic::AbcGeom::IN3fGeomParam Nparam = schema.getNormalsParam();
+            
+            bool computeNormals = (!Nparam.valid() ||  (Nparam.getScope() != Alembic::AbcGeom::kVaryingScope &&
+                                                        Nparam.getScope() != Alembic::AbcGeom::kFacevaryingScope));
+            
+            info->invalidFrame = !readBaseMesh(node, info, attrs, computeNormals);
             
             if (info->invalidFrame)
             {
@@ -1263,7 +1377,7 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicSubD &node, AlembicNode *i
                                   renderTime, interpolateAttribs, attrs,
                                   true, true, true, true, true);
             
-            info->invalidFrame = !readBaseMesh(node, info, attrs);
+            info->invalidFrame = !readBaseMesh(node, info, attrs, true);
             
             if (info->invalidFrame)
             {
