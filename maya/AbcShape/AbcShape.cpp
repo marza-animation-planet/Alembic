@@ -527,7 +527,6 @@ MStatus AbcShapeVRayInfo::doIt(const MArgList& args)
 
 
 const MTypeId AbcShape::ID(0x00082698);
-MCallbackId AbcShape::CallbackID;
 MObject AbcShape::aFilePath;
 MObject AbcShape::aObjectExpression;
 MObject AbcShape::aDisplayMode;
@@ -1213,109 +1212,6 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
 #ifdef ABCSHAPE_VRAY_SUPPORT
    else if (plug.attribute() == aVRayGeomResult)
    {
-      static bool sFirstExport = true;
-      
-      if (sFirstExport)
-      {
-         static MString _preMel(NAME_PREFIX "AbcShapeVRayInfo -init");
-         static MString _postPython("import " NAME_PREFIX "abcshape4vray; " NAME_PREFIX "abcshape4vray.PostTranslate()");
-            
-         MSelectionList sl;
-         MObject drg, vs;
-         
-         int drgIdx = -1;
-         int vsIdx = -1;
-         
-         if (sl.add("defaultRenderGlobals") == MS::kSuccess)
-         {
-            drgIdx = int(sl.length()) - 1;
-         }
-         
-         if (sl.add("vraySettings") == MS::kSuccess)
-         {
-            vsIdx = int(sl.length()) - 1;
-         }
-         
-         if (drgIdx >= 0 && sl.getDependNode(drgIdx, drg) == MS::kSuccess)
-         {
-            MFnDependencyNode nodeFn(drg);
-            
-            MPlug preMel = nodeFn.findPlug("preMel");
-            
-            if (!preMel.isNull())
-            {
-               MString s = preMel.asString();
-               
-               if (s.indexW(_preMel) == -1)
-               {
-                  int idx = s.indexW("AbcShapeVRayDisp");
-                  
-                  if (idx != -1)
-                  {
-                     s = s.substringW(0, idx - 1) + "AbcShapeVRayInfo" + s.substringW(idx + 16, s.length() - 1);
-                  }
-                  else if (s.length() > 0)
-                  {
-                     if (s.asChar()[s.length()-1] != ';')
-                     {
-                        s += "; " + _preMel;
-                     }
-                     else
-                     {
-                        s += " " + _preMel + ";";
-                     }
-                     
-                     // 'AbcShapeVRayInfo -init' wasn't found in pre-render MEL, call it now
-                     AbcShapeVRayInfo::initDispSets();
-                  }
-                  else
-                  {
-                     s = _preMel;
-                     
-                     // 'AbcShapeVRayInfo -init' wasn't found in pre-render MEL, call it now
-                     AbcShapeVRayInfo::initDispSets();
-                  }
-                  
-                  preMel.setString(s);
-               }
-            }
-         }
-         
-         if (vsIdx >= 0 && sl.getDependNode(vsIdx, vs) == MS::kSuccess)
-         {
-            MFnDependencyNode nodeFn(vs);
-            
-            MPlug postPython = nodeFn.findPlug("postTranslatePython");
-            
-            if (!postPython.isNull())
-            {
-               MString s = postPython.asString();
-               
-               if (s.indexW(_postPython) == -1)
-               {
-                  int idx = s.indexW("abcshape4vray.CreateDispTextures");
-                  
-                  if (idx != -1)
-                  {
-                     s = s.substringW(0, idx - 1) + "abcshape4vray.PostTranslate" + s.substringW(idx + 32, s.length() - 1);
-                  }
-                  else if (s.length() > 0)
-                  {
-                     s += "\n" + _postPython;
-                  }
-                  else
-                  {
-                     s = _postPython;
-                  }
-                  
-                  postPython.setString(s);
-               }
-            }
-         }
-         
-         sFirstExport = false;
-      }
-      
       syncInternals(block);
       
       MDataHandle hIn = block.inputValue(aVRayGeomInfo);
