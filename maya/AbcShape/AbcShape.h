@@ -21,7 +21,6 @@ class AbcShape : public MPxSurfaceShape
 public:
     
     static const MTypeId ID;
-    static MCallbackId CallbackID;
     
     static MObject aFilePath;
     static MObject aObjectExpression;
