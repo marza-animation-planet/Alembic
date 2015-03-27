@@ -202,6 +202,10 @@ public:
                         AlembicGeometrySource::GeomInfo *info);
    
    template <class MeshSchema>
+   void setMeshSmoothNormals(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
+                             AlembicGeometrySource::GeomInfo *info);
+   
+   template <class MeshSchema>
    size_t readMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
                       AlembicGeometrySource::GeomInfo *info,
                       const UserAttrsSet &attrs,
@@ -754,6 +758,93 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
    
    return rv;
 }
+
+template <class MeshSchema>
+void UpdateGeometry::setMeshSmoothNormals(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
+                                    AlembicGeometrySource::GeomInfo *info)
+{
+   double renderFrame = mGeoSrc->renderFrame();
+   
+   if (info->constNormals)
+   {
+      if (info->smoothNormals.size() == 1)
+      {
+         info->constNormals->setCount(info->numPoints, renderFrame);
+         VR::VectorList nl = info->constNormals->getVectorList(renderFrame);
+         
+         info->constFaceNormals->setCount(3 * info->numTriangles, renderFrame);
+         VR::IntList il = info->constFaceNormals->getIntList(renderFrame);
+         
+         const float *N = info->smoothNormals[0];
+         
+         for (unsigned int i=0, j=0; i<info->numPoints; ++i, j+=3)
+         {
+            nl[i].set(N[j], N[j+1], N[j+2]);
+         }
+         
+         for (unsigned int i=0, k=0; i<info->numTriangles; ++i)
+         {
+            for (unsigned int j=0; j<3; ++j, ++k)
+            {
+               il[k] = info->toPointIndex[k];
+            }
+         }
+      }
+      else
+      {
+         std::cout << "[AlembicLoader] Computed smooth normal samples and schema samples do no match, ignoring them" << std::endl;
+         
+         info->constNormals->setCount(0, renderFrame);
+         info->constFaceNormals->setCount(0, renderFrame);
+      }
+   }
+   else
+   {
+      info->normals->clear();
+      info->faceNormals->clear();
+      
+      MeshSchema &schema = node.typedObject().getSchema();
+      
+      bool varyingTopology = schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology;
+      bool singleSample = (mGeoSrc->params()->ignoreDeformBlur || varyingTopology);
+      double renderTime = mGeoSrc->renderTime();
+      double *times = (singleSample ? &renderTime : mGeoSrc->sampleTimes());
+      double *frames = (singleSample ? &renderFrame : mGeoSrc->sampleFrames());
+      size_t ntimes = (singleSample ? 1 : mGeoSrc->numTimeSamples());
+      
+      if (info->smoothNormals.size() == ntimes)
+      {
+         for (size_t i=0; i<ntimes; ++i)
+         {
+            const float *N = info->smoothNormals[i];
+            
+            VR::Table<VR::Vector> &nl = info->normals->at(frames[i]);
+            nl.setCount(info->numPoints, true);
+            
+            VR::Table<int> &il = info->faceNormals->at(frames[i]);
+            il.setCount(3 * info->numTriangles, true);
+            
+            for (unsigned int j=0, k=0; j<info->numPoints; ++j, k+=3)
+            {
+               nl[j].set(N[k], N[k+1], N[k+2]);
+            }
+            
+            for (unsigned int j=0, l=0; j<info->numTriangles; ++j)
+            {
+               for (unsigned int k=0; k<3; ++k, ++l)
+               {
+                  il[l] = info->toPointIndex[l];
+               }
+            }
+         }
+      }
+      else
+      {
+         std::cout << "[AlembicLoader] Computed smooth normal samples and schema samples do no match, ignoring them" << std::endl;
+      }
+   }
+}
+
 
 template <class MeshSchema>
 size_t UpdateGeometry::readMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,

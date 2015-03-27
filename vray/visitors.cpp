@@ -286,7 +286,10 @@ static AlembicGeometrySource::GeomInfo* BuildMeshPlugins(AlembicGeometrySource *
                      {
                         geoup.readMeshNormals(*refMesh, refInfo);
                      }
-                     // -> what about SUBD
+                     else if (refSubd)
+                     {
+                        geoup.setMeshSmoothNormals(*refSubd, refInfo);
+                     }
                      geoup.readMeshUVs(node, refInfo);
                   }
                   
@@ -1000,20 +1003,7 @@ void UpdateGeometry::readMeshNormals(AlembicMesh &node, AlembicGeometrySource::G
        (Nparam.getScope() != Alembic::AbcGeom::kVaryingScope &&
         Nparam.getScope() != Alembic::AbcGeom::kFacevaryingScope))
    {
-      if (isConst)
-      {
-         info->constNormals->setCount(0, renderFrame);
-         info->constFaceNormals->setCount(0, renderFrame);
-         
-         // info->constNormals->setCount(info->numPoints, renderFrame);
-         // info->smoothNormals[0] 
-         // float *N = computeMeshSmoothNormals(schema)
-      }
-      else
-      {
-         
-      }
-      
+      setMeshSmoothNormals(node, info);
       return;
    }
    else
@@ -1385,6 +1375,9 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicSubD &node, AlembicNode *i
             }
             else
             {
+               // Set normals
+               setMeshSmoothNormals(node, info);
+               
                // Output creases
                // TODO
                
