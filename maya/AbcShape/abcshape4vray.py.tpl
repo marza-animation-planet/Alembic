@@ -168,7 +168,7 @@ def PostTranslate(disp=True, multiuv=True):
          
          node = node[0]
          
-         uvswitchs = maya.cmds.<<NodeName>>VRayInfo(multiuv=shape, uvswitchlist=1)
+         uvswitchs = cmds.<<NodeName>>VRayInfo(multiuv=shape, uvswitchlist=1)
          
          if uvswitchs:
             
@@ -180,7 +180,7 @@ def PostTranslate(disp=True, multiuv=True):
                
                switcher = switcher[0]
                
-               index = maya.cmds.<<NodeName>>VRayInfo(multiuv=shape, uvindex=name)
+               index = cmds.<<NodeName>>VRayInfo(multiuv=shape, uvindex=name)
                
                if index < 0:
                   continue
@@ -195,7 +195,7 @@ def PostTranslate(disp=True, multiuv=True):
                switcher.set("values", values)
    
    # Setup subdivision/displacement nodes
-   disps = (maya.cmds.<<NodeName>>VRayInfo(displist=1) if disp else None)
+   disps = (cmds.<<NodeName>>VRayInfo(displist=1) if disp else None)
    
    if disps:
       
@@ -206,7 +206,7 @@ def PostTranslate(disp=True, multiuv=True):
          if not dispnode:
             continue
          
-         shapes = maya.cmds.<<NodeName>>VRayInfo(disp=disp, f=1)
+         shapes = cmds.<<NodeName>>VRayInfo(disp=disp, f=1)
          
          if shapes:
             """
@@ -250,7 +250,7 @@ def PostTranslate(disp=True, multiuv=True):
                
                shapenode[0].set("displacement_tex_float", texfnode)
          
-         shapes = maya.cmds.<<NodeName>>VRayInfo(disp=disp, c=1)
+         shapes = cmds.<<NodeName>>VRayInfo(disp=disp, c=1)
          if shapes:
             for shape in map(str, shapes):
                # connect to 'displacement_tex_color'
@@ -261,4 +261,4 @@ def PostTranslate(disp=True, multiuv=True):
                shapenode[0].set("displacement_tex_color", dispnode)
    
    # Clear post translate information cache
-   maya.cmds.<<NodeName>>VRayInfo(reset=1)
+   cmds.<<NodeName>>VRayInfo(reset=1)
