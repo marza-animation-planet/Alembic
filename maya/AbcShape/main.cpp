@@ -30,6 +30,7 @@ MCallbackId gVRaySettingsDeleted = 0;
 std::map<std::string, MCallbackId> gVRaySettingsAttrChanged;
 
 std::string gPreMel = NAME_PREFIX "AbcShapeVRayInfo -init";
+std::string gSafePreMel = "catchQuiet(`" + gPreMel + "`)";
 std::string gPostPythonImp = "import " NAME_PREFIX "abcshape4vray";
 std::string gPostPythonExc = NAME_PREFIX "abcshape4vray.PostTranslate()";
 std::string gPostPython = gPostPythonImp + "; " + gPostPythonExc;
@@ -286,12 +287,23 @@ static void EnsurePreMel(MPlug &plug)
    // For backward compatibility, replace old command name first
    bool changed = MelCompat(preMel);
    
-   size_t p = preMel.find(gPreMel);
+   size_t p = preMel.find(gSafePreMel);
    
    if (p == std::string::npos)
    {
-      AppendMel(preMel, gPreMel);
-      changed = true;
+      p = preMel.find(gPreMel);
+      
+      if (p == std::string::npos)
+      {
+         AppendMel(preMel, gSafePreMel);
+         changed = true;
+      }
+      else
+      {
+         RemoveMel(preMel, gPreMel);
+         AppendMel(preMel, gSafePreMel);
+         changed = true;
+      }
    }
    
    if (changed)
@@ -306,7 +318,11 @@ static void RemovePreMel(MPlug &plug)
    
    MelCompat(preMel);
    
-   if (RemoveMel(preMel, gPreMel))
+   if (RemoveMel(preMel, gSafePreMel))
+   {
+      plug.setString(preMel.c_str());
+   }
+   else if (RemoveMel(preMel, gPreMel))
    {
       plug.setString(preMel.c_str());
    }

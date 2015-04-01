@@ -144,12 +144,14 @@ def CreateDispTextures():
 def PostTranslate(disp=True, multiuv=True):
    try:
       import vray.utils
-      import maya.cmds
    except:
       return
    
+   if not cmds.pluginInfo("<<NodeName>>", query=1, loaded=1):
+      return
+   
    # Setup uv switch nodes
-   shapes = (maya.cmds.<<NodeName>>VRayInfo(multiuvlist=1) if multiuv else None)
+   shapes = (cmds.<<NodeName>>VRayInfo(multiuvlist=1) if multiuv else None)
    
    if shapes:
       
