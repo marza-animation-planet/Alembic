@@ -47,6 +47,7 @@ public:
 #ifdef ABCSHAPE_VRAY_SUPPORT
     // V-Ray specific attributes
     static MObject aOutApiType;
+    static MObject aOutApiClassification;
     static MObject aVRayGeomResult;
     static MObject aVRayGeomInfo;
     
@@ -274,6 +275,7 @@ private:
 #ifdef ABCSHAPE_VRAY_SUPPORT
 
 #include <maya/MPxCommand.h>
+#include <maya/MFnDependencyNode.h>
 
 class AbcShapeVRayInfo : public MPxCommand
 {
@@ -288,7 +290,7 @@ public:
 
     static MSyntax createSyntax();
     static void* create();
-    static bool getAssignedDisplacement(const MDagPath &path, std::string &setName, std::string &shaderName, std::string &stdDispName);
+    static bool getAssignedDisplacement(const MDagPath &path, MFnDependencyNode &set, MFnDependencyNode &shader, MFnDependencyNode &stdShader);
     static void fillMultiUVs(const MDagPath &path);
     static void initDispSets();
      
@@ -302,8 +304,8 @@ public:
     
     struct DispSet
     {
-        std::string setName;
-        std::string shaderName;
+        MObject set;
+        MObject shader;
     };
     
     typedef std::map<std::string, int> MultiUv;

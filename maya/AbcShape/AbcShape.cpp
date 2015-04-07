@@ -97,11 +97,11 @@ MSyntax AbcShapeVRayInfo::createSyntax()
    return syntax;
 }
 
-bool AbcShapeVRayInfo::getAssignedDisplacement(const MDagPath &inPath, std::string &setName, std::string &shaderName, std::string &stdDispName)
+bool AbcShapeVRayInfo::getAssignedDisplacement(const MDagPath &inPath, MFnDependencyNode &set, MFnDependencyNode &shader, MFnDependencyNode &stdShader)
 {
-   setName = "";
-   shaderName = "";
-   stdDispName = "";
+   set.setObject(MObject::kNullObj);
+   shader.setObject(MObject::kNullObj);
+   stdShader.setObject(MObject::kNullObj);
    
    // Lookup for maya standard displacement
    
@@ -134,11 +134,9 @@ bool AbcShapeVRayInfo::getAssignedDisplacement(const MDagPath &inPath, std::stri
             if (!pDisp.isNull() && pDisp.connectedTo(conns, true, false) && conns.length() == 1)
             {
                oDisp = conns[0].node();
-               nDisp.setObject(oDisp);
+               stdShader.setObject(oDisp);
                
-               // MGlobal::displayInfo("[AbcShape] " + inPath.fullPathName() + " : displacement texture " + nDisp.name());
-               
-               stdDispName = nDisp.name().asChar();
+               // MGlobal::displayInfo("[AbcShape] " + inPath.fullPathName() + " : displacement texture " + stdShader.name());
             }
          }
       }
@@ -156,8 +154,8 @@ bool AbcShapeVRayInfo::getAssignedDisplacement(const MDagPath &inPath, std::stri
       
       if (it != DispSets.end())
       {
-         setName = it->second.setName;
-         shaderName = it->second.shaderName;
+         set.setObject(it->second.set);
+         shader.setObject(it->second.shader);
          return true;
       }
       else
@@ -166,7 +164,7 @@ bool AbcShapeVRayInfo::getAssignedDisplacement(const MDagPath &inPath, std::stri
       }
    }
    
-   return (stdDispName.length() > 0);
+   return (!stdShader.object().isNull());
 }
 
 static void ToVRayName(std::string &n, const char *suffix=0)
@@ -268,13 +266,11 @@ void AbcShapeVRayInfo::initDispSets()
             
             pDisp.connectedTo(srcs, true, false);
             
-            std::string shaderName;
+            MObject shdObj = MObject::kNullObj;
             
             if (srcs.length() > 0)
             {
-               MObject shdObj = srcs[0].node();
-               
-               shaderName = MFnDependencyNode(shdObj).name().asChar();
+               shdObj = srcs[0].node();
             }
             
             MSelectionList members;
@@ -288,8 +284,8 @@ void AbcShapeVRayInfo::initDispSets()
                {
                   DispSet &ds = DispSets[memberPath.fullPathName().asChar()];
                   
-                  ds.setName = dispSet.name().asChar();
-                  ds.shaderName = shaderName;
+                  ds.set = obj;
+                  ds.shader = shdObj;
                   
                   // Fully expand children too?
                   // beware then that deeper level assignment takes precedence
@@ -358,13 +354,13 @@ MStatus AbcShapeVRayInfo::doIt(const MArgList& args)
          
          if (sl.add(val) == MS::kSuccess && sl.getDagPath(0, path) == MS::kSuccess)
          {
-            std::string setn, shdn, stdshdn;
+            MFnDependencyNode set, shd, stdshd;
             
-            if (getAssignedDisplacement(path, setn, shdn, stdshdn))
+            if (getAssignedDisplacement(path, set, shd, stdshd))
             {
-               rv.append(setn.c_str());
-               rv.append(shdn.c_str());
-               rv.append(stdshdn.c_str());
+               rv.append(set.name().asChar());
+               rv.append(shd.name().asChar());
+               rv.append(stdshd.name().asChar());
             }
          }
          
@@ -550,6 +546,7 @@ MObject AbcShape::aOutBoxMax;
 MObject AbcShape::aAnimated;
 #ifdef ABCSHAPE_VRAY_SUPPORT
 MObject AbcShape::aOutApiType;
+MObject AbcShape::aOutApiClassification;
 MObject AbcShape::aVRayGeomResult;
 MObject AbcShape::aVRayGeomInfo;
 MObject AbcShape::aVRayAbcVerbose;
@@ -767,12 +764,22 @@ MStatus AbcShape::initialize()
    MFnStringData outApiTypeDefault;
    MObject outApiTypeDefaultObject = outApiTypeDefault.create("VRayGeometry");
    aOutApiType = tAttr.create("outApiType", "oat", MFnData::kString, outApiTypeDefaultObject, &stat);
+   MCHECKERROR(stat, "Could not create 'outApiType' attribute");
    tAttr.setKeyable(false);
    tAttr.setStorable(true);
    tAttr.setHidden(true);
-   MCHECKERROR(stat, "Could not create 'outApiType' attribute");
    stat = addAttribute(aOutApiType);
    MCHECKERROR(stat, "Could not add 'outApiType' attribute");
+   
+   MFnStringData outApiClassificationDefault;
+   MObject outApiClassificationDefaultObject = outApiClassificationDefault.create("geometry");
+   aOutApiClassification = tAttr.create("outApiClassification", "oac", MFnData::kString, outApiClassificationDefaultObject, &stat);
+   MCHECKERROR(stat, "Could not create 'outApiClassification' attribute");
+   tAttr.setKeyable(false);
+   tAttr.setStorable(true);
+   tAttr.setHidden(true);
+   stat = addAttribute(aOutApiClassification);
+   MCHECKERROR(stat, "Could not add 'outApiClassification' attribute");
    
    aVRayGeomInfo = nAttr.createAddr("vrayGeomInfo", "vgi", &stat);
    MCHECKERROR(stat, "Could not create 'vrayGeomInfo' attribute");;
@@ -1215,7 +1222,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
       syncInternals(block);
       
       MDataHandle hIn = block.inputValue(aVRayGeomInfo);
-      MDataHandle hOut = block.outputValue(plug.attribute());
+      MDataHandle hOut = block.outputValue(aVRayGeomResult);
       
       void *ptr = hIn.asAddr();
       
@@ -1345,8 +1352,8 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                      subdqAttrObject = thisMObject();
                   }
                   
-                  std::string dispSetName, dispShaderName, stdDispShaderName;                  
-                  bool hasDispAssigned = AbcShapeVRayInfo::getAssignedDisplacement(thisPath, dispSetName, dispShaderName, stdDispShaderName);
+                  MFnDependencyNode dispSetFn, dispShaderFn, stdDispShaderFn;
+                  bool hasDispAssigned = AbcShapeVRayInfo::getAssignedDisplacement(thisPath, dispSetFn, dispShaderFn, stdDispShaderFn);
                   
                   if (hasDispAssigned)
                   {
@@ -1358,16 +1365,12 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                      // Note the displacement shader on the VRayDisplacement set may not be set, and this is accepted because we
                      //   may also wan't to pull subdivision related attributes from this set
                      // 
-                     MSelectionList sl;
+                     bool hasSet = !dispSetFn.object().isNull();
+                     bool hasShader = !dispShaderFn.object().isNull();
+                     bool hasStdShader = !stdDispShaderFn.object().isNull();
                      
-                     if (sl.add(dispSetName.c_str()) == MS::kSuccess)
+                     if (hasSet)
                      {
-                        MObject dispSetObj;
-                        
-                        sl.getDependNode(0, dispSetObj);
-                        
-                        MFnDependencyNode dispSetFn(dispSetObj);
-                        
                         if (displaced)
                         {
                            MPlug pDispNone = dispSetFn.findPlug("vrayDisplacementNone");
@@ -1382,7 +1385,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                                  if (dispAttrObject == MObject::kNullObj)
                                  {
                                     // use displacement parameters from VRayDisplacement set as they are not defined on object
-                                    dispAttrObject = dispSetObj;
+                                    dispAttrObject = dispSetFn.object();
                                  }
                               }
                            }
@@ -1396,7 +1399,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                               subdivided = true;
                               if (subdivAttrObject == MObject::kNullObj)
                               {
-                                 subdivAttrObject = dispSetObj;
+                                 subdivAttrObject = dispSetFn.object();
                               }
                            }
                         }
@@ -1409,7 +1412,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                               osd = true;
                               if (osdAttrObject == MObject::kNullObj)
                               {
-                                 osdAttrObject = dispSetObj;
+                                 osdAttrObject = dispSetFn.object();
                               }
                            }
                         }
@@ -1422,19 +1425,19 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                               subdquality = true;
                               if (subdqAttrObject == MObject::kNullObj)
                               {
-                                 subdqAttrObject = dispSetObj;
+                                 subdqAttrObject = dispSetFn.object();
                               }
                            }
                         }
                      }
                      
-                     if (stdDispShaderName.length() == 0 && dispShaderName.length() == 0)
+                     if (!hasStdShader && !hasShader)
                      {
                         displaced = false;
                      }
-                     else if (stdDispShaderName.length() > 0)
+                     else if (hasStdShader)
                      {
-                        dispShaderName = stdDispShaderName;
+                        dispShaderFn.setObject(stdDispShaderFn.object());
                      }
                   }
                   else
@@ -1675,7 +1678,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                      }
                      
                      // Track shader to be exported
-                     AbcShapeVRayInfo::DispShapes &dispShapes = AbcShapeVRayInfo::DispTexs[dispShaderName];
+                     AbcShapeVRayInfo::DispShapes &dispShapes = AbcShapeVRayInfo::DispTexs[dispShaderFn.name().asChar()];
                         
                      if (colorDisp)
                      {
@@ -1833,6 +1836,11 @@ void AbcShape::syncInternals()
 
 void AbcShape::syncInternals(MDataBlock &block)
 {
+   if (mUpdateLevel <= UL_none)
+   {
+      return;
+   }
+   
    block.inputValue(aFilePath).asString();
    block.inputValue(aObjectExpression).asString();
    block.inputValue(aTime).asTime();
