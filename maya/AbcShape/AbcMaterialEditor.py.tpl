@@ -506,7 +506,7 @@ def UI_selectUV(*args):
          
          else:
             cn = cmds.createNode("uvChooser", ss=1)
-            cmds.connectAttr(cn+".uvCoord", cp)
+            cmds.connectAttr(cn+".outUv", cp)
          
          # do connect
          uvi = getAbcShapeUVSetIndex(abc, uv)
