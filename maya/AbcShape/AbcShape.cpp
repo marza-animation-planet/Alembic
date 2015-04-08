@@ -544,6 +544,7 @@ MObject AbcShape::aDrawLocators;
 MObject AbcShape::aOutBoxMin;
 MObject AbcShape::aOutBoxMax;
 MObject AbcShape::aAnimated;
+MObject AbcShape::aUvSetCount;
 #ifdef ABCSHAPE_VRAY_SUPPORT
 MObject AbcShape::aOutApiType;
 MObject AbcShape::aOutApiClassification;
@@ -760,6 +761,15 @@ MStatus AbcShape::initialize()
    stat = addAttribute(aAnimated);
    MCHECKERROR(stat, "Could not add 'animated' attribute");
    
+   aUvSetCount = nAttr.create("uvSetCount", "uvct", MFnNumericData::kLong, 0, &stat);
+   MCHECKERROR(stat, "Could not create 'uvSetCount' attribute");
+   // nAttr.setWritable(false);
+   nAttr.setStorable(false);
+   nAttr.setKeyable(false);
+   nAttr.setHidden(true);
+   stat = addAttribute(aUvSetCount);
+   MCHECKERROR(stat, "Could not add 'uvSetCount' attribute");
+   
 #ifdef ABCSHAPE_VRAY_SUPPORT
    MFnStringData outApiTypeDefault;
    MObject outApiTypeDefaultObject = outApiTypeDefault.create("VRayGeometry");
@@ -959,6 +969,7 @@ MStatus AbcShape::initialize()
    attributeAffects(aIgnoreXforms, aAnimated);
    attributeAffects(aIgnoreVisibility, aAnimated);
    
+   attributeAffects(aFilePath, aOutBoxMin);
    attributeAffects(aObjectExpression, aOutBoxMin);
    attributeAffects(aDisplayMode, aOutBoxMin);
    attributeAffects(aCycleType, aOutBoxMin);
@@ -985,6 +996,19 @@ MStatus AbcShape::initialize()
    attributeAffects(aIgnoreXforms, aOutBoxMax);
    attributeAffects(aIgnoreInstances, aOutBoxMax);
    attributeAffects(aIgnoreVisibility, aOutBoxMax);
+   
+   attributeAffects(aFilePath, aUvSetCount);
+   attributeAffects(aObjectExpression, aUvSetCount);
+   attributeAffects(aCycleType, aUvSetCount);
+   attributeAffects(aTime, aUvSetCount);
+   attributeAffects(aSpeed, aUvSetCount);
+   attributeAffects(aOffset, aUvSetCount);
+   attributeAffects(aPreserveStartFrame, aUvSetCount);
+   attributeAffects(aStartFrame, aUvSetCount);
+   attributeAffects(aEndFrame, aUvSetCount);
+   attributeAffects(aIgnoreXforms, aUvSetCount);
+   attributeAffects(aIgnoreInstances, aUvSetCount);
+   attributeAffects(aIgnoreVisibility, aUvSetCount);
    
    return MS::kSuccess;
 }
@@ -1150,6 +1174,48 @@ void AbcShape::postConstructor()
    aUvSetName = fn.attribute("uvSetName");
 }
 
+MStatus AbcShape::setDependentsDirty(const MPlug &plugBeingDirtied, MPlugArray &affectedPlugs)
+{
+   MObject attr = plugBeingDirtied.attribute();
+   
+   // Doesn't seem to work by just checking aUvSetCount
+   
+   if (attr == aFilePath ||
+       attr == aObjectExpression ||
+       attr == aIgnoreVisibility ||
+       attr == aIgnoreXforms ||
+       attr == aIgnoreInstances ||
+       attr == aTime ||
+       attr == aStartFrame ||
+       attr == aEndFrame ||
+       attr == aOffset ||
+       attr == aSpeed ||
+       attr == aPreserveStartFrame ||
+       attr == aCycleType)
+   {
+      MObject self = thisMObject();
+      
+      MPlug pUvSet(self, aUvSet);
+      
+      affectedPlugs.append(pUvSet);
+      
+      if (pUvSet.numElements() == 0)
+      {
+         // Force at least one plug creation
+         affectedPlugs.append(pUvSet.elementByLogicalIndex(0).child(aUvSetName));
+      }
+      else
+      {
+         for (unsigned int i=0; i<pUvSet.numElements(); ++i)
+         {
+            affectedPlugs.append(pUvSet.elementByPhysicalIndex(i).child(aUvSetName));
+         }
+      }
+   }
+   
+   return MS::kSuccess;
+}
+
 bool AbcShape::ignoreCulling() const
 {
    MFnDependencyNode node(thisMObject());
@@ -1211,6 +1277,37 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
       MDataHandle hOut = block.outputValue(plug.attribute());
       
       hOut.setBool(mAnimated);
+      
+      block.setClean(plug);
+      
+      return MS::kSuccess;
+   }
+   else if (plug.attribute() == aUvSetCount)
+   {
+      syncInternals(block);
+      
+      MDataHandle hOut = block.outputValue(plug.attribute());
+      
+      hOut.setInt(mUvSetNames.size());
+      
+      block.setClean(plug);
+      
+      return MS::kSuccess;
+   }
+   else if (plug.attribute() == aUvSetName)
+   {
+      MDataHandle hOut = block.outputValue(plug);
+      
+      unsigned int i = plug.parent().logicalIndex();
+      
+      if (i < mUvSetNames.size())
+      {
+         hOut.setString(mUvSetNames[i].c_str());
+      }
+      else
+      {
+         hOut.setString("");
+      }
       
       block.setClean(plug);
       
@@ -2104,24 +2201,10 @@ void AbcShape::updateWorld()
    MObject self = thisMObject();
    
    // Reset existing UV set names
-   MPlug pUvSet(self, aUvSet);
-   
-   for (unsigned int i=0; i<pUvSet.numElements(); ++i)
-   {
-      pUvSet.elementByPhysicalIndex(i).child(aUvSetName).setString("");
-   }
    
    if (visitor.numShapes(false) == 1)
    {
       mUvSetNames = visitor.uvSetNames();
-      
-      MPlug pUvSetName(self, aUvSetName);
-      
-      for (size_t i=0; i<mUvSetNames.size(); ++i)
-      {
-         pUvSetName.selectAncestorLogicalIndex(i, aUvSet);
-         pUvSetName.setString(mUvSetNames[i].c_str());
-      }
    }
    else
    {
@@ -2260,7 +2343,7 @@ bool AbcShape::getInternalValueInContext(const MPlug &plug, MDataHandle &handle,
    }
    else
    {
-      return MPxNode::getInternalValueInContext(plug, handle, ctx);
+      return MPxSurfaceShape::getInternalValueInContext(plug, handle, ctx);
    }
 }
 
@@ -2449,7 +2532,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
    }
    else
    {
-      return MPxNode::setInternalValueInContext(plug, handle, ctx);
+      return MPxSurfaceShape::setInternalValueInContext(plug, handle, ctx);
    }
    
    if (sampleTimeUpdate)

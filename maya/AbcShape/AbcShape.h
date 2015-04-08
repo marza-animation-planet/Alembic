@@ -43,6 +43,7 @@ public:
     static MObject aOutBoxMin;
     static MObject aOutBoxMax;
     static MObject aAnimated;
+    static MObject aUvSetCount;
     
 #ifdef ABCSHAPE_VRAY_SUPPORT
     // V-Ray specific attributes
@@ -114,6 +115,8 @@ public:
                                            const MDataHandle &handle,
                                            MDGContext &ctx);
     virtual void copyInternalData(MPxNode *source);
+    
+    virtual MStatus setDependentsDirty(const MPlug &plugBeingDirtied, MPlugArray &affectedPlugs);
     
     inline AlembicScene* scene() { return mScene; }
     inline const AlembicScene* scene() const { return mScene; }

@@ -140,14 +140,15 @@ def getAbcShapeUVSetIndex(abc, uv):
    uvSetName = ""
    
    if cmds.attributeQuery("uvSet", node=abc, exists=1,  multi=1) == 0 or \
-       cmds.attributeQuery("uvSetName", node=abc, exists=1) == 0:
+      cmds.attributeQuery("uvSetName", node=abc, exists=1) == 0 or \
+      cmds.attributeQuery("uvSetCount", node=abc, exists=1) == 0:
       return -1
    
    pl = cmds.attributeQuery("uvSetName", node=abc, listParent=1)
    if pl is None or len(pl) != 1 or pl[0] != "uvSet":
       return -1
    
-   for index in xrange(cmds.getAttr("%s.uvSet" % abc, size=1)):
+   for index in xrange(cmds.getAttr("%s.uvSetCount" % abc)):
       uvSetName = cmds.getAttr("%s.uvSet[%d].uvSetName" % (abc, index))
       
       if not uvSetName:
@@ -162,14 +163,15 @@ def getAbcShapeUVSetNames(abc):
    uvSetNames = []
    
    if cmds.attributeQuery("uvSet", node=abc, exists=1,  multi=1) == 0 or \
-       cmds.attributeQuery("uvSetName", node=abc, exists=1) == 0:
+      cmds.attributeQuery("uvSetName", node=abc, exists=1) == 0 or \
+      cmds.attributeQuery("uvSetCount", node=abc, exists=1) == 0:
       return []
    
    pl = cmds.attributeQuery("uvSetName", node=abc, listParent=1)
    if pl is None or len(pl) != 1 or pl[0] != "uvSet":
       return []
    
-   for index in xrange(cmds.getAttr("%s.uvSet" % abc, size=1)):
+   for index in xrange(cmds.getAttr("%s.uvSetCount" % abc)):
       uvSetName = cmds.getAttr("%s.uvSet[%d].uvSetName" % (abc, index))
       if uvSetName:
          uvSetNames.append(uvSetName)
@@ -417,7 +419,7 @@ def UI_selectTex(*args):
          
          if uv is None:
             if primaryUV is None:
-               if cmds.getAttr(abc+".uvSet", size=1) > 0:
+               if cmds.getAttr(abc+".uvSetCount") > 0:
                   primaryUV = cmds.getAttr(abc+".uvSet[0].uvSetName")
             uv = primaryUV
          
@@ -457,7 +459,7 @@ def UI_selectUV(*args):
    uv = uvs[0]
    
    isPrimaryUV = True
-   if cmds.getAttr(abc+".uvSet", size=1) > 0:
+   if cmds.getAttr(abc+".uvSetCount") > 0:
       isPrimaryUV = (uv == cmds.getAttr(abc+".uvSet[0].uvSetName"))
    
    for tex in texs:
