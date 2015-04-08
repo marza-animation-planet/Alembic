@@ -116,8 +116,6 @@ public:
                                            MDGContext &ctx);
     virtual void copyInternalData(MPxNode *source);
     
-    virtual MStatus setDependentsDirty(const MPlug &plugBeingDirtied, MPlugArray &affectedPlugs);
-    
     inline AlembicScene* scene() { return mScene; }
     inline const AlembicScene* scene() const { return mScene; }
     inline const SceneGeometryData* sceneGeometry() const { return &mGeometry; }

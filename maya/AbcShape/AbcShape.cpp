@@ -763,9 +763,8 @@ MStatus AbcShape::initialize()
    
    aUvSetCount = nAttr.create("uvSetCount", "uvct", MFnNumericData::kLong, 0, &stat);
    MCHECKERROR(stat, "Could not create 'uvSetCount' attribute");
-   // nAttr.setWritable(false);
-   nAttr.setStorable(false);
-   nAttr.setKeyable(false);
+   nAttr.setWritable(true);
+   nAttr.setStorable(true);
    nAttr.setHidden(true);
    stat = addAttribute(aUvSetCount);
    MCHECKERROR(stat, "Could not add 'uvSetCount' attribute");
@@ -1172,48 +1171,6 @@ void AbcShape::postConstructor()
    
    aUvSet = fn.attribute("uvSet");
    aUvSetName = fn.attribute("uvSetName");
-}
-
-MStatus AbcShape::setDependentsDirty(const MPlug &plugBeingDirtied, MPlugArray &affectedPlugs)
-{
-   MObject attr = plugBeingDirtied.attribute();
-   
-   // Doesn't seem to work by just checking aUvSetCount
-   
-   if (attr == aFilePath ||
-       attr == aObjectExpression ||
-       attr == aIgnoreVisibility ||
-       attr == aIgnoreXforms ||
-       attr == aIgnoreInstances ||
-       attr == aTime ||
-       attr == aStartFrame ||
-       attr == aEndFrame ||
-       attr == aOffset ||
-       attr == aSpeed ||
-       attr == aPreserveStartFrame ||
-       attr == aCycleType)
-   {
-      MObject self = thisMObject();
-      
-      MPlug pUvSet(self, aUvSet);
-      
-      affectedPlugs.append(pUvSet);
-      
-      if (pUvSet.numElements() == 0)
-      {
-         // Force at least one plug creation
-         affectedPlugs.append(pUvSet.elementByLogicalIndex(0).child(aUvSetName));
-      }
-      else
-      {
-         for (unsigned int i=0; i<pUvSet.numElements(); ++i)
-         {
-            affectedPlugs.append(pUvSet.elementByPhysicalIndex(i).child(aUvSetName));
-         }
-      }
-   }
-   
-   return MS::kSuccess;
 }
 
 bool AbcShape::ignoreCulling() const
@@ -2201,14 +2158,57 @@ void AbcShape::updateWorld()
    MObject self = thisMObject();
    
    // Reset existing UV set names
+   MPlug pUvSet(self, aUvSet);
    
    if (visitor.numShapes(false) == 1)
    {
       mUvSetNames = visitor.uvSetNames();
+      
+      MPlug pUvSetName(self, aUvSetName);
+      
+      // UV set index == logical index
+      
+      for (size_t i=0; i<mUvSetNames.size(); ++i)
+      {
+         bool found = false;
+         
+         for (unsigned int j=0; j<pUvSet.numElements(); ++j)
+         {
+            MPlug pElem = pUvSet.elementByPhysicalIndex(j);
+            
+            if (pElem.logicalIndex() == i)
+            {
+               pElem = pElem.child(aUvSetName);
+               
+               if (pElem.asString() != mUvSetNames[i].c_str())
+               {
+                  pElem.setString(mUvSetNames[i].c_str());
+               }
+               found = true;
+               break;
+            }
+         }
+         
+         if (!found)
+         {
+            pUvSetName.selectAncestorLogicalIndex(i, aUvSet);
+            pUvSetName.setString(mUvSetNames[i].c_str());
+         }
+      }
    }
    else
    {
       mUvSetNames.clear();
+   }
+   
+   for (size_t i=0; i<pUvSet.numElements(); ++i)
+   {
+      MPlug pElem = pUvSet.elementByPhysicalIndex(i);
+      
+      if (pElem.logicalIndex() >= mUvSetNames.size())
+      {
+         pElem.child(aUvSetName).setString("");
+      }
    }
    
    #ifdef _DEBUG
@@ -2578,7 +2578,8 @@ void AbcShape::copyInternalData(MPxNode *source)
       mDrawTransformBounds = node->mDrawTransformBounds;
       mDrawLocators = node->mDrawLocators;
       mAnimated = node->mAnimated;
-      
+      mUvSetNames = node->mUvSetNames;
+    
       if (mScene && !AlembicSceneCache::Unref(mScene))
       {
          delete mScene;
