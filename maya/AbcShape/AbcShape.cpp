@@ -2207,7 +2207,12 @@ void AbcShape::updateWorld()
       
       if (pElem.logicalIndex() >= mUvSetNames.size())
       {
-         pElem.child(aUvSetName).setString("");
+         pElem = pElem.child(aUvSetName);
+         
+         if (pElem.asString() != "")
+         {
+            pElem.child(aUvSetName).setString("");
+         }
       }
    }
    
