@@ -183,6 +183,12 @@ elif sys.platform == "win32":
    regex_def = ["REGEX_STATIC"]
    regex_inc = [regex_dir]
    regex_src = [regex_dir + "/regex.c"]
+   # Work around the 2GB file limit with Visual Studio 10.0
+   #   https://connect.microsoft.com/VisualStudio/feedback/details/627639/std-fstream-use-32-bit-int-as-pos-type-even-on-x64-platform
+   #   https://groups.google.com/forum/#!topic/alembic-discussion/5ElRJkXhi9M
+   if excons.mscver == "10.0":
+      print("Fixing Microsoft's shit!")
+      env.Prepend(CPPPATH=["lib/vc10fix"])
 
 prjs = [
    {"name": "AlembicUtil",
@@ -400,17 +406,17 @@ if withArnold:
                 "custom": [arnold.Require]})
 
 if withVray:
-  prjs.append({"name": "%svray_AlembicLoader" % ("lib" if sys.platform != "win32" else ""),
-               "type": "dynamicmodule",
-               "ext": vray.PluginExt(),
-               "bldprefix": "vray-%s" % vray.Version(),
-               "prefix": "vray",
-               "defs": plugin_defs + regex_def,
-               "incdirs": incdirs + ["vray"] + ["lib/SceneHelper"] + regex_inc,
-               "libdirs": libdirs,
-               "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
-               "srcs": glob.glob("vray/*.cpp") + glob.glob("lib/SceneHelper/*.cpp") + regex_src,
-               "custom": [vray.Require]})
+   prjs.append({"name": "%svray_AlembicLoader" % ("lib" if sys.platform != "win32" else ""),
+                "type": "dynamicmodule",
+                "ext": vray.PluginExt(),
+                "bldprefix": "vray-%s" % vray.Version(),
+                "prefix": "vray",
+                "defs": plugin_defs + regex_def,
+                "incdirs": incdirs + ["vray"] + ["lib/SceneHelper"] + regex_inc,
+                "libdirs": libdirs,
+                "libs": alembic_libs + ilmbase_libs + hdf5_libs + libs,
+                "srcs": glob.glob("vray/*.cpp") + glob.glob("lib/SceneHelper/*.cpp") + regex_src,
+                "custom": [vray.Require]})
 
 if excons.GetArgument("with-maya", default=None) is not None:
    def replace_in_file(src, dst, srcStr, dstStr):
