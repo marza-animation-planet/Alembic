@@ -21,6 +21,9 @@
 #include <map>
 #include <string>
 
+MCallbackId gPluginLoaded = 0;
+MCallbackId gPluginUnloaded = 0;
+
 MCallbackId gRenderGlobalsCreated = 0;
 MCallbackId gRenderGlobalsDeleted = 0;
 std::map<std::string, MCallbackId> gRenderGlobalsAttrChanged;
@@ -42,7 +45,7 @@ bool gCurrentRendererIsVRay = false;
 
 static void StripLTWS(std::string &s)
 {
-   size_t p = s.find_first_not_of(" \t\n");
+   size_t p = s.find_first_not_of(" \t\n;");
    
    if (p == std::string::npos)
    {
@@ -55,7 +58,7 @@ static void StripLTWS(std::string &s)
          s = s.substr(p);
       }
       
-      p = s.find_last_not_of(" \t\n");
+      p = s.find_last_not_of(" \t\n;");
       
       if (p != std::string::npos)
       {
@@ -106,14 +109,7 @@ static void AppendMel(std::string &mel0, std::string &mel1)
    {
       if (l0 > 0)
       {
-         if (mel0[l0-1] == ';')
-         {
-            mel0 += " ";
-         }
-         else
-         {
-            mel0 += "; ";
-         }
+         mel0 += "; ";
       }
       
       mel0 += mel1;
@@ -121,7 +117,7 @@ static void AppendMel(std::string &mel0, std::string &mel1)
       l0 = mel0.length();
    }
    
-   if (l0 > 0 && mel0[l0-1] != ';')
+   if (l0 > 0)
    {
       mel0 += ";";
    }
@@ -148,37 +144,18 @@ static bool RemoveMel(std::string &mel, const std::string &s)
       
       if (al > 0)
       {
-         // may start with ';'
-         if (after[0] == ';')
+         if (bl == 0)
          {
-            if (bl > 0 && before[bl-1] != ';')
-            {
-               // keep heading ';'
-               mel += after;
-            }
-            else
-            {
-               // remove heading ';'
-               mel += after.substr(1);
-            }
+            // dont need to add ';'
+            mel += after;
          }
          else
          {
-            if (bl == 0 || before[bl-1] == ';')
-            {
-               // dont need to add ';'
-               mel += after;
-            }
-            else
-            {
-               mel += "; " + after;
-            }
+            mel += "; " + after;
          }
       }
       
-      len = mel.length();
-         
-      if (len > 0 && mel[len-1] != ';')
+      if (mel.length() > 0)
       {
          mel += ";";
       }
@@ -203,24 +180,10 @@ static void AppendPython(std::string &py0, std::string &py1)
    {
       if (l0 > 0)
       {
-         if (py0[l0-1] == ';')
-         {
-            py0[l0-1] = '\n';
-         }
-         else
-         {
-            py0 += "\n";
-         }
+         py0 += "\n";
       }
       
       py0 += py1;
-      
-      l0 = py0.length();
-   }
-   
-   if (l0 > 0 && py0[l0-1] == ';')
-   {
-      py0 = py0.substr(0, l0-1);
    }
 }
 
@@ -245,31 +208,12 @@ static bool RemovePython(std::string &py, const std::string &s)
       
       if (al > 0)
       {
-         if (after[0] == ';')
-         {
-            after = after.substr(1);
-         }
-         
          if (bl > 0)
          {
-            if (py[bl-1] == ';')
-            {
-               py[bl-1] = '\n';
-            }
-            else
-            {
-               py += "\n";
-            }
+            py += "\n";
          }
          
          py += after;
-      }
-      
-      len = py.length();
-      
-      if (len > 0 && py[len-1] == ';')
-      {
-         py = py.substr(0, len-1);
       }
       
       return true;
@@ -308,6 +252,7 @@ static void EnsurePreMel(MPlug &plug)
    
    if (changed)
    {
+      MGlobal::displayInfo(MString("[") + NAME_PREFIX "AbcShape] Pre render mel ensured");
       plug.setString(preMel.c_str());
    }
 }
@@ -316,15 +261,24 @@ static void RemovePreMel(MPlug &plug)
 {
    std::string preMel = plug.asString().asChar();
    
+   bool changed = false;
+   
    MelCompat(preMel);
    
    if (RemoveMel(preMel, gSafePreMel))
    {
       plug.setString(preMel.c_str());
+      changed = true;
    }
    else if (RemoveMel(preMel, gPreMel))
    {
       plug.setString(preMel.c_str());
+      changed = true;
+   }
+   
+   if (changed)
+   {
+      MGlobal::displayInfo(MString("[") + NAME_PREFIX "AbcShape] Pre render mel removed");
    }
 }
 
@@ -343,17 +297,22 @@ static void EnsurePostTranslatePython(MPlug &plug)
       
       if (p == std::string::npos)
       {
-         AppendPython(postPython, gPostPython);
+         // neither import nor call statements
+         
+         std::string tmp = postPython;
+         
+         postPython = gPostPython;
+         AppendPython(postPython, tmp);
       }
       else
       {
-         // missing PostTranslate call
-         std::string before = postPython.substr(0, p + gPostPythonImp.length());
+         // missing PostTranslate call by import line found
+         
+         std::string before = postPython.substr(0, p);
          std::string after = postPython.substr(p + gPostPythonImp.length());
          
-         postPython = before;
-         
-         AppendPython(postPython, gPostPythonExc);
+         postPython = gPostPython;
+         AppendPython(postPython, before);
          AppendPython(postPython, after);
       }
       
@@ -361,23 +320,63 @@ static void EnsurePostTranslatePython(MPlug &plug)
    }
    else
    {
-      if (postPython.find(gPostPythonImp) == std::string::npos)
+      size_t p1 = postPython.find(gPostPythonImp);
+      
+      if (p1 == std::string::npos)
       {
-         // missing import statement
+         // missing import statement but have PostTranslate call
+         
          std::string before = postPython.substr(0, p);
-         std::string after = postPython.substr(p);
+         std::string after = postPython.substr(p + gPostPythonExc.length());
          
-         postPython = before;
-         
-         AppendPython(postPython, gPostPythonImp);
+         postPython = gPostPython;
+         AppendPython(postPython, before);
          AppendPython(postPython, after);
          
          changed = true;
+      }
+      else
+      {
+         // have both import and call statement
+         
+         if (p1 > p)
+         {
+            // import was found after the PostTranslate call
+            
+            std::string beforeExc = postPython.substr(0, p);
+            std::string betweenExcAndImp = postPython.substr(p + gPostPythonExc.length(), p1 - (p + gPostPythonExc.length()));
+            std::string afterImp = postPython.substr(p1 + gPostPythonImp.length());
+            
+            postPython = gPostPython;
+            AppendPython(postPython, beforeExc);
+            AppendPython(postPython, betweenExcAndImp);
+            AppendPython(postPython, afterImp);
+            
+            changed = true;
+         }
+         else if (postPython.find_first_not_of(" \t\n;") != p1 ||
+                  postPython.find_first_not_of(" \t\n;", p1 + gPostPythonImp.length()) != p)
+         {
+            // not at the begining
+            
+            std::string beforeImp = postPython.substr(0, p1);
+            std::string betweenImpAndExc = postPython.substr(p1 + gPostPythonImp.length(), p - (p1 + gPostPythonImp.length()));
+            std::string afterExc = postPython.substr(p + gPostPythonExc.length());
+            
+            postPython = gPostPython;
+            AppendPython(postPython, beforeImp);
+            AppendPython(postPython, betweenImpAndExc);
+            AppendPython(postPython, afterExc);
+            
+            changed = true;
+         }
       }
    }
    
    if (changed)
    {
+      MGlobal::displayInfo(MString("[") + NAME_PREFIX "AbcShape] Post translate python ensured");
+      
       plug.setString(postPython.c_str());
    }
 }
@@ -397,9 +396,12 @@ static void RemovePostTranslatePython(MPlug &plug)
    
    if (changed)
    {
+      MGlobal::displayInfo(MString("[") + NAME_PREFIX "AbcShape] Post translate python removed");
       plug.setString(postPython.c_str());
    }
 }
+
+// ---
 
 static void CurrentRendererChanged(const MString &name, MObject drg=MObject::kNullObj, MObject vrs=MObject::kNullObj)
 {
@@ -431,6 +433,7 @@ static void CurrentRendererChanged(const MString &name, MObject drg=MObject::kNu
    }
    
    // Should actually do that for all 'VRaySettingsNode' nodes
+   
    if (!vrs.isNull() ||
        (sl.add("vraySettings") == MS::kSuccess &&
         sl.getDependNode(sl.length() - 1, obj) == MS::kSuccess))
@@ -559,110 +562,191 @@ static void VRaySettingsCreated(MObject &obj, void *)
    }
 }
 
+static void PluginUnloaded(const MStringArray &strs, void *)
+{
+   // strs[0]: plugin name
+   // strs[1]; plugin path
+   
+   if (strs[0] == "vrayformaya")
+   {
+      MGlobal::displayInfo(MString("[") + NAME_PREFIX "AbcShape] Cleanup translation callbacks");
+      
+      if (gRenderGlobalsCreated)
+      {
+         MMessage::removeCallback(gRenderGlobalsCreated);
+         gRenderGlobalsCreated = 0;
+      }
+      
+      if (gRenderGlobalsDeleted)
+      {
+         MMessage::removeCallback(gRenderGlobalsDeleted);
+         gRenderGlobalsDeleted = 0;
+      }
+      
+      if (gVRaySettingsCreated)
+      {
+         MMessage::removeCallback(gVRaySettingsCreated);
+         gVRaySettingsCreated = 0;
+      }
+      
+      if (gVRaySettingsDeleted)
+      {
+         MMessage::removeCallback(gVRaySettingsDeleted);
+         gVRaySettingsDeleted = 0;
+      }
+      
+      std::map<std::string, MCallbackId>::iterator it;
+      
+      for (it=gRenderGlobalsAttrChanged.begin(); it!=gRenderGlobalsAttrChanged.end(); ++it)
+      {
+         MMessage::removeCallback(it->second);
+      }
+      gRenderGlobalsAttrChanged.clear();
+      
+      for (it=gVRaySettingsAttrChanged.begin(); it!=gVRaySettingsAttrChanged.end(); ++it)
+      {
+         MMessage::removeCallback(it->second);
+      }
+      gVRaySettingsAttrChanged.clear();
+      
+      // Cleanup
+      
+      CurrentRendererChanged("dummy");
+   }
+}
+
+static void PluginLoaded(const MStringArray &strs, void *)
+{
+   // strs[0]: plugin path
+   // strs[1]: plugin name
+   
+   if (strs[1] == "vrayformaya")
+   {
+      MGlobal::displayInfo(MString("[") + NAME_PREFIX "AbcShape] Setup translation callbacks");
+      
+      MSelectionList sl;
+      MObject drg, vrs;
+      MStatus stat;
+      
+      gRenderGlobalsCreated = MDGMessage::addNodeAddedCallback(RenderGlobalsCreated, "renderGlobals", 0, &stat);
+         
+      if (stat != MS::kSuccess)
+      {
+         MGlobal::displayWarning("[AbcShape] Failed to register 'renderGlobals' created callback");
+      }
+      
+      gRenderGlobalsDeleted = MDGMessage::addNodeRemovedCallback(RenderGlobalsDeleted, "renderGlobals", 0, &stat);
+      
+      if (stat != MS::kSuccess)
+      {
+         MGlobal::displayWarning("[AbcShape] Failed to register 'renderGlobals' deleted callback");
+      }
+      
+      gVRaySettingsCreated = MDGMessage::addNodeAddedCallback(VRaySettingsCreated, "VRaySettingsNode", 0, &stat);
+      
+      if (stat != MS::kSuccess)
+      {
+         MGlobal::displayWarning("[AbcShape] Failed to register 'VRaySettingsNode' created callback");
+      }
+      
+      gVRaySettingsDeleted = MDGMessage::addNodeRemovedCallback(VRaySettingsDeleted, "VRaySettingsNode", 0, &stat);
+      
+      if (stat != MS::kSuccess)
+      {
+         MGlobal::displayWarning("[AbcShape] Failed to register 'VRaySettingsNode' deleted callback");
+      }
+      
+      // Initial setup
+      
+      MString renderer = "dummy";
+      
+      if (sl.add("vraySettings") == MS::kSuccess &&
+          sl.getDependNode(sl.length() - 1, vrs) == MS::kSuccess)
+      {
+         VRaySettingsCreated(vrs, 0);
+      }
+      
+      if (sl.add("defaultRenderGlobals") == MS::kSuccess &&
+          sl.getDependNode(sl.length() - 1, drg) == MS::kSuccess)
+      {
+         RenderGlobalsCreated(drg, 0);
+         
+         MFnDependencyNode node(drg);   
+         MPlug plug = node.findPlug("currentRenderer");
+      
+         if (!plug.isNull())
+         {
+            renderer = plug.asString();
+         }
+      }
+      
+      CurrentRendererChanged(renderer, drg, vrs);
+   }
+}
+
+// ---
+
 static void InitializeCallbacks()
 {
-   MSelectionList sl;
-   MObject drg, vrs;
-   MStatus stat;
+   MStatus stat = MS::kSuccess;
    
-   gRenderGlobalsCreated = MDGMessage::addNodeAddedCallback(RenderGlobalsCreated, "renderGlobals", 0, &stat);
+   gPluginLoaded = MSceneMessage::addStringArrayCallback(MSceneMessage::kAfterPluginLoad, PluginLoaded, 0, &stat);
       
    if (stat != MS::kSuccess)
    {
-      MGlobal::displayWarning("[AbcShape] Failed to register 'renderGlobals' created callback");
+      MGlobal::displayWarning("[AbcShape] Failed to register plugin loaded callback");
    }
    
-   gRenderGlobalsDeleted = MDGMessage::addNodeRemovedCallback(RenderGlobalsDeleted, "renderGlobals", 0, &stat);
-   
-   if (stat != MS::kSuccess)
-   {
-      MGlobal::displayWarning("[AbcShape] Failed to register 'renderGlobals' deelted callback");
-   }
-   
-   gVRaySettingsCreated = MDGMessage::addNodeAddedCallback(VRaySettingsCreated, "VRaySettingsNode", 0, &stat);
-   
-   if (stat != MS::kSuccess)
-   {
-      MGlobal::displayWarning("[AbcShape] Failed to register 'VRaySettingsNode' created callback");
-   }
-   
-   gVRaySettingsDeleted = MDGMessage::addNodeRemovedCallback(VRaySettingsDeleted, "VRaySettingsNode", 0, &stat);
-   
-   if (stat != MS::kSuccess)
-   {
-      MGlobal::displayWarning("[AbcShape] Failed to register 'VRaySettingsNode' deleted callback");
-   }
-   
-   // Initial setup
-   
-   MString renderer = "dummy";
-   
-   if (sl.add("vraySettings") == MS::kSuccess &&
-       sl.getDependNode(sl.length() - 1, vrs) == MS::kSuccess)
-   {
-      VRaySettingsCreated(vrs, 0);
-   }
-   
-   if (sl.add("defaultRenderGlobals") == MS::kSuccess &&
-       sl.getDependNode(sl.length() - 1, drg) == MS::kSuccess)
-   {
-      RenderGlobalsCreated(drg, 0);
+   gPluginUnloaded = MSceneMessage::addStringArrayCallback(MSceneMessage::kAfterPluginUnload, PluginUnloaded, 0, &stat);
       
-      MFnDependencyNode node(drg);   
-      MPlug plug = node.findPlug("currentRenderer");
-   
-      if (!plug.isNull())
-      {
-         renderer = plug.asString();
-      }
+   if (stat != MS::kSuccess)
+   {
+      MGlobal::displayWarning("[AbcShape] Failed to register plugin unloaded callback");
    }
    
-   CurrentRendererChanged(renderer, drg, vrs);
+   // V-Ray may already be loaded, execute PluginLoaded callback if set
+   
+   int vrayLoaded = 0;
+   
+   if (MGlobal::executeCommand("pluginInfo -query -loaded vrayformaya", vrayLoaded) == MS::kSuccess && vrayLoaded)
+   {
+      MStringArray strs;
+   
+      strs.setLength(2);
+      strs[0] = "vrayformaya";
+      strs[1] = "vrayformaya";
+      
+      PluginLoaded(strs, 0);
+   }
+   else
+   {
+      // This will cleanup renderGlobals if necessary
+      
+      CurrentRendererChanged("dummy");
+   }
 }
 
 static void UninitializeCallbacks()
 {
-   if (gRenderGlobalsCreated)
+   MStringArray strs;
+   
+   strs.setLength(2);
+   strs[0] = "vrayformaya";
+   strs[1] = "vrayformaya";
+   
+   PluginUnloaded(strs, 0);
+   
+   if (gPluginLoaded)
    {
-      MMessage::removeCallback(gRenderGlobalsCreated);
-      gRenderGlobalsCreated = 0;
+      MMessage::removeCallback(gPluginLoaded);
+      gPluginLoaded = 0;
    }
    
-   if (gRenderGlobalsDeleted)
+   if (gPluginUnloaded)
    {
-      MMessage::removeCallback(gRenderGlobalsDeleted);
-      gRenderGlobalsDeleted = 0;
+      MMessage::removeCallback(gPluginUnloaded);
+      gPluginUnloaded = 0;
    }
-   
-   if (gVRaySettingsCreated)
-   {
-      MMessage::removeCallback(gVRaySettingsCreated);
-      gVRaySettingsCreated = 0;
-   }
-   
-   if (gVRaySettingsDeleted)
-   {
-      MMessage::removeCallback(gVRaySettingsDeleted);
-      gVRaySettingsDeleted = 0;
-   }
-   
-   std::map<std::string, MCallbackId>::iterator it;
-   
-   for (it=gRenderGlobalsAttrChanged.begin(); it!=gRenderGlobalsAttrChanged.end(); ++it)
-   {
-      MMessage::removeCallback(it->second);
-   }
-   gRenderGlobalsAttrChanged.clear();
-   
-   for (it=gVRaySettingsAttrChanged.begin(); it!=gVRaySettingsAttrChanged.end(); ++it)
-   {
-      MMessage::removeCallback(it->second);
-   }
-   gVRaySettingsAttrChanged.clear();
-   
-   // Cleanup
-   
-   CurrentRendererChanged("dummy");
 }
 
 #endif

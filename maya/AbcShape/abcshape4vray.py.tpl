@@ -150,6 +150,8 @@ def PostTranslate(disp=True, multiuv=True):
    if not cmds.pluginInfo("<<NodeName>>", query=1, loaded=1):
       return
    
+   print("<<NodeName>> V-Ray Post Translate")
+   
    # Setup uv switch nodes
    shapes = (cmds.<<NodeName>>VRayInfo(multiuvlist=1) if multiuv else None)
    
