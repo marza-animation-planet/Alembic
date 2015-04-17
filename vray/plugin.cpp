@@ -41,7 +41,11 @@ void AlembicLoader::preRenderBegin(VR::VRayRenderer *vray)
    
    if (!mGeoSrc->isValid())
    {
-      std::cerr << "[AlembicLoader] AlembicLoader::preRenderBegin: Invalid source" << std::endl;
+      const char *filename = (mParams.filename.ptr() ? mParams.filename.ptr() : "");
+      const char *object = (mParams.objectPath.ptr() ? mParams.objectPath.ptr() : "");
+      
+      std::cerr << "[AlembicLoader] AlembicLoader::preRenderBegin: Invalid geometry (abc=\"" << filename << "\", objectPath=\"" << object << "\")" << std::endl;
+      
       delete mGeoSrc;
       mGeoSrc = 0;
    }
