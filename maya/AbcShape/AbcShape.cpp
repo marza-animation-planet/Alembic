@@ -1890,10 +1890,7 @@ void AbcShape::syncInternals()
 
 void AbcShape::syncInternals(MDataBlock &block)
 {
-   if (mUpdateLevel <= UL_none)
-   {
-      return;
-   }
+   // forces pending evaluations on input plugs
    
    block.inputValue(aFilePath).asString();
    block.inputValue(aObjectExpression).asString();
