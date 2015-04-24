@@ -599,14 +599,32 @@ void AlembicGeometrySource::beginFrame(VR::VRayRenderer *vray)
       mSampleTimes.clear();
       mSampleFrames.clear();
       
-      if (seqData.params.moblur.on && seqData.params.moblur.geomSamples > 1 && !ignoreMotionBlur)
+      // moblur.intervalCenter : frame relative value 
+      // moblur.duration       : in frames
+      // Examples:
+      //   for start on frame, 1 frame long: duration = 1, intervalCenter = 0.5
+      
+      int mbsamples = determineMotionBlurSamples(seqData, 0);
+      bool velocityBlur = isVelocityChannelPresent(seqData);
+      
+      if (velocityBlur && mbsamples <= 1)
+      {
+         // Note: This should never happen as far as I understand it, but just in case
+         mbsamples = 2;
+      }
+      
+      // for velocity channel, need to output 2 samples no matter what!
+      // if ignoreMotionBlur is set, output twice the same sample
+      // => the frame being rendered as V-Ray doesn't allow you to change
+      
+      if (velocityBlur || (seqData.params.moblur.on && mbsamples > 1 && !ignoreMotionBlur))
       {
          double t = frameData.frameStart;
-         double step = (frameData.frameEnd - frameData.frameStart) / double(seqData.params.moblur.geomSamples - 1);
+         double step = (frameData.frameEnd - frameData.frameStart) / double(mbsamples - 1);
          
          while (t <= frameData.frameEnd)
          {
-            double f = vray->getTimeInFrames(t);
+            double f = (ignoreMotionBlur ? mRenderFrame : vray->getTimeInFrames(t));
             mSampleFrames.push_back(f);
             mSampleTimes.push_back(f / mParams->fps);
             t += step;
