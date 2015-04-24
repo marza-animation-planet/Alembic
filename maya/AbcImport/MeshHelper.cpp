@@ -505,7 +505,13 @@ namespace
                 }
             }
         }
-
+        
+        // clear out the colors if we need to shrink the size of the color table
+        if (ioMesh.numColors(iColorSet) > (int) iColorList.length())
+        {
+            ioMesh.clearColors(&iColorSet);
+        }
+        
         MStatus status = ioMesh.setColors(iColorList, &iColorSet, iRepr);
         if (status != MStatus::kSuccess)
         {
