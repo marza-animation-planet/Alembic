@@ -250,23 +250,25 @@ static AlembicGeometrySource::GeomInfo* BuildMeshPlugins(AlembicGeometrySource *
                   
                   UpdateGeometry geoup(src);
                   
-                  bool computeNormals = false;
+                  bool success = false;
                   
-                  if (refSubd)
-                  {
-                     computeNormals = true;
-                  }
-                  else
+                  if (refMesh)
                   {
                      Alembic::AbcGeom::IPolyMeshSchema &schema = refMesh->typedObject().getSchema();
                      
                      Alembic::AbcGeom::IN3fGeomParam Nparam = schema.getNormalsParam();
                      
-                     computeNormals = (!Nparam.valid() ||  (Nparam.getScope() != Alembic::AbcGeom::kVaryingScope &&
-                                                            Nparam.getScope() != Alembic::AbcGeom::kFacevaryingScope));
+                     bool computeNormals = (!Nparam.valid() ||  (Nparam.getScope() != Alembic::AbcGeom::kVaryingScope &&
+                                                                 Nparam.getScope() != Alembic::AbcGeom::kFacevaryingScope));
+                     
+                     success = geoup.readBaseMesh(*refMesh, refInfo, computeNormals);
+                  }
+                  else
+                  {
+                     success = geoup.readBaseMesh(*refSubd, refInfo, true);
                   }
                   
-                  if (!geoup.readBaseMesh(node, refInfo, computeNormals))
+                  if (!success)
                   {
                      factory->removeVRayPluginParameter(refInfo->constPositions);
                      factory->removeVRayPluginParameter(refInfo->faces);
@@ -285,12 +287,13 @@ static AlembicGeometrySource::GeomInfo* BuildMeshPlugins(AlembicGeometrySource *
                      if (refMesh)
                      {
                         geoup.readMeshNormals(*refMesh, refInfo);
+                        geoup.readMeshUVs(*refMesh, refInfo);
                      }
-                     else if (refSubd)
+                     else
                      {
                         geoup.setMeshSmoothNormals(*refSubd, refInfo);
+                        geoup.readMeshUVs(*refSubd, refInfo);
                      }
-                     geoup.readMeshUVs(node, refInfo);
                   }
                   
                   src->removeInfo(infoKey);

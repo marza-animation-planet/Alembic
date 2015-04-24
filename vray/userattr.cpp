@@ -138,11 +138,13 @@ void DestroyUserAttribute(UserAttribute &attrib)
    if (attrib.data)
    {
       free(attrib.data);
+      attrib.data = 0;
    }
    
    if (attrib.indices)
    {
       free(attrib.indices);
+      attrib.indices = 0;
    }
    
    attrib.strings.clear();
@@ -571,13 +573,17 @@ bool ReadGeomParam(GeomParam param, UserAttribute &ua, double t, bool interpolat
       }
       
       ua.indicesCount = idxs->size();
-      ua.indices = (unsigned int*) malloc(ua.indicesCount * sizeof(unsigned int));
       
-      const Alembic::Util::uint32_t *indices = idxs->get();
-      
-      for (unsigned int i=0; i<ua.indicesCount; ++i)
+      if (ua.indicesCount > 0)
       {
-         ua.indices[i] = indices[i];
+         ua.indices = (unsigned int*) malloc(ua.indicesCount * sizeof(unsigned int));
+         
+         const Alembic::Util::uint32_t *indices = idxs->get();
+         
+         for (unsigned int i=0; i<ua.indicesCount; ++i)
+         {
+            ua.indices[i] = indices[i];
+         }
       }
    }
    
@@ -947,7 +953,7 @@ void SetUserAttributes(AlembicGeometrySource::GeomInfo *geom, UserAttributes &at
    {
       if (usedNames.find(it->first.c_str()) != usedNames.end())
       {
-         std::cout << "[AlembicLoader] SetUserAttributes: User defined channel '" << it->first.c_str() << "' already defined" << std::endl;
+         std::cout << "[AlembicLoader] SetUserAttributes: " << geom->geometry->getPluginName() << ": User defined channel '" << it->first.c_str() << "' already defined" << std::endl;
          continue;
       }
       
@@ -962,7 +968,7 @@ void SetUserAttributes(AlembicGeometrySource::GeomInfo *geom, UserAttributes &at
             
             if (verbose)
             {
-               std::cout << "[AlembicLoader] SetUserAttribtues: Added user defined channel \"" << it->first << "\"" << std::endl;
+               std::cout << "[AlembicLoader] SetUserAttribtues: " << geom->geometry->getPluginName() << ": Added user defined channel \"" << it->first << "\"" << std::endl;
             }
          }
          
@@ -983,12 +989,12 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
    // Type check
    if (ua.dataType < 0 || ua.dataType > String_Type)
    {
-      std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Undefined user attribute type" << std::endl;
+      std::cout << "[AlembicLoader] SetUserAttribute: " << geom->geometry->getPluginName() << ": \"" << name << "\" Undefined user attribute type" << std::endl;
       return false;
    }
    else if (ua.dataType == String_Type)
    {
-      std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" String user attribute not supported by V-Ray" << std::endl;
+      std::cout << "[AlembicLoader] SetUserAttribute: " << geom->geometry->getPluginName() << ": \"" << name << "\" String user attribute not supported by V-Ray" << std::endl;
       return false;
    }
    
@@ -997,7 +1003,7 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
    {
       if (ua.dataDim != 1)
       {
-         std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Unsupported data dimension" << std::endl;
+         std::cout << "[AlembicLoader] SetUserAttribute: " << geom->geometry->getPluginName() << ": \"" << name << "\" Unsupported data dimension" << std::endl;
          return false;
       }
    }
@@ -1005,7 +1011,7 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
    {
       if (ua.dataDim < 1 || ua.dataDim > 4)
       {
-         std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Unsupported data dimension" << std::endl;
+         std::cout << "[AlembicLoader] SetUserAttribute: " << geom->geometry->getPluginName() << ": \"" << name << "\" Unsupported data dimension" << std::endl;
          return false;
       }  
    }
@@ -1125,7 +1131,7 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
             {
                if (ua.indicesCount != geom->numFaceVertices)
                {
-                  std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Invalid indices count (" << ua.indicesCount << ", expected " << geom->numFaceVertices << ")" << std::endl;
+                  std::cout << "[AlembicLoader] SetUserAttribute: " << geom->geometry->getPluginName() << ": \"" << name << "\" Invalid indices count (" << ua.indicesCount << ", expected " << geom->numFaceVertices << ")" << std::endl;
                   return false;
                }
             }
@@ -1133,7 +1139,7 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
             {
                if (ua.dataCount != geom->numFaceVertices)
                {
-                  std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Invalid values count (" << ua.dataCount << ", expected " << geom->numFaceVertices << ")" << std::endl;
+                  std::cout << "[AlembicLoader] SetUserAttribute: " << geom->geometry->getPluginName() << ": \"" << name << "\" Invalid values count (" << ua.dataCount << ", expected " << geom->numFaceVertices << ")" << std::endl;
                   return false;
                }
             }
@@ -1214,7 +1220,7 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
             }
             break;
          default:
-            std::cerr << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Unsupported data type" << std::endl;
+            std::cerr << "[AlembicLoader] SetUserAttribute: " << geom->geometry->getPluginName() << ": \"" << name << "\" Unsupported data type" << std::endl;
             return false;
          }
          
@@ -1276,19 +1282,19 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
          // particles
          if (ua.scope != Varying_Scope)
          {
-            std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Only constant and varying attributes supported on points primitives" << std::endl;
+            std::cout << "[AlembicLoader] SetUserAttribute: " << geom->geometry->getPluginName() << ": \"" << name << "\" Only constant and varying attributes supported on points primitives" << std::endl;
             return false;
          }
          
          if (geom->numPoints != ua.dataCount)
          {
-            std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Invalid size for point attribute \"" << name << "\" (got " << ua.dataCount << " expected " << geom->numPoints << ")" << std::endl;
+            std::cout << "[AlembicLoader] SetUserAttribute: " << geom->geometry->getPluginName() << ": \"" << name << "\" Invalid size for point attribute \"" << name << "\" (got " << ua.dataCount << " expected " << geom->numPoints << ")" << std::endl;
             return false;
          }
          
          if (!geom->particleOrder)
          {
-            std::cout << "[AlembicLoader] SetUserAttribute: \"" << name << "\" No particle order defined" << std::endl;
+            std::cout << "[AlembicLoader] SetUserAttribute: " << geom->geometry->getPluginName() << ": \"" << name << "\" No particle order defined" << std::endl;
             return false;
          }
          
@@ -1296,7 +1302,7 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
          
          if (!geom->isValidParamName(paramName))
          {
-            std::cout << "[AlembicLoader] SetUserAttribute: Invalid parameter name \"" << paramName << "\" (\"" << name << "\")" << std::endl;
+            std::cout << "[AlembicLoader] SetUserAttribute: " << geom->geometry->getPluginName() << ": Invalid parameter name \"" << paramName << "\" (\"" << name << "\")" << std::endl;
             return false;
          }
          
@@ -1463,7 +1469,7 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
             }
             break;
          default:
-            std::cerr << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Unsupported data type" << std::endl;
+            std::cerr << "[AlembicLoader] SetUserAttribute: " << geom->geometry->getPluginName() << ": \"" << name << "\" Unsupported data type" << std::endl;
             return false;
          }
          
@@ -1471,13 +1477,13 @@ bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, U
       }
       else
       {
-         std::cerr << "[AlembicLoader] SetUserAttributes: \"" << name << "\" Unsupported target primitive" << std::endl;
+         std::cerr << "[AlembicLoader] SetUserAttributes: " << geom->geometry->getPluginName() << ": \"" << name << "\" Unsupported target primitive" << std::endl;
          return false;
       }
    }
    else
    {
-      std::cerr << "[AlembicLoader] SetUserAttribute: \"" << name << "\" Invalid user attribute scope" << std::endl;
+      std::cerr << "[AlembicLoader] SetUserAttribute: " << geom->geometry->getPluginName() << ": \"" << name << "\" Invalid user attribute scope" << std::endl;
       return false;
    }
 }

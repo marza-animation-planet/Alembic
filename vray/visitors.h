@@ -265,7 +265,7 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
    {
       if (mGeoSrc->params()->verbose)
       {
-         std::cout << "[AlembicLoader] UpdateGeometr::readBaseMesh: Constant geometry" << std::endl;
+         std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Constant geometry" << std::endl;
       }
       theSample = schema.getValue();
       
