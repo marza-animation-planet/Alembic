@@ -197,7 +197,7 @@ struct ListParamT : ListParamBase, VR::VRaySettableParamInterface, VR::VRayClone
       
       if (it != mTimedValues.end())
       {
-         it->second[index]; 
+         return it->second[index]; 
       }
       else
       {
@@ -480,6 +480,8 @@ struct AlembicLoaderParams : VR::VRayParameterListDesc
       float psizeScale;
       float psizeMin;
       float psizeMax;
+      
+      float time;
       
       Cache();
       void setupCache(VR::VRayParameterList *paramList);

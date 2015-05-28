@@ -424,6 +424,7 @@ AlembicLoaderParams::Cache::Cache()
    , psizeScale(1.0f)
    , psizeMin(0.0f)
    , psizeMax(1e+30f)
+   , time(0.0f)
 {
 }
 
@@ -506,6 +507,8 @@ void AlembicLoaderParams::Cache::setupCache(VR::VRayParameterList *paramList)
    paramList->setParamCache("psize_scale", &psizeScale);
    paramList->setParamCache("psize_min", &psizeMin);
    paramList->setParamCache("psize_max", &psizeMax);
+   
+   paramList->setParamCache("time", &time);
 }
 
 AlembicLoaderParams::AlembicLoaderParams()
@@ -515,6 +518,7 @@ AlembicLoaderParams::AlembicLoaderParams()
    addParamString("objectPath", "/", -1, "Object expression");
    addParamFloat("startFrame", 0.0f, -1, "Animation start frame");
    addParamFloat("endFrame", 0.0f, -1, "Animation end frame");
+   addParamFloat("time", 0.0f, -1, "Render time (in seconds)");
    addParamFloat("offset", 0.0f, -1, "Animation range offset");
    addParamFloat("speed", 1.0f, -1, "Animation speed");
    addParamFloat("fps", 24.0f, -1, "Animation frame rate");
