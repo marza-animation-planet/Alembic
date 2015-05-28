@@ -20,6 +20,7 @@
 #include <maya/MSelectionList.h>
 #include <maya/MDGModifier.h>
 #include <maya/MGlobal.h>
+#include <maya/MAnimControl.h>
 
 #ifdef __APPLE__
 #  include <OpenGL/gl.h>
@@ -41,6 +42,7 @@
 AbcShapeVRayInfo::DispTexMap AbcShapeVRayInfo::DispTexs;
 AbcShapeVRayInfo::DispSetMap AbcShapeVRayInfo::DispSets;
 AbcShapeVRayInfo::MultiUvMap AbcShapeVRayInfo::MultiUVs;
+MDagPathArray AbcShapeVRayInfo::AllShapes;
 
 static MObject GetShadingGroup(const MDagPath &path)
 {
@@ -75,6 +77,10 @@ MSyntax AbcShapeVRayInfo::createSyntax()
    
    syntax.addFlag("-i", "-init", MSyntax::kNoArg);
    syntax.addFlag("-r", "-reset", MSyntax::kNoArg);
+   
+   // Motion blur steps
+   syntax.addFlag("-mb", "-motionBegin", MSyntax::kNoArg);
+   syntax.addFlag("-ms", "-motionStep", MSyntax::kNoArg);
    
    // Displacement informations
    syntax.addFlag("-ad", "-assigneddisp", MSyntax::kString);
@@ -182,6 +188,12 @@ static void ToVRayName(std::string &n, const char *suffix=0)
    {
       n += suffix;
    }
+}
+
+void AbcShapeVRayInfo::trackPath(const MDagPath &path)
+{
+   std::cout << "[AbcShape] Track path: " << path.partialPathName().asChar() << std::endl;
+   AllShapes.append(path);
 }
 
 void AbcShapeVRayInfo::fillMultiUVs(const MDagPath &path)
@@ -325,6 +337,7 @@ MStatus AbcShapeVRayInfo::doIt(const MArgList& args)
    
    if (argData.isFlagSet("init"))
    {
+      AllShapes.clear();
       initDispSets();
       
       return MS::kSuccess;
@@ -333,6 +346,44 @@ MStatus AbcShapeVRayInfo::doIt(const MArgList& args)
    {
       DispTexs.clear();
       MultiUVs.clear();
+      // Keep AllShapes filled as motionBegin/motionEnd are called after reset
+      
+      return MS::kSuccess;
+   }
+   else if (argData.isFlagSet("motionBegin"))
+   {
+      MStatus stat;
+      
+      MTime t = MAnimControl::currentTime();
+      
+      for (unsigned int i=0; i<AllShapes.length(); ++i)
+      {
+         MFnDagNode node(AllShapes[i], &stat);
+         if (stat == MS::kSuccess)
+         {
+            node.findPlug("vrayGeomStepBegin").asInt();
+            
+            MPlug pForceStep = node.findPlug("vrayGeomForceNextStep");
+            pForceStep.setBool(!pForceStep.asBool());
+         }
+      }
+      
+      return MS::kSuccess;
+   }
+   else if (argData.isFlagSet("motionStep"))
+   {
+      MStatus stat;
+      
+      MTime t = MAnimControl::currentTime();
+      
+      for (unsigned int i=0; i<AllShapes.length(); ++i)
+      {
+         MFnDagNode node(AllShapes[i], &stat);
+         if (stat == MS::kSuccess)
+         {
+            node.findPlug("vrayGeomStep").asInt();
+         }
+      }
       
       return MS::kSuccess;
    }
@@ -513,6 +564,170 @@ MStatus AbcShapeVRayInfo::doIt(const MArgList& args)
    }
 }
 
+// ---
+
+static tchar* DuplicateString(const tchar *buf)
+{
+   if (buf)
+   {
+      size_t len = strlen(buf) + 1;
+      tchar *str = new tchar[len];
+      vutils_strcpy_n(str, buf, len);
+      return str;
+   }
+   else
+   {
+      return NULL;
+   }
+}
+
+AnimatedFloatParam::AnimatedFloatParam(const tchar *paramName, bool ownName)
+   : VR::VRayPluginParameter()
+   , mOwnName(ownName)
+{
+   mName = (mOwnName ? DuplicateString(paramName) : paramName);
+}
+
+AnimatedFloatParam::AnimatedFloatParam(const AnimatedFloatParam &other)
+   : VR::VRayPluginParameter()
+   , mOwnName(other.mOwnName)
+   , mTimedValues(other.mTimedValues)
+{
+   mName = (mOwnName ? DuplicateString(other.mName) : other.mName);
+}
+
+AnimatedFloatParam::~AnimatedFloatParam()
+{
+   if (mOwnName)
+   {
+      delete[] mName;
+   }
+   clear();
+}
+
+// From PluginBase
+PluginInterface* AnimatedFloatParam::newInterface(InterfaceID id)
+{
+   switch (id)
+   {
+   case EXT_SETTABLE_PARAM:
+      return static_cast<VR::VRaySettableParamInterface*>(this);
+   case EXT_CLONEABLE_PARAM:
+      return static_cast<VR::VRayCloneableParamInterface*>(this);
+   case EXT_INTERPOLATING:
+      return static_cast<VR::MyInterpolatingInterface*>(this);
+   default:
+      return VRayPluginParameter::newInterface(id);
+   }
+}
+
+// From PluginInterface
+PluginBase* AnimatedFloatParam::getPlugin(void)
+{
+   return static_cast<PluginBase*>(this);
+}
+
+// From VRayPluginParameter
+const tchar* AnimatedFloatParam::getName(void)
+{
+   return mName;
+}
+
+VR::VRayParameterType AnimatedFloatParam::getType(int index, double time)
+{
+   return VR::paramtype_float;
+}
+
+int AnimatedFloatParam::getBool(int index, double time)
+{
+   return (getValue(time) != 0.0f);
+}
+
+int AnimatedFloatParam::getInt(int index, double time)
+{
+   return int(getValue(time));
+}
+
+float AnimatedFloatParam::getFloat(int index, double time)
+{
+   return getValue(time);
+}
+
+double AnimatedFloatParam::getDouble(int index, double time)
+{
+   return double(getValue(time));
+}
+
+// From VRaySettableParamInterface
+void AnimatedFloatParam::setBool(int value, int index, double time)
+{
+   setValue(value != 0 ? 1.0f : 0.0f, time);
+}
+
+void AnimatedFloatParam::setInt(int value, int index, double time)
+{
+   setValue(float(value), time);
+}
+
+void AnimatedFloatParam::setFloat(float value, int index, double time)
+{
+   setValue(value, time);
+}
+
+void AnimatedFloatParam::setDouble(double value, int index, double time)
+{
+   setValue(float(value), time);
+}
+
+// From VRayCloneableParamInterface
+VR::VRayPluginParameter* AnimatedFloatParam::clone()
+{
+   return new AnimatedFloatParam(*this); 
+}
+
+// From MyInterpolatingInterface
+int AnimatedFloatParam::getNumKeyFrames(void)
+{
+   return int(mTimedValues.size());
+}
+
+double AnimatedFloatParam::getKeyFrameTime(int index)
+{
+   typename Map::iterator it = mTimedValues.begin();
+   for (int i=0; i<index; ++i, ++it);
+   return (it == mTimedValues.end() ? -1.0 : it->first);
+}
+
+int AnimatedFloatParam::isIncremental(void)
+{
+   return true;
+}
+
+// Class specific
+void AnimatedFloatParam::clear()
+{
+   mTimedValues.clear();
+}
+
+void AnimatedFloatParam::setValue(float value, double time)
+{
+   mTimedValues[time] = value;
+}
+
+float AnimatedFloatParam::getValue(double time)
+{
+   typename Map::iterator it = mTimedValues.find(time);
+   
+   if (it != mTimedValues.end())
+   {
+      return it->second;
+   }
+   else
+   {
+      return 0.0f;
+   }
+}
+
 #endif
 
 #define MCHECKERROR(STAT,MSG)                   \
@@ -550,6 +765,9 @@ MObject AbcShape::aOutApiType;
 MObject AbcShape::aOutApiClassification;
 MObject AbcShape::aVRayGeomResult;
 MObject AbcShape::aVRayGeomInfo;
+MObject AbcShape::aVRayGeomStepBegin;
+MObject AbcShape::aVRayGeomForceNextStep;
+MObject AbcShape::aVRayGeomStep;
 MObject AbcShape::aVRayAbcVerbose;
 MObject AbcShape::aVRayAbcReferenceFilename;
 MObject AbcShape::aVRayAbcParticleType;
@@ -810,6 +1028,36 @@ MStatus AbcShape::initialize()
    stat = addAttribute(aVRayGeomResult);
    MCHECKERROR(stat, "Could not add 'vrayGeomResult' attribute");
    
+   aVRayGeomStepBegin = nAttr.create("vrayGeomStepBegin", "vgsb", MFnNumericData::kInt, 0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayGeomStepBegin' attribute");
+   nAttr.setKeyable(false);
+   nAttr.setStorable(false);
+   nAttr.setReadable(true);
+   nAttr.setWritable(false);
+   nAttr.setHidden(true);
+   stat = addAttribute(aVRayGeomStepBegin);
+   MCHECKERROR(stat, "Could not add 'vrayGeomStepBegin' attribute");
+   
+   aVRayGeomForceNextStep = nAttr.create("vrayGeomForceNextStep", "vgfn", MFnNumericData::kBoolean, 0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayGeomForceNextStep' attribute");
+   nAttr.setKeyable(false);
+   nAttr.setStorable(false);
+   nAttr.setReadable(true);
+   nAttr.setWritable(true);
+   nAttr.setHidden(true);
+   stat = addAttribute(aVRayGeomForceNextStep);
+   MCHECKERROR(stat, "Could not add 'vrayGeomForceNextStep' attribute");
+   
+   aVRayGeomStep = nAttr.create("vrayGeomStep", "vgs", MFnNumericData::kInt, 0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayGeomStep' attribute");
+   nAttr.setKeyable(false);
+   nAttr.setStorable(false);
+   nAttr.setReadable(true);
+   nAttr.setWritable(false);
+   nAttr.setHidden(true);
+   stat = addAttribute(aVRayGeomStep);
+   MCHECKERROR(stat, "Could not add 'vrayGeomStep' attribute");
+   
    aVRayAbcVerbose = nAttr.create("vrayAbcVerbose", "vaverb", MFnNumericData::kBoolean, 0, &stat);
    MCHECKERROR(stat, "Could not create 'vrayAbcVerbose' attribute");
    nAttr.setKeyable(false);
@@ -932,6 +1180,7 @@ MStatus AbcShape::initialize()
    attributeAffects(aVRayGeomInfo, aVRayGeomResult);
    attributeAffects(aFilePath, aVRayGeomResult);
    attributeAffects(aObjectExpression, aVRayGeomResult);
+   attributeAffects(aTime, aVRayGeomResult);
    attributeAffects(aStartFrame, aVRayGeomResult);
    attributeAffects(aEndFrame, aVRayGeomResult);
    attributeAffects(aSpeed, aVRayGeomResult);
@@ -955,6 +1204,12 @@ MStatus AbcShape::initialize()
    attributeAffects(aVRayAbcPsizeScale, aVRayGeomResult);
    attributeAffects(aVRayAbcPsizeMin, aVRayGeomResult);
    attributeAffects(aVRayAbcPsizeMax, aVRayGeomResult);
+   
+   attributeAffects(aTime, aVRayGeomStepBegin);
+   
+   attributeAffects(aVRayGeomForceNextStep, aVRayGeomStep);
+   attributeAffects(aTime, aVRayGeomStep);
+   
 #endif
 
    attributeAffects(aFilePath, aNumShapes);
@@ -1142,6 +1397,7 @@ AbcShape::AbcShape()
    , mVRPsizeScale("psize_scale", 1.0f)
    , mVRPsizeMin("psize_min", 0.0f)
    , mVRPsizeMax("psize_max", 1e+30f)
+   , mVRTime("time")
 #endif
 {
 }
@@ -1271,6 +1527,34 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
       return MS::kSuccess;
    }
 #ifdef ABCSHAPE_VRAY_SUPPORT
+   else if (plug.attribute() == aVRayGeomStepBegin)
+   {
+      MDataHandle hTime = block.inputValue(aTime);
+      MDataHandle hOut = block.outputValue(aVRayGeomStepBegin);
+      
+      MTime t = hTime.asTime();
+      
+      mVRTime.clear();
+      
+      hOut.setInt(1);
+      block.setClean(plug);
+      
+      return MS::kSuccess;
+   }
+   else if (plug.attribute() == aVRayGeomStep)
+   {
+      MDataHandle hTime = block.inputValue(aTime);
+      MDataHandle hOut = block.outputValue(aVRayGeomStep);
+      
+      MTime t = hTime.asTime();
+      
+      mVRTime.setFloat(t.as(MTime::kSeconds), 0, t.as(MTime::uiUnit()));
+      
+      hOut.setInt(1);
+      block.setClean(plug);
+      
+      return MS::kSuccess;
+   }
    else if (plug.attribute() == aVRayGeomResult)
    {
       syncInternals(block);
@@ -1320,6 +1604,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   mVRPreserveStartFrame.setBool(mPreserveStartFrame, 0, 0.0);
                   mVRCycle.setInt(int(mCycleType), 0, 0.0);
                   mVRFps.setFloat(float(getFPS()), 0, 0.0);
+                  mVRTime.clear();
                   
                   MPlug pMotionBlur = thisNode.findPlug("motionBlur");
                   if (!pMotionBlur.isNull())
@@ -1807,6 +2092,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   MDataHandle hPsizeMax = block.inputValue(aVRayAbcPsizeMax);
                   mVRPsizeMax.setFloat(hPsizeMax.asFloat(), 0, 0.0);
                   
+                  AbcShapeVRayInfo::trackPath(thisPath);
                   AbcShapeVRayInfo::fillMultiUVs(thisPath);
                   
                   abc->setParameter(&mVRFilename);
@@ -1815,6 +2101,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   abc->setParameter(&mVROffset);
                   abc->setParameter(&mVRStartFrame);
                   abc->setParameter(&mVREndFrame);
+                  abc->setParameter(&mVRTime);
                   abc->setParameter(&mVRIgnoreTransforms);
                   abc->setParameter(&mVRIgnoreInstances);
                   abc->setParameter(&mVRIgnoreVisibility);

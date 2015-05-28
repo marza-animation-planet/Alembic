@@ -33,7 +33,11 @@ MCallbackId gVRaySettingsDeleted = 0;
 std::map<std::string, MCallbackId> gVRaySettingsAttrChanged;
 
 std::string gPreMel = NAME_PREFIX "AbcShapeVRayInfo -init";
+std::string gPreFrameMel = NAME_PREFIX "AbcShapeVRayInfo -motionBegin";
+std::string gPreKeyMel = NAME_PREFIX "AbcShapeVRayInfo -motionStep";
 std::string gSafePreMel = "catchQuiet(`" + gPreMel + "`)";
+std::string gSafePreFrameMel = "catchQuiet(`" + gPreFrameMel + "`)";
+std::string gSafePreKeyMel = "catchQuiet(`" + gPreKeyMel + "`)";
 std::string gPostPythonImp = "import " NAME_PREFIX "abcshape4vray";
 std::string gPostPythonExc = NAME_PREFIX "abcshape4vray.PostTranslate()";
 std::string gPostPython = gPostPythonImp + "; " + gPostPythonExc;
@@ -101,6 +105,31 @@ static void AppendMel(std::string &mel0, std::string &mel1)
 {
    StripLTWS(mel0);
    StripLTWS(mel1);
+   
+   size_t l0 = mel0.length();
+   size_t l1 = mel1.length();
+   
+   if (l1 > 0)
+   {
+      if (l0 > 0)
+      {
+         mel0 += "; ";
+      }
+      
+      mel0 += mel1;
+      
+      l0 = mel0.length();
+   }
+   
+   if (l0 > 0)
+   {
+      mel0 += ";";
+   }
+}
+
+static void AppendMel(std::string &mel0, const std::string &mel1)
+{
+   StripLTWS(mel0);
    
    size_t l0 = mel0.length();
    size_t l1 = mel1.length();
@@ -224,40 +253,40 @@ static bool RemovePython(std::string &py, const std::string &s)
    }
 }
 
-static void EnsurePreMel(MPlug &plug)
+static void EnsurePreMel(MPlug &plug, const std::string &cmd, const std::string &safeCmd, const char *what="render")
 {
    std::string preMel = plug.asString().asChar();
    
    // For backward compatibility, replace old command name first
    bool changed = MelCompat(preMel);
    
-   size_t p = preMel.find(gSafePreMel);
+   size_t p = preMel.find(safeCmd);
    
    if (p == std::string::npos)
    {
-      p = preMel.find(gPreMel);
+      p = preMel.find(cmd);
       
       if (p == std::string::npos)
       {
-         AppendMel(preMel, gSafePreMel);
+         AppendMel(preMel, safeCmd);
          changed = true;
       }
       else
       {
-         RemoveMel(preMel, gPreMel);
-         AppendMel(preMel, gSafePreMel);
+         RemoveMel(preMel, cmd);
+         AppendMel(preMel, safeCmd);
          changed = true;
       }
    }
    
    if (changed)
    {
-      MGlobal::displayInfo(MString("[") + NAME_PREFIX "AbcShape] Pre render mel ensured");
+      MGlobal::displayInfo(MString("[") + NAME_PREFIX "AbcShape] Pre " + MString(what) + " mel ensured");
       plug.setString(preMel.c_str());
    }
 }
 
-static void RemovePreMel(MPlug &plug)
+static void RemovePreMel(MPlug &plug, const std::string &cmd, const std::string &safeCmd, const char *what="render")
 {
    std::string preMel = plug.asString().asChar();
    
@@ -265,12 +294,12 @@ static void RemovePreMel(MPlug &plug)
    
    MelCompat(preMel);
    
-   if (RemoveMel(preMel, gSafePreMel))
+   if (RemoveMel(preMel, safeCmd))
    {
       plug.setString(preMel.c_str());
       changed = true;
    }
-   else if (RemoveMel(preMel, gPreMel))
+   else if (RemoveMel(preMel, cmd))
    {
       plug.setString(preMel.c_str());
       changed = true;
@@ -278,7 +307,7 @@ static void RemovePreMel(MPlug &plug)
    
    if (changed)
    {
-      MGlobal::displayInfo(MString("[") + NAME_PREFIX "AbcShape] Pre render mel removed");
+      MGlobal::displayInfo(MString("[") + NAME_PREFIX "AbcShape] Pre " + MString(what) + " mel removed");
    }
 }
 
@@ -423,11 +452,25 @@ static void CurrentRendererChanged(const MString &name, MObject drg=MObject::kNu
       {
          if (gCurrentRendererIsVRay)
          {
-            EnsurePreMel(plug);
+            EnsurePreMel(plug, gPreMel, gSafePreMel, "render");
          }
          else
          {
-            RemovePreMel(plug);
+            RemovePreMel(plug, gPreMel, gSafePreMel, "render");
+         }
+      }
+      
+      plug = node.findPlug("preRenderMel");
+      
+      if (!plug.isNull())
+      {
+         if (gCurrentRendererIsVRay)
+         {
+            EnsurePreMel(plug, gPreFrameMel, gSafePreFrameMel, "frame");
+         }
+         else
+         {
+            RemovePreMel(plug, gPreFrameMel, gSafePreFrameMel, "frame");
          }
       }
    }
@@ -453,6 +496,20 @@ static void CurrentRendererChanged(const MString &name, MObject drg=MObject::kNu
             RemovePostTranslatePython(plug);
          }
       }
+      
+      plug = node.findPlug("preKeyframeMel");
+      
+      if (!plug.isNull())
+      {
+         if (gCurrentRendererIsVRay)
+         {
+            EnsurePreMel(plug, gPreKeyMel, gSafePreKeyMel, "keyframe");
+         }
+         else
+         {
+            RemovePreMel(plug, gPreKeyMel, gSafePreKeyMel, "keyframe");
+         }
+      }
    }
 }
 
@@ -472,7 +529,14 @@ static void RenderGlobalsAttrChanged(MNodeMessage::AttributeMessage msg, MPlug &
       {
          if (gCurrentRendererIsVRay)
          {
-            EnsurePreMel(plug);
+            EnsurePreMel(plug, gPreMel, gSafePreMel, "render");
+         }
+      }
+      else if (attr == "preRenderMel")
+      {
+         if (gCurrentRendererIsVRay)
+         {
+            EnsurePreMel(plug, gPreFrameMel, gSafePreFrameMel, "frame");
          }
       }
    }
@@ -489,6 +553,13 @@ static void VRaySettingsAttrChanged(MNodeMessage::AttributeMessage msg, MPlug &p
          if (gCurrentRendererIsVRay)
          {
             EnsurePostTranslatePython(plug);
+         }
+      }
+      else if (attr == "preKeyframeMel")
+      {
+         if (gCurrentRendererIsVRay)
+         {
+            EnsurePreMel(plug, gPreKeyMel, gSafePreKeyMel, "keyframe");
          }
       }
    }

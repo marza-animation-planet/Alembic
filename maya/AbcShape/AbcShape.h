@@ -15,6 +15,61 @@
 #include <maya/M3dView.h>
 #include <maya/MDGMessage.h>
 
+#ifdef ABCSHAPE_VRAY_SUPPORT
+
+struct AnimatedFloatParam : VR::VRayPluginParameter,
+                            VR::VRaySettableParamInterface,
+                            VR::VRayCloneableParamInterface,
+                            VR::MyInterpolatingInterface
+{
+   typedef std::map<double, float> Map;
+   
+   AnimatedFloatParam(const tchar *paramName, bool ownName=false);
+   AnimatedFloatParam(const AnimatedFloatParam &other);
+   virtual ~AnimatedFloatParam();
+   
+   // From PluginBase
+   virtual PluginInterface* newInterface(InterfaceID id);
+   
+   // From PluginInterface
+   virtual PluginBase* getPlugin(void);
+   
+   // From VRayPluginParameter
+   virtual const tchar* getName(void);
+   virtual VR::VRayParameterType getType(int index, double time=0.0);
+   virtual int getBool(int index=0, double time=0.0);
+   virtual int getInt(int index=0, double time=0.0);
+   virtual float getFloat(int index=0, double time=0.0);
+   virtual double getDouble(int index=0, double time=0.0);
+
+   // From VRaySettableParamInterface
+   virtual void setBool(int value, int index=0, double time=0.0);
+   virtual void setInt(int value, int index=0, double time=0.0);
+   virtual void setFloat(float value, int index=0, double time=0.0);
+   virtual void setDouble(double value, int index=0, double time=0.0);
+   
+   // From VRayCloneableParamInterface
+   virtual VR::VRayPluginParameter* clone();
+   
+   // From MyInterpolatingInterface
+   virtual int getNumKeyFrames(void);
+   virtual double getKeyFrameTime(int index);
+   virtual int isIncremental(void);
+   
+   // Class specific
+   void clear();
+   void setValue(float, double time);
+   float getValue(double time);
+   
+protected:
+   
+   bool mOwnName;
+   const tchar *mName;
+   Map mTimedValues;
+};
+
+#endif
+
 
 class AbcShape : public MPxSurfaceShape
 {
@@ -51,6 +106,9 @@ public:
     static MObject aOutApiClassification;
     static MObject aVRayGeomResult;
     static MObject aVRayGeomInfo;
+    static MObject aVRayGeomStepBegin;
+    static MObject aVRayGeomForceNextStep;
+    static MObject aVRayGeomStep;
     
     static MObject aVRayAbcVerbose;
     static MObject aVRayAbcReferenceFilename;
@@ -270,6 +328,7 @@ private:
     VR::DefFloatParam mVRPsizeScale;
     VR::DefFloatParam mVRPsizeMin;
     VR::DefFloatParam mVRPsizeMax;
+    AnimatedFloatParam mVRTime;
 #endif
 };
 
@@ -277,6 +336,7 @@ private:
 
 #include <maya/MPxCommand.h>
 #include <maya/MFnDependencyNode.h>
+#include <maya/MDagPathArray.h>
 
 class AbcShapeVRayInfo : public MPxCommand
 {
@@ -293,6 +353,7 @@ public:
     static void* create();
     static bool getAssignedDisplacement(const MDagPath &path, MFnDependencyNode &set, MFnDependencyNode &shader, MFnDependencyNode &stdShader);
     static void fillMultiUVs(const MDagPath &path);
+    static void trackPath(const MDagPath &path);
     static void initDispSets();
      
     typedef std::set<std::string> NameSet;
@@ -318,6 +379,7 @@ public:
     static DispTexMap DispTexs;
     static DispSetMap DispSets;
     static MultiUvMap MultiUVs;
+    static MDagPathArray AllShapes;
 };
 
 #endif

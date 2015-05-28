@@ -17,6 +17,7 @@
 #   include <plugman.h>
 #   include <vraymayageom.h>
 #   include <defparams.h>
+#   include <vraypluginsexporter.h>
 #endif
 
 #endif
