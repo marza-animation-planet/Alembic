@@ -425,6 +425,7 @@ AlembicLoaderParams::Cache::Cache()
    , psizeMin(0.0f)
    , psizeMax(1e+30f)
    , time(0.0f)
+   , useReferenceObject(0)
 {
 }
 
@@ -509,6 +510,8 @@ void AlembicLoaderParams::Cache::setupCache(VR::VRayParameterList *paramList)
    paramList->setParamCache("psize_max", &psizeMax);
    
    paramList->setParamCache("time", &time);
+   
+   paramList->setParamCache("useReferenceObject", &useReferenceObject);
 }
 
 AlembicLoaderParams::AlembicLoaderParams()
@@ -524,6 +527,7 @@ AlembicLoaderParams::AlembicLoaderParams()
    addParamFloat("fps", 24.0f, -1, "Animation frame rate");
    addParamInt("cycle", 0, -1, "Cycle mode", "enum=(0:hold;1:loop;2:reverse;3:bounce)");
    addParamBool("preserveStartFrame", false, -1, "Keep startFrame invariant when speed changes");
+   addParamBool("useReferenceObject", false, -1, "Generate texture reference object");
    addParamString("referenceFilename", "", -1, "Alembic reference file path");
    addParamBool("ignoreVisibility", false, -1, "Treat all contained objects as visible");
    addParamBool("ignoreTransforms", false, -1, "Ignore transformations");
