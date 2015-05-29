@@ -282,7 +282,7 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
       // Note: isConst must be false
       if (refInfo && isConst)
       {
-         std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: reference object info found for constant object" << std::endl;
+         std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Reference object info found for constant object" << std::endl;
          cleanupReferenceObject(refInfoKey, refInfo);
          refInfo = 0;
       }
@@ -305,10 +305,6 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
    
    if (isConst)
    {
-      if (mGeoSrc->params()->verbose)
-      {
-         std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Constant geometry" << std::endl;
-      }
       theSample = schema.getValue();
       
       FC = theSample.getFaceCounts();
@@ -539,9 +535,11 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
          {
             Pref = (const float*) uait->second.data;
             
+            computeNormals = true;
+            
             if (mGeoSrc->params()->verbose)
             {
-               std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: use 'Pref' attribute" << std::endl;
+               std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Use 'Pref' attribute" << std::endl;
             }
          }
       }
@@ -562,7 +560,7 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
       {
          if (mGeoSrc->params()->verbose)
          {
-            std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: use 'Nref' vertex attribute for reference object normals" << std::endl;
+            std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Use 'Nref' vertex attribute for reference object normals" << std::endl;
          }
          
          computeNormals = false;
@@ -578,7 +576,7 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
          {
             if (mGeoSrc->params()->verbose)
             {
-               std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: use 'Nref' point attribute for reference object normals" << std::endl;
+               std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Use 'Nref' point attribute for reference object normals" << std::endl;
             }
             
             computeNormals = false;
@@ -589,8 +587,9 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
       {
          if (mGeoSrc->params()->verbose)
          {
-            std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: compute smooth normals for reference object" << std::endl;
+            std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Compute smooth normals for reference object" << std::endl;
          }
+         
          info->smoothNormals.push_back(computeMeshSmoothNormals(info, Pref, 0, 0.0f));
       }
    }
@@ -1036,7 +1035,7 @@ void UpdateGeometry::setMeshSmoothNormals(AlembicNodeT<Alembic::Abc::ISchemaObje
       }
       else
       {
-         std::cout << "[AlembicLoader] Computed smooth normal samples and schema samples do no match, ignoring them" << std::endl;
+         std::cout << "[AlembicLoader] UpdateGeometry::setMeshSmoothNormals: Computed smooth normal samples and schema samples do no match, ignoring them" << std::endl;
          
          info->constNormals->setCount(0, renderFrame);
          info->constFaceNormals->setCount(0, renderFrame);
@@ -1084,7 +1083,7 @@ void UpdateGeometry::setMeshSmoothNormals(AlembicNodeT<Alembic::Abc::ISchemaObje
       }
       else
       {
-         std::cout << "[AlembicLoader] Computed smooth normal samples and schema samples do no match, ignoring them" << std::endl;
+         std::cout << "[AlembicLoader] UpdateGeometry::setMeshSmoothNormals: Computed smooth normal samples and schema samples do no match, ignoring them" << std::endl;
       }
    }
 }

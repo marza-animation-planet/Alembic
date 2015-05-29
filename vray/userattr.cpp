@@ -610,7 +610,7 @@ bool _ReadUserAttribute(UserAttribute &ua,
       
       if (verbose)
       {
-         std::cout << "[AlembicLoader] ReadUserAttribute: Read geometry param \"" << header.getName() << "\"..." << std::endl;
+         std::cout << "[AlembicLoader] ReadUserAttribute: Read geometry param \"" << header.getName() << "\" at t=" << t << "..." << std::endl;
       }
       
       return ReadGeomParam<SrcT, DstT>(param, ua, t, interpolate, verbose);
@@ -628,7 +628,7 @@ bool _ReadUserAttribute(UserAttribute &ua,
          
          if (verbose)
          {
-            std::cout << "[AlembicLoader] ReadUserAttribute: Read scalar property \"" << header.getName() << "\"..." << std::endl;
+            std::cout << "[AlembicLoader] ReadUserAttribute: Read scalar property \"" << header.getName() << "\" at t=" << t << "..." << std::endl;
          }
          
          return ReadScalarProperty<SrcT, DstT>(prop, ua, t, interpolate, verbose);
@@ -644,7 +644,7 @@ bool _ReadUserAttribute(UserAttribute &ua,
          
          if (verbose)
          {
-            std::cout << "[AlembicLoader] ReadUserAttribute: Read array property \"" << header.getName() << "\"..." << std::endl;
+            std::cout << "[AlembicLoader] ReadUserAttribute: Read array property \"" << header.getName() << "\" at t=" << t << "..." << std::endl;
          }
          
          return ReadArrayProperty<SrcT, DstT>(prop, ua, t, interpolate, verbose);
