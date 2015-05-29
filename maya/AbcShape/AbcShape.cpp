@@ -769,6 +769,7 @@ MObject AbcShape::aVRayGeomStepBegin;
 MObject AbcShape::aVRayGeomForceNextStep;
 MObject AbcShape::aVRayGeomStep;
 MObject AbcShape::aVRayAbcVerbose;
+MObject AbcShape::aVRayAbcUseReferenceObject;
 MObject AbcShape::aVRayAbcReferenceFilename;
 MObject AbcShape::aVRayAbcParticleType;
 MObject AbcShape::aVRayAbcParticleAttribs;
@@ -1064,6 +1065,12 @@ MStatus AbcShape::initialize()
    stat = addAttribute(aVRayAbcVerbose);
    MCHECKERROR(stat, "Could not add 'vrayAbcVerbose' attribute");
    
+   aVRayAbcUseReferenceObject = nAttr.create("vrayAbcUseReferenceObject", "vauref", MFnNumericData::kBoolean, 0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcUseReferenceObject' attribute");
+   nAttr.setKeyable(false);
+   stat = addAttribute(aVRayAbcUseReferenceObject);
+   MCHECKERROR(stat, "Could not add 'vrayAbcUseReferenceObject' attribute");
+   
    MFnStringData refFileDef;
    MObject refFileDefObj = refFileDef.create("");
    aVRayAbcReferenceFilename = tAttr.create("vrayAbcReferenceFilename", "vareff", MFnData::kString, refFileDefObj, &stat);
@@ -1189,6 +1196,7 @@ MStatus AbcShape::initialize()
    attributeAffects(aCycleType, aVRayGeomResult);
    
    attributeAffects(aVRayAbcVerbose, aVRayGeomResult);
+   attributeAffects(aVRayAbcUseReferenceObject, aVRayGeomResult);
    attributeAffects(aVRayAbcReferenceFilename, aVRayGeomResult);
    attributeAffects(aVRayAbcParticleType, aVRayGeomResult);
    attributeAffects(aVRayAbcParticleAttribs, aVRayGeomResult);
@@ -1324,6 +1332,7 @@ AbcShape::AbcShape()
    , mUpdateLevel(AbcShape::UL_none)
 #ifdef ABCSHAPE_VRAY_SUPPORT
    , mVRFilename("filename", "")
+   , mVRUseReferenceObject("useReferenceObject", false)
    , mVRReferenceFilename("referenceFilename", "")
    , mVRObjectPath("objectPath", "/")
    , mVRIgnoreTransforms("ignoreTransforms", false)
@@ -1630,6 +1639,9 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   // {
                   //    mVRReferenceFilename.setString("", 0, 0.0);
                   // }
+                  MDataHandle hUseReferenceObject = block.inputValue(aVRayAbcUseReferenceObject);
+                  mVRUseReferenceObject.setBool(hUseReferenceObject.asBool(), 0, 0.0);
+                  
                   MDataHandle hReferenceFilename = block.inputValue(aVRayAbcReferenceFilename);
                   mVRReferenceFilename.setString(hReferenceFilename.asString().asChar(), 0, 0.0);
                   
@@ -2110,6 +2122,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   abc->setParameter(&mVRFps);
                   abc->setParameter(&mVRIgnoreTransformBlur);
                   abc->setParameter(&mVRIgnoreDeformBlur);
+                  abc->setParameter(&mVRUseReferenceObject);
                   abc->setParameter(&mVRReferenceFilename);
                   abc->setParameter(&mVRVerbose);
                   abc->setParameter(&mVRParticleType);

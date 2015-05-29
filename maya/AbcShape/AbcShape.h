@@ -111,6 +111,7 @@ public:
     static MObject aVRayGeomStep;
     
     static MObject aVRayAbcVerbose;
+    static MObject aVRayAbcUseReferenceObject;
     static MObject aVRayAbcReferenceFilename;
     static MObject aVRayAbcParticleType;
     static MObject aVRayAbcParticleAttribs;
@@ -251,6 +252,7 @@ private:
     
 #ifdef ABCSHAPE_VRAY_SUPPORT
     VR::DefStringParam mVRFilename;
+    VR::DefBoolParam mVRUseReferenceObject;
     VR::DefStringParam mVRReferenceFilename;
     VR::DefStringParam mVRObjectPath;
     VR::DefBoolParam mVRIgnoreTransforms;
