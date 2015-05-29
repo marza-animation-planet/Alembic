@@ -624,11 +624,21 @@ namespace
         Alembic::Abc::C4fArraySamplePtr sampVal = samp.getVals();
         size_t sampSize = sampVal->size();
 
-        if (ioMesh.numFaceVertices() != (int)samp.getIndices()->size() &&
+        if (ioMesh.numVertices() != 0 &&
+            ioMesh.numFaceVertices() != (int)samp.getIndices()->size() &&
             ioMesh.numVertices() != (int) samp.getIndices()->size())
         {
-            MGlobal::displayWarning(
-                "Color sample size != num face vertices");
+            MString msg = "Color sample size is: ";
+            msg += (int) samp.getIndices()->size();
+            msg += " expecting: ";
+            msg += ioMesh.numVertices();
+            msg += " or ";
+            msg += ioMesh.numFaceVertices();
+            MGlobal::displayWarning(msg);
+            return;
+        }
+        else if (ioMesh.numVertices() != 0)
+        {
             return;
         }
 
