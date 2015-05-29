@@ -72,7 +72,7 @@ bool CopyUserAttribute(UserAttribute &src, unsigned int srcIdx, unsigned int cou
 void DestroyUserAttribute(UserAttribute &);
 void DestroyUserAttributes(UserAttributes &);
 
-bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, UserAttribute &ua, double t, std::set<std::string> &usedNames, bool verbose=false);
+bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, UserAttribute &ua, double t, bool verbose=false);
 void SetUserAttributes(AlembicGeometrySource::GeomInfo *geom, UserAttributes &attribs, double t, bool verbose=false);
 
 #endif

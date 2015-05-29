@@ -957,7 +957,7 @@ void SetUserAttributes(AlembicGeometrySource::GeomInfo *geom, UserAttributes &at
          continue;
       }
       
-      if (SetUserAttribute(geom, it->first.c_str(), it->second, t, usedNames, verbose) && it->second.scope != Constant_Scope)
+      if (SetUserAttribute(geom, it->first.c_str(), it->second, t, verbose) && it->second.scope != Constant_Scope)
       {
          if (geom->channelNames)
          {
@@ -979,7 +979,7 @@ void SetUserAttributes(AlembicGeometrySource::GeomInfo *geom, UserAttributes &at
    }
 }
 
-bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, UserAttribute &ua, double t, std::set<std::string> &usedNames, bool verbose)
+bool SetUserAttribute(AlembicGeometrySource::GeomInfo *geom, const char *name, UserAttribute &ua, double t, bool verbose)
 {
    if (!geom || !ua.data)
    {
