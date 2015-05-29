@@ -432,20 +432,33 @@ AlembicGeometrySource::AlembicGeometrySource(VR::VRayRenderer *vray,
          
          if (mScene)
          {
-            CollectWorldMatrices WM(this);
-            
-            if (refPath.length() > 0)
+            if (params->useReferenceObject)
             {
-               mRefScene = AlembicSceneCache::Ref(refPath, mSceneID, filter, true);
+               CollectWorldMatrices WM(this);
                
-               if (mRefScene)
+               if (refPath.length() > 0)
                {
+                  mRefScene = AlembicSceneCache::Ref(refPath, mSceneID, filter, true);
+                  
+                  if (mRefScene)
+                  {
+                     mRefScene->visit(AlembicNode::VisitDepthFirst, WM);
+                     mRefMatrices = WM.getWorldMatrices();
+                  }
+               }
+               
+               if (!mRefScene)
+               {
+                  if (params->verbose)
+                  {
+                     std::cout << "[AlembicLoader] AlembicGeometrySource::AlembicGeometrySource: Use same scene as reference" << std::endl;
+                  }
+                  
+                  mRefScene = mScene;
+                  
+                  // Will collect world matrices from first sample
                   mRefScene->visit(AlembicNode::VisitDepthFirst, WM);
                   mRefMatrices = WM.getWorldMatrices();
-               }
-               else
-               {
-                  // use mScene?
                }
             }
             
@@ -469,16 +482,19 @@ AlembicGeometrySource::~AlembicGeometrySource()
 {
    TRACEM(AlembicGeometrySource, ~AlembicGeometrySource);
    
+   if (mRefScene)
+   {
+      if (mRefScene != mScene)
+      {
+         AlembicSceneCache::Unref(mRefScene, mSceneID);
+      }
+      mRefScene = 0;
+   }
+   
    if (mScene)
    {
       AlembicSceneCache::Unref(mScene, mSceneID);
       mScene = 0;
-   }
-   
-   if (mRefScene)
-   {
-      AlembicSceneCache::Unref(mRefScene, mSceneID);
-      mRefScene = 0;
    }
       
    if (mPluginMgr)
