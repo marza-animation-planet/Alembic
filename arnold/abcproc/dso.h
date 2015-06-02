@@ -83,6 +83,11 @@ public:
       return mCommonParams.filePath;
    }
    
+   inline bool outputReference() const
+   {
+      return mCommonParams.outputReference;
+   }
+   
    inline bool hasReference() const
    {
       return (mCommonParams.referenceFilePath.length() > 0);
@@ -349,6 +354,7 @@ private:
       
       bool verbose;
       
+      bool outputReference;
       
       void reset();
       std::string dataString(const char *targetShape) const;

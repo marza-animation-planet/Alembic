@@ -466,12 +466,22 @@ private:
          DestroyUserAttributes(pointAttrs);
       }
    };
+
+private:
+   
+   typedef bool (*CollectFilter)(const Alembic::AbcCoreAbstract::PropertyHeader &header);
+   
+   static bool FilterReferenceAttributes(const Alembic::AbcCoreAbstract::PropertyHeader &header);
    
 private:
    
    float adjustPointRadius(float radius) const;
    
    std::string arnoldNodeName(AlembicNode &node) const;
+   
+   bool isVaryingFloat3(MeshInfo &info, const UserAttribute &ua);
+   
+   bool isIndexedFloat3(MeshInfo &info, const UserAttribute &ua);
    
    void collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
                               Alembic::Abc::ICompoundProperty geomParams,
@@ -481,14 +491,16 @@ private:
                               UserAttributes *primitiveLevel,
                               UserAttributes *pointLevel,
                               UserAttributes *vertexLevel,
-                              UVSets *UVs);
+                              UVSets *UVs,
+                              CollectFilter filter=0);
    
    template <class Schema>
    AtNode* generateVolumeBox(Schema &schema);
    
    template <class MeshSchema>
    AtNode* generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
-                            MeshInfo &info);
+                            MeshInfo &info,
+                            std::vector<float*> *smoothNormals=0);
    
    template <class T>
    void outputInstanceNumber(AlembicNodeT<T> &node, AlembicNode *instance);
@@ -499,8 +511,8 @@ private:
                       MeshInfo &info);
    
    float* computeMeshSmoothNormals(MeshInfo &info,
-                                   Alembic::Abc::P3fArraySamplePtr P0,
-                                   Alembic::Abc::P3fArraySamplePtr P1,
+                                   const float *P0,
+                                   const float *P1,
                                    float blend);
    
    template <class MeshSchema>
@@ -512,11 +524,68 @@ private:
                                 float* &T,
                                 float* &B);
    
+   template <class MeshSchema>
+   bool getReferenceMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node, MeshInfo &info,
+                         AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> >* &refMesh,
+                         UserAttributes* &pointAttrs, UserAttributes* &vertexAttrs);
+   
+   template <class MeshSchema>
+   bool fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> >* &refMesh,
+                               MeshInfo &info,
+                               UserAttributes *pointAttrs,
+                               Alembic::Abc::M44d &Mref);
+   
+   bool checkReferenceNormals(MeshInfo &info,
+                              UserAttributes *pointAttrs,
+                              UserAttributes *vertexAttrs);
+   
+   bool readReferenceNormals(AlembicMesh *refMesh,
+                             MeshInfo &info,
+                             const Alembic::Abc::M44d &Mref);
+   
+   bool fillReferenceNormals(MeshInfo &info,
+                             UserAttributes *pointAttrs,
+                             UserAttributes *vertexAttrs);
+   
+   bool fillReferenceNormals(MeshInfo &info,
+                             bool computeSmoothNormals,
+                             UserAttributes *pointAttrs,
+                             UserAttributes *vertexAttrs);
+   
 private:
 
    class Dso *mDso;
    AtNode *mNode;
 };
+
+inline bool MakeShape::isVaryingFloat3(MeshInfo &info, const UserAttribute &ua)
+{
+   if (ua.arnoldCategory == AI_USERDEF_VARYING &&
+       ((ua.arnoldType == AI_TYPE_VECTOR && ua.dataCount == info.pointCount) ||
+        (ua.arnoldType == AI_TYPE_POINT && ua.dataCount == info.pointCount) ||
+        (ua.arnoldType == AI_TYPE_FLOAT && ua.dataCount == 3 * info.pointCount)))
+   {
+      return true;
+   }
+   else
+   {
+      return false;
+   }
+}
+
+inline bool MakeShape::isIndexedFloat3(MeshInfo &info, const UserAttribute &ua)
+{
+   if (ua.arnoldCategory == AI_USERDEF_INDEXED &&
+       ua.indicesCount == info.vertexCount &&
+       (ua.arnoldType == AI_TYPE_VECTOR || ua.arnoldType == AI_TYPE_POINT))
+   {
+      return true;
+   }
+   else
+   {
+      return false;
+   }
+}
 
 inline float MakeShape::adjustPointRadius(float radius) const
 {
@@ -616,7 +685,8 @@ AtNode* MakeShape::generateVolumeBox(Schema &schema)
 
 template <class MeshSchema>
 AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
-                                    MeshInfo &info)
+                                    MeshInfo &info,
+                                    std::vector<float*> *smoothNormals)
 {
    info.pointCount = 0;
    info.polygonCount = 0;
@@ -736,6 +806,11 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
          AiArraySetPnt(vlist, i, pnt);
       }
       
+      if (smoothNormals)
+      {
+         smoothNormals->push_back(computeMeshSmoothNormals(info, (const float*) P->getData(), 0, 0.0f));
+      }
+      
       if (mDso->verbose())
       {
          AiMsgInfo("[abcproc] Read %lu faces", FC->size());
@@ -775,14 +850,10 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
          {
             UserAttributes::iterator it = info.pointAttrs.find("velocity");
             
-            if (it == info.pointAttrs.end() ||
-                it->second.arnoldType != AI_TYPE_VECTOR ||
-                it->second.dataCount != info.pointCount)
+            if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
             {
                it = info.pointAttrs.find("v");
-               if (it != info.pointAttrs.end() && 
-                   (it->second.arnoldType != AI_TYPE_VECTOR ||
-                    it->second.dataCount != info.pointCount))
+               if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
                {
                   it = info.pointAttrs.end();
                }
@@ -800,19 +871,13 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
          {
             UserAttributes::iterator it = info.pointAttrs.find("acceleration");
             
-            if (it == info.pointAttrs.end() ||
-                it->second.arnoldType != AI_TYPE_VECTOR ||
-                it->second.dataCount != info.pointCount)
+            if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
             {
                it = info.pointAttrs.find("accel");
-               if (it == info.pointAttrs.end() ||
-                   it->second.arnoldType != AI_TYPE_VECTOR ||
-                   it->second.dataCount != info.pointCount)
+               if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
                {
                   it = info.pointAttrs.find("a");
-                  if (it != info.pointAttrs.end() &&
-                      (it->second.arnoldType != AI_TYPE_VECTOR ||
-                       it->second.dataCount != info.pointCount))
+                  if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
                   {
                      it = info.pointAttrs.end();
                   }
@@ -889,10 +954,23 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
                
                AiArraySetPnt(vlist, i, pnt);
             }
+            
+            if (smoothNormals)
+            {
+               smoothNormals->push_back(computeMeshSmoothNormals(info, (const float*) P->getData(), 0, 0.0f));
+            }
          }
          else
          {
             vlist = AiArrayAllocate(P->size(), mDso->numMotionSamples(), AI_TYPE_POINT);
+            
+            // extrapolated positions to use for smooth normal computation
+            float *eP = 0;
+               
+            if (smoothNormals)
+            {
+               eP = (float*) AiMalloc(3 * P->size() * sizeof(float));
+            }
             
             for (size_t i=0, j=0; i<mDso->numMotionSamples(); ++i)
             {
@@ -902,7 +980,8 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
                {
                   const float *vvel = vel;
                   const float *vacc = acc;
-                  for (size_t k=0; k<P->size(); ++k, vvel+=3, vacc+=3)
+                  
+                  for (size_t k=0, l=0; k<P->size(); ++k, vvel+=3, vacc+=3, l+=3)
                   {
                      Alembic::Abc::V3f p = P->get()[k];
                      
@@ -911,12 +990,20 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
                      pnt.z = p.z + dt * (vvel[2] + 0.5 * dt * vacc[2]);
                      
                      AiArraySetPnt(vlist, j+k, pnt);
+                     
+                     if (eP)
+                     {
+                        eP[l+0] = pnt.x;
+                        eP[l+1] = pnt.y;
+                        eP[l+2] = pnt.z;
+                     }
                   }
                }
                else
                {
                   const float *vvel = vel;
-                  for (size_t k=0; k<P->size(); ++k, vvel+=3)
+                  
+                  for (size_t k=0, l=0; k<P->size(); ++k, vvel+=3, l+=3)
                   {
                      Alembic::Abc::V3f p = P->get()[k];
                      
@@ -925,10 +1012,27 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
                      pnt.z = p.z + dt * vvel[2];
                      
                      AiArraySetPnt(vlist, j+k, pnt);
+                     
+                     if (eP)
+                     {
+                        eP[l+0] = pnt.x;
+                        eP[l+1] = pnt.y;
+                        eP[l+2] = pnt.z;
+                     }
                   }
                }
                
+               if (smoothNormals)
+               {
+                  smoothNormals->push_back(computeMeshSmoothNormals(info, eP, 0, 0.0f));
+               }
+               
                j += info.pointCount;
+            }
+            
+            if (smoothNormals)
+            {
+               AiFree(eP);
             }
          }
       }
@@ -1044,6 +1148,11 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
                   
                   AiArraySetPnt(vlist, j+k, pnt);
                }
+               
+               if (smoothNormals)
+               {
+                  smoothNormals->push_back(computeMeshSmoothNormals(info, (const float*) P0->getData(), (const float*) P1->getData(), b));
+               }
             }
             else
             {
@@ -1061,6 +1170,11 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
                   pnt.z = p.z;
                   
                   AiArraySetPnt(vlist, j+k, pnt);
+               }
+               
+               if (smoothNormals)
+               {
+                  smoothNormals->push_back(computeMeshSmoothNormals(info, (const float*) P0->getData(), 0, 0.0f));
                }
             }
             
@@ -1141,7 +1255,7 @@ bool MakeShape::computeMeshTangentSpace(AlembicNodeT<Alembic::Abc::ISchemaObject
    
    if (!N)
    {
-      N = computeMeshSmoothNormals(info, P0, P1, b);
+      N = computeMeshSmoothNormals(info, (const float*) P0->getData(), (const float*) P1->getData(), b);
       if (!N)
       {
          return false;
@@ -1596,6 +1710,276 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
       
       #endif
    }
+}
+
+template <class MeshSchema>
+bool MakeShape::getReferenceMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node, MeshInfo &info,
+                                 AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> >* &refMesh,
+                                 UserAttributes* &pointAttrs, UserAttributes* &vertexAttrs)
+{
+   if (!pointAttrs || !vertexAttrs)
+   {
+      // pointAttrs and vertexAttrs must be set
+      refMesh = 0;
+      return false;
+   }
+   
+   if (pointAttrs == &(info.pointAttrs) || vertexAttrs == &(info.vertexAttrs))
+   {
+      // pointAttrs and vertexAttrs should point to attribute storage other than current scene's one
+      refMesh = 0;
+      return false;
+   }
+   
+   // Priority
+   //   1/ "Pref" attribute in current alembic scene
+   //   2/ "Pref" attribute in reference alembic scene
+   //   3/ Positions from reference alembic scene
+   //   4/ Positions from current alembic scene's first frame
+   
+   UserAttributes::iterator uait;
+   bool hasPref = false;
+   
+   uait = info.pointAttrs.find("Pref");
+   
+   if (uait != info.pointAttrs.end())
+   {
+      if (isVaryingFloat3(info, uait->second))
+      {
+         hasPref = true;
+      }
+      else
+      {
+         // Pref exists but doesn't match requirements, get rid of it
+         DestroyUserAttribute(uait->second);
+         info.pointAttrs.erase(uait);
+      }
+   }
+   
+   if (hasPref)
+   {
+      refMesh = &node;
+      pointAttrs = &(info.pointAttrs);
+      vertexAttrs = &(info.vertexAttrs);
+   }
+   else
+   {
+      AlembicScene *refScene = mDso->referenceScene();
+      
+      if (!refScene)
+      {
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Using current alembic scene first sample as reference.");
+         }
+         
+         refMesh = &node;
+         pointAttrs = &(info.pointAttrs);
+         vertexAttrs = &(info.vertexAttrs);
+      }
+      else
+      {
+         AlembicNode *refNode = refScene->find(node.path());
+         
+         if (refNode)
+         {
+            refMesh = dynamic_cast<AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> >*>(refNode);
+            
+            if (!refMesh)
+            {
+               AiMsgWarning("[abcproc] Node in reference alembic doesn't have the same type. Using current alembic scene first sample as reference");
+               
+               refMesh = &node;
+               pointAttrs = &(info.pointAttrs);
+               vertexAttrs = &(info.vertexAttrs);
+            }
+            else
+            {
+               MeshSchema meshSchema = refMesh->typedObject().getSchema();
+               
+               double reftime = meshSchema.getTimeSampling()->getSampleTime(0);
+               
+               collectUserAttributes(meshSchema.getUserProperties(), meshSchema.getArbGeomParams(),
+                                     reftime, false,
+                                     0, 0, pointAttrs, vertexAttrs, 0,
+                                     FilterReferenceAttributes);
+               
+               uait = pointAttrs->find("Pref");
+               
+               if (uait != pointAttrs->end())
+               {
+                  if (isVaryingFloat3(info, uait->second))
+                  {
+                     hasPref = true;
+                  }
+                  else
+                  {
+                     // Pref exists but doesn't match requirements, get rid of it
+                     DestroyUserAttribute(uait->second);
+                     pointAttrs->erase(uait);
+                  }
+               }
+            }
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Couldn't find node in reference alembic scene. Using current alembic scene first sample as reference");
+            
+            refMesh = &node;
+            pointAttrs = &(info.pointAttrs);
+            vertexAttrs = &(info.vertexAttrs);
+         }
+      }
+   }
+   
+   return hasPref;
+}
+
+template <class MeshSchema>
+bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> >* &refMesh,
+                                       MeshInfo &info,
+                                       UserAttributes* pointAttrs,
+                                       Alembic::Abc::M44d &Mref)
+{
+   if (!refMesh || !pointAttrs)
+   {
+      return false;
+   }
+   
+   MeshSchema meshSchema = refMesh->typedObject().getSchema();
+         
+   typename MeshSchema::Sample meshSample = meshSchema.getValue();
+   
+   Alembic::Abc::P3fArraySamplePtr Pref = meshSample.getPositions();
+      
+   bool hasPref = (pointAttrs->find("Pref") != pointAttrs->end());
+   
+   if (!hasPref && Pref->size() == info.pointCount)
+   {
+      float *vals = (float*) AiMalloc(3 * info.pointCount * sizeof(float));
+      
+      const AtUserParamEntry *upe = AiNodeLookUpUserParameter(mDso->procNode(), "Mref");
+      
+      if (upe != 0 &&
+          AiUserParamGetCategory(upe) == AI_USERDEF_CONSTANT &&
+          AiUserParamGetType(upe) == AI_TYPE_MATRIX)
+      {
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Using provided Mref");
+         }
+         
+         AtMatrix mtx;
+         
+         AiNodeGetMatrix(mDso->procNode(), "Mref", mtx);
+         
+         for (int r=0; r<4; ++r)
+         {
+            for (int c=0; c<4; ++c)
+            {
+               Mref[r][c] = mtx[r][c];
+            }
+         }
+      }
+      else
+      {
+         // recompute matrix
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Compute reference world matrix Mref");
+         }
+         
+         AlembicXform *refParent = dynamic_cast<AlembicXform*>(refMesh->parent());
+         
+         while (refParent)
+         {
+            Alembic::AbcGeom::IXformSchema xformSchema = refParent->typedObject().getSchema();
+            
+            Alembic::AbcGeom::XformSample xformSample = xformSchema.getValue();
+            
+            Mref = Mref * xformSample.getMatrix();
+            
+            if (xformSchema.getInheritsXforms())
+            {
+               refParent = dynamic_cast<AlembicXform*>(refParent->parent());
+            }
+            else
+            {
+               refParent = 0;
+            }
+         }
+      }
+      
+      for (unsigned int p=0, off=0; p<info.pointCount; ++p, off+=3)
+      {
+         Alembic::Abc::V3f P = Pref->get()[p] * Mref;
+         
+         vals[off] = P.x;
+         vals[off+1] = P.y;
+         vals[off+2] = P.z;
+      }
+      
+      UserAttribute &ua = info.pointAttrs["Pref"];
+      
+      InitUserAttribute(ua);
+      
+      ua.arnoldCategory = AI_USERDEF_VARYING;
+      ua.arnoldType = AI_TYPE_POINT;
+      ua.arnoldTypeStr = "POINT";
+      ua.isArray = true;
+      ua.dataDim = 3;
+      ua.dataCount = info.pointCount;
+      ua.data = vals;
+      
+      hasPref = true;
+   }
+   else
+   {
+      if (hasPref)
+      {
+         if (pointAttrs != &(info.pointAttrs))
+         {
+            // Transfer from reference shape attributes to current shape attribtues
+            UserAttribute &src = (*pointAttrs)["Pref"];
+            UserAttribute &dst = info.pointAttrs["Pref"];
+            
+            dst = src;
+            
+            pointAttrs->erase(pointAttrs->find("Pref"));
+         }
+         
+         // Little type aliasing
+         UserAttribute &ua = info.pointAttrs["Pref"];
+         
+         if (ua.dataDim == 1 && ua.dataCount == (3 * info.pointCount))
+         {
+            if (mDso->verbose())
+            {
+               AiMsgInfo("[abcproc] \"Pref\" exported with wrong base type: float instead if float[3]");
+            }
+            
+            ua.dataDim = 3;
+            ua.dataCount = info.pointCount;
+            ua.arnoldType = AI_TYPE_POINT;
+            ua.arnoldTypeStr = "POINT";
+         }
+         
+         if (mDso->referenceScene())
+         {
+            AiMsgWarning("[abcproc] \"Pref\" read from user attribute, ignore values from reference alembic");
+         }
+         else if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] \"Pref\" read from user attribute");
+         }
+      }
+      else
+      {
+         AiMsgWarning("[abcproc] Could not generate \"Pref\" for mesh \"%s\"", refMesh->path().c_str());
+      }
+   }
+   
+   return hasPref;
 }
 
 #endif

@@ -616,13 +616,19 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
                                       UserAttributes *primitiveAttrs,
                                       UserAttributes *pointAttrs,
                                       UserAttributes *vertexAttrs,
-                                      std::map<std::string, Alembic::AbcGeom::IV2fGeomParam> *UVs)
+                                      std::map<std::string, Alembic::AbcGeom::IV2fGeomParam> *UVs,
+                                      MakeShape::CollectFilter filter)
 {
    if (userProps.valid() && objectAttrs && mDso->readObjectAttribs())
    {
       for (size_t i=0; i<userProps.getNumProperties(); ++i)
       {
          const Alembic::AbcCoreAbstract::PropertyHeader &header = userProps.getPropertyHeader(i);
+         
+         if (filter && !filter(header))
+         {
+            continue;
+         }
          
          std::pair<std::string, UserAttribute> ua;
          
@@ -651,12 +657,19 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
    if (geomParams.valid())
    {
       std::set<std::string> specialPointNames;
+      std::set<std::string> specialVertexNames;
       
       specialPointNames.insert("acceleration");
       specialPointNames.insert("accel");
       specialPointNames.insert("a");
       specialPointNames.insert("velocity");
       specialPointNames.insert("v");
+      if (mDso->outputReference())
+      {
+         specialPointNames.insert("Pref");
+         specialPointNames.insert("Nref");
+         specialVertexNames.insert("Nref");
+      }
       
       for (size_t i=0; i<geomParams.getNumProperties(); ++i)
       {
@@ -691,7 +704,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
             switch (scope)
             {
             case Alembic::AbcGeom::kFacevaryingScope:
-               if (vertexAttrs && mDso->readVertexAttribs())
+               if (vertexAttrs && (mDso->readVertexAttribs() || specialVertexNames.find(ua.first) != specialVertexNames.end()))
                {
                   //ua.second.arnoldCategory = AI_USERDEF_INDEXED;
                   attrs = vertexAttrs;
@@ -745,17 +758,24 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
             
             if (attrs)
             {
-               if (ReadUserAttribute(ua.second, geomParams, header, t, true, interpolate))
+               if (filter && !filter(header))
                {
-                  attrs->insert(ua);
+                  DestroyUserAttribute(ua.second);
                }
                else
                {
-                  if (mDso->verbose())
+                  if (ReadUserAttribute(ua.second, geomParams, header, t, true, interpolate))
                   {
-                     AiMsgWarning("[abcproc] Failed");
+                     attrs->insert(ua);
                   }
-                  DestroyUserAttribute(ua.second);
+                  else
+                  {
+                     if (mDso->verbose())
+                     {
+                        AiMsgWarning("[abcproc] Failed");
+                     }
+                     DestroyUserAttribute(ua.second);
+                  }
                }
             }
          }
@@ -765,13 +785,13 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
 
 
 float* MakeShape::computeMeshSmoothNormals(MakeShape::MeshInfo &info,
-                                           Alembic::Abc::P3fArraySamplePtr P0,
-                                           Alembic::Abc::P3fArraySamplePtr P1,
+                                           const float *P0,
+                                           const float *P1,
                                            float blend)
 {
    if (mDso->verbose())
    {
-      AiMsgInfo("[abcproc] Compute smooth point normals");
+      AiMsgInfo("[abcproc] Compute smooth normals");
    }
    
    size_t bytesize = 3 * info.pointCount * sizeof(float);
@@ -792,17 +812,43 @@ float* MakeShape::computeMeshSmoothNormals(MakeShape::MeshInfo &info,
                                info.vertexPointIndex[v + fv - 1],
                                info.vertexPointIndex[v + fv    ]};
          
+         const float *P0a = P0 + 3 * pi[0];
+         const float *P0b = P0 + 3 * pi[1];
+         const float *P0c = P0 + 3 * pi[2];
+         
          if (P1)
          {
-            p0 = (1.0f - blend) * P0->get()[pi[0]] + blend * P1->get()[pi[0]];
-            p1 = (1.0f - blend) * P0->get()[pi[1]] + blend * P1->get()[pi[1]];
-            p2 = (1.0f - blend) * P0->get()[pi[2]] + blend * P1->get()[pi[2]];
+            const float *P1a = P1 + 3 * pi[0];
+            const float *P1b = P1 + 3 * pi[1];
+            const float *P1c = P1 + 3 * pi[2];
+            
+            float iblend = (1.0f - blend);
+            
+            p0.x = iblend * P0a[0] + blend * P1a[0];
+            p0.y = iblend * P0a[1] + blend * P1a[1];
+            p0.z = iblend * P0a[2] + blend * P1a[2];
+            
+            p1.x = iblend * P0b[0] + blend * P1b[0];
+            p1.y = iblend * P0b[1] + blend * P1b[1];
+            p1.z = iblend * P0b[2] + blend * P1b[2];
+            
+            p2.x = iblend * P0c[0] + blend * P1c[0];
+            p2.y = iblend * P0c[1] + blend * P1c[1];
+            p2.z = iblend * P0c[2] + blend * P1c[2];
          }
          else
          {
-            p0 = P0->get()[pi[0]];
-            p1 = P0->get()[pi[1]];
-            p2 = P0->get()[pi[2]];
+            p0.x = P0a[0];
+            p0.y = P0a[1];
+            p0.z = P0a[2];
+            
+            p1.x = P0b[0];
+            p1.y = P0b[1];
+            p1.z = P0b[2];
+            
+            p2.x = P0c[0];
+            p2.y = P0c[1];
+            p2.z = P0c[2];
          }
          
          e0 = p1 - p0;
@@ -844,6 +890,295 @@ float* MakeShape::computeMeshSmoothNormals(MakeShape::MeshInfo &info,
    return smoothNormals;
 }
 
+bool MakeShape::FilterReferenceAttributes(const Alembic::AbcCoreAbstract::PropertyHeader &header)
+{
+   if (header.getName() == "Pref")
+   {
+      Alembic::AbcGeom::GeometryScope scope = Alembic::AbcGeom::GetGeometryScope(header.getMetaData());
+      
+      return (scope == Alembic::AbcGeom::kVaryingScope || scope == Alembic::AbcGeom::kVertexScope);
+   }
+   else if (header.getName() == "Nref")
+   {
+      Alembic::AbcGeom::GeometryScope scope = Alembic::AbcGeom::GetGeometryScope(header.getMetaData());
+      
+      return (scope != Alembic::AbcGeom::kConstantScope && scope != Alembic::AbcGeom::kUniformScope);
+   }
+   else
+   {
+      return false;
+   }
+}
+
+bool MakeShape::checkReferenceNormals(MeshInfo &info,
+                                      UserAttributes *pointAttrs,
+                                      UserAttributes *vertexAttrs)
+{
+   bool hasNref = false;
+   
+   UserAttributes::iterator uait = vertexAttrs->find("Nref");
+   
+   if (uait != vertexAttrs->end())
+   {
+      if (isIndexedFloat3(info, uait->second))
+      {
+         hasNref = true;
+      }
+      else
+      {
+         DestroyUserAttribute(uait->second);
+         vertexAttrs->erase(uait);
+      }
+   }
+   
+   if (!hasNref)
+   {
+      uait = pointAttrs->find("Nref");
+      
+      if (uait != pointAttrs->end())
+      {
+         if (isVaryingFloat3(info, uait->second))
+         {
+            hasNref = true;
+         }
+         else
+         {
+            DestroyUserAttribute(uait->second);
+            pointAttrs->erase(uait);
+         }
+      }
+   }
+   
+   return hasNref;
+}
+
+bool MakeShape::readReferenceNormals(AlembicMesh *refMesh,
+                                     MeshInfo &info,
+                                     const Alembic::Abc::M44d &Mref)
+{
+   Alembic::AbcGeom::IPolyMeshSchema meshSchema = refMesh->typedObject().getSchema();
+   
+   Alembic::AbcGeom::IN3fGeomParam Nref = meshSchema.getNormalsParam();
+   
+   if (Nref.valid() && (Nref.getScope() == Alembic::AbcGeom::kFacevaryingScope ||
+                        Nref.getScope() == Alembic::AbcGeom::kVertexScope ||
+                        Nref.getScope() == Alembic::AbcGeom::kVaryingScope))
+   {
+      Alembic::AbcGeom::IN3fGeomParam::Sample sample = Nref.getIndexedValue();
+      
+      Alembic::Abc::N3fArraySamplePtr vals = sample.getVals();
+      Alembic::Abc::UInt32ArraySamplePtr idxs = sample.getIndices();
+      
+      bool NrefPerPoint = (Nref.getScope() != Alembic::AbcGeom::kFacevaryingScope);
+      bool validSize = false;
+      
+      if (idxs)
+      {
+         validSize = (NrefPerPoint ? idxs->size() == info.pointCount : idxs->size() == info.vertexCount);
+      }
+      else
+      {
+         validSize = (NrefPerPoint ? vals->size() == info.pointCount : vals->size() == info.vertexCount);
+      }
+      
+      if (validSize)
+      {
+         float *vl = 0;
+         unsigned int *il = 0;
+         
+         if (NrefPerPoint)
+         {
+            vl = (float*) AiMalloc(3 * info.pointCount * sizeof(float));
+         }
+         else
+         {
+            vl = (float*) AiMalloc(3 * vals->size() * sizeof(float));
+         }
+         
+         if (!NrefPerPoint || !idxs)
+         {
+            // Can copy vector values straight from alembic property
+            for (size_t i=0, j=0; i<vals->size(); ++i, j+=3)
+            {
+               Alembic::Abc::N3f val;
+               
+               Mref.multDirMatrix(vals->get()[i], val);
+               val.normalize();
+               
+               vl[j+0] = val.x;
+               vl[j+1] = val.y;
+               vl[j+2] = val.z;
+            }
+         }
+         
+         if (idxs)
+         {
+            if (!NrefPerPoint)
+            {
+               il = (unsigned int*) AiMalloc(info.vertexCount * sizeof(unsigned int));
+               
+               for (unsigned int i=0; i<info.vertexCount; ++i)
+               {
+                  il[info.arnoldVertexIndex[i]] = idxs->get()[i];
+               }
+            }
+            else
+            {
+               // no mapping
+               for (unsigned int i=0, j=0; i<info.pointCount; ++i, j+=3)
+               {
+                  Alembic::Abc::N3f val;
+                  
+                  Mref.multDirMatrix(vals->get()[idxs->get()[i]], val);
+                  val.normalize();
+                  
+                  vl[j+0] = val.x;
+                  vl[j+1] = val.y;
+                  vl[j+2] = val.z;
+               }
+            }
+         }
+         else
+         {
+            if (!NrefPerPoint)
+            {
+               // Build straight mapping 
+               il = (unsigned int*) AiMalloc(info.vertexCount * sizeof(unsigned int));
+               
+               for (unsigned int i=0; i<info.vertexCount; ++i)
+               {
+                  il[info.arnoldVertexIndex[i]] = i;
+               }
+            }
+         }
+         
+         if (mDso->verbose())
+         {
+            if (mDso->referenceScene())
+            {
+               AiMsgInfo("[abcproc] Use reference alembic world space normals as \"Nref\"");
+            }
+            else
+            {
+               AiMsgInfo("[abcproc] Use first sample world space normals as \"Nref\"");
+            }
+         }
+         
+         UserAttribute &ua = (NrefPerPoint ? info.pointAttrs["Nref"] : info.vertexAttrs["Nref"]);
+   
+         InitUserAttribute(ua);
+         
+         ua.arnoldCategory = (NrefPerPoint ? AI_USERDEF_VARYING : AI_USERDEF_INDEXED);
+         ua.arnoldType = AI_TYPE_VECTOR;
+         ua.arnoldTypeStr = "VECTOR";
+         ua.isArray = true;
+         ua.dataDim = 3;
+         ua.dataCount = (NrefPerPoint ? info.pointCount : vals->size());
+         ua.data = vl;
+         ua.indicesCount = (NrefPerPoint ? 0 : info.vertexCount);
+         ua.indices = (NrefPerPoint ? 0 : il);
+         
+         return true;
+      }
+      else
+      {
+         if (mDso->referenceScene())
+         {
+            AiMsgWarning("[abcproc] Cannot use reference alembic normals as \"Nref\"");
+         }
+         
+         return false;
+      }
+   }
+   else
+   {
+      if (mDso->referenceScene())
+      {
+         AiMsgWarning("[abcproc] Cannot use reference alembic normals as \"Nref\"");
+      }
+      
+      return false;
+   }
+}
+
+bool MakeShape::fillReferenceNormals(MeshInfo &info,
+                                     UserAttributes *pointAttrs,
+                                     UserAttributes *vertexAttrs)
+{
+   if (!pointAttrs || !vertexAttrs)
+   {
+      return false;
+   }
+   
+   bool hasNref = checkReferenceNormals(info, pointAttrs, vertexAttrs);
+   
+   return fillReferenceNormals(info, !hasNref, pointAttrs, vertexAttrs);
+}
+
+bool MakeShape::fillReferenceNormals(MeshInfo &info,
+                                     bool computeSmoothNormals,
+                                     UserAttributes *pointAttrs,
+                                     UserAttributes *vertexAttrs)
+{
+   if (!pointAttrs || !vertexAttrs)
+   {
+      return false;
+   }
+   
+   if (computeSmoothNormals)
+   {
+      if (mDso->verbose())
+      {
+         AiMsgInfo("[abcproc] Compute smooth \"Nref\" from \"Pref\"");
+      }
+      
+      UserAttribute &ua = info.pointAttrs["Nref"];
+      
+      InitUserAttribute(ua);
+               
+      ua.arnoldCategory = AI_USERDEF_VARYING;
+      ua.arnoldType = AI_TYPE_VECTOR;
+      ua.arnoldTypeStr = "VECTOR";
+      ua.isArray = true;
+      ua.dataDim = 3;
+      ua.dataCount = info.pointCount;
+      ua.data = computeMeshSmoothNormals(info, (const float*) info.pointAttrs["Pref"].data, 0, 0.0f);
+      
+      return true;
+   }
+   else
+   {
+      bool NrefPerPoint = (vertexAttrs->find("Nref") == vertexAttrs->end());
+      
+      if (NrefPerPoint)
+      {
+         if (pointAttrs != &(info.pointAttrs))
+         {
+            UserAttribute &src = (*pointAttrs)["Nref"];
+            UserAttribute &dst = info.pointAttrs["Nref"];
+            
+            dst = src;
+            
+            pointAttrs->erase(pointAttrs->find("Nref"));
+         }
+      }
+      else
+      {
+         if (vertexAttrs != &(info.vertexAttrs))
+         {
+            UserAttribute &src = (*vertexAttrs)["Nref"];
+            UserAttribute &dst = info.vertexAttrs["Nref"];
+            
+            dst = src;
+            
+            vertexAttrs->erase(vertexAttrs->find("Nref"));
+         }
+      }
+      
+      return true;
+   }
+}
+
 AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instance)
 {
    Alembic::AbcGeom::IPolyMeshSchema schema = node.typedObject().getSchema();
@@ -882,20 +1217,14 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
    
    // Create base mesh
    
-   mNode = generateBaseMesh(node, info);
-   
-   if (!mNode)
-   {
-      return AlembicNode::DontVisitChildren;
-   }
-   
-   // Output normals
-   
-   AtArray *nlist = 0;
-   AtArray *nidxs = 0;
-   
+   // Figure out if normals need to be read or computed 
+   Alembic::AbcGeom::IN3fGeomParam N;
+   std::vector<float*> _smoothNormals;
+   std::vector<float*> *smoothNormals = 0;
    bool subd = false;
    bool smoothing = false;
+   bool readNormals = false;
+   bool NperPoint = false;
    
    const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mDso->procNode(), "subdiv_type");
    
@@ -913,542 +1242,605 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
       }
    }
    
-   bool readNormals = (!subd && smoothing);
+   readNormals = (!subd && smoothing);
    
-   if (mDso->verbose() && readNormals)
+   if (readNormals)
    {
-      AiMsgInfo("[abcproc] Read normals data if available");
-   }
-   
-   TimeSampleList<Alembic::AbcGeom::IN3fGeomParam> Nsamples;
-   Alembic::AbcGeom::IN3fGeomParam N = schema.getNormalsParam();
-   bool NperPoint = false;
-   
-   if (readNormals && N.valid() &&
-       (N.getScope() == Alembic::AbcGeom::kFacevaryingScope ||
-        N.getScope() == Alembic::AbcGeom::kVaryingScope))
-   {
-      if (info.varyingTopology)
+      if (mDso->verbose())
       {
-         Nsamples.update(N, mDso->renderTime(), mDso->renderTime(), false);
+         AiMsgInfo("[abcproc] Read normals data if available");
+      }
+      
+      N = schema.getNormalsParam();
+      
+      if (N.valid() && (N.getScope() == Alembic::AbcGeom::kFacevaryingScope ||
+                        N.getScope() == Alembic::AbcGeom::kVertexScope ||
+                        N.getScope() == Alembic::AbcGeom::kVaryingScope))
+      {
+         NperPoint = (N.getScope() != Alembic::AbcGeom::kFacevaryingScope);
       }
       else
       {
-         for (size_t i=0; i<mDso->numMotionSamples(); ++i)
-         {
-            double t = mDso->motionSampleTime(i);
-         
-            if (mDso->verbose())
-            {
-               AiMsgInfo("[abcproc] Sample normals \"%s\" at t=%lf", node.path().c_str(), t);
-            }
-         
-            Nsamples.update(N, t, t, i>0);
-         }
+         smoothNormals = &_smoothNormals;
+         NperPoint = true;
       }
-      
-      NperPoint = (N.getScope() == Alembic::AbcGeom::kVaryingScope);
    }
    
-   if (Nsamples.size() > 0)
+   mNode = generateBaseMesh(node, info, smoothNormals);
+   
+   if (!mNode)
    {
-      TimeSampleList<Alembic::AbcGeom::IN3fGeomParam>::ConstIterator n0, n1;
-      double blend = 0.0;
-      AtVector vec;
-      
-      if (info.varyingTopology || Nsamples.size() == 1)
+      return AlembicNode::DontVisitChildren;
+   }
+   
+   // Output normals
+   
+   AtArray *nlist = 0;
+   AtArray *nidxs = 0;
+   
+   if (readNormals)
+   {
+      if (smoothNormals)
       {
-         // Only output one sample
+         // output smooth normals (per-point)
          
-         Nsamples.getSamples(mDso->renderTime(), n0, n1, blend);
-         
-         Alembic::Abc::N3fArraySamplePtr vals = n0->data().getVals();
-         Alembic::Abc::UInt32ArraySamplePtr idxs = n0->data().getIndices();
-         
-         nlist = AiArrayAllocate(vals->size(), 1, AI_TYPE_VECTOR);
-         
-         for (size_t i=0; i<vals->size(); ++i)
+         // build vertex -> point mappings
+         nidxs = AiArrayAllocate(info.vertexCount, 1, AI_TYPE_UINT);
+         for (unsigned int k=0; k<info.vertexCount; ++k)
          {
-            Alembic::Abc::N3f val = vals->get()[i];
-            
-            vec.x = val.x;
-            vec.y = val.y;
-            vec.z = val.z;
-            
-            AiArraySetVec(nlist, i, vec);
+            AiArraySetUInt(nidxs, k, info.vertexPointIndex[k]);
          }
          
-         if (mDso->verbose())
-         {
-            AiMsgInfo("[abcproc] Read %lu normals", vals->size());
-         }
+         nlist = AiArrayAllocate(info.pointCount, smoothNormals->size(), AI_TYPE_VECTOR);
          
-         if (NperPoint)
+         unsigned int j = 0;
+         AtVector n;
+         
+         for (size_t i=0; i<smoothNormals->size(); ++i)
          {
-            if (idxs)
+            float *N = (*smoothNormals)[i];
+            
+            for (unsigned int k=0; k<info.pointCount; ++k, ++j, N+=3)
             {
-               nidxs = AiArrayAllocate(info.vertexCount, 1, AI_TYPE_UINT);
+               n.x = N[0];
+               n.y = N[1];
+               n.z = N[2];
                
-               for (unsigned int i=0; i<info.vertexCount; ++i)
-               {
-                  unsigned int vidx = info.arnoldVertexIndex[i];
-                  unsigned int pidx = info.vertexPointIndex[vidx];
-                  
-                  if (pidx >= idxs->size())
-                  {
-                     AiMsgWarning("[abcproc] Invalid normal index");
-                     AiArraySetUInt(nidxs, vidx, 0);
-                  }
-                  else
-                  {
-                     AiArraySetUInt(nidxs, vidx, idxs->get()[pidx]);
-                  }
-               }
+               AiArraySetVec(nlist, j, n);
             }
-            else
-            {
-               nidxs = AiArrayCopy(AiNodeGetArray(mNode, "vidxs"));
-            }
+            
+            AiFree(N);
+         }
+         
+         smoothNormals->clear();
+         
+         AiNodeSetArray(mNode, "nlist", nlist);
+         AiNodeSetArray(mNode, "nidxs", nidxs);
+      }
+      else
+      {
+         TimeSampleList<Alembic::AbcGeom::IN3fGeomParam> Nsamples;
+         
+         if (info.varyingTopology)
+         {
+            Nsamples.update(N, mDso->renderTime(), mDso->renderTime(), false);
          }
          else
-         {     
-            if (idxs)
+         {
+            for (size_t i=0; i<mDso->numMotionSamples(); ++i)
             {
-               nidxs = AiArrayAllocate(idxs->size(), 1, AI_TYPE_UINT);
-               
-               for (size_t i=0; i<idxs->size(); ++i)
-               {
-                  AiArraySetUInt(nidxs, info.arnoldVertexIndex[i], idxs->get()[i]);
-               }
-               
+               double t = mDso->motionSampleTime(i);
+            
                if (mDso->verbose())
                {
-                  AiMsgInfo("[abcproc] Read %lu normal indices", idxs->size());
+                  AiMsgInfo("[abcproc] Sample normals \"%s\" at t=%lf", node.path().c_str(), t);
                }
+            
+               Nsamples.update(N, t, t, i>0);
             }
-            else
+         }
+         
+         if (Nsamples.size() > 0)
+         {
+            TimeSampleList<Alembic::AbcGeom::IN3fGeomParam>::ConstIterator n0, n1;
+            double blend = 0.0;
+            AtVector vec;
+            
+            if (info.varyingTopology || Nsamples.size() == 1)
             {
-               nidxs = AiArrayAllocate(vals->size(), 1, AI_TYPE_UINT);
+               // Only output one sample
+               
+               Nsamples.getSamples(mDso->renderTime(), n0, n1, blend);
+               
+               Alembic::Abc::N3fArraySamplePtr vals = n0->data().getVals();
+               Alembic::Abc::UInt32ArraySamplePtr idxs = n0->data().getIndices();
+               
+               nlist = AiArrayAllocate(vals->size(), 1, AI_TYPE_VECTOR);
                
                for (size_t i=0; i<vals->size(); ++i)
                {
-                  AiArraySetUInt(nidxs, info.arnoldVertexIndex[i], i);
-               }
-            }
-         }
-      }
-      else
-      {
-         for (size_t i=0, j=0; i<mDso->numMotionSamples(); ++i)
-         {
-            double t = mDso->motionSampleTime(i);
-            
-            if (mDso->verbose())
-            {
-               AiMsgInfo("[abcproc] Read normal samples [t=%lf]", t);
-            }
-            
-            Nsamples.getSamples(t, n0, n1, blend);
-            
-            if (!nlist)
-            {
-               nlist = AiArrayAllocate(info.vertexCount, mDso->numMotionSamples(), AI_TYPE_VECTOR);
-            }
-            
-            if (blend > 0.0)
-            {
-               Alembic::Abc::N3fArraySamplePtr vals0 = n0->data().getVals();
-               Alembic::Abc::N3fArraySamplePtr vals1 = n1->data().getVals();
-               Alembic::Abc::UInt32ArraySamplePtr idxs0 = n0->data().getIndices();
-               Alembic::Abc::UInt32ArraySamplePtr idxs1 = n1->data().getIndices();
-               
-               if (mDso->verbose())
-               {
-                  AiMsgInfo("[abcproc] Read %lu normals / %lu normals [interpolate]", vals0->size(), vals1->size());
-               }
-               
-               double a = 1.0 - blend;
-               
-               if (idxs0)
-               {
-                  if (mDso->verbose())
-                  {
-                     AiMsgInfo("[abcproc] Read %lu normal indices", idxs0->size());
-                  }
+                  Alembic::Abc::N3f val = vals->get()[i];
                   
-                  if (idxs1)
-                  {
-                     if (mDso->verbose())
-                     {
-                        AiMsgInfo("[abcproc] Read %lu normal indices", idxs0->size());
-                     }
-                     
-                     if (idxs0->size() != idxs1->size() ||
-                         ( NperPoint && idxs0->size() != info.pointCount) ||
-                         (!NperPoint && idxs0->size() != info.vertexCount))
-                     {
-                        if (nidxs) AiArrayDestroy(nidxs);
-                        if (nlist) AiArrayDestroy(nlist);
-                        nidxs = 0;
-                        nlist = 0;
-                        AiMsgWarning("[abcproc] Ignore normals: non uniform samples");
-                        break;
-                     }
-                     
-                     if (NperPoint)
-                     {
-                        for (unsigned int k=0; k<info.vertexCount; ++k)
-                        {
-                           unsigned int vidx = info.arnoldVertexIndex[k];
-                           unsigned int pidx = info.vertexPointIndex[vidx];
-                           
-                           if (pidx >= idxs0->size() || pidx >= idxs1->size())
-                           {
-                              AiMsgWarning("[abcproc] Invalid normal index");
-                              AiArraySetVec(nlist, j + vidx, AI_V3_ZERO);
-                           }
-                           else
-                           {
-                              Alembic::Abc::N3f val0 = vals0->get()[idxs0->get()[pidx]];
-                              Alembic::Abc::N3f val1 = vals1->get()[idxs1->get()[pidx]];
-                              
-                              vec.x = a * val0.x + blend * val1.x;
-                              vec.y = a * val0.y + blend * val1.y;
-                              vec.z = a * val0.z + blend * val1.z;
-                              
-                              AiArraySetVec(nlist, j + vidx, vec);
-                           }
-                        }
-                     }
-                     else
-                     {
-                        for (unsigned int k=0; k<info.vertexCount; ++k)
-                        {
-                           Alembic::Abc::N3f val0 = vals0->get()[idxs0->get()[k]];
-                           Alembic::Abc::N3f val1 = vals1->get()[idxs1->get()[k]];
-                           
-                           vec.x = a * val0.x + blend * val1.x;
-                           vec.y = a * val0.y + blend * val1.y;
-                           vec.z = a * val0.z + blend * val1.z;
-                           
-                           AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
-                        }
-                     }
-                  }
-                  else
-                  {
-                     if (vals1->size() != idxs0->size() ||
-                         ( NperPoint && vals1->size() != info.pointCount) ||
-                         (!NperPoint && vals1->size() != info.vertexCount))
-                     {
-                        if (nidxs) AiArrayDestroy(nidxs);
-                        if (nlist) AiArrayDestroy(nlist);
-                        nidxs = 0;
-                        nlist = 0;
-                        AiMsgWarning("[abcproc] Ignore normals: non uniform samples");
-                        break;
-                     }
-                     
-                     if (NperPoint)
-                     {
-                        for (unsigned int k=0; k<info.vertexCount; ++k)
-                        {
-                           unsigned int vidx = info.arnoldVertexIndex[k];
-                           unsigned int pidx = info.vertexPointIndex[vidx];
-                           
-                           if (pidx >= vals1->size() || pidx >= idxs0->size())
-                           {
-                              AiMsgWarning("[abcproc] Invalid normal index");
-                              AiArraySetVec(nlist, j + vidx, AI_V3_ZERO);
-                           }
-                           else
-                           {
-                              Alembic::Abc::N3f val0 = vals0->get()[idxs0->get()[pidx]];
-                              Alembic::Abc::N3f val1 = vals1->get()[pidx];
-                              
-                              vec.x = a * val0.x + blend * val1.x;
-                              vec.y = a * val0.y + blend * val1.y;
-                              vec.z = a * val0.z + blend * val1.z;
-                              
-                              AiArraySetVec(nlist, j + vidx, vec);
-                           }
-                        }
-                     }
-                     else
-                     {
-                        for (unsigned int k=0; k<info.vertexCount; ++k)
-                        {
-                           Alembic::Abc::N3f val0 = vals0->get()[idxs0->get()[k]];
-                           Alembic::Abc::N3f val1 = vals1->get()[k];
-                           
-                           vec.x = a * val0.x + blend * val1.x;
-                           vec.y = a * val0.y + blend * val1.y;
-                           vec.z = a * val0.z + blend * val1.z;
-                           
-                           AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
-                        }
-                     }
-                  }
+                  vec.x = val.x;
+                  vec.y = val.y;
+                  vec.z = val.z;
+                  
+                  AiArraySetVec(nlist, i, vec);
                }
-               else
-               {
-                  if (idxs1)
-                  {
-                     if (mDso->verbose())
-                     {
-                        AiMsgInfo("[abcproc] Read %lu normal indices", idxs1->size());
-                     }
-                     
-                     if (vals0->size() != idxs1->size() ||
-                         ( NperPoint && vals0->size() != info.pointCount) ||
-                         (!NperPoint && vals0->size() != info.vertexCount))
-                     {
-                        if (nidxs) AiArrayDestroy(nidxs);
-                        if (nlist) AiArrayDestroy(nlist);
-                        nidxs = 0;
-                        nlist = 0;
-                        AiMsgWarning("[abcproc] Ignore normals: non uniform samples");
-                        break;
-                     }
-                     
-                     if (NperPoint)
-                     {
-                        for (unsigned int k=0; k<info.vertexCount; ++k)
-                        {
-                           unsigned int vidx = info.arnoldVertexIndex[k];
-                           unsigned int pidx = info.vertexPointIndex[vidx];
-                           
-                           if (pidx >= vals0->size() || pidx >= idxs1->size())
-                           {
-                              AiMsgWarning("[abcproc] Invalid normal index");
-                              AiArraySetVec(nlist, j + vidx, AI_V3_ZERO);
-                           }
-                           else
-                           {
-                              Alembic::Abc::N3f val0 = vals0->get()[pidx];
-                              Alembic::Abc::N3f val1 = vals1->get()[idxs1->get()[pidx]];
-                              
-                              vec.x = a * val0.x + blend * val1.x;
-                              vec.y = a * val0.y + blend * val1.y;
-                              vec.z = a * val0.z + blend * val1.z;
-                              
-                              AiArraySetVec(nlist, j + vidx, vec);
-                           }
-                        }
-                     }
-                     else
-                     {
-                        for (unsigned int k=0; k<info.vertexCount; ++k)
-                        {
-                           Alembic::Abc::N3f val0 = vals0->get()[k];
-                           Alembic::Abc::N3f val1 = vals1->get()[idxs1->get()[k]];
-                           
-                           vec.x = a * val0.x + blend * val1.x;
-                           vec.y = a * val0.y + blend * val1.y;
-                           vec.z = a * val0.z + blend * val1.z;
-                           
-                           AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
-                        }
-                     }
-                  }
-                  else
-                  {
-                     if (vals1->size() != vals0->size() ||
-                         ( NperPoint && vals0->size() != info.pointCount) ||
-                         (!NperPoint && vals0->size() != info.vertexCount))
-                     {
-                        if (nidxs) AiArrayDestroy(nidxs);
-                        if (nlist) AiArrayDestroy(nlist);
-                        nidxs = 0;
-                        nlist = 0;
-                        AiMsgWarning("[abcproc] Ignore normals: non uniform samples");
-                        break;
-                     }
-                     
-                     if (NperPoint)
-                     {
-                        for (unsigned int k=0; k<info.vertexCount; ++k)
-                        {
-                           unsigned int vidx = info.arnoldVertexIndex[k];
-                           unsigned int pidx = info.vertexPointIndex[vidx];
-                           
-                           if (pidx >= vals0->size())
-                           {
-                              AiMsgWarning("[abcproc] Invalid normal index");
-                              AiArraySetVec(nlist, j + vidx, AI_V3_ZERO);
-                           }
-                           else
-                           {
-                              Alembic::Abc::N3f val0 = vals0->get()[pidx];
-                              Alembic::Abc::N3f val1 = vals1->get()[pidx];
-                              
-                              vec.x = a * val0.x + blend * val1.x;
-                              vec.y = a * val0.y + blend * val1.y;
-                              vec.z = a * val0.z + blend * val1.z;
-                              
-                              AiArraySetVec(nlist, j + vidx, vec);
-                           }
-                        }
-                     }
-                     else
-                     {
-                        for (unsigned int k=0; k<info.vertexCount; ++k)
-                        {
-                           Alembic::Abc::N3f val0 = vals0->get()[k];
-                           Alembic::Abc::N3f val1 = vals1->get()[k];
-                           
-                           vec.x = a * val0.x + blend * val1.x;
-                           vec.y = a * val0.y + blend * val1.y;
-                           vec.z = a * val0.z + blend * val1.z;
-                           
-                           AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
-                        }
-                     }
-                  }
-               }
-            }
-            else
-            {
-               Alembic::Abc::N3fArraySamplePtr vals = n0->data().getVals();
-               Alembic::Abc::UInt32ArraySamplePtr idxs = n0->data().getIndices();
                
                if (mDso->verbose())
                {
                   AiMsgInfo("[abcproc] Read %lu normals", vals->size());
                }
                
-               if (idxs)
+               if (NperPoint)
                {
-                  if (mDso->verbose())
+                  if (idxs)
                   {
-                     AiMsgInfo("[abcproc] Read %lu normal indices", idxs->size());
-                  }
-                  
-                  if (( NperPoint && idxs->size() != info.pointCount ) ||
-                      (!NperPoint && idxs->size() != info.vertexCount))
-                  {
-                     AiArrayDestroy(nidxs);
-                     AiArrayDestroy(nlist);
-                     nidxs = 0;
-                     nlist = 0;
-                     AiMsgWarning("[abcproc] Ignore normals: non uniform samples");
-                     break;
-                  }
-                  
-                  if (NperPoint)
-                  {
-                     for (unsigned int k=0; k<info.vertexCount; ++k)
+                     nidxs = AiArrayAllocate(info.vertexCount, 1, AI_TYPE_UINT);
+                     
+                     for (unsigned int i=0; i<info.vertexCount; ++i)
                      {
-                        unsigned int vidx = info.arnoldVertexIndex[k];
+                        unsigned int vidx = info.arnoldVertexIndex[i];
                         unsigned int pidx = info.vertexPointIndex[vidx];
                         
                         if (pidx >= idxs->size())
                         {
                            AiMsgWarning("[abcproc] Invalid normal index");
-                           AiArraySetVec(nlist, j + vidx, AI_V3_ZERO);
+                           AiArraySetUInt(nidxs, vidx, 0);
                         }
                         else
                         {
-                           Alembic::Abc::N3f val = vals->get()[idxs->get()[pidx]];
-                           
-                           vec.x = val.x;
-                           vec.y = val.y;
-                           vec.z = val.z;
-                           
-                           AiArraySetVec(nlist, j + vidx, vec);
+                           AiArraySetUInt(nidxs, vidx, idxs->get()[pidx]);
                         }
                      }
                   }
                   else
                   {
-                     for (unsigned int k=0; k<info.vertexCount; ++k)
-                     {
-                        Alembic::Abc::N3f val = vals->get()[idxs->get()[k]];
-                        
-                        vec.x = val.x;
-                        vec.y = val.y;
-                        vec.z = val.z;
-                        
-                        AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
-                     }
+                     nidxs = AiArrayCopy(AiNodeGetArray(mNode, "vidxs"));
                   }
                }
                else
-               {
-                  if (( NperPoint && vals->size() != info.pointCount ) ||
-                      (!NperPoint && vals->size() != info.vertexCount))
+               {     
+                  if (idxs)
                   {
-                     AiArrayDestroy(nidxs);
-                     if (nlist) AiArrayDestroy(nlist);
-                     nidxs = 0;
-                     nlist = 0;
-                     AiMsgWarning("[abcproc] Ignore normals: non uniform samples");
-                     break;
+                     nidxs = AiArrayAllocate(idxs->size(), 1, AI_TYPE_UINT);
+                     
+                     for (size_t i=0; i<idxs->size(); ++i)
+                     {
+                        AiArraySetUInt(nidxs, info.arnoldVertexIndex[i], idxs->get()[i]);
+                     }
+                     
+                     if (mDso->verbose())
+                     {
+                        AiMsgInfo("[abcproc] Read %lu normal indices", idxs->size());
+                     }
+                  }
+                  else
+                  {
+                     nidxs = AiArrayAllocate(vals->size(), 1, AI_TYPE_UINT);
+                     
+                     for (size_t i=0; i<vals->size(); ++i)
+                     {
+                        AiArraySetUInt(nidxs, info.arnoldVertexIndex[i], i);
+                     }
+                  }
+               }
+            }
+            else
+            {
+               for (size_t i=0, j=0; i<mDso->numMotionSamples(); ++i)
+               {
+                  double t = mDso->motionSampleTime(i);
+                  
+                  if (mDso->verbose())
+                  {
+                     AiMsgInfo("[abcproc] Read normal samples [t=%lf]", t);
                   }
                   
-                  if (NperPoint)
+                  Nsamples.getSamples(t, n0, n1, blend);
+                  
+                  if (!nlist)
                   {
-                     for (unsigned int k=0; k<info.vertexCount; ++k)
+                     nlist = AiArrayAllocate(info.vertexCount, mDso->numMotionSamples(), AI_TYPE_VECTOR);
+                  }
+                  
+                  if (blend > 0.0)
+                  {
+                     Alembic::Abc::N3fArraySamplePtr vals0 = n0->data().getVals();
+                     Alembic::Abc::N3fArraySamplePtr vals1 = n1->data().getVals();
+                     Alembic::Abc::UInt32ArraySamplePtr idxs0 = n0->data().getIndices();
+                     Alembic::Abc::UInt32ArraySamplePtr idxs1 = n1->data().getIndices();
+                     
+                     if (mDso->verbose())
                      {
-                        unsigned int vidx = info.arnoldVertexIndex[k];
-                        unsigned int pidx = info.vertexPointIndex[vidx];
-                        
-                        if (pidx >= vals->size())
+                        AiMsgInfo("[abcproc] Read %lu normals / %lu normals [interpolate]", vals0->size(), vals1->size());
+                     }
+                     
+                     double a = 1.0 - blend;
+                     
+                     if (idxs0)
+                     {
+                        if (mDso->verbose())
                         {
-                           AiMsgWarning("[abcproc] Invalid normal index");
-                           AiArraySetVec(nlist, j + vidx, AI_V3_ZERO);
+                           AiMsgInfo("[abcproc] Read %lu normal indices", idxs0->size());
+                        }
+                        
+                        if (idxs1)
+                        {
+                           if (mDso->verbose())
+                           {
+                              AiMsgInfo("[abcproc] Read %lu normal indices", idxs0->size());
+                           }
+                           
+                           if (idxs0->size() != idxs1->size() ||
+                               ( NperPoint && idxs0->size() != info.pointCount) ||
+                               (!NperPoint && idxs0->size() != info.vertexCount))
+                           {
+                              if (nidxs) AiArrayDestroy(nidxs);
+                              if (nlist) AiArrayDestroy(nlist);
+                              nidxs = 0;
+                              nlist = 0;
+                              AiMsgWarning("[abcproc] Ignore normals: non uniform samples");
+                              break;
+                           }
+                           
+                           if (NperPoint)
+                           {
+                              for (unsigned int k=0; k<info.vertexCount; ++k)
+                              {
+                                 unsigned int vidx = info.arnoldVertexIndex[k];
+                                 unsigned int pidx = info.vertexPointIndex[vidx];
+                                 
+                                 if (pidx >= idxs0->size() || pidx >= idxs1->size())
+                                 {
+                                    AiMsgWarning("[abcproc] Invalid normal index");
+                                    AiArraySetVec(nlist, j + vidx, AI_V3_ZERO);
+                                 }
+                                 else
+                                 {
+                                    Alembic::Abc::N3f val0 = vals0->get()[idxs0->get()[pidx]];
+                                    Alembic::Abc::N3f val1 = vals1->get()[idxs1->get()[pidx]];
+                                    
+                                    vec.x = a * val0.x + blend * val1.x;
+                                    vec.y = a * val0.y + blend * val1.y;
+                                    vec.z = a * val0.z + blend * val1.z;
+                                    
+                                    AiArraySetVec(nlist, j + vidx, vec);
+                                 }
+                              }
+                           }
+                           else
+                           {
+                              for (unsigned int k=0; k<info.vertexCount; ++k)
+                              {
+                                 Alembic::Abc::N3f val0 = vals0->get()[idxs0->get()[k]];
+                                 Alembic::Abc::N3f val1 = vals1->get()[idxs1->get()[k]];
+                                 
+                                 vec.x = a * val0.x + blend * val1.x;
+                                 vec.y = a * val0.y + blend * val1.y;
+                                 vec.z = a * val0.z + blend * val1.z;
+                                 
+                                 AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                              }
+                           }
                         }
                         else
                         {
-                           Alembic::Abc::N3f val = vals->get()[pidx];
-                        
-                           vec.x = val.x;
-                           vec.y = val.y;
-                           vec.z = val.z;
+                           if (vals1->size() != idxs0->size() ||
+                               ( NperPoint && vals1->size() != info.pointCount) ||
+                               (!NperPoint && vals1->size() != info.vertexCount))
+                           {
+                              if (nidxs) AiArrayDestroy(nidxs);
+                              if (nlist) AiArrayDestroy(nlist);
+                              nidxs = 0;
+                              nlist = 0;
+                              AiMsgWarning("[abcproc] Ignore normals: non uniform samples");
+                              break;
+                           }
                            
-                           AiArraySetVec(nlist, j + vidx, vec);
+                           if (NperPoint)
+                           {
+                              for (unsigned int k=0; k<info.vertexCount; ++k)
+                              {
+                                 unsigned int vidx = info.arnoldVertexIndex[k];
+                                 unsigned int pidx = info.vertexPointIndex[vidx];
+                                 
+                                 if (pidx >= vals1->size() || pidx >= idxs0->size())
+                                 {
+                                    AiMsgWarning("[abcproc] Invalid normal index");
+                                    AiArraySetVec(nlist, j + vidx, AI_V3_ZERO);
+                                 }
+                                 else
+                                 {
+                                    Alembic::Abc::N3f val0 = vals0->get()[idxs0->get()[pidx]];
+                                    Alembic::Abc::N3f val1 = vals1->get()[pidx];
+                                    
+                                    vec.x = a * val0.x + blend * val1.x;
+                                    vec.y = a * val0.y + blend * val1.y;
+                                    vec.z = a * val0.z + blend * val1.z;
+                                    
+                                    AiArraySetVec(nlist, j + vidx, vec);
+                                 }
+                              }
+                           }
+                           else
+                           {
+                              for (unsigned int k=0; k<info.vertexCount; ++k)
+                              {
+                                 Alembic::Abc::N3f val0 = vals0->get()[idxs0->get()[k]];
+                                 Alembic::Abc::N3f val1 = vals1->get()[k];
+                                 
+                                 vec.x = a * val0.x + blend * val1.x;
+                                 vec.y = a * val0.y + blend * val1.y;
+                                 vec.z = a * val0.z + blend * val1.z;
+                                 
+                                 AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                              }
+                           }
+                        }
+                     }
+                     else
+                     {
+                        if (idxs1)
+                        {
+                           if (mDso->verbose())
+                           {
+                              AiMsgInfo("[abcproc] Read %lu normal indices", idxs1->size());
+                           }
+                           
+                           if (vals0->size() != idxs1->size() ||
+                               ( NperPoint && vals0->size() != info.pointCount) ||
+                               (!NperPoint && vals0->size() != info.vertexCount))
+                           {
+                              if (nidxs) AiArrayDestroy(nidxs);
+                              if (nlist) AiArrayDestroy(nlist);
+                              nidxs = 0;
+                              nlist = 0;
+                              AiMsgWarning("[abcproc] Ignore normals: non uniform samples");
+                              break;
+                           }
+                           
+                           if (NperPoint)
+                           {
+                              for (unsigned int k=0; k<info.vertexCount; ++k)
+                              {
+                                 unsigned int vidx = info.arnoldVertexIndex[k];
+                                 unsigned int pidx = info.vertexPointIndex[vidx];
+                                 
+                                 if (pidx >= vals0->size() || pidx >= idxs1->size())
+                                 {
+                                    AiMsgWarning("[abcproc] Invalid normal index");
+                                    AiArraySetVec(nlist, j + vidx, AI_V3_ZERO);
+                                 }
+                                 else
+                                 {
+                                    Alembic::Abc::N3f val0 = vals0->get()[pidx];
+                                    Alembic::Abc::N3f val1 = vals1->get()[idxs1->get()[pidx]];
+                                    
+                                    vec.x = a * val0.x + blend * val1.x;
+                                    vec.y = a * val0.y + blend * val1.y;
+                                    vec.z = a * val0.z + blend * val1.z;
+                                    
+                                    AiArraySetVec(nlist, j + vidx, vec);
+                                 }
+                              }
+                           }
+                           else
+                           {
+                              for (unsigned int k=0; k<info.vertexCount; ++k)
+                              {
+                                 Alembic::Abc::N3f val0 = vals0->get()[k];
+                                 Alembic::Abc::N3f val1 = vals1->get()[idxs1->get()[k]];
+                                 
+                                 vec.x = a * val0.x + blend * val1.x;
+                                 vec.y = a * val0.y + blend * val1.y;
+                                 vec.z = a * val0.z + blend * val1.z;
+                                 
+                                 AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                              }
+                           }
+                        }
+                        else
+                        {
+                           if (vals1->size() != vals0->size() ||
+                               ( NperPoint && vals0->size() != info.pointCount) ||
+                               (!NperPoint && vals0->size() != info.vertexCount))
+                           {
+                              if (nidxs) AiArrayDestroy(nidxs);
+                              if (nlist) AiArrayDestroy(nlist);
+                              nidxs = 0;
+                              nlist = 0;
+                              AiMsgWarning("[abcproc] Ignore normals: non uniform samples");
+                              break;
+                           }
+                           
+                           if (NperPoint)
+                           {
+                              for (unsigned int k=0; k<info.vertexCount; ++k)
+                              {
+                                 unsigned int vidx = info.arnoldVertexIndex[k];
+                                 unsigned int pidx = info.vertexPointIndex[vidx];
+                                 
+                                 if (pidx >= vals0->size())
+                                 {
+                                    AiMsgWarning("[abcproc] Invalid normal index");
+                                    AiArraySetVec(nlist, j + vidx, AI_V3_ZERO);
+                                 }
+                                 else
+                                 {
+                                    Alembic::Abc::N3f val0 = vals0->get()[pidx];
+                                    Alembic::Abc::N3f val1 = vals1->get()[pidx];
+                                    
+                                    vec.x = a * val0.x + blend * val1.x;
+                                    vec.y = a * val0.y + blend * val1.y;
+                                    vec.z = a * val0.z + blend * val1.z;
+                                    
+                                    AiArraySetVec(nlist, j + vidx, vec);
+                                 }
+                              }
+                           }
+                           else
+                           {
+                              for (unsigned int k=0; k<info.vertexCount; ++k)
+                              {
+                                 Alembic::Abc::N3f val0 = vals0->get()[k];
+                                 Alembic::Abc::N3f val1 = vals1->get()[k];
+                                 
+                                 vec.x = a * val0.x + blend * val1.x;
+                                 vec.y = a * val0.y + blend * val1.y;
+                                 vec.z = a * val0.z + blend * val1.z;
+                                 
+                                 AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                              }
+                           }
                         }
                      }
                   }
                   else
                   {
-                     for (unsigned int k=0; k<info.vertexCount; ++k)
+                     Alembic::Abc::N3fArraySamplePtr vals = n0->data().getVals();
+                     Alembic::Abc::UInt32ArraySamplePtr idxs = n0->data().getIndices();
+                     
+                     if (mDso->verbose())
                      {
-                        Alembic::Abc::N3f val = vals->get()[k];
+                        AiMsgInfo("[abcproc] Read %lu normals", vals->size());
+                     }
+                     
+                     if (idxs)
+                     {
+                        if (mDso->verbose())
+                        {
+                           AiMsgInfo("[abcproc] Read %lu normal indices", idxs->size());
+                        }
                         
-                        vec.x = val.x;
-                        vec.y = val.y;
-                        vec.z = val.z;
+                        if (( NperPoint && idxs->size() != info.pointCount ) ||
+                            (!NperPoint && idxs->size() != info.vertexCount))
+                        {
+                           AiArrayDestroy(nidxs);
+                           AiArrayDestroy(nlist);
+                           nidxs = 0;
+                           nlist = 0;
+                           AiMsgWarning("[abcproc] Ignore normals: non uniform samples");
+                           break;
+                        }
                         
-                        AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                        if (NperPoint)
+                        {
+                           for (unsigned int k=0; k<info.vertexCount; ++k)
+                           {
+                              unsigned int vidx = info.arnoldVertexIndex[k];
+                              unsigned int pidx = info.vertexPointIndex[vidx];
+                              
+                              if (pidx >= idxs->size())
+                              {
+                                 AiMsgWarning("[abcproc] Invalid normal index");
+                                 AiArraySetVec(nlist, j + vidx, AI_V3_ZERO);
+                              }
+                              else
+                              {
+                                 Alembic::Abc::N3f val = vals->get()[idxs->get()[pidx]];
+                                 
+                                 vec.x = val.x;
+                                 vec.y = val.y;
+                                 vec.z = val.z;
+                                 
+                                 AiArraySetVec(nlist, j + vidx, vec);
+                              }
+                           }
+                        }
+                        else
+                        {
+                           for (unsigned int k=0; k<info.vertexCount; ++k)
+                           {
+                              Alembic::Abc::N3f val = vals->get()[idxs->get()[k]];
+                              
+                              vec.x = val.x;
+                              vec.y = val.y;
+                              vec.z = val.z;
+                              
+                              AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                           }
+                        }
+                     }
+                     else
+                     {
+                        if (( NperPoint && vals->size() != info.pointCount ) ||
+                            (!NperPoint && vals->size() != info.vertexCount))
+                        {
+                           AiArrayDestroy(nidxs);
+                           if (nlist) AiArrayDestroy(nlist);
+                           nidxs = 0;
+                           nlist = 0;
+                           AiMsgWarning("[abcproc] Ignore normals: non uniform samples");
+                           break;
+                        }
+                        
+                        if (NperPoint)
+                        {
+                           for (unsigned int k=0; k<info.vertexCount; ++k)
+                           {
+                              unsigned int vidx = info.arnoldVertexIndex[k];
+                              unsigned int pidx = info.vertexPointIndex[vidx];
+                              
+                              if (pidx >= vals->size())
+                              {
+                                 AiMsgWarning("[abcproc] Invalid normal index");
+                                 AiArraySetVec(nlist, j + vidx, AI_V3_ZERO);
+                              }
+                              else
+                              {
+                                 Alembic::Abc::N3f val = vals->get()[pidx];
+                              
+                                 vec.x = val.x;
+                                 vec.y = val.y;
+                                 vec.z = val.z;
+                                 
+                                 AiArraySetVec(nlist, j + vidx, vec);
+                              }
+                           }
+                        }
+                        else
+                        {
+                           for (unsigned int k=0; k<info.vertexCount; ++k)
+                           {
+                              Alembic::Abc::N3f val = vals->get()[k];
+                              
+                              vec.x = val.x;
+                              vec.y = val.y;
+                              vec.z = val.z;
+                              
+                              AiArraySetVec(nlist, j + info.arnoldVertexIndex[k], vec);
+                           }
+                        }
                      }
                   }
+                  
+                  if (!nidxs)
+                  {
+                     // vertex remapping already happened at values level
+                     nidxs = AiArrayAllocate(info.vertexCount, 1, AI_TYPE_UINT);
+                     
+                     for (unsigned int k=0; k<info.vertexCount; ++k)
+                     {
+                        AiArraySetUInt(nidxs, k, k);
+                     }
+                  }
+                  
+                  j += info.vertexCount;
                }
             }
             
-            if (!nidxs)
+            if (nlist && nidxs)
             {
-               // vertex remapping already happened at values level
-               nidxs = AiArrayAllocate(info.vertexCount, 1, AI_TYPE_UINT);
-               
-               for (unsigned int k=0; k<info.vertexCount; ++k)
-               {
-                  AiArraySetUInt(nidxs, k, k);
-               }
+               AiNodeSetArray(mNode, "nlist", nlist);
+               AiNodeSetArray(mNode, "nidxs", nidxs);
             }
-            
-            j += info.vertexCount;
+            else
+            {
+               AiMsgWarning("[abcproc] Ignore normals: No valid data");
+            }
          }
-      }
-      
-      if (nlist && nidxs)
-      {
-         AiNodeSetArray(mNode, "nlist", nlist);
-         AiNodeSetArray(mNode, "nidxs", nidxs);
-      }
-      else
-      {
-         AiMsgWarning("[abcproc] Ignore normals: No valid data");
       }
    }
    
@@ -1458,123 +1850,67 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
    
    // Output reference (Pref)
    
-   if (mDso->referenceScene())
+   if (mDso->outputReference())
    {
-      AlembicNode *refNode = mDso->referenceScene()->find(node.path());
-      
-      if (refNode)
+      if (mDso->verbose())
       {
-         AlembicMesh *refMesh = dynamic_cast<AlembicMesh*>(refNode);
-         
-         if (refMesh)
-         {
-            Alembic::AbcGeom::IPolyMeshSchema meshSchema = refMesh->typedObject().getSchema();
-            
-            Alembic::AbcGeom::IPolyMeshSchema::Sample meshSample = meshSchema.getValue();
-            
-            Alembic::Abc::P3fArraySamplePtr Pref = meshSample.getPositions();
-            
-            // Output Pref
-            
-            if (Pref->size() == info.pointCount &&
-                info.pointAttrs.find("Pref") == info.pointAttrs.end())
-            {
-               if (mDso->verbose())
-               {
-                  AiMsgInfo("[abcproc] Ouptut Pref");
-               }
-               
-               float *vals = (float*) AiMalloc(3 * info.pointCount * sizeof(float));
-               
-               Alembic::Abc::M44d W;
-               
-               const AtUserParamEntry *upe = AiNodeLookUpUserParameter(mDso->procNode(), "Mref");
-               if (upe != 0 &&
-                   AiUserParamGetCategory(upe) == AI_USERDEF_CONSTANT &&
-                   AiUserParamGetType(upe) == AI_TYPE_MATRIX)
-               {
-                  if (mDso->verbose())
-                  {
-                     AiMsgInfo("[abcproc] Using provided Mref");
-                  }
-                  
-                  AtMatrix mtx;
-                  AiNodeGetMatrix(mDso->procNode(), "Mref", mtx);
-                  for (int r=0; r<4; ++r)
-                  {
-                     for (int c=0; c<4; ++c)
-                     {
-                        W[r][c] = mtx[r][c];
-                     }
-                  }
-               }
-               else
-               {
-                  // recompute matrix
-                  if (mDso->verbose())
-                  {
-                     AiMsgInfo("[abcproc] Compute reference world matrix Mref");
-                  }
-                  
-                  AlembicXform *refParent = dynamic_cast<AlembicXform*>(refNode->parent());
-                  
-                  while (refParent)
-                  {
-                     Alembic::AbcGeom::IXformSchema xformSchema = refParent->typedObject().getSchema();
-                     
-                     Alembic::AbcGeom::XformSample xformSample = xformSchema.getValue();
-                     
-                     W = W * xformSample.getMatrix();
-                     
-                     if (xformSchema.getInheritsXforms())
-                     {
-                        refParent = dynamic_cast<AlembicXform*>(refParent->parent());
-                     }
-                     else
-                     {
-                        refParent = 0;
-                     }
-                  }
-               }
-               
-               for (unsigned int p=0, off=0; p<info.pointCount; ++p, off+=3)
-               {
-                  Alembic::Abc::V3f P = Pref->get()[p] * W;
-                  
-                  vals[off] = P.x;
-                  vals[off+1] = P.y;
-                  vals[off+2] = P.z;
-               }
-               
-               UserAttribute &ua = info.pointAttrs["Pref"];
-               
-               InitUserAttribute(ua);
-               
-               ua.arnoldCategory = AI_USERDEF_VARYING;
-               ua.arnoldType = AI_TYPE_POINT;
-               ua.arnoldTypeStr = "POINT";
-               ua.isArray = true;
-               ua.dataDim = 3;
-               ua.dataCount = info.pointCount;
-               ua.data = vals;
-            }
-            else
-            {
-               if (Pref->size() != info.pointCount)
-               {
-                  AiMsgWarning("[abcproc] Point count mismatch in reference alembic for mesh \"%s\"", node.path().c_str());
-               }
-               else
-               {
-                  AiMsgWarning("[abcproc] \"Pref\" user attribute already exists, ignore values from reference alembic");
-               }
-            }
-            
-            // Nref?
-            // Tref?
-            // Bref?
-         }
+         AiMsgInfo("[abcproc] Generate reference attributes");
       }
+      
+      UserAttributes refPointAttrs;
+      UserAttributes refVertexAttrs;
+      UserAttributes *pointAttrs = &refPointAttrs;
+      UserAttributes *vertexAttrs = &refVertexAttrs;
+      AlembicMesh *refMesh = 0;
+      
+      bool hasPref = getReferenceMesh(node, info, refMesh, pointAttrs, vertexAttrs);
+      
+      if (refMesh)
+      {
+         // Generate Pref
+         
+         Alembic::Abc::M44d Mref;  // World matrix to apply to points from reference (applies to both P and N)
+         
+         bool hadPref = hasPref;
+         
+         hasPref = fillReferencePositions(refMesh, info, pointAttrs, Mref);
+         
+         // Generate Nref
+         
+         if (hasPref && readNormals)
+         {
+            bool hasNref = checkReferenceNormals(info, pointAttrs, vertexAttrs);
+            
+            if (!hasNref)
+            {
+               if (hadPref)
+               {
+                  // Pref coming from user defined attribute, use it to compute Nref
+                  // rather than reading a standard normal sample
+               }
+               else
+               {
+                  hasNref = readReferenceNormals(refMesh, info, Mref);
+                  
+                  if (hasNref)
+                  {
+                     // Nref is set in info's attribute stores
+                     vertexAttrs = &(info.vertexAttrs);
+                     pointAttrs = &(info.pointAttrs);
+                  }
+               }
+            }
+            
+            fillReferenceNormals(info, !hasNref, pointAttrs, vertexAttrs);
+         }
+         
+         // Tref?
+         // Bref?
+      }
+      
+      // Cleanup read reference attributes 
+      DestroyUserAttributes(refPointAttrs);
+      DestroyUserAttributes(refVertexAttrs);
    }
    
    // Output user defined attributes
@@ -1630,11 +1966,84 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
    
    // Create base mesh
    
-   mNode = generateBaseMesh(node, info);
+   // Check if normals should be computed
+   std::vector<float*> _smoothNormals;
+   std::vector<float*> *smoothNormals = 0;
+   bool subd = false;
+   bool smoothing = false;
+   bool readNormals = false;
+   
+   const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mDso->procNode(), "subdiv_type");
+   
+   if (pe)
+   {
+      subd = (AiNodeGetInt(mDso->procNode(), "subdiv_type") > 0);
+   }
+   
+   if (!subd)
+   {
+      pe = AiNodeLookUpUserParameter(mDso->procNode(), "smoothing");
+      if (pe)
+      {
+         smoothing = AiNodeGetBool(mDso->procNode(), "smoothing");
+      }
+   }
+   
+   readNormals = (!subd && smoothing);
+   
+   if (readNormals)
+   {
+      smoothNormals = &_smoothNormals;
+   }
+   
+   mNode = generateBaseMesh(node, info, smoothNormals);
    
    if (!mNode)
    {
       return AlembicNode::DontVisitChildren;
+   }
+   
+   // Output normals
+   
+   if (readNormals)
+   {
+      AtArray *nlist = 0;
+      AtArray *nidxs = 0;
+      
+      // output smooth normals (per-point)
+      
+      // build vertex -> point mappings
+      nidxs = AiArrayAllocate(info.vertexCount, 1, AI_TYPE_UINT);
+      for (unsigned int k=0; k<info.vertexCount; ++k)
+      {
+         AiArraySetUInt(nidxs, k, info.vertexPointIndex[k]);
+      }
+      
+      nlist = AiArrayAllocate(info.pointCount, smoothNormals->size(), AI_TYPE_VECTOR);
+      
+      unsigned int j = 0;
+      AtVector n;
+      
+      for (size_t i=0; i<smoothNormals->size(); ++i)
+      {
+         float *N = (*smoothNormals)[i];
+         
+         for (unsigned int k=0; k<info.pointCount; ++k, ++j, N+=3)
+         {
+            n.x = N[0];
+            n.y = N[1];
+            n.z = N[2];
+            
+            AiArraySetVec(nlist, j, n);
+         }
+         
+         AiFree(N);
+      }
+      
+      smoothNormals->clear();
+      
+      AiNodeSetArray(mNode, "nlist", nlist);
+      AiNodeSetArray(mNode, "nidxs", nidxs);
    }
    
    // Output UVs
@@ -1643,123 +2052,43 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
    
    // Output referece
    
-   if (mDso->referenceScene())
+   if (mDso->outputReference())
    {
-      AlembicNode *refNode = mDso->referenceScene()->find(node.path());
-      
-      if (refNode)
+      if (mDso->verbose())
       {
-         AlembicSubD *refMesh = dynamic_cast<AlembicSubD*>(refNode);
-         
-         if (refMesh)
-         {
-            Alembic::AbcGeom::ISubDSchema meshSchema = refMesh->typedObject().getSchema();
-            
-            Alembic::AbcGeom::ISubDSchema::Sample meshSample = meshSchema.getValue();
-            
-            Alembic::Abc::P3fArraySamplePtr Pref = meshSample.getPositions();
-            
-            // Output Pref
-            
-            if (Pref->size() == info.pointCount &&
-                info.pointAttrs.find("Pref") == info.pointAttrs.end())
-            {
-               if (mDso->verbose())
-               {
-                  AiMsgInfo("[abcproc] Ouptut Pref");
-               }
-               
-               float *vals = (float*) AiMalloc(3 * info.pointCount * sizeof(float));
-               
-               Alembic::Abc::M44d W;
-               
-               const AtUserParamEntry *upe = AiNodeLookUpUserParameter(mDso->procNode(), "Mref");
-               if (upe != 0 &&
-                   AiUserParamGetCategory(upe) == AI_USERDEF_CONSTANT &&
-                   AiUserParamGetType(upe) == AI_TYPE_MATRIX)
-               {
-                  if (mDso->verbose())
-                  {
-                     AiMsgInfo("[abcproc] Using provided Mref");
-                  }
-                  
-                  AtMatrix mtx;
-                  AiNodeGetMatrix(mDso->procNode(), "Mref", mtx);
-                  for (int r=0; r<4; ++r)
-                  {
-                     for (int c=0; c<4; ++c)
-                     {
-                        W[r][c] = mtx[r][c];
-                     }
-                  }
-               }
-               else
-               {
-                  // recompute matrix
-                  if (mDso->verbose())
-                  {
-                     AiMsgInfo("[abcproc] Compute reference world matrix Mref");
-                  }
-                  
-                  AlembicXform *refParent = dynamic_cast<AlembicXform*>(refNode->parent());
-                  
-                  while (refParent)
-                  {
-                     Alembic::AbcGeom::IXformSchema xformSchema = refParent->typedObject().getSchema();
-                     
-                     Alembic::AbcGeom::XformSample xformSample = xformSchema.getValue();
-                     
-                     W = W * xformSample.getMatrix();
-                     
-                     if (xformSchema.getInheritsXforms())
-                     {
-                        refParent = dynamic_cast<AlembicXform*>(refParent->parent());
-                     }
-                     else
-                     {
-                        refParent = 0;
-                     }
-                  }
-               }
-               
-               for (unsigned int p=0, off=0; p<info.pointCount; ++p, off+=3)
-               {
-                  Alembic::Abc::V3f P = Pref->get()[p] * W;
-                  
-                  vals[off] = P.x;
-                  vals[off+1] = P.y;
-                  vals[off+2] = P.z;
-               }
-               
-               UserAttribute &ua = info.pointAttrs["Pref"];
-               
-               InitUserAttribute(ua);
-               
-               ua.arnoldCategory = AI_USERDEF_VARYING;
-               ua.arnoldType = AI_TYPE_POINT;
-               ua.arnoldTypeStr = "POINT";
-               ua.isArray = true;
-               ua.dataDim = 3;
-               ua.dataCount = info.pointCount;
-               ua.data = vals;
-            }
-            else
-            {
-               if (Pref->size() != info.pointCount)
-               {
-                  AiMsgWarning("[abcproc] Point count mismatch in reference alembic for mesh \"%s\"", node.path().c_str());
-               }
-               else
-               {
-                  AiMsgWarning("[abcproc] \"Pref\" user attribute already exists, ignore values from reference alembic");
-               }
-            }
-            
-            // Nref?
-            // Tref?
-            // Bref?
-         }
+         AiMsgInfo("[abcproc] Generate reference attributes");
       }
+      
+      UserAttributes refPointAttrs;
+      UserAttributes refVertexAttrs;
+      UserAttributes *pointAttrs = &refPointAttrs;
+      UserAttributes *vertexAttrs = &refVertexAttrs;
+      AlembicSubD *refMesh = 0;
+      
+      bool hasPref = getReferenceMesh(node, info, refMesh, pointAttrs, vertexAttrs);
+      
+      if (refMesh)
+      {
+         // Generate Pref
+         
+         Alembic::Abc::M44d Mref;  // World matrix to apply to points from reference (applies to both P and N)
+         
+         hasPref = fillReferencePositions(refMesh, info, pointAttrs, Mref);
+         
+         // Generate Nref
+         
+         if (hasPref && readNormals)
+         {
+            fillReferenceNormals(info, pointAttrs, vertexAttrs);
+         }
+         
+         // Tref?
+         // Bref?
+      }
+      
+      // Cleanup read reference attributes 
+      DestroyUserAttributes(refPointAttrs);
+      DestroyUserAttributes(refVertexAttrs);
    }
    
    // Output user defined attributes

@@ -52,6 +52,8 @@ void Dso::CommonParameters::reset()
    optimizeSamples = false;
    
    verbose = false;
+   
+   outputReference = false;
 }
 
 std::string Dso::CommonParameters::dataString(const char *targetShape) const
@@ -63,6 +65,10 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    if (filePath.length() > 0)
    {
       oss << " -filename " << filePath;
+   }
+   if (outputReference)
+   {
+      oss << " -outputreference";
    }
    if (referenceFilePath.length() > 0)
    {
@@ -157,6 +163,10 @@ std::string Dso::CommonParameters::shapeKey() const
    if (filePath.length() > 0)
    {
       oss << " -filename " << filePath;
+   }
+   if (outputReference)
+   {
+      oss << " -outputreference";
    }
    if (referenceFilePath.length() > 0)
    {
@@ -1009,9 +1019,14 @@ void Dso::readFromDataParam()
       {
          size_t j = i;
          
-         if (!processFlag(args, i))
+         if (!processFlag(args, j))
          {
-            AiMsgWarning("[abcproc] Failed processing flag \"%s\"", args[j].c_str());
+            AiMsgWarning("[abcproc] Failed processing flag \"%s\"", args[i].c_str());
+            ++i;
+         }
+         else
+         {
+            i = j;
          }
       }
       else
@@ -1145,7 +1160,7 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
    else if (args[i] == "-filename")
    {
       ++i;
-      if (i >= args.size())
+      if (i >= args.size() || isFlag(args[i]))
       {
          return false;
       }
@@ -1154,7 +1169,7 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
    else if (args[i] == "-nameprefix")
    {
       ++i;
-      if (i >= args.size())
+      if (i >= args.size() || isFlag(args[i]))
       {
          return false;
       }
@@ -1163,7 +1178,7 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
    else if (args[i] == "-objectpath")
    {
       ++i;
-      if (i >= args.size())
+      if (i >= args.size() || isFlag(args[i]))
       {
          return false;
       }
@@ -1214,10 +1229,14 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       }
    }
    // Process common parameters
+   else if (args[i] == "-outputreference")
+   {
+      mCommonParams.outputReference = true;
+   }
    else if (args[i] == "-referencefilename")
    {
       ++i;
-      if (i >= args.size())
+      if (i >= args.size() || isFlag(args[i]))
       {
          return false;
       }
@@ -1538,6 +1557,17 @@ void Dso::readFromUserParams()
          else
          {
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
+      else if (param == "outputreference")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
+         {
+            mCommonParams.outputReference = AiNodeGetBool(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
          }
       }
       else if (param == "referencefilename")

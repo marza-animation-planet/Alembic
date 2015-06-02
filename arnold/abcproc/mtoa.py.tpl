@@ -106,6 +106,10 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
       if ignoreVisibility:
          data += " -ignorevisibility"
       
+      val = cmds.getAttr(nodeName+".mtoa_abc_outputReference")
+      if val:
+         data += " -outputReference"
+      
       val = cmds.getAttr(nodeName+".mtoa_abc_referenceFilename")
       if val:
          data += " -referencefilename %s" % val
@@ -260,6 +264,7 @@ def SetupAttrs():
    try:
       attrs.append(stu.AttrData(arnoldNode="box", arnoldAttr="step_size"))
       
+      attrs.append(stu.AttrData(name="mtoa_abc_outputReference", shortName="outref", type=arnold.AI_TYPE_BOOLEAN, defaultValue=False))
       attrs.append(stu.AttrData(name="mtoa_abc_referenceFilename", shortName="reffp", type=arnold.AI_TYPE_STRING, defaultValue=""))
       
       attrs.append(stu.AttrData(name="mtoa_abc_computeTangents", shortName="cmptan", type=arnold.AI_TYPE_STRING, defaultValue=""))
