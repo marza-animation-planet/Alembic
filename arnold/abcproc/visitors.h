@@ -530,7 +530,7 @@ private:
                          UserAttributes* &pointAttrs, UserAttributes* &vertexAttrs);
    
    template <class MeshSchema>
-   bool fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> >* &refMesh,
+   bool fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > *refMesh,
                                MeshInfo &info,
                                UserAttributes *pointAttrs,
                                Alembic::Abc::M44d &Mref);
@@ -1836,7 +1836,7 @@ bool MakeShape::getReferenceMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSc
 }
 
 template <class MeshSchema>
-bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> >* &refMesh,
+bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > *refMesh,
                                        MeshInfo &info,
                                        UserAttributes* pointAttrs,
                                        Alembic::Abc::M44d &Mref)
