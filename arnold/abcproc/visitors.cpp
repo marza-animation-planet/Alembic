@@ -683,6 +683,11 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
              header.getMetaData().get("notUV") != "1")
              //Alembic::AbcGeom::isUV(header))
          {
+            if (filter && !filter(header))
+            {
+               continue;
+            }
+            
             std::pair<std::string, Alembic::AbcGeom::IV2fGeomParam> UV;
             
             UV.first = header.getName();
