@@ -191,7 +191,10 @@ public:
    bool readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
                      AlembicGeometrySource::GeomInfo *info,
                      const UserAttrsSet &attrs,
-                     bool computeNormals);
+                     bool computeNormals,
+                     AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > *refNode,
+                     AlembicGeometrySource::GeomInfo *refInfo,
+                     const UserAttrsSet *refAttrs);
    
    template <class MeshSchema>
    inline bool readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
@@ -199,7 +202,7 @@ public:
                             bool computeNormals)
    {
       UserAttrsSet attrs;
-      return readBaseMesh(node, info, attrs, computeNormals);
+      return readBaseMesh(node, info, attrs, computeNormals, 0, 0, 0);
    }
    
    float* computeMeshSmoothNormals(AlembicGeometrySource::GeomInfo *info,
@@ -207,9 +210,8 @@ public:
                                    const float *P1,
                                    float blend);
    
-   void readMeshNormals(AlembicMesh &mesh,
-                        AlembicGeometrySource::GeomInfo *info,
-                        const UserAttribute *Nref=0);
+   bool readMeshNormals(AlembicMesh &mesh,
+                        AlembicGeometrySource::GeomInfo *info);
    
    template <class MeshSchema>
    void setMeshNormals(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
@@ -235,10 +237,37 @@ public:
       return readMeshUVs(node, info, attrs, false, 0);
    }
    
+   template <class IObject>
+   AlembicNodeT<IObject>* getReferenceNode(AlembicNodeT<IObject> &node,
+                                           const UserAttrsSet &attrs);
+   
+   bool hasReferencePositions(AlembicGeometrySource::GeomInfo *info,
+                              const UserAttrsSet *attrs,
+                              UserAttributes::const_iterator *outIt=0);
+   
+   bool hasReferenceNormals(AlembicGeometrySource::GeomInfo *info,
+                            const UserAttrsSet *attrs,
+                            UserAttributes::const_iterator *outIt=0);
+   
 protected:
    
    std::vector<std::vector<Alembic::Abc::M44d> > mMatrixSamplesStack;
 };
+
+template <class IObject>
+AlembicNodeT<IObject>* UpdateGeometry::getReferenceNode(AlembicNodeT<IObject> &node,
+                                                        const UserAttrsSet &attrs)
+{
+   if (attrs.point.find("Pref") != attrs.point.end())
+   {
+      // if 'Pref' point attribute is defined, always use node
+      return &node;
+   }
+   else
+   {
+      return dynamic_cast<AlembicNodeT<IObject>*>(mGeoSrc->referenceScene()->find(node.path()));
+   }
+}
 
 template <class IObject>
 void UpdateGeometry::cleanupReferenceObject(AlembicNodeT<IObject> &node)
@@ -254,7 +283,10 @@ template <class MeshSchema>
 bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
                                   AlembicGeometrySource::GeomInfo *info,
                                   const UserAttrsSet &attrs,
-                                  bool computeNormals)
+                                  bool computeNormals,
+                                  AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > *refNode,
+                                  AlembicGeometrySource::GeomInfo *refInfo,
+                                  const UserAttrsSet *refAttrs)
 {
    MeshSchema &schema = node.typedObject().getSchema();
    
@@ -271,23 +303,6 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
    double b = 0.0;
    bool rv = true;
    
-   // refInfo pointer will be non null for topology varying mesh that require a reference object
-   AlembicGeometrySource::GeomInfo *refInfo = 0;
-   std::string refInfoKey = node.path() + "@reference";
-   
-   if (varyingTopology)
-   {
-      refInfo = mGeoSrc->getInfo(refInfoKey);
-            
-      // Note: isConst must be false
-      if (refInfo && isConst)
-      {
-         std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Reference object info found for constant object" << std::endl;
-         cleanupReferenceObject(refInfoKey, refInfo);
-         refInfo = 0;
-      }
-   }
-   
    if (mGeoSrc->params()->verbose && varyingTopology)
    {
       std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Topology varying mesh" << std::endl;
@@ -297,7 +312,7 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
    
    TimeSampleList<MeshSchema> &meshSamples = node.samples().schemaSamples;
    typename TimeSampleList<MeshSchema>::ConstIterator samp0, samp1; // for animated mesh
-   typename MeshSchema::Sample theSample; // for reference mesh
+   typename MeshSchema::Sample theSample; // for constant mesh
    
    // Build topology
    Alembic::Abc::Int32ArraySamplePtr FC;
@@ -371,8 +386,8 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
    
    if (refInfo)
    {
-      refInfo->faces->setCount(info->numTriangles * 3, renderFrame);
-      
+      refInfo->numTriangles = info->numTriangles;
+      refInfo->faces->setCount(info->numTriangles * 3, 0);
       refInfo->numFaces = info->numFaces;
       refInfo->numFaceVertices = info->numFaceVertices;
    }
@@ -438,7 +453,7 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
             info->toVertexIndex[k] = j0;
             if (refInfo)
             {
-               refInfo->faces->setInt(i0, k, renderFrame);
+               refInfo->faces->setInt(i0, k, 0);
                refInfo->toFaceIndex[k] = i;
                refInfo->toPointIndex[k] = i0;
                refInfo->toVertexIndex[k] = j0;
@@ -451,7 +466,7 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
             info->toVertexIndex[k] = j1;
             if (refInfo)
             {
-               refInfo->faces->setInt(i1, k, renderFrame);
+               refInfo->faces->setInt(i1, k, 0);
                refInfo->toFaceIndex[k] = i;
                refInfo->toPointIndex[k] = i1;
                refInfo->toVertexIndex[k] = j1;
@@ -464,7 +479,7 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
             info->toVertexIndex[k] = j2;
             if (refInfo)
             {
-               refInfo->faces->setInt(i2, k, renderFrame);
+               refInfo->faces->setInt(i2, k, 0);
                refInfo->toFaceIndex[k] = i;
                refInfo->toPointIndex[k] = i2;
                refInfo->toVertexIndex[k] = j2;
@@ -523,64 +538,12 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
          std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: " << info->numPoints << " point(s)" << std::endl;
       }
       
-      // Use 'Pref' attribute if found
       const float *Pref = (const float*) P->getData();
-          
-      UserAttributes::const_iterator uait = attrs.point.find("Pref");
-      
-      if (uait != attrs.point.end())
-      {
-         if (uait->second.dataCount * uait->second.dataDim == 3 * P->size() &&
-             uait->second.dataType == Float_Type)
-         {
-            Pref = (const float*) uait->second.data;
-            
-            computeNormals = true;
-            
-            if (mGeoSrc->params()->verbose)
-            {
-               std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Use 'Pref' attribute" << std::endl;
-            }
-         }
-      }
       
       const float *cPref = Pref;
       for (size_t i=0; i<P->size(); ++i, cPref+=3)
       {
          vl[i].set(cPref[0], cPref[1], cPref[2]);
-      }
-      
-      // Check for 'Nref' attribute and disable computation of smooth normals if found
-      uait = attrs.vertex.find("Nref");
-      
-      if (uait != attrs.vertex.end() && 
-          uait->second.dataType == Float_Type &&
-          uait->second.dataDim == 3 &&
-          uait->second.indicesCount == info->numFaceVertices)
-      {
-         if (mGeoSrc->params()->verbose)
-         {
-            std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Use 'Nref' vertex attribute for reference object normals" << std::endl;
-         }
-         
-         computeNormals = false;
-      }
-      else
-      {
-         uait = attrs.point.find("Nref");
-         
-         if (uait != attrs.point.end() &&
-             uait->second.dataType == Float_Type &&
-             uait->second.dataDim == 3 &&
-             uait->second.dataCount == info->numPoints)
-         {
-            if (mGeoSrc->params()->verbose)
-            {
-               std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Use 'Nref' point attribute for reference object normals" << std::endl;
-            }
-            
-            computeNormals = false;
-         }
       }
       
       if (computeNormals)
@@ -817,51 +780,6 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
                
                free(Pm);
             }
-            
-            // Setting varying topology mesh reference object points
-            if (refInfo)
-            {
-               // Use Pref or don't output anything
-               const float *Pref = 0;
-               
-               UserAttributes::const_iterator PrefIt = attrs.point.find("Pref");
-               
-               if (PrefIt != attrs.point.end())
-               {
-                  if (PrefIt->second.dataCount * PrefIt->second.dataDim == 3 * info->numPoints &&
-                      PrefIt->second.dataType == Float_Type)
-                  {
-                     Pref = (const float*) PrefIt->second.data;
-                  }
-               }
-                        
-               if (!Pref)
-               {
-                  std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: No or invalid 'Pref' attribute. Unable to generate reference object." << std::endl;
-                  
-                  cleanupReferenceObject(refInfoKey, refInfo);
-               }
-               else
-               {
-                  refInfo->numPoints = info->numPoints;
-                  
-                  if (mGeoSrc->params()->verbose)
-                  {
-                     std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Set reference object positions from attribute 'Pref'" << std::endl;
-                  }
-                  
-                  refInfo->constPositions->setCount(P->size(), renderFrame);
-                  
-                  VR::VectorList rvl = refInfo->constPositions->getVectorList(renderFrame);
-                  
-                  const float *cPref = Pref;
-                  
-                  for (size_t i=0; i<P->size(); ++i, cPref+=3)
-                  {
-                     rvl[i].set(cPref[0], cPref[1], cPref[2]);
-                  }
-               }
-            }
          }
          else
          {
@@ -947,6 +865,78 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
       }
    }
    
+   // Read reference positions
+   if (refInfo)
+   {
+      refInfo->numPoints = info->numPoints;
+      
+      UserAttributes::const_iterator PrefIt;
+      typename MeshSchema::Sample refSample;
+      Alembic::Abc::P3fArraySamplePtr Psamp;
+      const float *Pref = 0;
+      
+      if (hasReferencePositions(refInfo, refAttrs, &PrefIt))
+      {
+         if (mGeoSrc->params()->verbose)
+         {
+            std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Construct reference positions from 'Pref' attribute" << std::endl;
+         }
+         
+         const UserAttribute &ua = PrefIt->second;
+         
+         Pref = (const float*) ua.data;
+         
+         // Force computation of normals from Pref
+         computeNormals = true;
+      }
+      else
+      {
+         MeshSchema &refSchema = refNode->typedObject().getSchema();
+         
+         refSample = refSchema.getValue();
+         
+         Psamp = refSample.getPositions();
+         
+         if (Psamp->size() != info->numPoints)
+         {
+            if (mGeoSrc->params()->verbose)
+            {
+               std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Construct reference position from existing sample" << std::endl;
+            }
+            
+            Pref = (const float*) Psamp->getData();
+         }
+      }
+      
+      if (Pref)
+      {
+         const float *cP = Pref;
+         
+         refInfo->constPositions->setCount(refInfo->numPoints, 0);
+         
+         VR::VectorList vl = refInfo->constPositions->getVectorList(0);
+         
+         for (size_t i=0; i<refInfo->numPoints; ++i, cP+=3)
+         {
+            vl[i].set(cP[0], cP[1], cP[2]);
+         }
+         
+         if (computeNormals && !hasReferenceNormals(refInfo, refAttrs))
+         {
+            refInfo->smoothNormals.push_back(computeMeshSmoothNormals(refInfo, Pref, 0, 0.0f));
+         }
+      }
+      else
+      {
+         std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: No valid reference positions found." << std::endl;
+         
+         cleanupReferenceObject(node);
+         refInfo = 0;
+         refNode = 0;
+         refAttrs = 0;
+      }
+   }
+   
    return rv;
 }
 
@@ -955,7 +945,7 @@ void UpdateGeometry::setMeshNormals(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
                                     AlembicGeometrySource::GeomInfo *info,
                                     const UserAttribute *Nattr)
 {
-   if (!info->constNormals || !info->constFaceNormals)
+   if (!info->constNormals || !info->constFaceNormals || !Nattr)
    {
       return;
    }
