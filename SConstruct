@@ -73,14 +73,17 @@ def RequireAlembic(withPython=False, withGL=False):
       reqs = []
       
       if withGL:
+         if sys.platform != "darwin":
+           reqs.append(glew.Require)
          reqs.append(glut.Require)
-         reqs.append(glew.Require if sys.platform != "darwin" else gl.Require)
+         reqs.append(gl.Require)
       
       if withPython:
          reqs.append(ilmbase.Require(ilmthread=True, iexmath=True, python=True))
          reqs.append(boost.Require(libs=["python"]))
          reqs.append(python.SoftRequire)
          reqs.append(hdf5.Require(hl=True, verbose=True))
+         
       else:
          reqs.append(ilmbase.Require(ilmthread=True, iexmath=True))
          reqs.append(boost.Require())
