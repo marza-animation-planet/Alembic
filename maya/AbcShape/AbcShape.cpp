@@ -693,7 +693,7 @@ int AnimatedFloatParam::getNumKeyFrames(void)
 
 double AnimatedFloatParam::getKeyFrameTime(int index)
 {
-   typename Map::iterator it = mTimedValues.begin();
+   Map::iterator it = mTimedValues.begin();
    for (int i=0; i<index; ++i, ++it);
    return (it == mTimedValues.end() ? -1.0 : it->first);
 }
@@ -716,7 +716,7 @@ void AnimatedFloatParam::setValue(float value, double time)
 
 float AnimatedFloatParam::getValue(double time)
 {
-   typename Map::iterator it = mTimedValues.find(time);
+   Map::iterator it = mTimedValues.find(time);
    
    if (it != mTimedValues.end())
    {
