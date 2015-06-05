@@ -364,3 +364,6 @@ if excons.GetArgument("with-maya", default=None) is not None:
                              "maya/python": [AbcShapeMtoa, AbcMatEditPy] + ([AbcShapePy] if withVray else [])}}])
 
 excons.DeclareTargets(env, prjs)
+
+Export("RequireAlembic")
+Export("RequireAlembicHelper")
