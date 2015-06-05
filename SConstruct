@@ -26,6 +26,29 @@ def RequireAlembic(withPython=False, withGL=False):
    def _RequireFunc(env):
       global deps_inc, deps_lib
       
+      if sys.platform == "darwin":
+         import platform
+         vers = map(int, platform.mac_ver()[0].split("."))
+         if vers[0] > 10 or vers[1] >= 9:
+            # clang complains a lot, make it quieter
+            env.Append(CPPFLAGS=" ".join([" -std=c++11",
+                                          "-Wno-deprecated-register",
+                                          "-Wno-deprecated-declarations",
+                                          "-Wno-missing-field-initializers",
+                                          "-Wno-unused-parameter",
+                                          "-Wno-unused-value",
+                                          "-Wno-unused-function",
+                                          "-Wno-unused-variable",
+                                          "-Wno-unused-private-field"]))
+      elif sys.platform == "win32":
+         env.Append(CCFLAGS=" /bigobj")
+         env.Append(CPPDEFINES=["NOMINMAX"])
+         # Work around the 2GB file limit with Visual Studio 10.0
+         #   https://connect.microsoft.com/VisualStudio/feedback/details/627639/std-fstream-use-32-bit-int-as-pos-type-even-on-x64-platform
+         #   https://groups.google.com/forum/#!topic/alembic-discussion/5ElRJkXhi9M
+         if excons.mscver == "10.0":
+            env.Prepend(CPPPATH=["lib/vc10fix"])
+      
       defs = []
       incdirs = ["lib"]
       libdirs = []
@@ -34,17 +57,19 @@ def RequireAlembic(withPython=False, withGL=False):
       if sys.platform == "win32":
          #defs.extend(["PLATFORM_WINDOWS", "PLATFORM=WINDOWS"])
          defs.extend(["PLATFORM_WINDOWS"])
-
+      
       elif sys.platform == "darwin":
          defs.extend(["PLATFORM_DARWIN", "PLATFORM=DARWIN"])
          libs.append("m")
-
+      
       else:
          defs.extend(["PLATFORM_LINUX", "PLATFORM=LINUX"])
          libs.extend(["dl", "rt", "m"])
       
       if deps_inc:
          incdirs.append(deps_inc)
+         if os.path.isdir(deps_inc + "/OpenEXR"):
+           incdirs.append(deps_inc + "/OpenEXR")
       
       if deps_lib:
          libdirs.append(deps_lib)
@@ -121,43 +146,8 @@ def RequireAlembicHelper(withPython=False, withGL=False):
    return _RequireFunc
 
 
-def SafeRemove(lst, item):
-   try:
-      lst.remove(item)
-   except:
-      pass
-   return lst
-
-
 
 env = excons.MakeBaseEnv()
-
-
-if sys.platform == "darwin":
-   import platform
-   vers = map(int, platform.mac_ver()[0].split("."))
-   if vers[0] > 10 or vers[1] >= 9:
-      # Shut clang's up
-      env.Append(CPPFLAGS=" ".join([" -std=c++11",
-                                    "-Wno-deprecated-register",
-                                    "-Wno-deprecated-declarations",
-                                    "-Wno-missing-field-initializers",
-                                    "-Wno-unused-parameter",
-                                    "-Wno-unused-value",
-                                    "-Wno-unused-function",
-                                    "-Wno-unused-variable",
-                                    "-Wno-unused-private-field"]))
-elif sys.platform == "win32":
-   env.Append(CCFLAGS=" /bigobj")
-   env.Append(CPPDEFINES=["NOMINMAX"])
-   # Work around the 2GB file limit with Visual Studio 10.0
-   #   https://connect.microsoft.com/VisualStudio/feedback/details/627639/std-fstream-use-32-bit-int-as-pos-type-even-on-x64-platform
-   #   https://groups.google.com/forum/#!topic/alembic-discussion/5ElRJkXhi9M
-   if excons.mscver == "10.0":
-      print("Fixing Microsoft's shit!")
-      env.Prepend(CPPPATH=["lib/vc10fix"])
-
-
 
 prjs = []
 
