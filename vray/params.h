@@ -401,6 +401,14 @@ struct FloatListParam : ListParamT<float>
 
 struct AlembicLoaderParams : VR::VRayParameterListDesc
 {
+   enum CycleType
+   {
+      CT_hold = 0,
+      CT_loop,
+      CT_reverse,
+      CT_bounce
+   };
+   
    struct Cache
    {
       VR::CharString filename;

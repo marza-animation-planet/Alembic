@@ -157,7 +157,8 @@ struct AlembicGeometrySource : VR::VRayStaticGeometry
 private:
   
    bool compileMatrices(GeomInfo &info, VR::TraceTransform* &tm, double* &times, int &tmCount);
-  
+   double adjustFrame(double inFrame) const;
+   
 private:
    
    AlembicLoaderParams::Cache *mParams;

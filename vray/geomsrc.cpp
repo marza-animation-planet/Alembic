@@ -598,6 +598,72 @@ const AlembicGeometrySource::GeomInfo* AlembicGeometrySource::getInfo(const std:
    return (it != mGeoms.end() ? &(it->second) : 0);
 }
 
+double AlembicGeometrySource::adjustFrame(double inFrame) const
+{
+   double invFps = 1.0 / mParams->fps;
+   double extraOffset = 0.0;
+   
+   if (mParams->preserveStartFrame)
+   {
+      extraOffset = mParams->startFrame * (mParams->speed - 1.0);
+   }
+   
+   double outTime = invFps * (mParams->speed  * (inFrame - mParams->offset) - extraOffset);
+   double startTime = invFps * mParams->startFrame;
+   double endTime = invFps * mParams->endFrame;
+   double playTime = endTime - startTime;
+   double eps = 0.001;
+   
+   if (mParams->cycle == AlembicLoaderParams::CT_hold)
+   {
+      outTime = std::max(startTime, std::min(outTime, endTime));
+   }
+   else
+   {
+      double normalizedTime = (outTime - startTime) / playTime;
+      double playRepeat = floor(normalizedTime);
+      double fraction = fabs(normalizedTime - playRepeat);
+      
+      if (mParams->cycle == AlembicLoaderParams::CT_reverse)
+      {
+         if (outTime > (startTime + eps) && outTime < (endTime - eps))
+         {
+            outTime = endTime - fraction * playTime;
+         }
+         else if (outTime < (startTime + eps))
+         {
+            outTime = endTime;
+         }
+         else
+         {
+            outTime = startTime;
+         }
+      }
+      else
+      {
+         if (outTime < (startTime - eps) || outTime > (endTime + eps))
+         {
+            if (mParams->cycle == AlembicLoaderParams::CT_loop || (int(playRepeat) % 2) == 0)
+            {
+               outTime = startTime + fraction * playTime;
+            }
+            else
+            {
+               outTime = endTime - fraction * playTime;
+            }
+         }
+      }
+   }
+   
+   #ifdef _DEBUG
+   std::cout << "[AlembicLoader] adjustFrame: " << inFrame << " -> " << (mParams->fps * outTime);
+   std::cout << " (offset = " << mParams->offset << ", speed = " << mParams->speed << ", range = [";
+   std::cout << mParams->startFrame << ", " << mParams->endFrame << "])" << std::endl;
+   #endif
+   
+   return outTime * mParams->fps;
+} 
+
 void AlembicGeometrySource::beginFrame(VR::VRayRenderer *vray)
 {
    TRACEM(AlembicGeometrySource, beginFrame);
@@ -609,7 +675,7 @@ void AlembicGeometrySource::beginFrame(VR::VRayRenderer *vray)
       
       bool ignoreMotionBlur = (mParams->ignoreDeformBlur && (mParams->ignoreTransforms || mParams->ignoreTransformBlur));
       
-      mRenderFrame = vray->getTimeInFrames(frameData.t);
+      mRenderFrame = adjustFrame(vray->getTimeInFrames(frameData.t));
       mRenderTime = mRenderFrame / mParams->fps;
       
       mSampleTimes.clear();
@@ -640,7 +706,7 @@ void AlembicGeometrySource::beginFrame(VR::VRayRenderer *vray)
          
          while (t <= frameData.frameEnd)
          {
-            double f = (ignoreMotionBlur ? mRenderFrame : vray->getTimeInFrames(t));
+            double f = adjustFrame(ignoreMotionBlur ? mRenderFrame : vray->getTimeInFrames(t));
             mSampleFrames.push_back(f);
             mSampleTimes.push_back(f / mParams->fps);
             t += step;
