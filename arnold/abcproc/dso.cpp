@@ -931,11 +931,11 @@ double Dso::computeTime(double frame) const
    default:
       if (t < (startTime - eps))
       {
-         t = startTime;
+         t2 = startTime;
       }
       else if (t > (endTime + eps))
       {
-         t = endTime;
+         t2 = endTime;
       }
       break;
    }
