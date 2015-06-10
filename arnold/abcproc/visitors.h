@@ -1187,6 +1187,15 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
    {
       AiMsgWarning("[abcproc] Failed to generate base mesh data");
       
+      if (smoothNormals)
+      {
+         for (std::vector<float*>::iterator it=smoothNormals->begin(); it!=smoothNormals->end(); ++it)
+         {
+            AiFree(*it);
+         }
+         smoothNormals->clear();
+      }
+      
       AiNodeDestroy(mesh);
       
       if (nsides) AiArrayDestroy(nsides);

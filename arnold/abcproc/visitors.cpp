@@ -1301,9 +1301,9 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
          unsigned int j = 0;
          AtVector n;
          
-         for (size_t i=0; i<smoothNormals->size(); ++i)
+         for (std::vector<float*>::iterator nit=smoothNormals->begin(); nit!=smoothNormals->end(); ++nit)
          {
-            float *N = (*smoothNormals)[i];
+            float *N = *nit;
             
             for (unsigned int k=0; k<info.pointCount; ++k, ++j, N+=3)
             {
@@ -1314,7 +1314,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
                AiArraySetVec(nlist, j, n);
             }
             
-            AiFree(N);
+            AiFree(*nit);
          }
          
          smoothNormals->clear();
@@ -2029,9 +2029,9 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
       unsigned int j = 0;
       AtVector n;
       
-      for (size_t i=0; i<smoothNormals->size(); ++i)
+      for (std::vector<float*>::iterator nit=smoothNormals->begin(); nit!=smoothNormals->end(); ++nit)
       {
-         float *N = (*smoothNormals)[i];
+         float *N = *nit;
          
          for (unsigned int k=0; k<info.pointCount; ++k, ++j, N+=3)
          {
@@ -2042,7 +2042,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
             AiArraySetVec(nlist, j, n);
          }
          
-         AiFree(N);
+         AiFree(*nit);
       }
       
       smoothNormals->clear();
