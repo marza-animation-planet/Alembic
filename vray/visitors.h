@@ -387,7 +387,7 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
    if (refInfo)
    {
       refInfo->numTriangles = info->numTriangles;
-      refInfo->faces->setCount(info->numTriangles * 3, 0);
+      refInfo->faces->setCount(info->numTriangles * 3, renderFrame);
       refInfo->numFaces = info->numFaces;
       refInfo->numFaceVertices = info->numFaceVertices;
    }
@@ -453,7 +453,7 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
             info->toVertexIndex[k] = j0;
             if (refInfo)
             {
-               refInfo->faces->setInt(i0, k, 0);
+               refInfo->faces->setInt(i0, k, renderFrame);
                refInfo->toFaceIndex[k] = i;
                refInfo->toPointIndex[k] = i0;
                refInfo->toVertexIndex[k] = j0;
@@ -466,7 +466,7 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
             info->toVertexIndex[k] = j1;
             if (refInfo)
             {
-               refInfo->faces->setInt(i1, k, 0);
+               refInfo->faces->setInt(i1, k, renderFrame);
                refInfo->toFaceIndex[k] = i;
                refInfo->toPointIndex[k] = i1;
                refInfo->toVertexIndex[k] = j1;
@@ -479,7 +479,7 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
             info->toVertexIndex[k] = j2;
             if (refInfo)
             {
-               refInfo->faces->setInt(i2, k, 0);
+               refInfo->faces->setInt(i2, k, renderFrame);
                refInfo->toFaceIndex[k] = i;
                refInfo->toPointIndex[k] = i2;
                refInfo->toVertexIndex[k] = j2;
@@ -912,9 +912,9 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
       {
          const float *cP = Pref;
          
-         refInfo->constPositions->setCount(refInfo->numPoints, 0);
+         refInfo->constPositions->setCount(refInfo->numPoints, renderFrame);
          
-         VR::VectorList vl = refInfo->constPositions->getVectorList(0);
+         VR::VectorList vl = refInfo->constPositions->getVectorList(renderFrame);
          
          for (size_t i=0; i<refInfo->numPoints; ++i, cP+=3)
          {
@@ -1126,7 +1126,7 @@ size_t UpdateGeometry::readMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<Mesh
       
       if (ReadUserAttribute(uv, uvParam.getParent(), uvParam.getHeader(), renderTime, true, false, mGeoSrc->params()->verbose))
       {
-         if (SetUserAttribute(info, name.c_str(), uv, renderTime, mGeoSrc->params()->verbose))
+         if (SetUserAttribute(info, name.c_str(), uv, renderFrame, mGeoSrc->params()->verbose))
          {
             int count = info->channelNames->getCount(renderFrame);
             info->channelNames->setCount(count + 1, renderFrame);
@@ -1137,7 +1137,7 @@ size_t UpdateGeometry::readMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<Mesh
                std::cout << "[AlembicLoader] UpdateGeometry::readMeshUVs: Added UV set \"" << name << "\"" << std::endl;
             }
             
-            if (refInfo && SetUserAttribute(refInfo, name.c_str(), uv, renderTime, mGeoSrc->params()->verbose))
+            if (refInfo && SetUserAttribute(refInfo, name.c_str(), uv, renderFrame, mGeoSrc->params()->verbose))
             {
                int count = refInfo->channelNames->getCount(renderFrame);
                refInfo->channelNames->setCount(count + 1, renderFrame);
@@ -1170,7 +1170,7 @@ size_t UpdateGeometry::readMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<Mesh
          
             if (ReadUserAttribute(uv, uvit->second.getParent(), uvit->second.getHeader(), renderTime, true, false, mGeoSrc->params()->verbose))
             {
-               if (SetUserAttribute(info, uvit->first.c_str(), uv, renderTime, mGeoSrc->params()->verbose))
+               if (SetUserAttribute(info, uvit->first.c_str(), uv, renderFrame, mGeoSrc->params()->verbose))
                {
                   int count = info->channelNames->getCount(renderFrame);
                   info->channelNames->setCount(count + 1, renderFrame);
@@ -1181,7 +1181,7 @@ size_t UpdateGeometry::readMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<Mesh
                      std::cout << "[AlembicLoader] UpdateGeometry::readMeshUVs: Added UV set \"" << uvit->first << "\"" << std::endl;
                   }
                   
-                  if (refInfo && SetUserAttribute(refInfo, uvit->first.c_str(), uv, renderTime, mGeoSrc->params()->verbose))
+                  if (refInfo && SetUserAttribute(refInfo, uvit->first.c_str(), uv, renderFrame, mGeoSrc->params()->verbose))
                   {
                      int count = refInfo->channelNames->getCount(renderFrame);
                      refInfo->channelNames->setCount(count + 1, renderFrame);

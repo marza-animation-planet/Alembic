@@ -1538,7 +1538,7 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicMesh &node, AlembicNode *i
                      
                      if (computeNormals)
                      {
-                        VR::VectorList vl = refInfo->constPositions->getVectorList(0);
+                        VR::VectorList vl = refInfo->constPositions->getVectorList(renderFrame);
                         
                         refInfo->smoothNormals.push_back(computeMeshSmoothNormals(refInfo, (const float*) vl.get(), 0, 0.0f));
                      }
@@ -1825,7 +1825,7 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicSubD &node, AlembicNode *i
                   {
                      if (refInfo->smoothNormals.size() == 0)
                      {
-                        VR::VectorList vl = refInfo->constPositions->getVectorList(0);
+                        VR::VectorList vl = refInfo->constPositions->getVectorList(renderFrame);
                         
                         refInfo->smoothNormals.push_back(computeMeshSmoothNormals(refInfo, (const float*) vl.get(), 0, 0.0f));
                      }
@@ -2742,8 +2742,8 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                            VR::DefFloatListParam *radii = new VR::DefFloatListParam("radii");
                            info->floatParams["radii"] = radii;
                            
-                           radii->setCount(info->numPoints + 1);
-                           VR::FloatList fl = radii->getFloatList(renderTime);
+                           radii->setCount(info->numPoints + 1, renderFrame);
+                           VR::FloatList fl = radii->getFloatList(renderFrame);
                            fl[0] = 0.0f;
                            
                            if (R1)

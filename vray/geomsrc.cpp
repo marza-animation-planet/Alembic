@@ -675,8 +675,8 @@ void AlembicGeometrySource::beginFrame(VR::VRayRenderer *vray)
       
       bool ignoreMotionBlur = (mParams->ignoreDeformBlur && (mParams->ignoreTransforms || mParams->ignoreTransformBlur));
       
-      mRenderFrame = adjustFrame(vray->getTimeInFrames(frameData.t));
-      mRenderTime = mRenderFrame / mParams->fps;
+      mRenderFrame = vray->getTimeInFrames(frameData.t);
+      mRenderTime = adjustFrame(mRenderFrame) / mParams->fps;
       
       mSampleTimes.clear();
       mSampleFrames.clear();
@@ -706,9 +706,9 @@ void AlembicGeometrySource::beginFrame(VR::VRayRenderer *vray)
          
          while (t <= frameData.frameEnd)
          {
-            double f = adjustFrame(ignoreMotionBlur ? mRenderFrame : vray->getTimeInFrames(t));
+            double f = ignoreMotionBlur ? mRenderFrame : vray->getTimeInFrames(t);
             mSampleFrames.push_back(f);
-            mSampleTimes.push_back(f / mParams->fps);
+            mSampleTimes.push_back(adjustFrame(f) / mParams->fps);
             t += step;
          }
       }
