@@ -102,6 +102,11 @@ static bool CheckReferencePositions(AlembicNodeT<Schema> &node)
 {
    Alembic::Abc::ICompoundProperty geomParams = node.typedObject().getSchema().getArbGeomParams();
    
+   if (!geomParams.valid())
+   {
+      return false;
+   }
+   
    for (size_t i=0; i<geomParams.getNumProperties(); ++i)
    {
       const Alembic::AbcCoreAbstract::PropertyHeader &header = geomParams.getPropertyHeader(i);
