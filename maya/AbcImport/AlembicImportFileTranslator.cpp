@@ -54,6 +54,8 @@ MStatus AlembicImportFileTranslator::reader(
     bool addnodes = false;
     bool remnodes = false;
     MString submode = "Add";
+
+    MFileObject::MFileResolveMethod resmeth = MFileObject::kInputFile;
     
     if (mode == MPxFileTranslator::kOpenAccessMode)
     {
@@ -64,6 +66,11 @@ MStatus AlembicImportFileTranslator::reader(
              mode == MPxFileTranslator::kReferenceAccessMode)
     {
         impmode = " -m import";
+
+        if (mode == MPxFileTranslator::kReferenceAccessMode)
+        {
+            resmeth = MFileObject::kInputReference;
+        }
     }
     else
     {
@@ -225,7 +232,11 @@ MStatus AlembicImportFileTranslator::reader(
         }
     }
     
-    script += impmode + options + " \"" + file.resolvedFullName() + "\";";
+    MFileObject fobj(file);
+
+    fobj.setResolveMethod(resmeth);
+
+    script += impmode + options + " \"" + fobj.resolvedFullName() + "\";";
 
     MStatus status = MGlobal::executeCommand(script, true);
 
@@ -237,6 +248,10 @@ AlembicImportFileTranslator::identifyFile(const MFileObject& file,
                                           const char* buffer,
                                           short size) const
 {
+    MFileObject fobj(file);
+
+    fobj.setResolveMethod(MFileObject::kInputFile);
+
     MString name = file.resolvedName();
     unsigned int len = name.numChars();
     if (len > 4 && name.substringW(len - 4, len - 1).toLowerCase() == ".abc")

@@ -294,11 +294,13 @@ MStatus AbcImport::doIt(const MArgList & args)
 
             // get the path to the alembic file rule
             MFileObject directory;
+            directory.setResolveMethod(MFileObject::kInputFile);
             directory.setRawFullName(expandName);
             MString directoryName = directory.resolvedFullName();
 
             // resolve the relative path
             MFileObject absoluteFile;
+            absoluteFile.setResolveMethod(MFileObject::kInputFile);
             absoluteFile.setRawFullName(filename);
 #if MAYA_API_VERSION < 201300
             if (absoluteFile.resolvedFullName() !=
