@@ -60,7 +60,8 @@ MStatus AlembicImportFileTranslator::reader(
         impmode = " -m open";
     }
     
-    else if (mode == MPxFileTranslator::kImportAccessMode)
+    else if (mode == MPxFileTranslator::kImportAccessMode ||
+             mode == MPxFileTranslator::kReferenceAccessMode)
     {
         impmode = " -m import";
     }
