@@ -49,7 +49,7 @@ def RequireAlembic(withPython=False, withGL=False):
          if excons.mscver == "10.0":
             env.Prepend(CPPPATH=["lib/vc10fix"])
       
-      defs = []
+      defs = ["ALEMBIC_LIB_USES_BOOST"]
       incdirs = ["lib"]
       libdirs = []
       libs = []
