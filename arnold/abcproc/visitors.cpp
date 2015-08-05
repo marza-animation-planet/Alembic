@@ -50,9 +50,9 @@ AlembicNode::VisitReturn GetTimeRange::enter(AlembicPoints &node, AlembicNode *)
    return AlembicNode::ContinueVisit;
 }
 
-AlembicNode::VisitReturn GetTimeRange::enter(AlembicCurves &, AlembicNode *)
+AlembicNode::VisitReturn GetTimeRange::enter(AlembicCurves &node, AlembicNode *)
 {
-   //updateTimeRange(node);
+   updateTimeRange(node);
    return AlembicNode::ContinueVisit;
 }
 
@@ -178,10 +178,9 @@ AlembicNode::VisitReturn CountShapes::enter(AlembicPoints &node, AlembicNode *)
    return shapeEnter(node);
 }
 
-AlembicNode::VisitReturn CountShapes::enter(AlembicCurves &, AlembicNode *)
+AlembicNode::VisitReturn CountShapes::enter(AlembicCurves &node, AlembicNode *)
 {
-   //return shapeEnter(node);
-   return AlembicNode::ContinueVisit;
+   return shapeEnter(node);
 }
 
 AlembicNode::VisitReturn CountShapes::enter(AlembicNuPatch &, AlembicNode *)
@@ -453,10 +452,10 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
    return shapeEnter(node, instance, false, extraPadding);
 }
 
-AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &, AlembicNode *)
+AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode *instance)
 {
-   //return shapeEnter(node, instance);
-   return AlembicNode::ContinueVisit;
+   bool interpolate = (node.typedObject().getSchema().getTopologyVariance() != Alembic::AbcGeom::kHeterogenousTopology);
+   return shapeEnter(node, instance, interpolate, 0.0);
 }
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicNuPatch &, AlembicNode *)
@@ -2539,7 +2538,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
                            r = R0->get()[i];
                         }
                         
-                        radius[i] = adjustPointRadius(r);
+                        radius[i] = adjustRadius(r);
                      }
                      
                      std::map<Alembic::Util::uint64_t, std::pair<size_t, size_t> >::iterator idit1;
@@ -2548,7 +2547,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
                      {
                         r = R1->get()[idit1->second.first];
                         
-                        radius[idit1->second.second] = adjustPointRadius(r);
+                        radius[idit1->second.second] = adjustRadius(r);
                      }
                   }
                   else
@@ -2559,7 +2558,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
                      {
                         r = R0->get()[i];
                         
-                        radius[i] = adjustPointRadius(r);
+                        radius[i] = adjustRadius(r);
                      }
                   }
                   
@@ -2626,7 +2625,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
       {
          for (unsigned int j=0; i<ra->dataDim; ++j, ++r)
          {
-            *r = adjustPointRadius(*r);
+            *r = adjustRadius(*r);
          }
       }
    }
@@ -2650,6 +2649,456 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    SetUserAttributes(mNode, info.pointAttrs, info.pointCount);
    
    // Make sure we have the 'instance_num' attribute
+   
+   outputInstanceNumber(node, instance);
+   
+   return AlembicNode::ContinueVisit;
+}
+
+bool MakeShape::getReferenceCurves(AlembicCurves &node,
+                                   CurvesInfo &info,
+                                   AlembicCurves* &refCurves,
+                                   UserAttributes* &pointAttrs)
+{
+   if (!pointAttrs)
+   {
+      // pointAttrs must be set
+      refCurves = 0;
+      return false;
+   }
+   
+   if (pointAttrs == &(info.pointAttrs))
+   {
+      // pointAttrs should point to attribute storage other than current scene's one
+      refCurves = 0;
+      return false;
+   }
+   
+   // Priority
+   //   1/ "Pref" attribute in current alembic scene
+   //   2/ "Pref" attribute in reference alembic scene
+   //   3/ Positions from reference alembic scene
+   //   4/ Positions from current alembic scene's first frame
+   
+   UserAttributes::iterator uait;
+   bool hasPref = false;
+   
+   uait = info.pointAttrs.find("Pref");
+   
+   if (uait != info.pointAttrs.end())
+   {
+      if (isVaryingFloat3(info, uait->second))
+      {
+         hasPref = true;
+      }
+      else
+      {
+         // Pref exists but doesn't match requirements, get rid of it
+         DestroyUserAttribute(uait->second);
+         info.pointAttrs.erase(uait);
+      }
+   }
+   
+   if (hasPref)
+   {
+      refCurves = &node;
+      pointAttrs = &(info.pointAttrs);
+   }
+   else
+   {
+      AlembicScene *refScene = mDso->referenceScene();
+      
+      if (!refScene)
+      {
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Using current alembic scene first sample as reference.");
+         }
+         
+         refCurves = &node;
+         pointAttrs = &(info.pointAttrs);
+      }
+      else
+      {
+         AlembicNode *refNode = refScene->find(node.path());
+         
+         if (refNode)
+         {
+            refCurves = dynamic_cast<AlembicCurves*>(refNode);
+            
+            if (!refCurves)
+            {
+               AiMsgWarning("[abcproc] Node in reference alembic doesn't have the same type. Using current alembic scene first sample as reference");
+               
+               refCurves = &node;
+               pointAttrs = &(info.pointAttrs);
+            }
+            else
+            {
+               Alembic::AbcGeom::ICurvesSchema schema = refCurves->typedObject().getSchema();
+               
+               double reftime = schema.getTimeSampling()->getSampleTime(0);
+               
+               collectUserAttributes(schema.getUserProperties(),
+                                     schema.getArbGeomParams(),
+                                     reftime, false,
+                                     0, 0, pointAttrs, 0, 0,
+                                     FilterReferenceAttributes);
+               
+               uait = pointAttrs->find("Pref");
+               
+               if (uait != pointAttrs->end())
+               {
+                  if (isVaryingFloat3(info, uait->second))
+                  {
+                     hasPref = true;
+                  }
+                  else
+                  {
+                     // Pref exists but doesn't match requirements, get rid of it
+                     DestroyUserAttribute(uait->second);
+                     pointAttrs->erase(uait);
+                  }
+               }
+            }
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Couldn't find node in reference alembic scene. Using current alembic scene first sample as reference");
+            
+            refCurves = &node;
+            pointAttrs = &(info.pointAttrs);
+         }
+      }
+   }
+   
+   return hasPref;
+}
+
+bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
+                                       CurvesInfo &info,
+                                       UserAttributes *pointAttrs)
+{
+   if (!refCurves || !pointAttrs)
+   {
+      return false;
+   }
+   
+   Alembic::AbcGeom::ICurvesSchema schema = refCurves->typedObject().getSchema();
+         
+   Alembic::AbcGeom::ICurvesSchema::Sample sample = schema.getValue();
+   
+   Alembic::Abc::P3fArraySamplePtr Pref = sample.getPositions();
+      
+   bool hasPref = (pointAttrs->find("Pref") != pointAttrs->end());
+   
+   if (!hasPref && Pref->size() == info.pointCount)
+   {
+      Alembic::Abc::M44d Mref;
+      
+      float *vals = (float*) AiMalloc(3 * info.pointCount * sizeof(float));
+      
+      const AtUserParamEntry *upe = AiNodeLookUpUserParameter(mDso->procNode(), "Mref");
+      
+      if (upe != 0 &&
+          AiUserParamGetCategory(upe) == AI_USERDEF_CONSTANT &&
+          AiUserParamGetType(upe) == AI_TYPE_MATRIX)
+      {
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Using provided Mref");
+         }
+         
+         AtMatrix mtx;
+         
+         AiNodeGetMatrix(mDso->procNode(), "Mref", mtx);
+         
+         for (int r=0; r<4; ++r)
+         {
+            for (int c=0; c<4; ++c)
+            {
+               Mref[r][c] = mtx[r][c];
+            }
+         }
+      }
+      else
+      {
+         // recompute matrix
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Compute reference world matrix Mref");
+         }
+         
+         AlembicXform *refParent = dynamic_cast<AlembicXform*>(refCurves->parent());
+         
+         while (refParent)
+         {
+            Alembic::AbcGeom::IXformSchema xformSchema = refParent->typedObject().getSchema();
+            
+            Alembic::AbcGeom::XformSample xformSample = xformSchema.getValue();
+            
+            Mref = Mref * xformSample.getMatrix();
+            
+            if (xformSchema.getInheritsXforms())
+            {
+               refParent = dynamic_cast<AlembicXform*>(refParent->parent());
+            }
+            else
+            {
+               refParent = 0;
+            }
+         }
+      }
+      
+      for (unsigned int p=0, off=0; p<info.pointCount; ++p, off+=3)
+      {
+         Alembic::Abc::V3f P = Pref->get()[p] * Mref;
+         
+         vals[off] = P.x;
+         vals[off+1] = P.y;
+         vals[off+2] = P.z;
+      }
+      
+      UserAttribute &ua = info.pointAttrs["Pref"];
+      
+      InitUserAttribute(ua);
+      
+      ua.arnoldCategory = AI_USERDEF_VARYING;
+      ua.arnoldType = AI_TYPE_POINT;
+      ua.arnoldTypeStr = "POINT";
+      ua.isArray = true;
+      ua.dataDim = 3;
+      ua.dataCount = info.pointCount;
+      ua.data = vals;
+      
+      hasPref = true;
+   }
+   else
+   {
+      if (hasPref)
+      {
+         if (pointAttrs != &(info.pointAttrs))
+         {
+            // Transfer from reference shape attributes to current shape attribtues
+            UserAttribute &src = (*pointAttrs)["Pref"];
+            UserAttribute &dst = info.pointAttrs["Pref"];
+            
+            dst = src;
+            
+            pointAttrs->erase(pointAttrs->find("Pref"));
+         }
+         
+         // Little type aliasing
+         UserAttribute &ua = info.pointAttrs["Pref"];
+         
+         if (ua.dataDim == 1 && ua.dataCount == (3 * info.pointCount))
+         {
+            if (mDso->verbose())
+            {
+               AiMsgInfo("[abcproc] \"Pref\" exported with wrong base type: float instead if float[3]");
+            }
+            
+            ua.dataDim = 3;
+            ua.dataCount = info.pointCount;
+            ua.arnoldType = AI_TYPE_POINT;
+            ua.arnoldTypeStr = "POINT";
+         }
+         
+         if (mDso->referenceScene())
+         {
+            AiMsgWarning("[abcproc] \"Pref\" read from user attribute, ignore values from reference alembic");
+         }
+         else if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] \"Pref\" read from user attribute");
+         }
+      }
+      else
+      {
+         AiMsgWarning("[abcproc] Could not generate \"Pref\" for curves \"%s\"", refCurves->path().c_str());
+      }
+   }
+   
+   return hasPref;
+}
+
+AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *instance)
+{
+   Alembic::AbcGeom::ICurvesSchema schema = node.typedObject().getSchema();
+   
+   if (mDso->isVolume())
+   {
+      mNode = generateVolumeBox(schema);
+      outputInstanceNumber(node, instance);
+      return AlembicNode::ContinueVisit;
+   }
+   
+   CurvesInfo info;
+   
+   info.varyingTopology = (schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
+   
+   TimeSampleList<Alembic::AbcGeom::ICurvesSchema> &samples = node.samples().schemaSamples;
+   TimeSampleList<Alembic::AbcGeom::ICurvesSchema>::ConstIterator samp0, samp1;
+   double a = 1.0;
+   double b = 0.0;
+   
+   if (info.varyingTopology)
+   {
+      node.sampleSchema(mDso->renderTime(), mDso->renderTime(), false);
+   }
+   else
+   {
+      for (size_t i=0; i<mDso->numMotionSamples(); ++i)
+      {
+         double t = mDso->motionSampleTime(i);
+         
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Sample curves \"%s\" at t=%lf", node.path().c_str(), t);
+         }
+      
+         node.sampleSchema(t, t, i > 0);
+      }
+      
+      // renderTime() may not be in the sample list, let's at it just in case
+      node.sampleSchema(mDso->renderTime(), mDso->renderTime(), true);
+   }
+   
+   if (mDso->verbose())
+   {
+      AiMsgInfo("[abcproc] Read %lu curves samples", samples.size());
+   }
+   
+   if (samples.size() == 0)
+   {
+      return AlembicNode::DontVisitChildren;
+   }
+   
+   std::string name = arnoldNodeName(node);
+   
+   mNode = AiNode("curves");
+   AiNodeSetStr(mNode, "name", name.c_str());
+   
+   AtArray *points = 0;
+   AtArray *num_points = 0;
+   AtArray *radius = 0;
+   
+   // Collect attributes
+   
+   double attribsTime = (info.varyingTopology ? mDso->renderTime() : mDso->attribsTime(mDso->attribsFrame()));
+   
+   bool interpolateAttribs = !info.varyingTopology;
+   
+   collectUserAttributes(schema.getUserProperties(),
+                         schema.getArbGeomParams(),
+                         attribsTime,
+                         interpolateAttribs,
+                         &info.objectAttrs,
+                         &info.primitiveAttrs,
+                         &info.pointAttrs,
+                         0,
+                         0);
+   
+   if (samples.size() == 1 && !info.varyingTopology)
+   {
+      samp0 = samples.begin();
+      
+      Alembic::Abc::Int32ArraySamplePtr Nv = samp0->data().getCurvesNumVertices();
+      Alembic::Abc::P3fArraySamplePtr P = samp0->data().getPositions();
+            
+      info.curveCount = (unsigned int) Nv->size();
+      info.pointCount = (unsigned int) P->size();
+      
+      num_points = AiArrayAllocate(info.curveCount, 1, AI_TYPE_UINT);
+      points = AiArrayAllocate(info.pointCount + 2, 1, AI_TYPE_POINT);
+   }
+   else
+   {
+      if (info.varyingTopology)
+      {
+         // using velocity
+         double b = 0.0;
+         
+         samples.getSamples(mDso->renderTime(), samp0, samp1, b);
+         
+         Alembic::Abc::V3fArraySamplePtr V = samp0->data().getVelocities();
+      }
+      else
+      {
+         // interpolate samples
+         for (size_t i=0, j=0; i<mDso->numMotionSamples(); ++i)
+         {
+            double b = 0.0;
+            double t = mDso->motionSampleTime(i);
+            
+            samples.getSamples(t, samp0, samp1, b);
+            
+            
+         }
+      }
+   }
+   
+   AiNodeSetArray(mNode, "num_points", num_points);
+   AiNodeSetArray(mNode, "points", points);
+   if (radius)
+   {
+      AiNodeSetArray(mNode, "radius", radius);
+   }
+   
+   if (mDso->outputReference())
+   {
+      if (mDso->verbose())
+      {
+         AiMsgInfo("[abcproc] Generate reference attributes");
+      }
+      
+      UserAttributes refPointAttrs;
+      UserAttributes *pointAttrs = &refPointAttrs;
+      AlembicCurves *refCurves = 0;
+      
+      if (getReferenceCurves(node, info, refCurves, pointAttrs))
+      {
+         fillReferencePositions(refCurves, info, pointAttrs);
+      }
+      
+      DestroyUserAttributes(refPointAttrs);
+   }
+   
+   
+   SetUserAttributes(mNode, info.objectAttrs, 0);
+   SetUserAttributes(mNode, info.primitiveAttrs, info.curveCount);
+   SetUserAttributes(mNode, info.pointAttrs, info.pointCount);
+   
+   // curves.basis [bezier, b-spline, catmull-rom, linear]
+   //       .min_pixel_width FLOAT
+   //       .num_points UINT[]
+   //       .orientations VECTOR[]
+   //       .points POINT[]
+   //       .radius FLOAT[]
+   //       .mode [ribbon, thick, oriented]
+   //       .invert_normals BOOL
+   
+   // in schema::sample
+   //   size_t getNumCurves()
+   //   Abc::Int32ArraySamplePtr getCurvesNumVertices()
+   //   Abc::P3fArraySamplePtr getPositions()
+   //   CurveType getType()
+   //   CurvePeriodicity getWrap()
+   //   BasisType getBasis()
+   //   Abc::UcharArraySamplePtr getOrders() [type == kVariableOrder]
+   //   Abc::FloatArraySamplePtr getKnots()
+   //   Abc::FloatArraySamplePtr getPositionWeights() [all 1 if null]
+   //   Abc::V3fArraySamplePtr getVelocities()
+   // 
+   // in schema
+   //   getPositionsProperty()
+   //   getVelocitiesProperty()
+   //   getNumVerticesProperty()
+   //   getUVsParam()
+   //   getNormalsParam()
+   //   getWidthsParam()
+   //   getOrdersProperty()
+   //   getKnotsProperty()
    
    outputInstanceNumber(node, instance);
    
