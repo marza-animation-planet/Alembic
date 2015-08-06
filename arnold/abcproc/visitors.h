@@ -135,6 +135,8 @@ public:
    
 private:
    
+   float adjustRadius(float radius) const;
+   
    template <class T>
    AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance, bool interpolateBounds, double extraPadding);
 
@@ -145,6 +147,24 @@ private:
    std::vector<AtNode*> mNodes;
    std::vector<std::string> mPaths;
 };
+
+inline float MakeProcedurals::adjustRadius(float radius) const
+{
+   radius *= mDso->radiusScale();
+   
+   if (radius < mDso->radiusMin())
+   {
+      return mDso->radiusMin();
+   }
+   else if (radius > mDso->radiusMax())
+   {
+      return mDso->radiusMax();
+   }
+   else
+   {
+      return radius;
+   }
+}
 
 template <class T>
 AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance, bool interpolateBounds, double extraPadding)

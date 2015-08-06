@@ -430,7 +430,8 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
             
             for (size_t i=0; i<vals->size(); ++i)
             {
-               float r = vals->get()[i];
+               float r = adjustRadius(vals->get()[i]);
+               
                if (r > extraPadding)
                {
                   extraPadding = r;
@@ -454,8 +455,74 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode *instance)
 {
-   bool interpolate = (node.typedObject().getSchema().getTopologyVariance() != Alembic::AbcGeom::kHeterogenousTopology);
-   return shapeEnter(node, instance, interpolate, 0.0);
+   //bool interpolate = (node.typedObject().getSchema().getTopologyVariance() != Alembic::AbcGeom::kHeterogenousTopology);
+   //return shapeEnter(node, instance, interpolate, 0.0);
+   
+   // Take into account the curve width in the computed bounds
+   
+   Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
+   
+   double extraPadding = 0.0;
+   
+   if (visible)
+   {
+      Alembic::AbcGeom::IFloatGeomParam widths = node.typedObject().getSchema().getWidthsParam();
+      
+      if (widths.valid())
+      {
+         TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> wsamples;
+         TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator wsample;
+            
+         double renderTime = mDso->renderTime();
+         
+         const double *sampleTimes = 0;
+         size_t sampleTimesCount = 0;
+         
+         if (mDso->ignoreDeformBlur())
+         {
+            sampleTimes = &renderTime;
+            sampleTimesCount = 1;
+         }
+         else
+         {
+            sampleTimes = &(mDso->motionSampleTimes()[0]);
+            sampleTimesCount = mDso->numMotionSamples();
+         }
+            
+         for (size_t i=0; i<sampleTimesCount; ++i)
+         {
+            double t = sampleTimes[i];
+            
+            wsamples.update(widths, t, t, (i > 0 || instance != 0));
+         }
+         
+         for (wsample=wsamples.begin(); wsample!=wsamples.end(); ++wsample)
+         {
+            Alembic::Abc::FloatArraySamplePtr vals = wsample->data().getVals();
+            
+            for (size_t i=0; i<vals->size(); ++i)
+            {
+               float r = adjustRadius(0.5 * vals->get()[i]);
+               
+               if (r > extraPadding)
+               {
+                  extraPadding = r;
+               }
+            }
+         }
+      }
+      else
+      {
+         extraPadding = mDso->radiusMin();
+      }
+      
+      if (mDso->verbose())
+      {
+         AiMsgInfo("[abcproc] Curves extra bounds padding: %lf", extraPadding);
+      }
+   }
+   
+   return shapeEnter(node, instance, false, extraPadding);
 }
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicNuPatch &, AlembicNode *)
@@ -2938,19 +3005,39 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
    info.varyingTopology = (schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
    
    TimeSampleList<Alembic::AbcGeom::ICurvesSchema> &samples = node.samples().schemaSamples;
+   TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> Wsamples;
+   TimeSampleList<Alembic::AbcGeom::IN3fGeomParam> Nsamples;
    TimeSampleList<Alembic::AbcGeom::ICurvesSchema>::ConstIterator samp0, samp1;
+   TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator Wsamp0, Wsamp1;
+   TimeSampleList<Alembic::AbcGeom::IN3fGeomParam>::ConstIterator Nsamp0, Nsamp1;
    double a = 1.0;
    double b = 0.0;
+   double t = 0.0;
+   
+   Alembic::AbcGeom::IFloatGeomParam widths = schema.getWidthsParam();
+   Alembic::AbcGeom::IN3fGeomParam normals = schema.getNormalsParam();
+   Alembic::AbcGeom::IV2fGeomParam uvs = schema.getUVsParam();
    
    if (info.varyingTopology)
    {
-      node.sampleSchema(mDso->renderTime(), mDso->renderTime(), false);
+      t = mDso->renderTime();
+      
+      node.sampleSchema(t, t, false);
+      
+      if (widths)
+      {
+         Wsamples.update(widths, t, t, false);
+      }
+      if (normals)
+      {
+         Nsamples.update(normals, t, t, false);
+      }
    }
    else
    {
       for (size_t i=0; i<mDso->numMotionSamples(); ++i)
       {
-         double t = mDso->motionSampleTime(i);
+         t = mDso->motionSampleTime(i);
          
          if (mDso->verbose())
          {
@@ -2958,6 +3045,15 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
          }
       
          node.sampleSchema(t, t, i > 0);
+         
+         if (widths)
+         {
+            Wsamples.update(widths, t, t, i > 0);
+         }
+         if (normals)
+         {
+            Nsamples.update(normals, t, t, i > 0);
+         }
       }
       
       // renderTime() may not be in the sample list, let's at it just in case
@@ -2977,11 +3073,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
    std::string name = arnoldNodeName(node);
    
    mNode = AiNode("curves");
-   AiNodeSetStr(mNode, "name", name.c_str());
    
-   AtArray *points = 0;
-   AtArray *num_points = 0;
-   AtArray *radius = 0;
+   AiNodeSetStr(mNode, "name", name.c_str());
    
    // Collect attributes
    
@@ -2999,51 +3092,672 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
                          0,
                          0);
    
+   // Process point positions
+   
+   AtArray *num_points = 0;
+   AtArray *points = 0;
+   std::string basis = "b-spline";
+   
    if (samples.size() == 1 && !info.varyingTopology)
    {
       samp0 = samples.begin();
       
       Alembic::Abc::Int32ArraySamplePtr Nv = samp0->data().getCurvesNumVertices();
       Alembic::Abc::P3fArraySamplePtr P = samp0->data().getPositions();
-            
+      
       info.curveCount = (unsigned int) Nv->size();
       info.pointCount = (unsigned int) P->size();
       
+      if (mDso->verbose())
+      {
+         AiMsgInfo("[abcproc] %lu curve(s), %lu point(s)", info.curveCount, info.pointCount);
+      }
+      
       num_points = AiArrayAllocate(info.curveCount, 1, AI_TYPE_UINT);
-      points = AiArrayAllocate(info.pointCount + 2, 1, AI_TYPE_POINT);
+      points = AiArrayAllocate(info.pointCount + (2 * info.curveCount), 1, AI_TYPE_POINT);
+      
+      size_t po = 0; // source point offset
+      size_t pi = 0; // dest point index
+      Alembic::Abc::V3f p; // source point
+      AtPoint pnt;
+      
+      for (unsigned int ci=0; ci<info.curveCount; ++ci)
+      {
+         int np = Nv->get()[ci];
+         AiArraySetUInt(num_points, ci, (unsigned int) (np + 2));
+         
+         p = P->get()[po];
+         pnt.x = p.x;
+         pnt.y = p.y;
+         pnt.z = p.z;
+         AiArraySetPnt(points, pi++, pnt);
+         
+         for (int i=0; i<np; ++i)
+         {
+            p = P->get()[po + i];
+            pnt.x = p.x;
+            pnt.y = p.y;
+            pnt.z = p.z;
+            AiArraySetPnt(points, pi++, pnt);
+         }
+         
+         p = P->get()[po + np - 1];
+         pnt.x = p.x;
+         pnt.y = p.y;
+         pnt.z = p.z;
+         AiArraySetPnt(points, pi++, pnt);
+         
+         po += np;
+      }
    }
    else
    {
       if (info.varyingTopology)
       {
-         // using velocity
-         double b = 0.0;
+         // extrapolate using velocity and acceleration
+         b = 0.0;
          
          samples.getSamples(mDso->renderTime(), samp0, samp1, b);
          
-         Alembic::Abc::V3fArraySamplePtr V = samp0->data().getVelocities();
+         Alembic::Abc::Int32ArraySamplePtr Nv = samp0->data().getCurvesNumVertices();
+         Alembic::Abc::P3fArraySamplePtr P = samp0->data().getPositions();
+               
+         info.curveCount = (unsigned int) Nv->size();
+         info.pointCount = (unsigned int) P->size();
+         
+         num_points = AiArrayAllocate(info.curveCount, 1, AI_TYPE_UINT);
+         for (unsigned int ci=0; ci<info.curveCount; ++ci)
+         {
+            AiArraySetUInt(num_points, ci, (unsigned int) (Nv->get()[ci] + 2));
+         }
+         
+         const float *vel = 0;
+         const float *acc = 0;
+         
+         // Get velocity
+         if (samp0->data().getVelocities())
+         {
+            vel = (const float*) samp0->data().getVelocities()->getData();
+         }
+         else
+         {
+            UserAttributes::iterator it = info.pointAttrs.find("velocity");
+            
+            if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
+            {
+               it = info.pointAttrs.find("v");
+               if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+               {
+                  it = info.pointAttrs.end();
+               }
+            }
+            
+            if (it != info.pointAttrs.end())
+            {
+               vel = (const float*) it->second.data;
+            }
+         }
+         
+         // Get acceleration
+         if (vel)
+         {
+            UserAttributes::iterator it = info.pointAttrs.find("acceleration");
+            
+            if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
+            {
+               it = info.pointAttrs.find("accel");
+               if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
+               {
+                  it = info.pointAttrs.find("a");
+                  if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+                  {
+                     it = info.pointAttrs.end();
+                  }
+               }
+            }
+            
+            if (it != info.pointAttrs.end())
+            {
+               acc = (const float*) it->second.data;
+            }
+         }
+         
+         // Compute positions
+         size_t po = 0; // source point offset
+         size_t pi = 0; // dest point index
+         Alembic::Abc::V3f p; // source point
+         AtPoint pnt;
+         
+         if (!vel)
+         {
+            // Cannot extrapolate samples, output a single sample
+            points = AiArrayAllocate(info.pointCount + (2 * info.curveCount), 1, AI_TYPE_POINT);
+            
+            for (unsigned int ci=0; ci<info.curveCount; ++ci)
+            {
+               int np = Nv->get()[ci];
+               
+               p = P->get()[po];
+               pnt.x = p.x;
+               pnt.y = p.y;
+               pnt.z = p.z;
+               AiArraySetPnt(points, pi++, pnt);
+               
+               for (int i=0; i<np; ++i)
+               {
+                  p = P->get()[po + i];
+                  pnt.x = p.x;
+                  pnt.y = p.y;
+                  pnt.z = p.z;
+                  AiArraySetPnt(points, pi++, pnt);
+               }
+               
+               p = P->get()[po + np - 1];
+               pnt.x = p.x;
+               pnt.y = p.y;
+               pnt.z = p.z;
+               AiArraySetPnt(points, pi++, pnt);
+               
+               po += np;
+            }
+         }
+         else
+         {
+            // Extrapolate samples
+            points = AiArrayAllocate(info.pointCount + (2 * info.curveCount), mDso->numMotionSamples(), AI_TYPE_POINT);
+            
+            for (size_t i=0, j=0; i<mDso->numMotionSamples(); ++i)
+            {
+               po = 0;
+               t = mDso->motionSampleTime(i) - mDso->renderTime();
+               
+               if (acc)
+               {
+                  const float *v = vel;
+                  const float *a = acc;
+                  const float *pv = 0;
+                  const float *pa = 0;
+                  
+                  for (unsigned int ci=0; ci<info.curveCount; ++ci)
+                  {
+                     int np = Nv->get()[ci];
+                     
+                     p = P->get()[po];
+                     pnt.x = p.x + t * (v[0] + t * a[0]);
+                     pnt.y = p.y + t * (v[1] + t * a[1]);
+                     pnt.z = p.z + t * (v[2] + t * a[2]);
+                     AiArraySetPnt(points, pi++, pnt);
+                     
+                     for (int i=0; i<np; ++i, v+=3, a+=3)
+                     {
+                        p = P->get()[po + i];
+                        pnt.x = p.x + t * (v[0] + t * a[0]);
+                        pnt.y = p.y + t * (v[1] + t * a[1]);
+                        pnt.z = p.z + t * (v[2] + t * a[2]);
+                        AiArraySetPnt(points, pi++, pnt);
+                        
+                        pv = v;
+                        pa = a;
+                     }
+                     
+                     p = P->get()[po + np - 1];
+                     pnt.x = p.x + t * (pv[0] + t * pa[0]);
+                     pnt.y = p.y + t * (pv[1] + t * pa[1]);
+                     pnt.z = p.z + t * (pv[2] + t * pa[2]);
+                     AiArraySetPnt(points, pi++, pnt);
+                     
+                     po += np;
+                  }
+               }
+               else
+               {
+                  const float *v = vel;
+                  const float *pv = 0;
+                  
+                  for (unsigned int ci=0; ci<info.curveCount; ++ci)
+                  {
+                     int np = Nv->get()[ci];
+                     AiArraySetUInt(num_points, ci, (unsigned int) (np + 2));
+                     
+                     p = P->get()[po];
+                     pnt.x = p.x + t * v[0];
+                     pnt.y = p.y + t * v[1];
+                     pnt.z = p.z + t * v[2];
+                     AiArraySetPnt(points, pi++, pnt);
+                     
+                     for (int i=0; i<np; ++i, v+=3)
+                     {
+                        p = P->get()[po + i];
+                        pnt.x = p.x + t * v[0];
+                        pnt.y = p.y + t * v[1];
+                        pnt.z = p.z + t * v[2];
+                        AiArraySetPnt(points, pi++, pnt);
+                        
+                        pv = v;
+                     }
+                     
+                     p = P->get()[po + np - 1];
+                     pnt.x = p.x + t * pv[0];
+                     pnt.y = p.y + t * pv[1];
+                     pnt.z = p.z + t * pv[2];
+                     AiArraySetPnt(points, pi++, pnt);
+                     
+                     po += np;
+                  }
+               }
+            }
+         }
       }
       else
       {
-         // interpolate samples
-         for (size_t i=0, j=0; i<mDso->numMotionSamples(); ++i)
+         size_t po = 0; // source point offset
+         size_t pi = 0; // dest point index
+         Alembic::Abc::V3f p0, p1; // source points
+         AtPoint pnt;
+         
+         for (size_t i=0; i<mDso->numMotionSamples(); ++i)
          {
-            double b = 0.0;
-            double t = mDso->motionSampleTime(i);
+            b = 0.0;
+            t = mDso->motionSampleTime(i);
             
             samples.getSamples(t, samp0, samp1, b);
             
+            Alembic::Abc::Int32ArraySamplePtr Nv = samp0->data().getCurvesNumVertices();
+            Alembic::Abc::P3fArraySamplePtr P0 = samp0->data().getPositions();
             
+            if (!num_points)
+            {
+               info.curveCount = (unsigned int) Nv->size();
+               num_points = AiArrayAllocate(info.curveCount, 1, AI_TYPE_UINT);
+               
+               for (unsigned int ci=0; ci<info.curveCount; ++ci)
+               {
+                  AiArraySetUInt(num_points, ci, (unsigned int) (Nv->get()[ci] + 2));
+               }
+            }
+            
+            if (!points)
+            {
+               info.pointCount = (unsigned int) P0->size();
+               points = AiArrayAllocate(info.pointCount + (2 + info.curveCount), mDso->numMotionSamples(), AI_TYPE_POINT);
+            }
+            
+            if (b > 0.0)
+            {
+               // interpolate 2 samples
+               Alembic::Abc::P3fArraySamplePtr P1 = samp1->data().getPositions();
+               
+               a = 1.0 - b;
+               
+               po = 0;
+               
+               for (unsigned int ci=0; ci<info.curveCount; ++ci)
+               {
+                  int np = Nv->get()[ci];
+                  
+                  p0 = P0->get()[po];
+                  p1 = P1->get()[po];
+                  pnt.x = a * p0.x + b * p1.x;
+                  pnt.y = a * p0.y + b * p1.y;
+                  pnt.z = a * p0.z + b * p1.z;
+                  AiArraySetPnt(points, pi++, pnt);
+                  
+                  for (int i=0; i<np; ++i)
+                  {
+                     p0 = P0->get()[po + i];
+                     p1 = P1->get()[po + i];
+                     pnt.x = a * p0.x + b * p1.x;
+                     pnt.y = a * p0.y + b * p1.y;
+                     pnt.z = a * p0.z + b * p1.z;
+                     AiArraySetPnt(points, pi++, pnt);
+                  }
+                  
+                  p0 = P0->get()[po + np - 1];
+                  p1 = P1->get()[po + np - 1];
+                  pnt.x = a * p0.x + b * p1.x;
+                  pnt.y = a * p0.y + b * p1.y;
+                  pnt.z = a * p0.z + b * p1.z;
+                  AiArraySetPnt(points, pi++, pnt);
+                  
+                  po += np;
+               }
+            }
+            else
+            {
+               // exact sample
+               po = 0;
+               
+               for (unsigned int ci=0; ci<info.curveCount; ++ci)
+               {
+                  int np = Nv->get()[ci];
+                  
+                  p0 = P0->get()[po];
+                  pnt.x = p0.x;
+                  pnt.y = p0.y;
+                  pnt.z = p0.z;
+                  AiArraySetPnt(points, pi++, pnt);
+                  
+                  for (int i=0; i<np; ++i)
+                  {
+                     p0 = P0->get()[po + i];
+                     pnt.x = p0.x;
+                     pnt.y = p0.y;
+                     pnt.z = p0.z;
+                     AiArraySetPnt(points, pi++, pnt);
+                  }
+                  
+                  p0 = P0->get()[po + np - 1];
+                  pnt.x = p0.x;
+                  pnt.y = p0.y;
+                  pnt.z = p0.z;
+                  AiArraySetPnt(points, pi++, pnt);
+                  
+                  po += np;
+               }
+            }
          }
       }
    }
    
+   AiNodeSetStr(mNode, "basis", basis.c_str());
    AiNodeSetArray(mNode, "num_points", num_points);
    AiNodeSetArray(mNode, "points", points);
-   if (radius)
+   // mode
+   // min_pixel_width
+   // invert_normals
+   
+   // Process radius
+   AtArray *radius = 0;
+   
+   if (Wsamples.size() > 0)
    {
-      AiNodeSetArray(mNode, "radius", radius);
+      Alembic::Abc::FloatArraySamplePtr W0, W1;
+      
+      if (Wsamples.size() > 1 && !info.varyingTopology)
+      {
+         radius = AiArrayAllocate(info.pointCount, mDso->numMotionSamples(), AI_TYPE_FLOAT);
+         
+         unsigned int po = 0;
+         
+         for (size_t i=0; i<mDso->numMotionSamples(); ++i)
+         {
+            b = 0.0;
+            
+            Wsamples.getSamples(mDso->motionSampleTime(i), Wsamp0, Wsamp1, b);
+            
+            W0 = Wsamp0->data().getVals();
+            
+            if (W0->size() != 1 &&
+                W0->size() != info.curveCount &&
+                W0->size() != info.pointCount)
+            {
+               AiArrayDestroy(radius);
+               radius = 0;
+               break;
+            }
+            
+            unsigned int Wcount = (unsigned int) W0->size();
+            unsigned int pi = 0;
+            
+            if (b > 0.0)
+            {
+               a = 1.0 - b;
+               
+               W1 = Wsamp1->data().getVals();
+               
+               if (W1->size() != W0->size())
+               {
+                  AiArrayDestroy(radius);
+                  radius = 0;
+                  break;
+               }
+               
+               for (unsigned int ci=0; ci<info.curveCount; ++ci)
+               {
+                  unsigned int np = AiArrayGetUInt(num_points, ci) - 2;
+                  
+                  for (unsigned int j=0; j<np; ++j, ++pi)
+                  {
+                     unsigned int wi = (Wcount == 1 ? 0 : (Wcount == info.curveCount ? ci : pi));
+                     
+                     float w0 = W0->get()[wi];
+                     float w1 = W1->get()[wi];
+                     
+                     AiArraySetFlt(radius, po + pi, adjustRadius(0.5f * (a * w0 + b * w1)));
+                  }
+               }
+            }
+            else
+            {
+               for (unsigned int ci=0; ci<info.curveCount; ++ci)
+               {
+                  unsigned int np = AiArrayGetUInt(num_points, ci) - 2;
+                  
+                  for (unsigned int j=0; j<np; ++j, ++pi)
+                  {
+                     unsigned int wi = (Wcount == 1 ? 0 : (Wcount == info.curveCount ? ci : pi));
+                     
+                     AiArraySetFlt(radius, po + pi, adjustRadius(0.5f * W0->get()[wi]));
+                  }
+               }
+            }
+            
+            po += info.pointCount;
+         }
+      }
+      else
+      {
+         Wsamples.getSamples(mDso->renderTime(), Wsamp0, Wsamp1, b);
+            
+         W0 = Wsamp0->data().getVals();
+         
+         if (W0->size() == 1 ||
+             W0->size() == info.curveCount ||
+             W0->size() == info.pointCount)
+         {
+            unsigned int Wcount = (unsigned int) W0->size();
+         
+            radius = AiArrayAllocate(info.pointCount, 1, AI_TYPE_FLOAT);
+            
+            unsigned int pi = 0;
+            
+            for (unsigned int ci=0; ci<info.curveCount; ++ci)
+            {
+               unsigned int np = AiArrayGetUInt(num_points, ci) - 2;
+               
+               for (unsigned int j=0; j<np; ++j, ++pi)
+               {
+                  unsigned int wi = (Wcount == 1 ? 0 : (Wcount == info.curveCount ? ci : pi));
+                  
+                  AiArraySetFlt(radius, pi, adjustRadius(0.5f * W0->get()[wi]));
+               }
+            }
+         }
+      }
    }
+   
+   if (!radius)
+   {
+      AiMsgWarning("[abcproc] Defaulting curve radius to 0.01");
+      
+      float defaultWidth = 0.01f;
+      
+      radius = AiArrayAllocate(info.pointCount, 1, AI_TYPE_FLOAT);
+      
+      for (unsigned int i=0; i<info.pointCount; ++i)
+      {
+         AiArraySetFlt(radius, i, adjustRadius(0.5f * defaultWidth));
+      }
+   }
+   
+   AiNodeSetArray(mNode, "radius", radius);
+   
+   // Process normals (orientation)
+   AtArray *orientations = 0;
+   
+   if (Nsamples.size() > 0)
+   {
+      Alembic::Abc::N3fArraySamplePtr N0, N1;
+      Alembic::Abc::V3f n0, n1;
+      AtVector nrm;
+         
+      if (Nsamples.size() > 1 && !info.varyingTopology)
+      {
+         orientations = AiArrayAllocate(info.pointCount, mDso->numMotionSamples(), AI_TYPE_VECTOR);
+         
+         unsigned int po = 0;
+         
+         for (size_t i=0; i<mDso->numMotionSamples(); ++i)
+         {
+            b = 0.0;
+            
+            Nsamples.getSamples(mDso->motionSampleTime(i), Nsamp0, Nsamp1, b);
+            
+            N0 = Nsamp0->data().getVals();
+            
+            if (N0->size() != 1 &&
+                N0->size() != info.curveCount &&
+                N0->size() != info.pointCount)
+            {
+               AiArrayDestroy(orientations);
+               orientations = 0;
+               break;
+            }
+            
+            unsigned int Ncount = (unsigned int) N0->size();
+            unsigned int pi = 0;
+            
+            if (b > 0.0)
+            {
+               a = 1.0 - b;
+               
+               N1 = Nsamp1->data().getVals();
+               
+               if (N1->size() != N0->size())
+               {
+                  AiArrayDestroy(orientations);
+                  orientations = 0;
+                  break;
+               }
+               
+               for (unsigned int ci=0; ci<info.curveCount; ++ci)
+               {
+                  unsigned int np = AiArrayGetUInt(num_points, ci) - 2;
+                  
+                  for (unsigned int j=0; j<np; ++j, ++pi)
+                  {
+                     unsigned int ni = (Ncount == 1 ? 0 : (Ncount == info.curveCount ? ci : pi));
+                     
+                     n0 = N0->get()[ni];
+                     n1 = N1->get()[ni];
+                     nrm.x = a * n0.x + b * n1.x;
+                     nrm.y = a * n0.y + b * n1.y;
+                     nrm.z = a * n0.z + b * n1.z;
+                     AiArraySetVec(orientations, po + pi, nrm);
+                  }
+               }
+            }
+            else
+            {
+               for (unsigned int ci=0; ci<info.curveCount; ++ci)
+               {
+                  unsigned int np = AiArrayGetUInt(num_points, ci) - 2;
+                  
+                  for (unsigned int j=0; j<np; ++j, ++pi)
+                  {
+                     unsigned int ni = (Ncount == 1 ? 0 : (Ncount == info.curveCount ? ci : pi));
+                     
+                     n0 = N0->get()[ni];
+                     nrm.x = n0.x;
+                     nrm.y = n0.y;
+                     nrm.z = n0.z;
+                     AiArraySetVec(orientations, po + pi, nrm);
+                  }
+               }
+            }
+            
+            po += info.pointCount;
+         }
+      }
+      else
+      {
+         Nsamples.getSamples(mDso->renderTime(), Nsamp0, Nsamp0, b);
+            
+         N0 = Nsamp0->data().getVals();
+         
+         if (N0->size() == 1 ||
+             N0->size() == info.curveCount ||
+             N0->size() == info.pointCount)
+         {
+            unsigned int Ncount = (unsigned int) N0->size();
+         
+            orientations = AiArrayAllocate(info.pointCount, 1, AI_TYPE_VECTOR);
+            
+            unsigned int pi = 0;
+            
+            for (unsigned int ci=0; ci<info.curveCount; ++ci)
+            {
+               unsigned int np = AiArrayGetUInt(num_points, ci) - 2;
+               
+               for (unsigned int j=0; j<np; ++j, ++pi)
+               {
+                  unsigned int ni = (Ncount == 1 ? 0 : (Ncount == info.curveCount ? ci : pi));
+                  
+                  n0 = N0->get()[ni];
+                  nrm.x = n0.x;
+                  nrm.y = n0.y;
+                  nrm.z = n0.z;
+                  AiArraySetVec(orientations, pi, nrm);
+               }
+            }
+         }
+      }
+   }
+   
+   if (orientations)
+   {
+      AiNodeSetArray(mNode, "orientations", orientations);
+   }
+   
+   // Process uvs
+   
+   if (uvs)
+   {
+      if (info.pointAttrs.find("uv") != info.pointAttrs.end() ||
+          info.primitiveAttrs.find("uv") != info.primitiveAttrs.end() ||
+          info.objectAttrs.find("uv") != info.objectAttrs.end())
+      {
+         AiMsgWarning("[abcproc] Curves node already has a 'uv' user attribute, ignore alembic's");
+      }
+      else
+      {
+         Alembic::Abc::ICompoundProperty uvsProp = uvs.getValueProperty().getParent();
+         
+         UserAttribute uvsAttr;
+         
+         InitUserAttribute(uvsAttr);
+         
+         if (ReadUserAttribute(uvsAttr, uvsProp.getParent(), uvsProp.getHeader(), attribsTime, true, interpolateAttribs))
+         {
+            switch (uvsAttr.arnoldCategory)
+            {
+            case AI_USERDEF_CONSTANT:
+               SetUserAttribute(mNode, "uv", uvsAttr, 0);
+               break;
+            case AI_USERDEF_UNIFORM:
+               SetUserAttribute(mNode, "uv", uvsAttr, info.curveCount);
+               break;
+            case AI_USERDEF_VARYING:
+               SetUserAttribute(mNode, "uv", uvsAttr, info.pointCount);
+               break;
+            }
+         }
+         
+         DestroyUserAttribute(uvsAttr);
+      }
+   }
+   
+   // Reference positions
    
    if (mDso->outputReference())
    {
@@ -3078,13 +3792,26 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
    //       .mode [ribbon, thick, oriented]
    //       .invert_normals BOOL
    
+   /*
+   // curve specific Arnold render settings.
+   plug = FindMayaPlug("aiMinPixelWidth");
+   if (!plug.isNull()) AiNodeSetFlt(curve, "min_pixel_width", plug.asFloat());
+
+   // Mode is an enum, 0 == ribbon, 1 == tubes.
+   plug = FindMayaPlug("aiMode");
+   if (!plug.isNull()) AiNodeSetInt(curve, "mode", plug.asInt());
+
+   AiNodeSetStr(curve, "basis", "catmull-rom");
+   */
+   
    // in schema::sample
-   //   size_t getNumCurves()
-   //   Abc::Int32ArraySamplePtr getCurvesNumVertices()
-   //   Abc::P3fArraySamplePtr getPositions()
    //   CurveType getType()
    //   CurvePeriodicity getWrap()
    //   BasisType getBasis()
+   
+   //   size_t getNumCurves()
+   //   Abc::Int32ArraySamplePtr getCurvesNumVertices()
+   //   Abc::P3fArraySamplePtr getPositions()
    //   Abc::UcharArraySamplePtr getOrders() [type == kVariableOrder]
    //   Abc::FloatArraySamplePtr getKnots()
    //   Abc::FloatArraySamplePtr getPositionWeights() [all 1 if null]
