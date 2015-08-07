@@ -493,6 +493,10 @@ private:
       bool varyingTopology;
       unsigned int curveCount;
       unsigned int pointCount;
+      int degree;
+      bool periodic;
+      bool nurbs;
+      unsigned int cvCount;
       UserAttributes objectAttrs;
       UserAttributes primitiveAttrs;
       UserAttributes pointAttrs;
@@ -501,6 +505,10 @@ private:
          : varyingTopology(false)
          , curveCount(0)
          , pointCount(0)
+         , degree(-1)
+         , periodic(false)
+         , nurbs(false)
+         , cvCount(0)
       {
       }
       
@@ -597,6 +605,26 @@ private:
                              bool computeSmoothNormals,
                              UserAttributes *pointAttrs,
                              UserAttributes *vertexAttrs);
+   
+   
+   bool initCurves(CurvesInfo &info,
+                   const Alembic::AbcGeom::ICurvesSchema::Sample &sample,
+                   std::string &arnoldBasis);
+   
+   bool fillCurvesPositions(CurvesInfo &info,
+                            size_t motionStep,
+                            size_t numMotionSteps,
+                            Alembic::Abc::Int32ArraySamplePtr Nv,
+                            Alembic::Abc::P3fArraySamplePtr P0,
+                            Alembic::Abc::FloatArraySamplePtr W0,
+                            Alembic::Abc::P3fArraySamplePtr P1,
+                            Alembic::Abc::FloatArraySamplePtr W1,
+                            const float *vel,
+                            const float *acc,
+                            float blend,
+                            Alembic::Abc::FloatArraySamplePtr K,
+                            AtArray* &num_points,
+                            AtArray* &points);
    
    bool getReferenceCurves(AlembicCurves &node, CurvesInfo &info,
                            AlembicCurves* &refCurves,

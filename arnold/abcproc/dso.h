@@ -244,6 +244,13 @@ public:
       return mSingleParams.radiusScale;
    }
    
+   // Curves
+   
+   inline int nurbsSampleRate() const
+   {
+      return mSingleParams.nurbsSampleRate;
+   }
+   
    // Volume
    
    inline bool isVolume() const
@@ -387,6 +394,9 @@ private:
       float radiusMin;
       float radiusMax;
       float radiusScale;
+      
+      // curves
+      int nurbsSampleRate;
       
       
       void reset();
