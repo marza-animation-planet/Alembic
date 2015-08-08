@@ -3018,7 +3018,7 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
       
       if (mDso->verbose())
       {
-         AiMsgInfo("[abcproc] Allocate %lu point(s) for %lu curve(s), from %lu cv(s)", info.pointCount, info.curveCount, P0->size());
+         AiMsgInfo("[abcproc] Allocate %u point(s) for %u curve(s), from %lu cv(s)", info.pointCount, info.curveCount, P0->size());
       }
       
       for (unsigned int ci=0; ci<info.curveCount; ++ci)
@@ -3053,7 +3053,7 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
                   
                   if (mDso->verbose())
                   {
-                     AiMsgInfo("[abcproc] curve[%lu].cv[%ld] = (%f, %f, %f, %f)", ci, i, cv[0], cv[1], cv[2], cv[3]);
+                     AiMsgInfo("[abcproc] curve[%u].cv[%ld] = (%f, %f, %f, %f)", ci, i, cv[0], cv[1], cv[2], cv[3]);
                   }
                   
                   curve.setCV(i, cv);
@@ -3073,7 +3073,7 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
                   
                   if (mDso->verbose())
                   {
-                     AiMsgInfo("[abcproc] curve[%lu].cv[%ld] = (%f, %f, %f, %f)", ci, i, cv[0], cv[1], cv[2], cv[3]);
+                     AiMsgInfo("[abcproc] curve[%u].cv[%ld] = (%f, %f, %f, %f)", ci, i, cv[0], cv[1], cv[2], cv[3]);
                   }
                   
                   curve.setCV(i, cv);
@@ -3093,7 +3093,7 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
                   
                   if (mDso->verbose())
                   {
-                     AiMsgInfo("[abcproc] curve[%lu].cv[%ld] = (%f, %f, %f, %f)", ci, i, cv[0], cv[1], cv[2], cv[3]);
+                     AiMsgInfo("[abcproc] curve[%u].cv[%ld] = (%f, %f, %f, %f)", ci, i, cv[0], cv[1], cv[2], cv[3]);
                   }
                   
                   curve.setCV(i, cv);
@@ -3114,7 +3114,7 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
                
                if (mDso->verbose())
                {
-                  AiMsgInfo("[abcproc] curve[%lu].cv[%ld] = (%f, %f, %f, %f)", ci, i, cv[0], cv[1], cv[2], cv[3]);
+                  AiMsgInfo("[abcproc] curve[%u].cv[%ld] = (%f, %f, %f, %f)", ci, i, cv[0], cv[1], cv[2], cv[3]);
                }
                
                curve.setCV(i, cv);
@@ -3125,7 +3125,7 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
          {
             if (mDso->verbose())
             {
-               AiMsgInfo("[abcproc] curve[%lu].knot[%ld] = %f", ci, i, K->get()[ko + i]);
+               AiMsgInfo("[abcproc] curve[%u].knot[%ld] = %f", ci, i, K->get()[ko + i]);
             }
             
             curve.setKnot(i, K->get()[ko + i]);
@@ -3147,7 +3147,7 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
          
          if (mDso->verbose())
          {
-            AiMsgInfo("[abcproc] curve[%lu] domain = [%f, %f], step = %f, points = %ld", ci, ustart, uend, ustep, numSamples);
+            AiMsgInfo("[abcproc] curve[%u] domain = [%f, %f], step = %f, points = %ld", ci, ustart, uend, ustep, numSamples);
          }
          
          if (extraPoints > 0)
@@ -3201,7 +3201,7 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
    {
       if (mDso->verbose())
       {
-         AiMsgInfo("[abcproc] %lu curve(s), %lu point(s)", info.curveCount, info.pointCount);
+         AiMsgInfo("[abcproc] %u curve(s), %u point(s)", info.curveCount, info.pointCount);
       }
       
       if (blend > 0.0f && (P1 || vel))
@@ -3378,86 +3378,91 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
       
    bool hasPref = (pointAttrs->find("Pref") != pointAttrs->end());
    
-   if (!hasPref && (( info.nurbs && Pref->size() == info.cvCount) ||
-                    (!info.nurbs && Pref->size() == info.pointCount)))
+   if (hasPref)
    {
-      Alembic::Abc::M44d Mref;
+      if (pointAttrs != &(info.pointAttrs))
+      {
+         bool destroyDst = (info.pointAttrs.find("Pref") != info.pointAttrs.end());
+         
+         // Transfer from reference shape attributes to current shape attribtues
+         UserAttribute &src = (*pointAttrs)["Pref"];
+         UserAttribute &dst = info.pointAttrs["Pref"];
+         
+         if (destroyDst)
+         {
+            DestroyUserAttribute(dst);
+         }
+         
+         dst = src;
+         
+         pointAttrs->erase(pointAttrs->find("Pref"));
+      }
       
-      float *vals = (float*) AiMalloc(3 * info.pointCount * sizeof(float));
+      UserAttribute &ua = info.pointAttrs["Pref"];
       
-      // Figure out world matrix
+      unsigned int count = (info.nurbs ? info.cvCount : info.pointCount);
       
-      const AtUserParamEntry *upe = AiNodeLookUpUserParameter(mDso->procNode(), "Mref");
-      
-      if (upe != 0 &&
-          AiUserParamGetCategory(upe) == AI_USERDEF_CONSTANT &&
-          AiUserParamGetType(upe) == AI_TYPE_MATRIX)
+      // Little type aliasing: float[1][3n] -> float[3][n]
+      if (ua.dataDim == 1 && ua.dataCount == (3 * count))
       {
          if (mDso->verbose())
          {
-            AiMsgInfo("[abcproc] Using provided Mref");
+            AiMsgInfo("[abcproc] \"Pref\" exported with wrong base type: float instead if float[3]");
          }
          
-         AtMatrix mtx;
-         
-         AiNodeGetMatrix(mDso->procNode(), "Mref", mtx);
-         
-         for (int r=0; r<4; ++r)
-         {
-            for (int c=0; c<4; ++c)
-            {
-               Mref[r][c] = mtx[r][c];
-            }
-         }
-      }
-      else
-      {
-         // recompute matrix
-         if (mDso->verbose())
-         {
-            AiMsgInfo("[abcproc] Compute reference world matrix Mref");
-         }
-         
-         AlembicXform *refParent = dynamic_cast<AlembicXform*>(refCurves->parent());
-         
-         while (refParent)
-         {
-            Alembic::AbcGeom::IXformSchema xformSchema = refParent->typedObject().getSchema();
-            
-            Alembic::AbcGeom::XformSample xformSample = xformSchema.getValue();
-            
-            Mref = Mref * xformSample.getMatrix();
-            
-            if (xformSchema.getInheritsXforms())
-            {
-               refParent = dynamic_cast<AlembicXform*>(refParent->parent());
-            }
-            else
-            {
-               refParent = 0;
-            }
-         }
+         ua.dataDim = 3;
+         ua.dataCount = count;
+         ua.arnoldType = AI_TYPE_POINT;
+         ua.arnoldTypeStr = "POINT";
       }
       
-      // Compute reference positions
+      // Check valid point count
+      if (ua.dataCount != count || ua.dataDim != 3)
+      {
+         AiMsgWarning("[abcproc] \"Pref\" exported with incompatible size and/or dimension");
+         DestroyUserAttribute(ua);
+         info.pointAttrs.erase(info.pointAttrs.find("Pref"));
+         return false;
+      }
       
       if (info.nurbs)
       {
          Alembic::Abc::Int32ArraySamplePtr Nv = sample.getCurvesNumVertices();
+         
+         if (Nv->size() != info.curveCount)
+         {
+            AiMsgWarning("[abcproc] Incompatible curve count in reference object");
+            DestroyUserAttribute(ua);
+            info.pointAttrs.erase(info.pointAttrs.find("Pref"));
+            return false;
+         }
+         
+         if (Pref->size() != count)
+         {
+            AiMsgWarning("[abcproc] Incompatible point count in reference object");
+            DestroyUserAttribute(ua);
+            info.pointAttrs.erase(info.pointAttrs.find("Pref"));
+            return false;
+         }
+         
          Alembic::Abc::FloatArraySamplePtr W = sample.getPositionWeights();
          Alembic::Abc::FloatArraySamplePtr K;
-         
          schema.getKnotsProperty().get(K);
          
          NURBS<3> curve;
          NURBS<3>::CV cv;
          NURBS<3>::Pnt pnt;
          Alembic::Abc::V3f p;
+         const float *P = (const float*) ua.data;
+         float *newP = (float*) AiMalloc(3 * info.pointCount * sizeof(float));
          long ko = 0;
          long po = 0;
+         size_t off = 0;
          
-         for (size_t ci=0, off=0; ci<Nv->size(); ++ci)
+         for (size_t ci=0, pi=0; ci<Nv->size(); ++ci)
          {
+            // Build NURBS curve
+            
             long np = Nv->get()[ci];
             long ns = np - info.degree;
             long nk = ns + 2 * info.degree + 1;
@@ -3465,12 +3470,11 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
             curve.setNumCVs(np);
             curve.setNumKnots(nk);
             
-            for (int pi=0; pi<np; ++pi)
+            for (int pi=0; pi<np; ++pi, P+=3)
             {
-               p = Pref->get()[po + pi] * Mref;
-               cv[0] = p.x;
-               cv[1] = p.y;
-               cv[2] = p.z;
+               cv[0] = P[0];
+               cv[1] = P[1];
+               cv[2] = P[2];
                cv[3] = (W ? W->get()[po + pi] : 1.0f);
                curve.setCV(pi, cv);
             }
@@ -3482,6 +3486,8 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
             
             po += np;
             ko += nk;
+            
+            // Evaluate NURBS curve
             
             float ustart = 0.0f;
             float uend = 0.0f;
@@ -3498,97 +3504,115 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
             {
                curve.eval(u, pnt);
                
-               vals[off + 0] = pnt[0];
-               vals[off + 1] = pnt[1];
-               vals[off + 2] = pnt[2];
+               // check off < 3 * info.pointCount?
+               newP[off + 0] = pnt[0];
+               newP[off + 1] = pnt[1];
+               newP[off + 2] = pnt[2];
                
                u += ustep;
             }
          }
+         
+         AiFree(ua.data);
+         ua.data = newP;
+         ua.dataDim = 3;
+         ua.dataCount = info.pointCount;
       }
-      else
+      
+      if (mDso->referenceScene())
       {
-         for (unsigned int i=0, off=0; i<info.pointCount; ++i, off+=3)
-         {
-            Alembic::Abc::V3f p = Pref->get()[i] * Mref;
-            
-            vals[off + 0] = p.x;
-            vals[off + 1] = p.y;
-            vals[off + 2] = p.z;
-         }
+         AiMsgWarning("[abcproc] \"Pref\" read from user attribute, ignore values from reference alembic");
       }
-      
-      UserAttribute &ua = info.pointAttrs["Pref"];
-      
-      InitUserAttribute(ua);
-      
-      ua.arnoldCategory = AI_USERDEF_VARYING;
-      ua.arnoldType = AI_TYPE_POINT;
-      ua.arnoldTypeStr = "POINT";
-      ua.isArray = true;
-      ua.dataDim = 3;
-      ua.dataCount = info.pointCount;
-      ua.data = vals;
-      
-      hasPref = true;
+      else if (mDso->verbose())
+      {
+         AiMsgInfo("[abcproc] \"Pref\" read from user attribute");
+      }
    }
    else
    {
-      if (hasPref)
+      Alembic::Abc::Int32ArraySamplePtr Nv = sample.getCurvesNumVertices();
+      
+      if (Nv->size() == info.curveCount &&
+          Pref->size() == (info.nurbs ? info.cvCount : info.pointCount))
       {
-         if (pointAttrs != &(info.pointAttrs))
-         {
-            // Transfer from reference shape attributes to current shape attribtues
-            UserAttribute &src = (*pointAttrs)["Pref"];
-            UserAttribute &dst = info.pointAttrs["Pref"];
-            
-            dst = src;
-            
-            pointAttrs->erase(pointAttrs->find("Pref"));
-         }
+         // Figure out world matrix
          
-         // Little type aliasing: float[1][3n] -> float[3][n]
+         Alembic::Abc::M44d Mref;
          
-         UserAttribute &ua = info.pointAttrs["Pref"];
+         const AtUserParamEntry *upe = AiNodeLookUpUserParameter(mDso->procNode(), "Mref");
          
-         unsigned int count = (info.nurbs ? info.cvCount : info.pointCount);
-         
-         if (ua.dataDim == 1 && ua.dataCount == (3 * count))
+         if (upe != 0 &&
+             AiUserParamGetCategory(upe) == AI_USERDEF_CONSTANT &&
+             AiUserParamGetType(upe) == AI_TYPE_MATRIX)
          {
             if (mDso->verbose())
             {
-               AiMsgInfo("[abcproc] \"Pref\" exported with wrong base type: float instead if float[3]");
+               AiMsgInfo("[abcproc] Using provided Mref");
             }
-            
-            ua.dataDim = 3;
-            ua.dataCount = count;
-            ua.arnoldType = AI_TYPE_POINT;
-            ua.arnoldTypeStr = "POINT";
+         
+            AtMatrix mtx;
+         
+            AiNodeGetMatrix(mDso->procNode(), "Mref", mtx);
+         
+            for (int r=0; r<4; ++r)
+            {
+               for (int c=0; c<4; ++c)
+               {
+                  Mref[r][c] = mtx[r][c];
+               }
+            }
          }
+         else
+         {
+            // recompute matrix
+            if (mDso->verbose())
+            {
+               AiMsgInfo("[abcproc] Compute reference world matrix Mref");
+            }
+         
+            AlembicXform *refParent = dynamic_cast<AlembicXform*>(refCurves->parent());
+         
+            while (refParent)
+            {
+               Alembic::AbcGeom::IXformSchema xformSchema = refParent->typedObject().getSchema();
+            
+               Alembic::AbcGeom::XformSample xformSample = xformSchema.getValue();
+            
+               Mref = Mref * xformSample.getMatrix();
+            
+               if (xformSchema.getInheritsXforms())
+               {
+                  refParent = dynamic_cast<AlembicXform*>(refParent->parent());
+               }
+               else
+               {
+                  refParent = 0;
+               }
+            }
+         }
+         
+         // Compute reference positions
+         
+         float *vals = (float*) AiMalloc(3 * info.pointCount * sizeof(float));
          
          if (info.nurbs)
          {
-            // need to evaluate nurbs
-            // knot vector?
-            Alembic::Abc::FloatArraySamplePtr K;
             Alembic::Abc::FloatArraySamplePtr W = sample.getPositionWeights();
-            Alembic::Abc::Int32ArraySamplePtr Nv = sample.getCurvesNumVertices();
+            Alembic::Abc::FloatArraySamplePtr K;
             
             schema.getKnotsProperty().get(K);
             
-            // note: 
             NURBS<3> curve;
             NURBS<3>::CV cv;
             NURBS<3>::Pnt pnt;
             Alembic::Abc::V3f p;
-            const float *P = (const float*) ua.data;
-            float *newP = new float[3 * info.pointCount];
             long ko = 0;
             long po = 0;
-            size_t off = 0;
             
-            for (size_t ci=0, pi=0; ci<Nv->size(); ++ci)
+            for (size_t ci=0, off=0; ci<Nv->size(); ++ci)
             {
+               // Build NURBS curve
+               
                long np = Nv->get()[ci];
                long ns = np - info.degree;
                long nk = ns + 2 * info.degree + 1;
@@ -3596,11 +3620,12 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
                curve.setNumCVs(np);
                curve.setNumKnots(nk);
                
-               for (int pi=0; pi<np; ++pi, P+=3)
+               for (int pi=0; pi<np; ++pi)
                {
-                  cv[0] = P[0];
-                  cv[1] = P[1];
-                  cv[2] = P[2];
+                  p = Pref->get()[po + pi] * Mref;
+                  cv[0] = p.x;
+                  cv[1] = p.y;
+                  cv[2] = p.z;
                   cv[3] = (W ? W->get()[po + pi] : 1.0f);
                   curve.setCV(pi, cv);
                }
@@ -3612,6 +3637,8 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
                
                po += np;
                ko += nk;
+               
+               // Evaluate curve
                
                float ustart = 0.0f;
                float uend = 0.0f;
@@ -3628,33 +3655,39 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
                {
                   curve.eval(u, pnt);
                   
-                  newP[off + 0] = pnt[0];
-                  newP[off + 1] = pnt[1];
-                  newP[off + 2] = pnt[2];
+                  vals[off + 0] = pnt[0];
+                  vals[off + 1] = pnt[1];
+                  vals[off + 2] = pnt[2];
                   
                   u += ustep;
                }
             }
-            
-            free(ua.data);
-            
-            ua.data = newP;
-            ua.dataDim = 3;
-            ua.dataCount = info.pointCount;
          }
          else
          {
-            // NOOP
+            for (unsigned int i=0, off=0; i<info.pointCount; ++i, off+=3)
+            {
+               Alembic::Abc::V3f p = Pref->get()[i] * Mref;
+               
+               vals[off + 0] = p.x;
+               vals[off + 1] = p.y;
+               vals[off + 2] = p.z;
+            }
          }
          
-         if (mDso->referenceScene())
-         {
-            AiMsgWarning("[abcproc] \"Pref\" read from user attribute, ignore values from reference alembic");
-         }
-         else if (mDso->verbose())
-         {
-            AiMsgInfo("[abcproc] \"Pref\" read from user attribute");
-         }
+         UserAttribute &ua = info.pointAttrs["Pref"];
+         
+         InitUserAttribute(ua);
+         
+         ua.arnoldCategory = AI_USERDEF_VARYING;
+         ua.arnoldType = AI_TYPE_POINT;
+         ua.arnoldTypeStr = "POINT";
+         ua.isArray = true;
+         ua.dataDim = 3;
+         ua.dataCount = info.pointCount;
+         ua.data = vals;
+         
+         hasPref = true;
       }
       else
       {
