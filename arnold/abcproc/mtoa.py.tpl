@@ -280,7 +280,7 @@ def SetupAttrs():
       attrs.append(stu.AttrData(name="mtoa_abc_radiusScale", shortName="radscl", type=arnold.AI_TYPE_FLOAT, defaultValue=1.0, min=0))
       attrs.append(stu.AttrData(name="mtoa_abc_radiusMin", shortName="radmin", type=arnold.AI_TYPE_FLOAT, defaultValue=0.0, min=0))
       attrs.append(stu.AttrData(name="mtoa_abc_radiusMax", shortName="radmax", type=arnold.AI_TYPE_FLOAT, defaultValue=1000000.0, min=0))
-      attrs.append(stu.AttrData(name="mtoa_abc_nurbsSampleRate", shortName="nurbssr", type=arnold.AI_TYPE_INT, defaultValue=2, min=1))
+      attrs.append(stu.AttrData(name="mtoa_abc_nurbsSampleRate", shortName="nurbssr", type=arnold.AI_TYPE_INT, defaultValue=5, min=1))
       
       attrs.append(stu.AttrData(name="mtoa_abc_overrideAttribs", shortname="ovatrs", type=arnold.AI_TYPE_STRING, defaultValue=""))
       attrs.append(stu.AttrData(name="mtoa_abc_removeAttribPrefices", shortName="rematp", type=arnold.AI_TYPE_STRING, defaultValue=""))

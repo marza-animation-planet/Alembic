@@ -262,7 +262,7 @@ void Dso::SingleParameters::reset()
    radiusMax = 1000000.0f;
    radiusScale = 1.0f;
    
-   nurbsSampleRate = 2;
+   nurbsSampleRate = 5;
 }
 
 std::string Dso::SingleParameters::dataString() const
