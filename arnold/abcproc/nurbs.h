@@ -490,7 +490,7 @@ NURBS<D>& NURBS<D>::operator=(const NURBS<D> &rhs)
 }
 
 template <unsigned int D>
-bool NURBS<D>::getBoundingBox(NURBS<D>::Pnt &min, NURBS<D>::Pnt &max) const
+bool NURBS<D>::getBoundingBox(typename NURBS<D>::Pnt &min, typename NURBS<D>::Pnt &max) const
 {
    if (mCVs.size() == 0)
    {
@@ -671,7 +671,7 @@ void NURBS<D>::setWeight(long idx, float w)
 }
 
 template <unsigned int D>
-long NURBS<D>::getWeights(NURBS<D>::WeightArray &weights) const
+long NURBS<D>::getWeights(typename NURBS<D>::WeightArray &weights) const
 {
    weights.resize(mCVs.size());
    for (size_t i=0; i<mCVs.size(); ++i)
@@ -682,7 +682,7 @@ long NURBS<D>::getWeights(NURBS<D>::WeightArray &weights) const
 }
 
 template <unsigned int D>
-void NURBS<D>::setWeights(const NURBS<D>::WeightArray &weights)
+void NURBS<D>::setWeights(const typename NURBS<D>::WeightArray &weights)
 {
    mDirty = (weights.size() != mCVs.size());
    if (mDirty)
@@ -728,7 +728,7 @@ float NURBS<D>::getKnot(long idx) const
 }
 
 template <unsigned int D>
-long NURBS<D>::getKnots(NURBS<D>::KnotArray &knots) const
+long NURBS<D>::getKnots(typename NURBS<D>::KnotArray &knots) const
 {
    knots = mKnots;
    return long(mKnots.size());
@@ -742,7 +742,7 @@ void NURBS<D>::setKnot(long idx, float k)
 }
 
 template <unsigned int D>
-void NURBS<D>::setKnots(const NURBS<D>::WeightArray &knots)
+void NURBS<D>::setKnots(const typename NURBS<D>::WeightArray &knots)
 {
    mKnots = knots;
    mDirty = true; // even if size hasn't changed have to re-check knot sequence
@@ -1172,7 +1172,7 @@ long NURBS<D>::computeBasis(float u, float *basis) const
 }
 
 template <unsigned int D>
-bool NURBS<D>::eval(float u, NURBS<D>::Pnt &r) const
+bool NURBS<D>::eval(float u, typename NURBS<D>::Pnt &r) const
 {
    float *coeffs = (float*) alloca((mDegree+1) * sizeof(float));
 
@@ -1250,7 +1250,7 @@ bool NURBS<D>::derivate(NURBS<D> &d) const
 }
 
 template <unsigned int D>
-bool NURBS<D>::evalDerivative(float u, NURBS<D>::Vec &r) const
+bool NURBS<D>::evalDerivative(float u, typename NURBS<D>::Vec &r) const
 {
    NURBS<D> d;
    if (derivate(d))
@@ -1396,7 +1396,7 @@ float NURBS<D>::getParamAtLength(float l, float precision)
 }
 
 template <unsigned int D>
-bool NURBS<D>::getTangent(float u, NURBS<D>::Vec &t, bool normalize)
+bool NURBS<D>::getTangent(float u, typename NURBS<D>::Vec &t, bool normalize)
 {
    if (!evalDerivative(u, t))
    {
@@ -1410,7 +1410,7 @@ bool NURBS<D>::getTangent(float u, NURBS<D>::Vec &t, bool normalize)
 }
 
 template <unsigned int D>
-bool NURBS<D>::getNormal(float u, NURBS<D>::Vec &n, bool normalize)
+bool NURBS<D>::getNormal(float u, typename NURBS<D>::Vec &n, bool normalize)
 {
    NURBS<D> d;
    
