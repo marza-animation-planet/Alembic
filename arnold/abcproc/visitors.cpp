@@ -2271,7 +2271,14 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    
    if (V0)
    {
-      vel0 = (const float*) V0->getData();
+      if (V0->size() != P0->size())
+      {
+         AiMsgWarning("[abcproc] Velocities count doesn't match points' one. Ignoring it.");
+      }
+      else
+      {
+         vel0 = (const float*) V0->getData();
+      }
    }
    else
    {
@@ -2359,13 +2366,19 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
       
       if (V1)
       {
-         vel1 = (const float*) V1->getData();
+         if (V1->size() != P1->size())
+         {
+            AiMsgWarning("[abcproc] Velocities count doesn't match points' one. Ignoring it.");
+         }
+         else
+         {
+            vel1 = (const float*) V1->getData();
+         }
       }
       else if (vname.length() > 0)
       {
-         // Don't really have to check it as we are sampling the same schema, just at a different time
          UserAttributes::iterator it = extraPointAttrs.find(vname);
-         if (it != extraPointAttrs.end())
+         if (it != extraPointAttrs.end() && it->second.dataCount == P1->size())
          {
             vel1 = (const float*) it->second.data;
          }
@@ -2373,9 +2386,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
       
       if (aname.length() > 0)
       {
-         // Don't really have to check it as we are sampling the same schema, just at a different time
          UserAttributes::iterator it = extraPointAttrs.find(aname);
-         if (it != extraPointAttrs.end())
+         if (it != extraPointAttrs.end() && it->second.dataCount == P1->size())
          {
             acc1 = (const float*) it->second.data;
          }
