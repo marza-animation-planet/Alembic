@@ -2757,10 +2757,20 @@ bool MakeShape::getReferenceCurves(AlembicCurves &node,
    {
       if (isVaryingFloat3(info, uait->second))
       {
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Using 'Pref' attribute found in alembic file");
+         }
+         
          hasPref = true;
       }
       else
       {
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Ignore 'Pref' attribute found in alembic file");
+         }
+         
          // Pref exists but doesn't match requirements, get rid of it
          DestroyUserAttribute(uait->second);
          info.pointAttrs.erase(uait);
@@ -4342,9 +4352,15 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
       UserAttributes *pointAttrs = &refPointAttrs;
       AlembicCurves *refCurves = 0;
       
-      if (getReferenceCurves(node, info, refCurves, pointAttrs))
+      getReferenceCurves(node, info, refCurves, pointAttrs);
+      
+      if (refCurves)
       {
          fillReferencePositions(refCurves, info, pointAttrs);
+      }
+      else
+      {
+         AiMsgWarning("[abcproc] No valid reference curve found");
       }
       
       DestroyUserAttributes(refPointAttrs);
