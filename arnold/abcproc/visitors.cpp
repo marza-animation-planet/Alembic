@@ -3051,10 +3051,10 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
                   cv[2] = a * p0.z + blend * p1.z;
                   cv[3] = a * w0 + blend * w1;
                   
-                  if (mDso->verbose())
-                  {
-                     AiMsgInfo("[abcproc] curve[%u].cv[%ld] = (%f, %f, %f, %f)", ci, i, cv[0], cv[1], cv[2], cv[3]);
-                  }
+                  // if (mDso->verbose())
+                  // {
+                  //    AiMsgInfo("[abcproc] curve[%u].cv[%ld] = (%f, %f, %f, %f)", ci, i, cv[0], cv[1], cv[2], cv[3]);
+                  // }
                   
                   curve.setCV(i, cv);
                }
@@ -3071,10 +3071,10 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
                   cv[2] = p0.z + blend * (cvel[2] + 0.5f * blend * cacc[2]);
                   cv[3] = w0;
                   
-                  if (mDso->verbose())
-                  {
-                     AiMsgInfo("[abcproc] curve[%u].cv[%ld] = (%f, %f, %f, %f)", ci, i, cv[0], cv[1], cv[2], cv[3]);
-                  }
+                  // if (mDso->verbose())
+                  // {
+                  //    AiMsgInfo("[abcproc] curve[%u].cv[%ld] = (%f, %f, %f, %f)", ci, i, cv[0], cv[1], cv[2], cv[3]);
+                  // }
                   
                   curve.setCV(i, cv);
                }
@@ -3091,10 +3091,10 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
                   cv[2] = p0.z + blend * cvel[2];
                   cv[3] = w0;
                   
-                  if (mDso->verbose())
-                  {
-                     AiMsgInfo("[abcproc] curve[%u].cv[%ld] = (%f, %f, %f, %f)", ci, i, cv[0], cv[1], cv[2], cv[3]);
-                  }
+                  // if (mDso->verbose())
+                  // {
+                  //    AiMsgInfo("[abcproc] curve[%u].cv[%ld] = (%f, %f, %f, %f)", ci, i, cv[0], cv[1], cv[2], cv[3]);
+                  // }
                   
                   curve.setCV(i, cv);
                }
@@ -3112,10 +3112,10 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
                cv[2] = p0.z;
                cv[3] = w0;
                
-               if (mDso->verbose())
-               {
-                  AiMsgInfo("[abcproc] curve[%u].cv[%ld] = (%f, %f, %f, %f)", ci, i, cv[0], cv[1], cv[2], cv[3]);
-               }
+               // if (mDso->verbose())
+               // {
+               //    AiMsgInfo("[abcproc] curve[%u].cv[%ld] = (%f, %f, %f, %f)", ci, i, cv[0], cv[1], cv[2], cv[3]);
+               // }
                
                curve.setCV(i, cv);
             }
@@ -3123,10 +3123,10 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
          
          for (long i=0; i<nk; ++i)
          {
-            if (mDso->verbose())
-            {
-               AiMsgInfo("[abcproc] curve[%u].knot[%ld] = %f", ci, i, K->get()[ko + i]);
-            }
+            // if (mDso->verbose())
+            // {
+            //    AiMsgInfo("[abcproc] curve[%u].knot[%ld] = %f", ci, i, K->get()[ko + i]);
+            // }
             
             curve.setKnot(i, K->get()[ko + i]);
          }
@@ -3158,10 +3158,10 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
             pnt.z = pt[2];
             AiArraySetPnt(points, pi++, pnt);
             
-            if (mDso->verbose())
-            {
-               AiMsgInfo("[abcproc] first point (u=%f, idx=%lu): (%f, %f, %f)", ustart, pi-1, pnt.x, pnt.y, pnt.z);
-            }
+            // if (mDso->verbose())
+            // {
+            //    AiMsgInfo("[abcproc] first point (u=%f, idx=%lu): (%f, %f, %f)", ustart, pi-1, pnt.x, pnt.y, pnt.z);
+            // }
          }
          
          float u = ustart;
@@ -3174,10 +3174,10 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
             pnt.z = pt[2];
             AiArraySetPnt(points, pi++, pnt);
             
-            if (mDso->verbose())
-            {
-               AiMsgInfo("[abcproc] point(u=%f, idx=%lu): (%f, %f, %f)", u, pi-1, pnt.x, pnt.y, pnt.z);
-            }
+            // if (mDso->verbose())
+            // {
+            //    AiMsgInfo("[abcproc] point(u=%f, idx=%lu): (%f, %f, %f)", u, pi-1, pnt.x, pnt.y, pnt.z);
+            // }
          
             u += ustep;
          }
@@ -3190,10 +3190,10 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
             pnt.z = pt[2];
             AiArraySetPnt(points, pi++, pnt);
             
-            if (mDso->verbose())
-            {
-               AiMsgInfo("[abcproc] last point(u=%f, idx=%lu): (%f, %f, %f)", uend, pi-1, pnt.x, pnt.y, pnt.z);
-            }
+            // if (mDso->verbose())
+            // {
+            //    AiMsgInfo("[abcproc] last point(u=%f, idx=%lu): (%f, %f, %f)", uend, pi-1, pnt.x, pnt.y, pnt.z);
+            // }
          }
       }
    }
@@ -3405,10 +3405,7 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
       // Little type aliasing: float[1][3n] -> float[3][n]
       if (ua.dataDim == 1 && ua.dataCount == (3 * count))
       {
-         if (mDso->verbose())
-         {
-            AiMsgInfo("[abcproc] \"Pref\" exported with wrong base type: float instead if float[3]");
-         }
+         AiMsgWarning("[abcproc] \"Pref\" exported with wrong base type: float instead if float[3]");
          
          ua.dataDim = 3;
          ua.dataCount = count;
@@ -3420,6 +3417,7 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
       if (ua.dataCount != count || ua.dataDim != 3)
       {
          AiMsgWarning("[abcproc] \"Pref\" exported with incompatible size and/or dimension");
+         
          DestroyUserAttribute(ua);
          info.pointAttrs.erase(info.pointAttrs.find("Pref"));
          return false;
@@ -3432,6 +3430,7 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
          if (Nv->size() != info.curveCount)
          {
             AiMsgWarning("[abcproc] Incompatible curve count in reference object");
+            
             DestroyUserAttribute(ua);
             info.pointAttrs.erase(info.pointAttrs.find("Pref"));
             return false;
@@ -3440,6 +3439,7 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
          if (Pref->size() != count)
          {
             AiMsgWarning("[abcproc] Incompatible point count in reference object");
+            
             DestroyUserAttribute(ua);
             info.pointAttrs.erase(info.pointAttrs.find("Pref"));
             return false;
@@ -3850,9 +3850,6 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
             {
                W0 = samp0->data().getPositionWeights();
                
-               // getKnots() is not 'const'! WTF!
-               //K = samp0->data().getKnots();
-               
                Alembic::Abc::ISampleSelector iss(samp0->time(), Alembic::Abc::ISampleSelector::kNearIndex);
                schema.getKnotsProperty().get(K, iss);
             }
@@ -3958,9 +3955,6 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
             if (info.nurbs)
             {
                W0 = samp0->data().getPositionWeights();
-               
-               // getKnots() is not 'const'! WTF!
-               //K = samp0->data().getKnots();
                
                Alembic::Abc::ISampleSelector iss(samp0->time(), Alembic::Abc::ISampleSelector::kNearIndex);
                schema.getKnotsProperty().get(K, iss);
@@ -4154,6 +4148,11 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
    
    if (Nsamples.size() > 0)
    {
+      if (mDso->verbose())
+      {
+         AiMsgInfo("[abcproc] Reading curve normal(s)...");
+      }
+      
       Alembic::Abc::N3fArraySamplePtr N0, N1;
       Alembic::Abc::V3f n0, n1;
       AtVector nrm;
@@ -4176,8 +4175,14 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
                 N0->size() != info.curveCount &&
                 N0->size() != info.pointCount)
             {
+               if (mDso->verbose())
+               {
+                  AiMsgInfo("[abcproc] Curve normals count mismatch");
+               }
+               
                AiArrayDestroy(orientations);
                orientations = 0;
+               
                break;
             }
             
@@ -4268,6 +4273,10 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
                }
             }
          }
+         else if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Curve normals count mismatch");
+         }
       }
    }
    
@@ -4289,6 +4298,11 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
       }
       else
       {
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Reading curve uv(s)...");
+         }
+         
          Alembic::Abc::ICompoundProperty uvsProp = uvs.getValueProperty().getParent();
          
          UserAttribute uvsAttr;
