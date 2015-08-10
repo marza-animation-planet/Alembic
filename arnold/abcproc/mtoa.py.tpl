@@ -130,6 +130,10 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
       if val is not None:
          data += " -radiusmax %f" % val
       
+      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_nurbsSampleRate", None)
+      if val is not None:
+         data += " -nurbssamplerate %d" % val
+      
       val = stu.GetOverrideAttr(nodeName, "mtoa_abc_overrideAttribs", None)
       if val:
          data += " -overrideattribs %s" % val
@@ -187,9 +191,13 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
             pad = cmds.getAttr(nodeName+".aiDispPadding")
             Paddings[nodeName] = pad
          
+         elif cmds.attributeQuery("mtoa_disp_padding", node=nodeName, exists=1):
+            pad = cmds.getAttr(nodeName+".mtoa_disp_padding")
+            Paddings[nodeName] = pad
+         
          # Note: For instanced <<NodeName>> with time related attribute overrides, 'outBoxMin', 'outBoxMax'
          #       attributes won't return the right values, maybe provide some additional attributes
-         #       on the <<NodeName>> node to compute an alternate bounding box (using a different set of 
+         #       on the <<NodeName>> node to compute an alternate bounding box (using a different set of
          #       speed/offset/startFrame/endFrame/time/preserveStartFrame attributes) ?
          
          bmin = cmds.getAttr(nodeName+".outBoxMin")[0]
@@ -272,6 +280,7 @@ def SetupAttrs():
       attrs.append(stu.AttrData(name="mtoa_abc_radiusScale", shortName="radscl", type=arnold.AI_TYPE_FLOAT, defaultValue=1.0, min=0))
       attrs.append(stu.AttrData(name="mtoa_abc_radiusMin", shortName="radmin", type=arnold.AI_TYPE_FLOAT, defaultValue=0.0, min=0))
       attrs.append(stu.AttrData(name="mtoa_abc_radiusMax", shortName="radmax", type=arnold.AI_TYPE_FLOAT, defaultValue=1000000.0, min=0))
+      attrs.append(stu.AttrData(name="mtoa_abc_nurbsSampleRate", shortName="nurbssr", type=arnold.AI_TYPE_INT, defaultValue=5, min=1))
       
       attrs.append(stu.AttrData(name="mtoa_abc_overrideAttribs", shortname="ovatrs", type=arnold.AI_TYPE_STRING, defaultValue=""))
       attrs.append(stu.AttrData(name="mtoa_abc_removeAttribPrefices", shortName="rematp", type=arnold.AI_TYPE_STRING, defaultValue=""))
@@ -316,6 +325,7 @@ def SetupAE(translator):
             self.addControl("mtoa_abc_radiusScale", label="Radius Scale")
             self.addControl("mtoa_abc_radiusMin", label="Min. Radius")
             self.addControl("mtoa_abc_radiusMax", label="Max. Radius")
+            self.addControl("mtoa_abc_nurbsSampleRate", label="NURBS Sample Rate")
             self.addSeparator()
             
             self.addControl("mtoa_abc_overrideAttribs", label="Override Attributes")

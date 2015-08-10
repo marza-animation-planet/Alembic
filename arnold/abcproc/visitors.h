@@ -135,6 +135,8 @@ public:
    
 private:
    
+   float adjustRadius(float radius) const;
+   
    template <class T>
    AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance, bool interpolateBounds, double extraPadding);
 
@@ -145,6 +147,24 @@ private:
    std::vector<AtNode*> mNodes;
    std::vector<std::string> mPaths;
 };
+
+inline float MakeProcedurals::adjustRadius(float radius) const
+{
+   radius *= mDso->radiusScale();
+   
+   if (radius < mDso->radiusMin())
+   {
+      return mDso->radiusMin();
+   }
+   else if (radius > mDso->radiusMax())
+   {
+      return mDso->radiusMax();
+   }
+   else
+   {
+      return radius;
+   }
+}
 
 template <class T>
 AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance, bool interpolateBounds, double extraPadding)
@@ -396,6 +416,7 @@ public:
    AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicSubD &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicPoints &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicCurves &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0);
    
    void leave(AlembicNode &node, AlembicNode *instance=0);
@@ -466,6 +487,38 @@ private:
          DestroyUserAttributes(pointAttrs);
       }
    };
+   
+   struct CurvesInfo
+   {
+      bool varyingTopology;
+      unsigned int curveCount;
+      unsigned int pointCount;
+      int degree;
+      bool periodic;
+      bool nurbs;
+      unsigned int cvCount;
+      UserAttributes objectAttrs;
+      UserAttributes primitiveAttrs;
+      UserAttributes pointAttrs;
+      
+      CurvesInfo()
+         : varyingTopology(false)
+         , curveCount(0)
+         , pointCount(0)
+         , degree(-1)
+         , periodic(false)
+         , nurbs(false)
+         , cvCount(0)
+      {
+      }
+      
+      ~CurvesInfo()
+      {
+         DestroyUserAttributes(objectAttrs);
+         DestroyUserAttributes(primitiveAttrs);
+         DestroyUserAttributes(pointAttrs);
+      }
+   };
 
 private:
    
@@ -475,11 +528,12 @@ private:
    
 private:
    
-   float adjustPointRadius(float radius) const;
+   float adjustRadius(float radius) const;
    
    std::string arnoldNodeName(AlembicNode &node) const;
    
-   bool isVaryingFloat3(MeshInfo &info, const UserAttribute &ua);
+   template <class Info>
+   bool isVaryingFloat3(Info &info, const UserAttribute &ua);
    
    bool isIndexedFloat3(MeshInfo &info, const UserAttribute &ua);
    
@@ -552,13 +606,42 @@ private:
                              UserAttributes *pointAttrs,
                              UserAttributes *vertexAttrs);
    
+   
+   bool initCurves(CurvesInfo &info,
+                   const Alembic::AbcGeom::ICurvesSchema::Sample &sample,
+                   std::string &arnoldBasis);
+   
+   bool fillCurvesPositions(CurvesInfo &info,
+                            size_t motionStep,
+                            size_t numMotionSteps,
+                            Alembic::Abc::Int32ArraySamplePtr Nv,
+                            Alembic::Abc::P3fArraySamplePtr P0,
+                            Alembic::Abc::FloatArraySamplePtr W0,
+                            Alembic::Abc::P3fArraySamplePtr P1,
+                            Alembic::Abc::FloatArraySamplePtr W1,
+                            const float *vel,
+                            const float *acc,
+                            float blend,
+                            Alembic::Abc::FloatArraySamplePtr K,
+                            AtArray* &num_points,
+                            AtArray* &points);
+   
+   bool getReferenceCurves(AlembicCurves &node, CurvesInfo &info,
+                           AlembicCurves* &refCurves,
+                           UserAttributes* &pointAttrs);
+   
+   bool fillReferencePositions(AlembicCurves *refCurves,
+                               CurvesInfo &info,
+                               UserAttributes *pointAttrs);
+   
 private:
 
    class Dso *mDso;
    AtNode *mNode;
 };
 
-inline bool MakeShape::isVaryingFloat3(MeshInfo &info, const UserAttribute &ua)
+template <class Info>
+inline bool MakeShape::isVaryingFloat3(Info &info, const UserAttribute &ua)
 {
    if (ua.arnoldCategory == AI_USERDEF_VARYING &&
        ((ua.arnoldType == AI_TYPE_VECTOR && ua.dataCount == info.pointCount) ||
@@ -587,7 +670,7 @@ inline bool MakeShape::isIndexedFloat3(MeshInfo &info, const UserAttribute &ua)
    }
 }
 
-inline float MakeShape::adjustPointRadius(float radius) const
+inline float MakeShape::adjustRadius(float radius) const
 {
    radius *= mDso->radiusScale();
    

@@ -261,6 +261,8 @@ void Dso::SingleParameters::reset()
    radiusMin = 0.0f;
    radiusMax = 1000000.0f;
    radiusScale = 1.0f;
+   
+   nurbsSampleRate = 5;
 }
 
 std::string Dso::SingleParameters::dataString() const
@@ -312,6 +314,7 @@ std::string Dso::SingleParameters::dataString() const
    oss << " -radiusmin " << radiusMin;
    oss << " -radiusmax " << radiusMax;
    oss << " -radiusscale " << radiusScale;
+   oss << " -nurbssamplerate " << nurbsSampleRate;
    
    return oss.str();
 }
@@ -1483,6 +1486,15 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
          return false;
       }
    }
+   else if (args[i] == "-nurbssamplerate")
+   {
+      ++i;
+      if (i >= args.size() ||
+          sscanf(args[i].c_str(), "%d", &(mSingleParams.nurbsSampleRate)) != 1)
+      {
+         return false;
+      }
+   }
    else
    {
       AiMsgWarning("[abcproc] Unknown flag \"%s\"", args[i].c_str());
@@ -2141,6 +2153,17 @@ void Dso::readFromUserParams()
          else
          {
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
+         }
+      }
+      else if (param == "nurbssamplerate")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_INT)
+         {
+            mSingleParams.nurbsSampleRate = AiNodeGetInt(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an integer value", pname);
          }
       }
    }
