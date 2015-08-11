@@ -1,5 +1,9 @@
 #include "AlembicSceneCache.h"
 
+void AlembicSceneCache::SetConcurrency(size_t n)
+{
+   Instance().setConcurrency(n);
+}
 
 AlembicScene* AlembicSceneCache::Ref(const std::string &filepath, bool persistent)
 {
@@ -40,6 +44,7 @@ AlembicSceneCache& AlembicSceneCache::Instance()
 // ---
 
 AlembicSceneCache::AlembicSceneCache()
+   : mDefaultConcurrency(1)
 {
 }
 
@@ -62,6 +67,14 @@ AlembicSceneCache::~AlembicSceneCache()
    }
    
    mScenes.clear();
+}
+
+void AlembicSceneCache::setConcurrency(size_t n)
+{
+   if (n > 0)
+   {
+      mDefaultConcurrency = n;
+   }
 }
 
 std::string AlembicSceneCache::formatPath(const std::string &filepath)
@@ -158,6 +171,7 @@ AlembicScene* AlembicSceneCache::ref(const std::string &filepath, const std::str
          Alembic::AbcCoreFactory::IFactory::CoreType coreType;
          
          factory.setPolicy(Alembic::Abc::ErrorHandler::kQuietNoopPolicy);
+         factory.setOgawaNumStreams(mDefaultConcurrency);
          Alembic::Abc::IArchive archive = factory.getArchive(path, coreType);
          
          if (archive.valid())

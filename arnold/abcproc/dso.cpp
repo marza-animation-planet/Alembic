@@ -357,11 +357,11 @@ Dso::Dso(AtNode *node)
    // Override values from "data" string
    readFromUserParams();
    
+   AtNode *opts = AiUniverseGetOptions();
+
    // Set framerate if needed
    if (mCommonParams.fps <= 0.0)
    {
-      AtNode *opts = AiUniverseGetOptions();
-      
       if (AiNodeLookUpUserParameter(opts, "fps") != 0)
       {
          double fps = AiNodeGetFlt(opts, "fps");
@@ -389,7 +389,7 @@ Dso::Dso(AtNode *node)
    }
    normalizeFilePath(mCommonParams.referenceFilePath);
    
-   mReverseWinding = AiNodeGetBool(AiUniverseGetOptions(), "CCW_points");
+   mReverseWinding = AiNodeGetBool(opts, "CCW_points");
    
    // Only acquire global lock when create new alembic scenes
    //
@@ -403,6 +403,8 @@ Dso::Dso(AtNode *node)
       sprintf(id, "%p", AiThreadSelf());
       
       AlembicSceneFilter filter(mCommonParams.objectPath, "");
+
+      AlembicSceneCache::SetConcurrency(size_t(AiNodeGetInt(opts, "threads")));
       
       mScene = AlembicSceneCache::Ref(mCommonParams.filePath, id, filter, true);
    

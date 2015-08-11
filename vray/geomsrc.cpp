@@ -427,6 +427,8 @@ AlembicGeometrySource::AlembicGeometrySource(VR::VRayRenderer *vray,
          AlembicSceneFilter filter(objPath, "");
          
          // Allow for directory mappings here
+
+         AlembicSceneCache::SetConcurrency(size_t(VR::getNumProcessors()));
          
          mScene = AlembicSceneCache::Ref(path, mSceneID, filter, true);
          

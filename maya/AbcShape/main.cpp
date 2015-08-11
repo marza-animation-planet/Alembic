@@ -2,6 +2,7 @@
 #include <maya/MDrawRegistry.h>
 #include "AbcShape.h"
 #include "AbcShapeImport.h"
+#include "AlembicSceneCache.h"
 #include "VP2.h"
 
 #ifndef ABCSHAPE_VERSION
@@ -18,6 +19,7 @@
 #include <maya/MFnDependencyNode.h>
 #include <maya/MPlug.h>
 #include <maya/MGlobal.h>
+#include <maya/MThreadUtils.h>
 #include <map>
 #include <string>
 
@@ -828,6 +830,8 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
    MString commandName = PREFIX_NAME("AbcShapeImport");
    
    MFnPlugin plugin(obj, nodeName.asChar(), ABCSHAPE_VERSION, "Any");
+
+   AlembicSceneCache::SetConcurrency(size_t(MThreadUtils::getNumThreads()));
 
    MStatus status = plugin.registerShape(nodeName,
                                          AbcShape::ID,
