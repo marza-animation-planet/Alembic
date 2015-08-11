@@ -40,9 +40,12 @@
 #include <AbcOpenGL/All.h>
 #include <string>
 
+#include <boost/version.hpp>
+#include <boost/config.hpp>
+
 // if Alembic::Util::shared_ptr resolves to boost::shared_ptr then we
 // don't need this since it's defined elsewhere
-#ifndef ALEMBIC_LIB_USES_BOOST
+#if !defined(ALEMBIC_LIB_USES_BOOST) && (BOOST_VERSION < 105000 || defined(BOOST_NO_CXX11_SMART_PTR))
 namespace boost
 {
 
