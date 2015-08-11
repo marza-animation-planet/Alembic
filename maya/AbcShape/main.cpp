@@ -1,5 +1,6 @@
 #include <maya/MFnPlugin.h>
 #include <maya/MDrawRegistry.h>
+#include <maya/MThreadUtils.h>
 #include "AbcShape.h"
 #include "AbcShapeImport.h"
 #include "AlembicSceneCache.h"
@@ -19,7 +20,6 @@
 #include <maya/MFnDependencyNode.h>
 #include <maya/MPlug.h>
 #include <maya/MGlobal.h>
-#include <maya/MThreadUtils.h>
 #include <map>
 #include <string>
 
