@@ -19,6 +19,8 @@ deps_inc, deps_lib = excons.GetDirs("deps", noexc=True, silent=True)
 nameprefix = excons.GetArgument("name-prefix", default="")
 
 regex_src_dir = "lib/SceneHelper/regex-2.7/src"
+regex_inc = [regex_src_dir + "/regex.h"] if sys.platform == "win32" else []
+regex_src = [regex_src_dir + "/regex.c"] if sys.platform == "win32" else []
 
 
 def RequireAlembic(withPython=False, withGL=False):
@@ -49,7 +51,7 @@ def RequireAlembic(withPython=False, withGL=False):
          if excons.mscver == "10.0":
             env.Prepend(CPPPATH=["lib/vc10fix"])
       
-      defs = ["ALEMBIC_LIB_USES_BOOST"]
+      defs = []
       incdirs = ["lib"]
       libdirs = []
       libs = []
@@ -124,15 +126,18 @@ def RequireAlembic(withPython=False, withGL=False):
    return _RequireFunc
 
 
-
-def RequireAlembicHelper(withPython=False, withGL=False):
+def RequireRegex(env):
    global regex_src_dir
    
+   if sys.platform == "win32":
+      env.Append(CPPDEFINES=["REGEX_STATIC"])
+      env.Append(CPPPATH=[regex_src_dir])
+
+
+def RequireAlembicHelper(withPython=False, withGL=False):
    def _RequireFunc(env):
       
-      if sys.platform == "win32":
-         env.Append(CPPDEFINES=["REGEX_STATIC"])
-         env.Append(CPPPATH=[regex_src_dir])
+      RequireRegex(env)
       
       env.Append(CPPPATH=["lib/SceneHelper"])
       
@@ -226,11 +231,9 @@ prjs.append({"name": "SimpleAbcViewer",
 # Helper library and test
 prjs.extend([{"name": "SceneHelper",
               "type": "staticlib",
-              "srcs": glob.glob("lib/SceneHelper/*.cpp") +
-                      ([regex_src_dir + "/regex.c"] if sys.platform == "win32" else []),
+              "srcs": glob.glob("lib/SceneHelper/*.cpp") + regex_src,
               "custom": [RequireAlembicHelper()],
-              "install": {"include/SceneHelper": glob.glob("lib/SceneHelper/*.h") +
-                                                ([regex_src_dir + "/regex.h"] if sys.platform == "win32" else [])}
+              "install": {"include/SceneHelper": glob.glob("lib/SceneHelper/*.h") + regex_inc}
              },
              {"name": "SceneHelperTest",
               "type": "program",
@@ -255,8 +258,8 @@ if withArnold:
                 "bldprefix": "arnold-%s" % arnold.Version(),
                 "defs": defs,
                 "incdirs": ["arnold/Procedural"],
-                "srcs": glob.glob("arnold/Procedural/*.cpp"),
-                "custom": [arnold.Require, RequireAlembicHelper()]})
+                "srcs": glob.glob("arnold/Procedural/*.cpp") + regex_src,
+                "custom": [arnold.Require, RequireRegex, RequireAlembic()]})
    
    prjs.append({"name": "abcproc",
                 "type": "dynamicmodule",
@@ -325,8 +328,8 @@ if excons.GetArgument("with-maya", default=None) is not None:
                  "bldprefix": "maya-%s" % maya.Version(),
                  "defs": defs + (["ABCIMPORT_VERSION=\"\\\"%s\\\"\"" % impver] if impver else []),
                  "incdirs": ["maya/AbcImport"],
-                 "srcs": glob.glob("maya/AbcImport/*.cpp"),
-                 "custom": [maya.Require, maya.Plugin, RequireAlembicHelper()],
+                 "srcs": glob.glob("maya/AbcImport/*.cpp") + regex_src,
+                 "custom": [maya.Require, maya.Plugin, RequireRegex, RequireAlembic()],
                  "install": {"maya/scripts": glob.glob("maya/AbcImport/*.mel")}
                 },
                 {"name": "%sAbcExport" % nameprefix,
@@ -337,7 +340,7 @@ if excons.GetArgument("with-maya", default=None) is not None:
                  "defs": defs + (["ABCEXPORT_VERSION=\"\\\"%s\\\"\"" % expver] if expver else []),
                  "incdirs": ["maya/AbcExport"],
                  "srcs": glob.glob("maya/AbcExport/*.cpp"),
-                 "custom": [maya.Require, maya.Plugin, RequireAlembicHelper()],
+                 "custom": [maya.Require, maya.Plugin, RequireAlembic()],
                  "install": {"maya/scripts": glob.glob("maya/AbcExport/*.mel")}
                 },
                 {"name": "%sAbcShape" % nameprefix,
