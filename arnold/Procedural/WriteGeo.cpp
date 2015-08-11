@@ -336,7 +336,7 @@ AtNode * ProcessPolyMeshBase(
             nsides.reserve( sample.getFaceCounts()->size() );
             for ( size_t i = 0; i < numPolys; ++i ) 
             {
-                int32_t n = sample.getFaceCounts()->get()[i];
+                Alembic::Util::int32_t n = sample.getFaceCounts()->get()[i];
                 
                 if ( n > 255 )
                 {

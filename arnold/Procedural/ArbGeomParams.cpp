@@ -147,7 +147,7 @@ void AddArbitraryGeomParam( ICompoundProperty & parent,
         {
             case AI_TYPE_INT:
                 AiNodeSetInt( primNode, param.getName().c_str(),
-                        reinterpret_cast<const int32_t *>(
+                        reinterpret_cast<const Alembic::Util::int32_t *>(
                                 valueSample->get() )[0] );
                 
                 break;
