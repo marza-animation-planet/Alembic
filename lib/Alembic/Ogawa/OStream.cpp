@@ -37,6 +37,10 @@
 #include <fstream>
 #include <stdexcept>
 
+#ifdef _WIN32
+#define STREAM_BUF_SIZE 2097152 // 2 * 1024 * 1024
+#endif
+
 namespace Alembic {
 namespace Ogawa {
 namespace ALEMBIC_VERSION_NS {
@@ -52,6 +56,9 @@ public:
         if (filestream->is_open())
         {
             stream = filestream;
+#ifdef _WIN32
+            filestream->rdbuf()->pubsetbuf(buffer, STREAM_BUF_SIZE);
+#endif
             stream->exceptions ( std::ofstream::failbit |
                                  std::ofstream::badbit );
         }
@@ -91,6 +98,9 @@ public:
         }
     }
 
+#ifdef _WIN32
+    char buffer[STREAM_BUF_SIZE];
+#endif
     std::ostream * stream;
     std::string fileName;
     Alembic::Util::uint64_t startPos;
