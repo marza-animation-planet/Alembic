@@ -355,6 +355,44 @@ if excons.GetArgument("with-maya", default=None) is not None:
                  "custom": [maya.Require, maya.Plugin] + ([vray.Require] if withVray else []) + [RequireAlembicHelper()],
                  "install": {"maya/scripts": glob.glob("maya/AbcShape/*.mel"),
                              "maya/python": [AbcShapeMtoa, AbcMatEditPy] + ([AbcShapePy] if withVray else [])}}])
+   
+   if withArnold:
+      mtoa_inc = excons.GetArgument("with-mtoa-inc")
+      mtoa_lib = excons.GetArgument("with-mtoa-lib")
+      mtoa_base = excons.GetArgument("with-mtoa")
+      mtoa_defs = defs[:]
+      mtoa_ext = ""
+      
+      if (mtoa_inc is None or mtoa_lib is None) and mtoa_base is None:
+         print("Please provide mtoa SDK directory using with-mtoa or with-mtoa-inc/with-mtoa-lib flags")
+         sys.exit(1)
+
+      if mtoa_inc is None:
+         mtoa_inc = mtoa_base + "/include"
+
+      if mtoa_lib is None:
+         mtoa_lib = mtoa_base + ("/lib" if sys.platform == "win32" else "/bin")
+
+      if sys.platform == "darwin":
+         mtoa_defs.append("_DARWIN")
+         mtoa_ext = ".dylib"
+      elif sys.platform == "win32":
+         mtoa_defs.append("_WIN32")
+         mtoa_ext = ".dll"
+      else:
+         mtoa_defs.append("_LINUX")
+         mtoa_ext = ".so"
+
+      prjs.append({"name": "%sAbcShapeMtoa" % nameprefix,
+                   "type": "dynamicmodule",
+                   "ext": mtoa_ext,
+                   "defs": mtoa_defs,
+                   "srcs": glob.glob("maya/AbcShape/mtoa/*.cpp"),
+                   "incdirs": [mtoa_inc],
+                   "libdirs": [mtoa_lib],
+                   "libs": ["mtoa_api"],
+                   "custom": [arnold.Require, maya.Require]})
+
 
 excons.DeclareTargets(env, prjs)
 
