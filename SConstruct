@@ -363,35 +363,41 @@ if excons.GetArgument("with-maya", default=None) is not None:
       mtoa_defs = defs[:]
       mtoa_ext = ""
       
-      if (mtoa_inc is None or mtoa_lib is None) and mtoa_base is None:
-         print("Please provide mtoa SDK directory using with-mtoa or with-mtoa-inc/with-mtoa-lib flags")
-         sys.exit(1)
+      if mtoa_base or (mtoa_inc and mtoa_lib):
+         if mtoa_inc is None:
+            mtoa_inc = mtoa_base + "/include"
+         
+         if mtoa_lib is None:
+            mtoa_lib = mtoa_base + ("/lib" if sys.platform == "win32" else "/bin")
 
-      if mtoa_inc is None:
-         mtoa_inc = mtoa_base + "/include"
-
-      if mtoa_lib is None:
-         mtoa_lib = mtoa_base + ("/lib" if sys.platform == "win32" else "/bin")
-
-      if sys.platform == "darwin":
-         mtoa_defs.append("_DARWIN")
-         mtoa_ext = ".dylib"
-      elif sys.platform == "win32":
-         mtoa_defs.append("_WIN32")
-         mtoa_ext = ".dll"
-      else:
-         mtoa_defs.append("_LINUX")
-         mtoa_ext = ".so"
-
-      prjs.append({"name": "%sAbcShapeMtoa" % nameprefix,
-                   "type": "dynamicmodule",
-                   "ext": mtoa_ext,
-                   "defs": mtoa_defs,
-                   "srcs": glob.glob("maya/AbcShape/mtoa/*.cpp"),
-                   "incdirs": [mtoa_inc],
-                   "libdirs": [mtoa_lib],
-                   "libs": ["mtoa_api"],
-                   "custom": [arnold.Require, maya.Require]})
+         if sys.platform == "darwin":
+            mtoa_defs.append("_DARWIN")
+            mtoa_ext = ".dylib"
+         
+         elif sys.platform == "win32":
+            mtoa_defs.append("_WIN32")
+            mtoa_ext = ".dll"
+         
+         else:
+            mtoa_defs.append("_LINUX")
+            mtoa_ext = ".so"
+         
+         AbcShapeMtoa = "maya/AbcShape/mtoa/%sMtoa.py" % AbcShapeName
+         
+         if not os.path.exists(AbcShapeMtoa) or os.stat(AbcShapeMtoa).st_mtime < os.stat("maya/AbcShape/mtoa/AbcShapeMtoa.py.tpl").st_mtime:
+            replace_in_file("maya/AbcShape/mtoa/AbcShapeMtoa.py.tpl", AbcShapeMtoa, "<<NodeName>>", AbcShapeName)
+         
+         prjs.append({"name": "%sAbcShapeMtoa" % nameprefix,
+                      "type": "dynamicmodule",
+                      "prefix": "maya/plug-ins/mtoa",
+                      "ext": mtoa_ext,
+                      "defs": mtoa_defs,
+                      "srcs": glob.glob("maya/AbcShape/mtoa/*.cpp"),
+                      "incdirs": [mtoa_inc],
+                      "libdirs": [mtoa_lib],
+                      "libs": ["mtoa_api"],
+                      "install": {"maya/plug-ins/mtoa": [AbcShapeMtoa]},
+                      "custom": [arnold.Require, maya.Require]})
 
 
 excons.DeclareTargets(env, prjs)

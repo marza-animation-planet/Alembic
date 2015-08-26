@@ -18,4 +18,5 @@ maya/AbcShape/AE*Template.mel
 maya/AbcShape/*.py
 maya/AbcShape/*AbcMaterialEditor.mel
 maya/AbcShape/*AbcMaterialEditor.py
+maya/AbcShape/mtoa/*.py
 arnold/abcproc/*.py
