@@ -847,7 +847,7 @@ std::string Dso::uniqueName(const std::string &baseName) const
 {
    size_t i = 0;
    std::string name = baseName;
-   
+
    while (AiNodeLookUpByName(name.c_str()) != 0)
    {
       ++i;
@@ -857,7 +857,7 @@ std::string Dso::uniqueName(const std::string &baseName) const
       
       name = oss.str();
    }
-   
+
    return name;
 }
 
@@ -1241,11 +1241,10 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
    else if (args[i] == "-referencefilename")
    {
       ++i;
-      if (i >= args.size() || isFlag(args[i]))
+      if (i < args.size() && !isFlag(args[i]))
       {
-         return false;
+         mCommonParams.referenceFilePath = args[i];
       }
-      mCommonParams.referenceFilePath = args[i];
    }
    else if (args[i] == "-offset")
    {

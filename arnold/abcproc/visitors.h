@@ -5,6 +5,7 @@
 #include <ai.h>
 #include "dso.h"
 #include "userattr.h"
+#include "globallock.h"
 
 // ---
 
@@ -279,9 +280,15 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
       AlembicNode *targetNode = (instance ? instance : &node);
       
       // Format name 'a la maya'
+      GlobalLock::Acquire();
+      
       std::string targetName = targetNode->formatPartialPath(mDso->namePrefix().c_str(), AlembicNode::LocalPrefix, '|');
       std::string name = mDso->uniqueName(targetName);
-      
+      AtNode *proc = AiNode("procedural");
+      AiNodeSetStr(proc, "name", name.c_str());
+
+      GlobalLock::Release();
+
       if (mDso->verbose())
       {
          AiMsgInfo("[abcproc] Generate new procedural node \"%s\"", name.c_str());
@@ -289,8 +296,6 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
                    box.min.x, box.min.y, box.min.z, box.max.x, box.max.y, box.max.z);
       }
       
-      AtNode *proc = AiNode("procedural");
-      AiNodeSetStr(proc, "name", name.c_str());
       AiNodeSetStr(proc, "dso", AiNodeGetStr(mDso->procNode(), "dso"));
       AiNodeSetStr(proc, "data", mDso->dataString(targetNode->path().c_str()).c_str());
       AiNodeSetBool(proc, "load_at_init", false);
@@ -530,7 +535,7 @@ private:
    
    float adjustRadius(float radius) const;
    
-   std::string arnoldNodeName(AlembicNode &node) const;
+   AtNode* createArnoldNode(const char *nodeType, AlembicNode &node, bool useProcName=false) const;
    
    template <class Info>
    bool isVaryingFloat3(Info &info, const UserAttribute &ua);
@@ -553,6 +558,7 @@ private:
    
    template <class MeshSchema>
    AtNode* generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
+                            AlembicNode *instance,
                             MeshInfo &info,
                             std::vector<float*> *smoothNormals=0);
    
@@ -768,6 +774,7 @@ AtNode* MakeShape::generateVolumeBox(Schema &schema)
 
 template <class MeshSchema>
 AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
+                                    AlembicNode *instance,
                                     MeshInfo &info,
                                     std::vector<float*> *smoothNormals)
 {
@@ -783,8 +790,6 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
    AtArray *vlist = 0;
    
    MeshSchema schema = node.typedObject().getSchema();
-   
-   std::string name = arnoldNodeName(node);
    
    TimeSampleList<MeshSchema> &meshSamples = node.samples().schemaSamples;
    typename TimeSampleList<MeshSchema>::ConstIterator samp0, samp1;
@@ -818,8 +823,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
       return 0;
    }
    
-   AtNode *mesh = AiNode("polymesh");
-   AiNodeSetStr(mesh, "name", name.c_str());
+   AtNode *mesh = createArnoldNode("polymesh", (instance ? *instance : node), true);
    
    AtPoint pnt;
    

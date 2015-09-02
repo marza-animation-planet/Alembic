@@ -669,10 +669,33 @@ MakeShape::MakeShape(Dso *dso)
 {
 }
 
-std::string MakeShape::arnoldNodeName(AlembicNode &node) const
+AtNode* MakeShape::createArnoldNode(const char *nodeType, AlembicNode &node, bool useProcName) const
 {
-   std::string baseName = node.formatPartialPath(mDso->namePrefix().c_str(), AlembicNode::LocalPrefix, '|');
-   return mDso->uniqueName(baseName);
+   GlobalLock::Acquire();
+
+   AtNode *anode = AiNode(nodeType);
+
+   std::string name;
+
+   if (useProcName)
+   {
+      name = AiNodeGetName(mDso->procNode());
+
+      // rename source procedural node
+      AiNodeSetStr(mDso->procNode(), "name", mDso->uniqueName("_"+name).c_str());
+
+      // use procedural name for newly generated node
+      AiNodeSetStr(anode, "name", name.c_str());
+   }
+   else
+   {
+      name = node.formatPartialPath(mDso->namePrefix().c_str(), AlembicNode::LocalPrefix, '|');
+      AiNodeSetStr(anode, "name", mDso->uniqueName(name).c_str());
+   }
+
+   GlobalLock::Release();
+
+   return anode;
 }
 
 void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
@@ -1338,7 +1361,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
       }
    }
    
-   mNode = generateBaseMesh(node, info, smoothNormals);
+   mNode = generateBaseMesh(node, instance, info, smoothNormals);
    
    if (!mNode)
    {
@@ -2068,7 +2091,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
       smoothNormals = &_smoothNormals;
    }
    
-   mNode = generateBaseMesh(node, info, smoothNormals);
+   mNode = generateBaseMesh(node, instance, info, smoothNormals);
    
    if (!mNode)
    {
@@ -2224,10 +2247,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
       return AlembicNode::DontVisitChildren;
    }
    
-   std::string name = arnoldNodeName(node);
-   
-   mNode = AiNode("points");
-   AiNodeSetStr(mNode, "name", name.c_str());
+   mNode = createArnoldNode("points", (instance ? *instance : node), true);
    
    // Build IDmap
    Alembic::Abc::P3fArraySamplePtr P0 = samp0->data().getPositions();
@@ -3803,8 +3823,6 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
       return AlembicNode::DontVisitChildren;
    }
    
-   std::string name = arnoldNodeName(node);
-   
    // Collect attributes
    
    double attribsTime = (info.varyingTopology ? mDso->renderTime() : mDso->attribsTime(mDso->attribsFrame()));
@@ -4027,9 +4045,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
       return AlembicNode::DontVisitChildren;
    }
    
-   mNode = AiNode("curves");
-   
-   AiNodeSetStr(mNode, "name", name.c_str());
+   mNode = createArnoldNode("curves", (instance ? *instance : node), true);
    AiNodeSetStr(mNode, "basis", basis.c_str());
    AiNodeSetArray(mNode, "num_points", num_points);
    AiNodeSetArray(mNode, "points", points);

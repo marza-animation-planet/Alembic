@@ -100,8 +100,18 @@ AtNode* ProcGetNode(void *user_ptr, int i)
                {
                   GlobalLock::Release();
                   
-                  AiMsgWarning("[abcproc] Master node created in another thread. Destroy read data.");
-                  AiNodeDestroy(output);
+                  AiMsgWarning("[abcproc] Master node '%s' created in another thread. Ignore %s node '%s'.",
+                               masterNodeName.c_str(),
+                               AiNodeEntryGetName(AiNodeGetNodeEntry(output)),
+                               AiNodeGetName(output));
+                  
+                  // reset name to avoid clashes
+                  AiNodeSetStr(output, "name", "");
+                  AiNodeSetByte(output, "visibility", 0);
+#if AI_VERSION_ARCH_NUM > 4 || (AI_VERSION_ARCH_NUM == 4 && AI_VERSION_MAJOR_NUM > 2 || (AI_VERSION_MAJOR_NUM == 2 && AI_VERSION_MINOR_NUM >= 3))
+                  AiNodeSetDisabled(output, true);
+#endif
+
                   isInstance = true;
                }
                else
@@ -139,7 +149,7 @@ AtNode* ProcGetNode(void *user_ptr, int i)
             }
             else
             {
-               AiMsgWarning("[abcproc] Master node not expanded");
+               AiMsgWarning("[abcproc] Master node '%s' not yet expanded. Ignore instance.", masterNodeName.c_str());
             }
          }
          
