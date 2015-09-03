@@ -34,43 +34,52 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    helper.MakeInputFloat(data);
    
    data.defaultValue.BOOL = false;
-   data.name = "mtoa_abc_outputReference";
+   data.name = "mtoa_constant_abc_outputReference";
    data.shortName = "outref";
    helper.MakeInputBoolean(data);
    
    data.defaultValue.STR = "";
-   data.name = "mtoa_abc_referenceFilename";
+   data.name = "mtoa_constant_abc_referenceFilename";
    data.shortName = "reffp";
    helper.MakeInputString(data);
    
+   data.defaultValue.FLT = 0.0f;
+   data.name = "mtoa_constant_abc_boundsPadding";
+   data.shortName = "bndpad";
+   data.hasSoftMin = true;
+   data.softMin.FLT = 0.0f;
+   data.hasSoftMax = true;
+   data.softMax.FLT = 100.0f;
+   helper.MakeInputFloat(data);
+   
    data.defaultValue.STR = "";
-   data.name = "mtoa_abc_computeTangents";
+   data.name = "mtoa_constant_abc_computeTangents";
    data.shortName = "cmptan";
    helper.MakeInputString(data);
    
    data.defaultValue.FLT = 1.0;
-   data.name = "mtoa_abc_radiusScale";
+   data.name = "mtoa_constant_abc_radiusScale";
    data.shortName = "radscl";
    data.hasMin = true;
    data.min.FLT = 0.0;
    helper.MakeInputFloat(data);
    
    data.defaultValue.FLT = 0.0;
-   data.name = "mtoa_abc_radiusMin";
+   data.name = "mtoa_constant_abc_radiusMin";
    data.shortName = "radmin";
    data.hasMin = true;
    data.min.FLT = 0.0;
    helper.MakeInputFloat(data);
    
    data.defaultValue.FLT = 1000000.0;
-   data.name = "mtoa_abc_radiusMax";
+   data.name = "mtoa_constant_abc_radiusMax";
    data.shortName = "radmax";
    data.hasMin = true;
    data.min.FLT = 0.0;
    helper.MakeInputFloat(data);
    
    data.defaultValue.INT = 5;
-   data.name = "mtoa_abc_nurbsSampleRate";
+   data.name = "mtoa_constant_abc_nurbsSampleRate";
    data.shortName = "nurbssr";
    data.hasMin = true;
    data.min.INT = 1;
@@ -79,32 +88,32 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    helper.MakeInputInt(data);
    
    data.defaultValue.STR = "";
-   data.name = "mtoa_abc_overrideAttribs";
+   data.name = "mtoa_constant_abc_overrideAttribs";
    data.shortName = "ovatrs";
    helper.MakeInputString(data);
    
    data.defaultValue.STR = "";
-   data.name = "mtoa_abc_removeAttribPrefices";
+   data.name = "mtoa_constant_abc_removeAttribPrefices";
    data.shortName = "rematp";
    helper.MakeInputString(data);
    
    data.defaultValue.BOOL = false;
-   data.name = "mtoa_abc_objectAttribs";
+   data.name = "mtoa_constant_abc_objectAttribs";
    data.shortName = "objatrs";
    helper.MakeInputBoolean(data);
    
    data.defaultValue.BOOL = false;
-   data.name = "mtoa_abc_primitiveAttribs";
+   data.name = "mtoa_constant_abc_primitiveAttribs";
    data.shortName = "pratrs";
    helper.MakeInputBoolean(data);
    
    data.defaultValue.BOOL = false;
-   data.name = "mtoa_abc_pointAttribs";
+   data.name = "mtoa_constant_abc_pointAttribs";
    data.shortName = "ptatrs";
    helper.MakeInputBoolean(data);
    
    data.defaultValue.BOOL = false;
-   data.name = "mtoa_abc_vertexAttribs";
+   data.name = "mtoa_constant_abc_vertexAttribs";
    data.shortName = "vtxatrs";
    helper.MakeInputBoolean(data);
    
@@ -114,12 +123,12 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.enums.append("shutter");
    data.enums.append("shutter_open");
    data.enums.append("shutter_close");
-   data.name = "mtoa_abc_attribsFrame";
+   data.name = "mtoa_constant_abc_attribsFrame";
    data.shortName = "atrsfrm";
    helper.MakeInputEnum(data);
    
    data.defaultValue.INT = 0;
-   data.name = "mtoa_abc_samplesExpandIterations";
+   data.name = "mtoa_constant_abc_samplesExpandIterations";
    data.shortName = "sampexpiter";
    data.hasMin = true;
    data.min.INT = 0;
@@ -128,7 +137,7 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    helper.MakeInputInt(data);
    
    data.defaultValue.BOOL = false;
-   data.name = "mtoa_abc_optimizeSamples";
+   data.name = "mtoa_constant_abc_optimizeSamples";
    data.shortName = "optsamp";
    helper.MakeInputBoolean(data);
 }
@@ -397,6 +406,20 @@ void CAbcTranslator::ExportSubdivAttribs(AtNode *proc)
    {
       AiNodeSetFlt(proc, "subdiv_pixel_error", plug.asFloat());
    }
+   
+   // starting arnold 4.2.8.0
+   plug = FindMayaPlug("aiSubdivAdaptiveSpace");
+   if (!plug.isNull() && HasParameter(nodeEntry, "subdiv_adaptive_space", proc, "constant INT"))
+   {
+      AiNodeSetInt(proc, "subdiv_adaptive_space", plug.asInt());
+   }
+   
+   // starting arnold 4.2.8.0
+   plug = FindMayaPlug("aiSubdivAdaptiveError");
+   if (!plug.isNull() && HasParameter(nodeEntry, "subdiv_adaptive_error", proc, "constant FLOAT"))
+   {
+      AiNodeSetFlt(proc, "subdiv_adaptive_error", plug.asFloat());
+   }
 
    plug = FindMayaPlug("aiSubdivDicingCamera");
    if (!plug.isNull() && HasParameter(nodeEntry, "subdiv_dicing_camera", proc, "constant NODE"))
@@ -497,7 +520,7 @@ void CAbcTranslator::ExportVisibility(AtNode *proc)
    }
 
    AiNodeSetByte(proc, "visibility", visibility);
-
+   
    plug = FindMayaPlug("aiSelfShadows");
    if (!plug.isNull()) AiNodeSetBool(proc, "self_shadows", plug.asBool());
 
@@ -514,14 +537,22 @@ void CAbcTranslator::ExportVisibility(AtNode *proc)
    //plug = FindMayaPlug("aiSssSampleSpacing");
    //if (!plug.isNull()) AiNodeSetFlt(proc, "sss_sample_spacing", plug.asFloat());
    
+   const AtNodeEntry *nodeEntry = AiNodeGetNodeEntry(proc);
+   
    plug = FindMayaPlug("aiSssSetname");
    //if (!plug.isNull() && HasParameter(AiNodeGetNodeEntry(proc), "sss_setname", proc, "constant STRING")) AiNodeSetStr(proc, "sss_setname", plug.asString().asChar());
    if (!plug.isNull() && plug.asString().length() > 0)
    {
-      if (HasParameter(AiNodeGetNodeEntry(proc), "sss_setname", proc, "constant STRING"))
+      if (HasParameter(nodeEntry, "sss_setname", proc, "constant STRING"))
       {
          AiNodeSetStr(proc, "sss_setname", plug.asString().asChar());
       }
+   }
+   
+   plug = FindMayaPlug("aiMatte");
+   if (!plug.isNull() && HasParameter(nodeEntry, "matte", proc, "constant BOOL"))
+   {
+      AiNodeSetBool(proc, "matte", plug.asBool());
    }
 }
 
@@ -720,7 +751,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
    bool ignoreInstances = FindMayaObjectPlug("ignoreInstances").asBool();
    bool ignoreVisibility = FindMayaObjectPlug("ignoreVisibility").asBool();
    
-   MPlug plug = FindMayaPlug("mtoa_abc_relativeSamples");
+   MPlug plug = FindMayaPlug("mtoa_constant_abc_relativeSamples");
    
    bool relativeSamples = (plug.isNull() ? true : plug.asBool());
    
@@ -824,85 +855,85 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaObjectPlug("mtoa_abc_outputReference");
+      plug = FindMayaObjectPlug("mtoa_constant_abc_outputReference");
       if (!plug.isNull() && plug.asBool())
       {
          data += " -outputreference";
       }
       
-      plug = FindMayaObjectPlug("mtoa_abc_referenceFilename");
+      plug = FindMayaObjectPlug("mtoa_constant_abc_referenceFilename");
       if (!plug.isNull())
       {
          data += " -referencefilename " + plug.asString();
       }
       
-      plug = FindMayaPlug("mtoa_abc_computeTangents");
+      plug = FindMayaPlug("mtoa_constant_abc_computeTangents");
       if (!plug.isNull())
       {
          data += " -computetangents " + plug.asString();
       }
       
-      plug = FindMayaPlug("mtoa_abc_radiusScale");
+      plug = FindMayaPlug("mtoa_constant_abc_radiusScale");
       if (!plug.isNull())
       {
          data += " -radiusscale " + ToString(plug.asFloat());
       }
       
-      plug = FindMayaPlug("mtoa_abc_radiusMin");
+      plug = FindMayaPlug("mtoa_constant_abc_radiusMin");
       if (!plug.isNull())
       {
          data += " -radiusmin " + ToString(plug.asFloat());
       }
       
-      plug = FindMayaPlug("mtoa_abc_radiusMax");
+      plug = FindMayaPlug("mtoa_constant_abc_radiusMax");
       if (!plug.isNull())
       {
          data += " -radiusmax " + ToString(plug.asFloat());
       }
       
-      plug = FindMayaPlug("mtoa_abc_nurbsSampleRate");
+      plug = FindMayaPlug("mtoa_constant_abc_nurbsSampleRate");
       if (!plug.isNull())
       {
          data += " -nurbssamplerate " + ToString(plug.asInt());
       }
       
-      plug = FindMayaPlug("mtoa_abc_overrideAttribs");
+      plug = FindMayaPlug("mtoa_constant_abc_overrideAttribs");
       if (!plug.isNull())
       {
          data += " -overrideattribs " + plug.asString();
       }
       
-      plug = FindMayaPlug("mtoa_abc_removeAttribPrefices");
+      plug = FindMayaPlug("mtoa_constant_abc_removeAttribPrefices");
       if (!plug.isNull())
       {
          data += " -removeattribprefices " + plug.asString();
       }
       
-      plug = FindMayaPlug("mtoa_abc_objectAttribs");
+      plug = FindMayaPlug("mtoa_constant_abc_objectAttribs");
       if (!plug.isNull() && plug.asBool())
       {
          data += " -objectattribs";
       }
       
-      plug = FindMayaPlug("mtoa_abc_primitiveAttribs");
+      plug = FindMayaPlug("mtoa_constant_abc_primitiveAttribs");
       if (!plug.isNull() && plug.asBool())
       {
          data += " -primitiveattribs";
       }
       
-      plug = FindMayaPlug("mtoa_abc_pointAttribs");
+      plug = FindMayaPlug("mtoa_constant_abc_pointAttribs");
       if (!plug.isNull() && plug.asBool())
       {
          data += " -pointAttribs";
       }
       
-      plug = FindMayaPlug("mtoa_abc_vertexAttribs");
+      plug = FindMayaPlug("mtoa_constant_abc_vertexAttribs");
       if (!plug.isNull() && plug.asBool())
       {
          data += " -vertexattribs";
       }
       
-      plug = FindMayaPlug("mtoa_abc_attribsFrame");
+      plug = FindMayaPlug("mtoa_constant_abc_attribsFrame");
       if (!plug.isNull())
       {
          switch (plug.asInt())
@@ -920,7 +951,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_abc_samplesExpandIterations");
+      plug = FindMayaPlug("mtoa_constant_abc_samplesExpandIterations");
       if (!plug.isNull())
       {
          int expIter = plug.asInt();
@@ -928,7 +959,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          
          if (expIter > 0)
          {
-            plug = FindMayaPlug("mtoa_abc_optimizeSamples");
+            plug = FindMayaPlug("mtoa_constant_abc_optimizeSamples");
             if (!plug.isNull() && plug.asBool())
             {
                data += " -optimizesamples";
@@ -936,7 +967,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_abc_verbose");
+      plug = FindMayaPlug("mtoa_constant_abc_verbose");
       if (!plug.isNull())
       {
          data += " -verbose";
@@ -1064,10 +1095,21 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
       const AtNodeEntry *nodeEntry = AiNodeGetNodeEntry(proc);
 
       // Add padding to bounding box
+      float padding = 0.0f;
+      
       if (HasParameter(nodeEntry, "disp_padding", proc))
       {
-         float padding = AiNodeGetFlt(proc, "disp_padding");
-
+         padding += AiNodeGetFlt(proc, "disp_padding");
+      }
+      
+      MPlug plug = FindMayaPlug("mtoa_constant_abc_boundsPadding");
+      if (!plug.isNull())
+      {
+         padding += plug.asFloat();
+      }
+      
+      if (padding != 0.0f)
+      {
          AtPoint cmin = AiNodeGetPnt(proc, "min");
          AtPoint cmax = AiNodeGetPnt(proc, "max");
 
