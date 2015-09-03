@@ -1330,6 +1330,7 @@ AbcShape::AbcShape()
    , mDrawTransformBounds(false)
    , mDrawLocators(false)
    , mUpdateLevel(AbcShape::UL_none)
+   , mAnimated(false)
 #ifdef ABCSHAPE_VRAY_SUPPORT
    , mVRFilename("filename", "")
    , mVRUseReferenceObject("useReferenceObject", false)
@@ -2749,7 +2750,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       if (fabs(t.as(MTime::kSeconds) - mTime.as(MTime::kSeconds)) > 0.0001)
       {
          mTime = t;
-         sampleTimeUpdate = mAnimated;
+         sampleTimeUpdate = true;
       }
    }
    else if (plug == aSpeed)
@@ -2759,7 +2760,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       if (fabs(speed - mSpeed) > 0.0001)
       {
          mSpeed = speed;
-         sampleTimeUpdate = mAnimated;
+         sampleTimeUpdate = true;
       }
    }
    else if (plug == aPreserveStartFrame)
@@ -2769,7 +2770,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       if (psf != mPreserveStartFrame)
       {
          mPreserveStartFrame = psf;
-         sampleTimeUpdate = mAnimated;
+         sampleTimeUpdate = true;
       }
    }
    else if (plug == aOffset)
@@ -2779,7 +2780,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       if (fabs(offset - mOffset) > 0.0001)
       {
          mOffset = offset;
-         sampleTimeUpdate = mAnimated;
+         sampleTimeUpdate = true;
       }
    }
    else if (plug == aCycleType)
@@ -2789,7 +2790,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       if (c != mCycleType)
       {
          mCycleType = c;
-         sampleTimeUpdate = mAnimated;
+         sampleTimeUpdate = true;
       }
    }
    else if (plug == aStartFrame)
@@ -2799,7 +2800,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       if (fabs(sf - mStartFrame) > 0.0001)
       {
          mStartFrame = sf;
-         sampleTimeUpdate = mAnimated;
+         sampleTimeUpdate = true;
       }
    }
    else if (plug == aEndFrame)
@@ -2809,7 +2810,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       if (fabs(ef - mEndFrame) > 0.0001)
       {
          mEndFrame = ef;
-         sampleTimeUpdate = mAnimated;
+         sampleTimeUpdate = true;
       }
    }
    else if (plug == aLineWidth)
