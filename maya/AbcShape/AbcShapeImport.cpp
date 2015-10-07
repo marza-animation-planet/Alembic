@@ -33,6 +33,7 @@
 #include <maya/MFnCompoundAttribute.h>
 #include <maya/MFnMatrixData.h>
 #include <maya/MFnStringData.h>
+#include <maya/MDistance.h>
 
 MSyntax AbcShapeImport::createSyntax()
 {
@@ -108,7 +109,7 @@ template <> struct MatrixType<double> { enum { Value = MFnMatrixAttribute::kDoub
 template <typename T, int D, typename TT>
 struct NumericData
 {
-   static void Set(const T* value, MPlug &plug)
+   static void Set(const T* value, MPlug &plug, bool convertDistances=false)
    {
    }
 };
@@ -116,16 +117,40 @@ struct NumericData
 template <typename T, typename TT>
 struct NumericData<T, 1, TT>
 {
-   static void Set(const T* value, MPlug &plug)
+   static void Set(const T* value, MPlug &plug, bool convertDistances=false)
    {
       plug.setValue(TT(value[0]));
+   }
+};
+
+template <typename TT>
+struct NumericData<float, 1, TT>
+{
+   static void Set(const float* value, MPlug &plug, bool convertDistances=false)
+   {
+      MDistance::Unit srcUnits = MDistance::uiUnit();
+      MDistance::Unit dstUnits = MDistance::kCentimeters;
+      
+      plug.setValue(TT(convertDistances ? MDistance(value[0], srcUnits).as(dstUnits) : value[0]));
+   }
+};
+
+template <typename TT>
+struct NumericData<double, 1, TT>
+{
+   static void Set(const double* value, MPlug &plug, bool convertDistances=false)
+   {
+      MDistance::Unit srcUnits = MDistance::uiUnit();
+      MDistance::Unit dstUnits = MDistance::kCentimeters;
+      
+      plug.setValue(TT(convertDistances ? MDistance(value[0], srcUnits).as(dstUnits) : value[0]));
    }
 };
 
 template <typename T, typename TT>
 struct NumericData<T, 2, TT>
 {
-   static void Set(const T* value, MPlug &plug)
+   static void Set(const T* value, MPlug &plug, bool convertDistances=false)
    {
       MFnNumericData data;
       MFnNumericData::Type type = (MFnNumericData::Type) NumericType<TT, 2>::Value;
@@ -135,10 +160,44 @@ struct NumericData<T, 2, TT>
    }
 };
 
+template <typename TT>
+struct NumericData<float, 2, TT>
+{
+   static void Set(const float* value, MPlug &plug, bool convertDistances=false)
+   {
+      MDistance::Unit srcUnits = MDistance::uiUnit();
+      MDistance::Unit dstUnits = MDistance::kCentimeters;
+      
+      MFnNumericData data;
+      MFnNumericData::Type type = (MFnNumericData::Type) NumericType<TT, 2>::Value;
+      MObject oval = data.create(type);
+      data.setData(TT(convertDistances ? MDistance(value[0], srcUnits).as(dstUnits) : value[0]),
+                   TT(convertDistances ? MDistance(value[1], srcUnits).as(dstUnits) : value[1]));
+      plug.setValue(oval);
+   }
+};
+
+template <typename TT>
+struct NumericData<double, 2, TT>
+{
+   static void Set(const double* value, MPlug &plug, bool convertDistances=false)
+   {
+      MDistance::Unit srcUnits = MDistance::uiUnit();
+      MDistance::Unit dstUnits = MDistance::kCentimeters;
+      
+      MFnNumericData data;
+      MFnNumericData::Type type = (MFnNumericData::Type) NumericType<TT, 2>::Value;
+      MObject oval = data.create(type);
+      data.setData(TT(convertDistances ? MDistance(value[0], srcUnits).as(dstUnits) : value[0]),
+                   TT(convertDistances ? MDistance(value[1], srcUnits).as(dstUnits) : value[1]));
+      plug.setValue(oval);
+   }
+};
+
 template <typename T, typename TT>
 struct NumericData<T, 3, TT>
 {
-   static void Set(const T* value, MPlug &plug)
+   static void Set(const T* value, MPlug &plug, bool convertDistances=false)
    {
       MFnNumericData data;
       MFnNumericData::Type type = (MFnNumericData::Type) NumericType<TT, 3>::Value;
@@ -148,15 +207,89 @@ struct NumericData<T, 3, TT>
    }
 };
 
+template <typename TT>
+struct NumericData<float, 3, TT>
+{
+   static void Set(const float* value, MPlug &plug, bool convertDistances=false)
+   {
+      MDistance::Unit srcUnits = MDistance::uiUnit();
+      MDistance::Unit dstUnits = MDistance::kCentimeters;
+      
+      MFnNumericData data;
+      MFnNumericData::Type type = (MFnNumericData::Type) NumericType<TT, 3>::Value;
+      MObject oval = data.create(type);
+      data.setData(TT(convertDistances ? MDistance(value[0], srcUnits).as(dstUnits) : value[0]),
+                   TT(convertDistances ? MDistance(value[1], srcUnits).as(dstUnits) : value[1]),
+                   TT(convertDistances ? MDistance(value[2], srcUnits).as(dstUnits) : value[2]));
+      plug.setValue(oval);
+   }
+};
+
+template <typename TT>
+struct NumericData<double, 3, TT>
+{
+   static void Set(const double* value, MPlug &plug, bool convertDistances=false)
+   {
+      MDistance::Unit srcUnits = MDistance::uiUnit();
+      MDistance::Unit dstUnits = MDistance::kCentimeters;
+      
+      MFnNumericData data;
+      MFnNumericData::Type type = (MFnNumericData::Type) NumericType<TT, 3>::Value;
+      MObject oval = data.create(type);
+      data.setData(TT(convertDistances ? MDistance(value[0], srcUnits).as(dstUnits) : value[0]),
+                   TT(convertDistances ? MDistance(value[1], srcUnits).as(dstUnits) : value[1]),
+                   TT(convertDistances ? MDistance(value[2], srcUnits).as(dstUnits) : value[2]));
+      plug.setValue(oval);
+   }
+};
+
 template <typename T, typename TT>
 struct NumericData<T, 4, TT>
 {
-   static void Set(const T* value, MPlug &plug)
+   static void Set(const T* value, MPlug &plug, bool convertDistances=false)
    {
       MFnNumericData data;
       MFnNumericData::Type type = (MFnNumericData::Type) NumericType<TT, 4>::Value;
       MObject oval = data.create(type);
       data.setData(TT(value[0]), TT(value[1]), TT(value[2]), TT(value[3]));
+      plug.setValue(oval);
+   }
+};
+
+template <typename TT>
+struct NumericData<float, 4, TT>
+{
+   static void Set(const float* value, MPlug &plug, bool convertDistances=false)
+   {
+      MDistance::Unit srcUnits = MDistance::uiUnit();
+      MDistance::Unit dstUnits = MDistance::kCentimeters;
+      
+      MFnNumericData data;
+      MFnNumericData::Type type = (MFnNumericData::Type) NumericType<TT, 4>::Value;
+      MObject oval = data.create(type);
+      data.setData(TT(convertDistances ? MDistance(value[0], srcUnits).as(dstUnits) : value[0]),
+                   TT(convertDistances ? MDistance(value[1], srcUnits).as(dstUnits) : value[1]),
+                   TT(convertDistances ? MDistance(value[2], srcUnits).as(dstUnits) : value[2]),
+                   TT(convertDistances ? MDistance(value[3], srcUnits).as(dstUnits) : value[3]));
+      plug.setValue(oval);
+   }
+};
+
+template <typename TT>
+struct NumericData<double, 4, TT>
+{
+   static void Set(const double* value, MPlug &plug, bool convertDistances=false)
+   {
+      MDistance::Unit srcUnits = MDistance::uiUnit();
+      MDistance::Unit dstUnits = MDistance::kCentimeters;
+      
+      MFnNumericData data;
+      MFnNumericData::Type type = (MFnNumericData::Type) NumericType<TT, 4>::Value;
+      MObject oval = data.create(type);
+      data.setData(TT(convertDistances ? MDistance(value[0], srcUnits).as(dstUnits) : value[0]),
+                   TT(convertDistances ? MDistance(value[1], srcUnits).as(dstUnits) : value[1]),
+                   TT(convertDistances ? MDistance(value[2], srcUnits).as(dstUnits) : value[2]),
+                   TT(convertDistances ? MDistance(value[3], srcUnits).as(dstUnits) : value[3]));
       plug.setValue(oval);
    }
 };
@@ -266,7 +399,7 @@ private:
    template <typename T, int D>
    void attributeSample(Alembic::Abc::IArrayProperty prop, Alembic::AbcCoreAbstract::index_t sampIdx, T *outVal);
    template <typename T, int D, class Property>
-   void keyAttribute(Property prop, MPlug &plug);
+   void keyAttribute(Property prop, MPlug &plug, bool convertDistances=false);
    
    template <typename T, int D, typename TT>
    void setNumericUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop);
@@ -628,6 +761,16 @@ void CreateTree::getDefaultTransform(AlembicXform *node, bool worldSpace, MMatri
    
    MMatrix M = MMatrix(sample.getMatrix().x);
    
+   MDistance::Unit srcUnits = MDistance::uiUnit();
+   MDistance::Unit dstUnits = MDistance::kCentimeters;
+   
+   if (srcUnits != dstUnits)
+   {
+      M[3][0] = MDistance(M[3][0], srcUnits).as(dstUnits);
+      M[3][1] = MDistance(M[3][1], srcUnits).as(dstUnits);
+      M[3][2] = MDistance(M[3][2], srcUnits).as(dstUnits);
+   }
+   
    if (!worldSpace)
    {
       outM = M;
@@ -672,6 +815,16 @@ void CreateTree::getTransformAtTime(AlembicXform *node, double t, bool worldSpac
       M = MMatrix(sample.getMatrix().x);
    }
    
+   MDistance::Unit srcUnits = MDistance::uiUnit();
+   MDistance::Unit dstUnits = MDistance::kCentimeters;
+   
+   if (srcUnits != dstUnits)
+   {
+      M[3][0] = MDistance(M[3][0], srcUnits).as(dstUnits);
+      M[3][1] = MDistance(M[3][1], srcUnits).as(dstUnits);
+      M[3][2] = MDistance(M[3][2], srcUnits).as(dstUnits);
+   }
+   
    if (!worldSpace)
    {
       outM = M;
@@ -703,6 +856,10 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
    {
       return AlembicNode::ContinueVisit;
    }
+   
+   MDistance::Unit srcUnits = MDistance::uiUnit();
+   MDistance::Unit dstUnits = MDistance::kCentimeters;
+   bool convertDistances = (srcUnits != dstUnits);
    
    if (node.isLocator())
    {
@@ -781,12 +938,12 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
       MPlug pSy = locNode.findPlug("localScaleY");
       MPlug pSz = locNode.findPlug("localScaleZ");
       
-      pPx.setDouble(posscl[0]);
-      pPy.setDouble(posscl[1]);
-      pPz.setDouble(posscl[2]);
-      pSx.setDouble(posscl[3]);
-      pSy.setDouble(posscl[4]);
-      pSz.setDouble(posscl[5]);
+      pPx.setDouble(convertDistances ? MDistance(posscl[0], srcUnits).as(dstUnits) : posscl[0]);
+      pPy.setDouble(convertDistances ? MDistance(posscl[1], srcUnits).as(dstUnits) : posscl[1]);
+      pPz.setDouble(convertDistances ? MDistance(posscl[2], srcUnits).as(dstUnits) : posscl[2]);
+      pSx.setDouble(convertDistances ? MDistance(posscl[3], srcUnits).as(dstUnits) : posscl[3]);
+      pSy.setDouble(convertDistances ? MDistance(posscl[4], srcUnits).as(dstUnits) : posscl[4]);
+      pSz.setDouble(convertDistances ? MDistance(posscl[5], srcUnits).as(dstUnits) : posscl[5]);
       
       if (!loc.isConstant() && fabs(mSpeed) > 0.0001)
       {
@@ -820,12 +977,12 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
             
             mKeyframer.setCurrentTime(t);
             
-            mKeyframer.addAnyKey(locObj, "localPositionX", 0, posscl[0]);
-            mKeyframer.addAnyKey(locObj, "localPositionY", 0, posscl[1]);
-            mKeyframer.addAnyKey(locObj, "localPositionZ", 0, posscl[2]);
-            mKeyframer.addAnyKey(locObj, "localScaleX", 0, posscl[3]);
-            mKeyframer.addAnyKey(locObj, "localScaleY", 0, posscl[4]);
-            mKeyframer.addAnyKey(locObj, "localScaleZ", 0, posscl[5]);
+            mKeyframer.addAnyKey(locObj, "localPositionX", 0, (convertDistances ? MDistance(posscl[0], srcUnits).as(dstUnits) : posscl[0]));
+            mKeyframer.addAnyKey(locObj, "localPositionY", 0, (convertDistances ? MDistance(posscl[1], srcUnits).as(dstUnits) : posscl[1]));
+            mKeyframer.addAnyKey(locObj, "localPositionZ", 0, (convertDistances ? MDistance(posscl[2], srcUnits).as(dstUnits) : posscl[2]));
+            mKeyframer.addAnyKey(locObj, "localScaleX", 0, (convertDistances ? MDistance(posscl[3], srcUnits).as(dstUnits) : posscl[3]));
+            mKeyframer.addAnyKey(locObj, "localScaleY", 0, (convertDistances ? MDistance(posscl[4], srcUnits).as(dstUnits) : posscl[4]));
+            mKeyframer.addAnyKey(locObj, "localScaleZ", 0, (convertDistances ? MDistance(posscl[5], srcUnits).as(dstUnits) : posscl[5]));
          }
          
          bool rev = (mCycleType == AbcShape::CT_reverse);
@@ -866,7 +1023,16 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
          pIT.setBool(inheritsXforms);
          
          // Transformation matrix
-         MTransformationMatrix mmat(MMatrix(sample.getMatrix().x));
+         MMatrix mtx(sample.getMatrix().x);
+         
+         if (convertDistances)
+         {
+            mtx[3][0] = MDistance(mtx[3][0], srcUnits).as(dstUnits);
+            mtx[3][1] = MDistance(mtx[3][1], srcUnits).as(dstUnits);
+            mtx[3][2] = MDistance(mtx[3][2], srcUnits).as(dstUnits);
+         }
+         
+         MTransformationMatrix mmat(mtx);
          xform.set(mmat);
          
          if (!schema.isConstant() && fabs(mSpeed) > 0.0001)
@@ -900,6 +1066,13 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
                Alembic::AbcGeom::XformSample sample = schema.getValue(Alembic::Abc::ISampleSelector(idx));
                
                MMatrix mmat(sample.getMatrix().x);
+               
+               if (convertDistances)
+               {
+                  mmat[3][0] = MDistance(mmat[3][0], srcUnits).as(dstUnits);
+                  mmat[3][1] = MDistance(mmat[3][1], srcUnits).as(dstUnits);
+                  mmat[3][2] = MDistance(mmat[3][2], srcUnits).as(dstUnits);
+               }
                
                mKeyframer.setCurrentTime(t);
                mKeyframer.addTransformKey(xformObj, mmat);
@@ -1379,7 +1552,7 @@ void CreateTree::attributeSample(Alembic::Abc::IArrayProperty prop, Alembic::Abc
 }
 
 template <typename T, int D, class Property>
-void CreateTree::keyAttribute(Property prop, MPlug &plug)
+void CreateTree::keyAttribute(Property prop, MPlug &plug, bool convertDistances)
 {
    if (!prop.isConstant() && fabs(mSpeed) > 0.0001)
    {
@@ -1417,9 +1590,23 @@ void CreateTree::keyAttribute(Property prop, MPlug &plug)
          attributeSample<T, D>(prop, idx, val);
          
          mKeyframer.setCurrentTime(t);
-         for (int d=0; d<D; ++d)
+         
+         if (convertDistances)
          {
-            mKeyframer.addAnyKey(nodeObj, plugName, d, val[d]);
+            MDistance::Unit srcUnits = MDistance::uiUnit();
+            MDistance::Unit dstUnits = MDistance::kCentimeters;
+            
+            for (int d=0; d<D; ++d)
+            {
+               mKeyframer.addAnyKey(nodeObj, plugName, d, MDistance(val[d], srcUnits).as(dstUnits));
+            }
+         }
+         else
+         {
+            for (int d=0; d<D; ++d)
+            {
+               mKeyframer.addAnyKey(nodeObj, plugName, d, val[d]);
+            }
          }
       }
       
@@ -1441,31 +1628,34 @@ void CreateTree::keyAttribute(Property prop, MPlug &plug)
 template <typename T, int D, typename TT>
 void CreateTree::setNumericAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
 {
+   bool convertDistances = (MDistance::uiUnit() != MDistance::kCentimeters && plug.attribute().hasFn(MFn::kUnitAttribute));
    T val[D];
    
    prop.get(val);
    
-   NumericData<T, D, TT>::Set(val, plug);
+   NumericData<T, D, TT>::Set(val, plug, convertDistances);
    
-   keyAttribute<T, D>(prop, plug);
+   keyAttribute<T, D>(prop, plug, convertDistances);
 }
 
 template <typename T, int D, typename TT>
 void CreateTree::setNumericAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
 {
+   bool convertDistances = (MDistance::uiUnit() != MDistance::kCentimeters && plug.attribute().hasFn(MFn::kUnitAttribute));
    Alembic::AbcCoreAbstract::ArraySamplePtr samp;
    prop.get(samp);
    
    const T *val = (const T*) samp->getData();
    
-   NumericData<T, D, TT>::Set(val, plug);
+   NumericData<T, D, TT>::Set(val, plug, convertDistances);
    
-   keyAttribute<T, D>(prop, plug);
+   keyAttribute<T, D>(prop, plug, convertDistances);
 }
 
 template <typename T, int D, typename TT>
 void CreateTree::setNumericArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
 {
+   bool convertDistances = (MDistance::uiUnit() != MDistance::kCentimeters && plug.attribute().hasFn(MFn::kUnitAttribute));
    Alembic::AbcCoreAbstract::ArraySamplePtr samp;
    prop.get(samp);
    
@@ -1474,7 +1664,7 @@ void CreateTree::setNumericArrayAttribute(Alembic::Abc::IArrayProperty prop, MPl
    for (size_t i=0; i<samp->size(); ++i, val+=D)
    {
       MPlug elem = plug.elementByLogicalIndex(i);
-      NumericData<T, D, TT>::Set(val, elem);
+      NumericData<T, D, TT>::Set(val, elem, convertDistances);
    }
 }
 
@@ -1542,6 +1732,15 @@ void CreateTree::setMatrixAttribute(Alembic::Abc::IScalarProperty prop, MPlug &p
       }
    }
    
+   MDistance::Unit srcUnits = MDistance::uiUnit();
+   MDistance::Unit dstUnits = MDistance::kCentimeters;
+   if (srcUnits != dstUnits)
+   {
+      m[3][0] = MDistance(m[3][0], srcUnits).as(dstUnits);
+      m[3][1] = MDistance(m[3][1], srcUnits).as(dstUnits);
+      m[3][2] = MDistance(m[3][2], srcUnits).as(dstUnits);
+   }
+   
    MFnMatrixData data;
    MObject oval = data.create(m);
    plug.setValue(oval);
@@ -1564,6 +1763,15 @@ void CreateTree::setMatrixAttribute(Alembic::Abc::IArrayProperty prop, MPlug &pl
       {
          m[r][c] = double(val[i]);
       }
+   }
+   
+   MDistance::Unit srcUnits = MDistance::uiUnit();
+   MDistance::Unit dstUnits = MDistance::kCentimeters;
+   if (srcUnits != dstUnits)
+   {
+      m[3][0] = MDistance(m[3][0], srcUnits).as(dstUnits);
+      m[3][1] = MDistance(m[3][1], srcUnits).as(dstUnits);
+      m[3][2] = MDistance(m[3][2], srcUnits).as(dstUnits);
    }
    
    MFnMatrixData data;
