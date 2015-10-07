@@ -69,6 +69,7 @@
 #include <maya/MFnCamera.h>
 #include <maya/MFnParticleSystem.h>
 #include <maya/MTime.h>
+#include <maya/MDistance.h>
 
 template <class T>
 void unsupportedWarning(T & iProp)
@@ -542,6 +543,16 @@ bool addArrayProp(Alembic::Abc::IArrayProperty & iProp, MObject & iParent)
 
                 if (!plug.isNull())
                 {
+                    MDistance::Unit srcUnits = MDistance::uiUnit();
+                    MDistance::Unit dstUnits = MDistance::kCentimeters;
+                    
+                    if (srcUnits != dstUnits && plug.attribute().hasFn(MFn::kUnitAttribute))
+                    {
+                        val[0] = MDistance(val[0], srcUnits).as(dstUnits);
+                        val[1] = MDistance(val[1], srcUnits).as(dstUnits);
+                        val[2] = MDistance(val[2], srcUnits).as(dstUnits);
+                    }
+
                     unsigned int numChildren = plug.numChildren();
                     if (numChildren == 0)
                     {
@@ -739,6 +750,17 @@ bool addArrayProp(Alembic::Abc::IArrayProperty & iProp, MObject & iParent)
 
                 if (!plug.isNull())
                 {
+                    MDistance::Unit srcUnits = MDistance::uiUnit();
+                    MDistance::Unit dstUnits = MDistance::kCentimeters;
+                    
+                    if (srcUnits != dstUnits && plug.attribute().hasFn(MFn::kUnitAttribute))
+                    {
+                        val[0] = MDistance(val[0], srcUnits).as(dstUnits);
+                        val[1] = MDistance(val[1], srcUnits).as(dstUnits);
+                        val[2] = MDistance(val[2], srcUnits).as(dstUnits);
+                        val[3] = MDistance(val[3], srcUnits).as(dstUnits);
+                    }
+
                     unsigned int numChildren = plug.numChildren();
                     if (numChildren == 0)
                     {
@@ -1017,7 +1039,12 @@ addScalarExtentOneProp(Alembic::Abc::IScalarProperty& iProp,
     }
     else
     {
-        plug.setValue(val);
+        MDistance::Unit srcUnits = MDistance::uiUnit();
+        MDistance::Unit dstUnits = MDistance::kCentimeters;
+        bool convert = (srcUnits != dstUnits && plug.attribute().hasFn(MFn::kUnitAttribute));
+
+        plug.setValue(convert ? MDistance(val, srcUnits).as(dstUnits) : val);
+
         return VALID_DONE;
     }
 
@@ -1049,10 +1076,14 @@ addScalarExtentThreeProp(Alembic::Abc::IScalarProperty& iProp,
 
     if (!plug.isNull())
     {
+        MDistance::Unit srcUnits = MDistance::uiUnit();
+        MDistance::Unit dstUnits = MDistance::kCentimeters;
+        bool convert = (srcUnits != dstUnits && plug.attribute().hasFn(MFn::kUnitAttribute));
+
         unsigned int numChildren = plug.numChildren();
         if (numChildren == 0)
         {
-            plug.setValue(val[0]);
+            plug.setValue(convert ? MDistance(val[0], srcUnits).as(dstUnits) : val[0]);
         }
         else
         {
@@ -1060,7 +1091,7 @@ addScalarExtentThreeProp(Alembic::Abc::IScalarProperty& iProp,
                 numChildren = extent;
 
             for (unsigned int i = 0; i < numChildren; ++i)
-                plug.child(i).setValue(val[i]);
+                plug.child(i).setValue(convert ? MDistance(val[i], srcUnits).as(dstUnits) : val[i]);
         }
         return VALID_DONE;
     }
@@ -1109,10 +1140,14 @@ addScalarExtentFourProp(Alembic::Abc::IScalarProperty& iProp,
 
     if (!plug.isNull())
     {
+        MDistance::Unit srcUnits = MDistance::uiUnit();
+        MDistance::Unit dstUnits = MDistance::kCentimeters;
+        bool convert = (srcUnits != dstUnits && plug.attribute().hasFn(MFn::kUnitAttribute));
+
         unsigned int numChildren = plug.numChildren();
         if (numChildren == 0)
         {
-            plug.setValue(val[0]);
+            plug.setValue(convert ? MDistance(val[0], srcUnits).as(dstUnits) : val[0]);
         }
         else
         {
@@ -1121,7 +1156,7 @@ addScalarExtentFourProp(Alembic::Abc::IScalarProperty& iProp,
 
             for (unsigned int i = 0; i < numChildren; ++i)
             {
-                plug.child(i).setValue(val[i]);
+                plug.child(i).setValue(convert ? MDistance(val[i], srcUnits).as(dstUnits) : val[i]);
             }
         }
 

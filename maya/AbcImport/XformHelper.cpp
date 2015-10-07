@@ -51,6 +51,8 @@
 #include <maya/MVector.h>
 #include <maya/MGlobal.h>
 #include <maya/MDagModifier.h>
+#include <maya/MDistance.h>
+#include <maya/MFnUnitAttribute.h>
 
 namespace
 {
@@ -72,6 +74,10 @@ void readComplex(double iFrame, Alembic::AbcGeom::IXform & iNode,
         iNode.getSchema().getNumSamples(),
         index, ceilIndex);
 
+    MDistance::Unit srcUnits = MDistance::uiUnit();
+    MDistance::Unit dstUnits = MDistance::kCentimeters;
+    bool convert = (srcUnits != dstUnits);
+
     Alembic::Abc::M44d m; 
 
     if (alpha != 0.0 && index != ceilIndex)
@@ -92,27 +98,41 @@ void readComplex(double iFrame, Alembic::AbcGeom::IXform & iNode,
         m = samp.getMatrix();
     }
 
+    // Note:
+    //   Maya API expects translations to be expressed in centimeters.
+    if (convert)
+    {
+        m.x[3][0] = MDistance(m.x[3][0], srcUnits).as(dstUnits);
+        m.x[3][1] = MDistance(m.x[3][1], srcUnits).as(dstUnits);
+        m.x[3][2] = MDistance(m.x[3][2], srcUnits).as(dstUnits);
+    }
+
     MTransformationMatrix mmat(MMatrix(m.x));
 
     // Everywhere else we use kPreTransform, but this doesn't work
     // when we pass in the matrix for some reason
     MSpace::Space tSpace = MSpace::kTransform;
 
+    // Note:
+    //   As the alembic node's attributes are unitless, maya will automatically introduce
+    //     a unit conversion node to convert from UI units to centimeters.
+    //   We need to convert values back to UI units as maya API only returns distances in centimeters.
+
     // push the results into sampleList
     MVector vec = mmat.getTranslation(tSpace);
-    oSampleList.push_back(vec.x);
-    oSampleList.push_back(vec.y);
-    oSampleList.push_back(vec.z);
+    oSampleList.push_back(convert ? MDistance(vec.x, dstUnits).as(srcUnits) : vec.x);
+    oSampleList.push_back(convert ? MDistance(vec.y, dstUnits).as(srcUnits) : vec.y);
+    oSampleList.push_back(convert ? MDistance(vec.z, dstUnits).as(srcUnits) : vec.z);
 
     vec = mmat.rotatePivotTranslation(tSpace);
-    oSampleList.push_back(vec.x);
-    oSampleList.push_back(vec.y);
-    oSampleList.push_back(vec.z);
+    oSampleList.push_back(convert ? MDistance(vec.x, dstUnits).as(srcUnits) : vec.x);
+    oSampleList.push_back(convert ? MDistance(vec.y, dstUnits).as(srcUnits) : vec.y);
+    oSampleList.push_back(convert ? MDistance(vec.z, dstUnits).as(srcUnits) : vec.z);
 
     MPoint pt = mmat.rotatePivot(tSpace);
-    oSampleList.push_back(pt.x);
-    oSampleList.push_back(pt.y);
-    oSampleList.push_back(pt.z);
+    oSampleList.push_back(convert ? MDistance(pt.x, dstUnits).as(srcUnits) : pt.x);
+    oSampleList.push_back(convert ? MDistance(pt.y, dstUnits).as(srcUnits) : pt.y);
+    oSampleList.push_back(convert ? MDistance(pt.z, dstUnits).as(srcUnits) : pt.z);
 
     double rot[3];
     MTransformationMatrix::RotationOrder order;
@@ -128,14 +148,14 @@ void readComplex(double iFrame, Alembic::AbcGeom::IXform & iNode,
     oSampleList.push_back(Alembic::AbcGeom::RadiansToDegrees(vec.z));
 
     pt = mmat.scalePivotTranslation(tSpace);
-    oSampleList.push_back(vec.x);
-    oSampleList.push_back(vec.y);
-    oSampleList.push_back(vec.z);
+    oSampleList.push_back(convert ? MDistance(vec.x, dstUnits).as(srcUnits) : vec.x);
+    oSampleList.push_back(convert ? MDistance(vec.y, dstUnits).as(srcUnits) : vec.y);
+    oSampleList.push_back(convert ? MDistance(vec.z, dstUnits).as(srcUnits) : vec.z);
 
     vec = mmat.scalePivot(tSpace);
-    oSampleList.push_back(vec.x);
-    oSampleList.push_back(vec.y);
-    oSampleList.push_back(vec.z);
+    oSampleList.push_back(convert ? MDistance(vec.x, dstUnits).as(srcUnits) : vec.x);
+    oSampleList.push_back(convert ? MDistance(vec.y, dstUnits).as(srcUnits) : vec.y);
+    oSampleList.push_back(convert ? MDistance(vec.z, dstUnits).as(srcUnits) : vec.z);
 
     double shear[3];
     mmat.getShear(shear, tSpace);
@@ -520,6 +540,10 @@ MStatus connectToXform(const Alembic::AbcGeom::XformSample & iSamp,
     // disconnect connections to animated props
     disconnectProps(trans, iSampledPropList, iFirstProp);
 
+    MDistance::Unit srcUnits = MDistance::uiUnit();
+    MDistance::Unit dstUnits = MDistance::kCentimeters;
+    bool convert = (srcUnits != dstUnits);
+
     if (isComplex(iSamp))
     {
         if (!isConstant)
@@ -554,6 +578,14 @@ MStatus connectToXform(const Alembic::AbcGeom::XformSample & iSamp,
         }
 
         Alembic::Abc::M44d m = iSamp.getMatrix();
+
+        if (convert)
+        {
+            m.x[3][0] = MDistance(m.x[3][0], srcUnits).as(dstUnits);
+            m.x[3][1] = MDistance(m.x[3][1], srcUnits).as(dstUnits);
+            m.x[3][2] = MDistance(m.x[3][2], srcUnits).as(dstUnits);
+        }
+
         MTransformationMatrix mmat(MMatrix(m.x));
 
         // Everywhere else we use kPreTransform, but this doesn't work
@@ -839,6 +871,13 @@ MStatus connectToXform(const Alembic::AbcGeom::XformSample & iSamp,
                         }
                         vec.z = op.getChannelValue(2);
 
+                        if (convert)
+                        {
+                            vec.x = MDistance(vec.x, srcUnits).as(dstUnits);
+                            vec.y = MDistance(vec.y, srcUnits).as(dstUnits);
+                            vec.z = MDistance(vec.z, srcUnits).as(dstUnits);
+                        }
+
                         trans.setTranslation(vec, gSpace);
                     }
                     break;
@@ -895,6 +934,12 @@ MStatus connectToXform(const Alembic::AbcGeom::XformSample & iSamp,
                         }
                         point.z = op.getChannelValue(2);
 
+                        if (convert)
+                        {
+                            point.x = MDistance(point.x, srcUnits).as(dstUnits);
+                            point.y = MDistance(point.y, srcUnits).as(dstUnits);
+                            point.z = MDistance(point.z, srcUnits).as(dstUnits);
+                        }
 
                         // we only want to apply this to the first one
                         // the second one is the inverse
@@ -932,6 +977,13 @@ MStatus connectToXform(const Alembic::AbcGeom::XformSample & iSamp,
                                 "scalePivotTranslateZ");
                         }
                         vec.z = op.getChannelValue(2);
+
+                        if (convert)
+                        {
+                            vec.x = MDistance(vec.x, srcUnits).as(dstUnits);
+                            vec.y = MDistance(vec.y, srcUnits).as(dstUnits);
+                            vec.z = MDistance(vec.z, srcUnits).as(dstUnits);
+                        }
 
                         trans.setScalePivotTranslation(vec, gSpace);
                     }
@@ -988,6 +1040,12 @@ MStatus connectToXform(const Alembic::AbcGeom::XformSample & iSamp,
                         }
                         point.z = op.getChannelValue(2);
 
+                        if (convert)
+                        {
+                            point.x = MDistance(point.x, srcUnits).as(dstUnits);
+                            point.y = MDistance(point.y, srcUnits).as(dstUnits);
+                            point.z = MDistance(point.z, srcUnits).as(dstUnits);
+                        }
 
                         // only set rotate pivot on the first one, the second
                         // one is just the inverse
@@ -1022,6 +1080,13 @@ MStatus connectToXform(const Alembic::AbcGeom::XformSample & iSamp,
                                 "rotatePivotTranslateZ");
                         }
                         vec.z = op.getChannelValue(2);
+
+                        if (convert)
+                        {
+                            vec.x = MDistance(vec.x, srcUnits).as(dstUnits);
+                            vec.y = MDistance(vec.y, srcUnits).as(dstUnits);
+                            vec.z = MDistance(vec.z, srcUnits).as(dstUnits);
+                        }
 
                         trans.setRotatePivotTranslation(vec, gSpace);
                     }

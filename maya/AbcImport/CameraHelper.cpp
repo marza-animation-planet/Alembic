@@ -46,6 +46,8 @@
 #include <maya/MTime.h>
 #include <maya/MVector.h>
 #include <maya/MDagModifier.h>
+#include <maya/MDistance.h>
+#include <maya/MFnUnitAttribute.h>
 
 void read(double iFrame, Alembic::AbcGeom::ICamera & iCamera,
     std::vector<double> & oArray)
@@ -284,6 +286,9 @@ MObject create(Alembic::AbcGeom::ICamera & iNode, MObject & iParent)
 
     if (schema.isConstant())
     {
+        MDistance::Unit srcUnits = MDistance::uiUnit();
+        MDistance::Unit dstUnits = MDistance::kCentimeters;
+        bool convert = (srcUnits != dstUnits);
 
         // no center of interest
         fnCamera.setFocalLength(samp.getFocalLength());
@@ -311,14 +316,17 @@ MObject create(Alembic::AbcGeom::ICamera & iNode, MObject & iParent)
             MGlobal::displayWarning(warn);
         }
 
-        fnCamera.setNearClippingPlane(samp.getNearClippingPlane());
-        fnCamera.setFarClippingPlane(samp.getFarClippingPlane());
+        double nearClippingPlane = samp.getNearClippingPlane();
+        fnCamera.setNearClippingPlane(convert ? MDistance(nearClippingPlane, srcUnits).as(dstUnits) : nearClippingPlane);
+        double farClippingPlane = samp.getFarClippingPlane();
+        fnCamera.setFarClippingPlane(convert ? MDistance(farClippingPlane, srcUnits).as(dstUnits) : farClippingPlane);
 
         // prescale, film translate H, V, roll pivot H,V, film roll value
         // post scale might be in the 3x3
 
         fnCamera.setFStop(samp.getFStop());
-        fnCamera.setFocusDistance(samp.getFocusDistance());
+        double focusDistance = samp.getFocusDistance();
+        fnCamera.setFocusDistance(convert ? MDistance(focusDistance, srcUnits).as(dstUnits) : focusDistance);
 
         MTime sec(1.0, MTime::kSeconds);
         fnCamera.setShutterAngle(Alembic::AbcGeom::DegreesToRadians(

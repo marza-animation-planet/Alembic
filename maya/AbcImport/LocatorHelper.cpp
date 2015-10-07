@@ -44,6 +44,8 @@
 #include <maya/MVector.h>
 #include <maya/MGlobal.h>
 #include <maya/MDagModifier.h>
+#include <maya/MDistance.h>
+#include <maya/MFnUnitAttribute.h>
 
 
 MObject create(Alembic::AbcGeom::IXform & iLocator,
@@ -71,6 +73,10 @@ MObject create(Alembic::AbcGeom::IXform & iLocator,
 
     if (iLocProp.isConstant())
     {
+        MDistance::Unit srcUnits = MDistance::uiUnit();
+        MDistance::Unit dstUnits = MDistance::kCentimeters;
+        bool convert = (srcUnits != dstUnits);
+
         // read the value from iLocProp
         double oSample[6];
         iLocProp.get(oSample, 0);
@@ -78,17 +84,17 @@ MObject create(Alembic::AbcGeom::IXform & iLocator,
         // set the plugs and be done
         MPlug dstPlug;
         dstPlug = fnLocator.findPlug("localPositionX");
-        dstPlug.setValue(oSample[0]);
+        dstPlug.setValue(convert ? MDistance(oSample[0], srcUnits).as(dstUnits) : oSample[0]);
         dstPlug = fnLocator.findPlug("localPositionY");
-        dstPlug.setValue(oSample[1]);
+        dstPlug.setValue(convert ? MDistance(oSample[1], srcUnits).as(dstUnits) : oSample[1]);
         dstPlug = fnLocator.findPlug("localPositionZ");
-        dstPlug.setValue(oSample[2]);
+        dstPlug.setValue(convert ? MDistance(oSample[2], srcUnits).as(dstUnits) : oSample[2]);
         dstPlug = fnLocator.findPlug("localScaleX");
-        dstPlug.setValue(oSample[3]);
+        dstPlug.setValue(convert ? MDistance(oSample[3], srcUnits).as(dstUnits) : oSample[3]);
         dstPlug = fnLocator.findPlug("localScaleY");
-        dstPlug.setValue(oSample[4]);
+        dstPlug.setValue(convert ? MDistance(oSample[4], srcUnits).as(dstUnits) : oSample[4]);
         dstPlug = fnLocator.findPlug("localScaleZ");
-        dstPlug.setValue(oSample[5]);
+        dstPlug.setValue(convert ? MDistance(oSample[5], srcUnits).as(dstUnits) : oSample[5]);
     }
 
     return locatorObj;
