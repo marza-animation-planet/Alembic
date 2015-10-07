@@ -294,7 +294,7 @@ if excons.GetArgument("with-maya", default=None) is not None:
    AbcShapeMel = "maya/AbcShape/AE%sTemplate.mel" % AbcShapeName
    AbcMatEditPy = "maya/AbcShape/%sAbcMaterialEditor.py" % nameprefix
    AbcMatEditMel = "maya/AbcShape/%sAbcMaterialEditor.mel" % nameprefix
-   AbcShapeMtoa = "arnold/abcproc/mtoa_%s.py" % AbcShapeName
+   #AbcShapeMtoa = "arnold/abcproc/mtoa_%s.py" % AbcShapeName
    if withVray:
       AbcShapePy = "maya/AbcShape/%sabcshape4vray.py" % nameprefix.lower()
    
@@ -305,8 +305,8 @@ if excons.GetArgument("with-maya", default=None) is not None:
    if not os.path.exists(AbcShapeMel) or os.stat(AbcShapeMel).st_mtime < os.stat("maya/AbcShape/AETemplate.mel.tpl").st_mtime:
       replace_in_file("maya/AbcShape/AETemplate.mel.tpl", AbcShapeMel, "<<NodeName>>", AbcShapeName)
    
-   if not os.path.exists(AbcShapeMtoa) or os.stat(AbcShapeMtoa).st_mtime < os.stat("arnold/abcproc/mtoa.py.tpl").st_mtime:
-      replace_in_file("arnold/abcproc/mtoa.py.tpl", AbcShapeMtoa, "<<NodeName>>", AbcShapeName)
+   #if not os.path.exists(AbcShapeMtoa) or os.stat(AbcShapeMtoa).st_mtime < os.stat("arnold/abcproc/mtoa.py.tpl").st_mtime:
+   #   replace_in_file("arnold/abcproc/mtoa.py.tpl", AbcShapeMtoa, "<<NodeName>>", AbcShapeName)
    
    if not os.path.exists(AbcMatEditMel) or os.stat(AbcMatEditMel).st_mtime < os.stat("maya/AbcShape/AbcMaterialEditor.mel.tpl").st_mtime:
       replace_in_file("maya/AbcShape/AbcMaterialEditor.mel.tpl", AbcMatEditMel, "<<Prefix>>", nameprefix)
@@ -353,8 +353,10 @@ if excons.GetArgument("with-maya", default=None) is not None:
                  "incdirs": ["maya/AbcShape"],
                  "srcs": glob.glob("maya/AbcShape/*.cpp"),
                  "custom": [maya.Require, maya.Plugin] + ([vray.Require] if withVray else []) + [RequireAlembicHelper()],
-                 "install": {"maya/scripts": glob.glob("maya/AbcShape/*.mel"),
-                             "maya/python": [AbcShapeMtoa, AbcMatEditPy] + ([AbcShapePy] if withVray else [])}}])
+                 "install": {#"maya/scripts": glob.glob("maya/AbcShape/*.mel"),
+                             "maya/scripts": [AbcShapeMel, AbcMatEditMel],
+                             "maya/python": [AbcMatEditPy] + ([AbcShapePy] if withVray else [])}}])
+                             #"maya/python": [AbcShapeMtoa, AbcMatEditPy] + ([AbcShapePy] if withVray else [])}}])
    
    if withArnold:
       mtoa_inc = excons.GetArgument("with-mtoa-inc")
