@@ -35,6 +35,8 @@
 //-*****************************************************************************
 
 #include "MayaCameraWriter.h"
+#include <maya/MFnUnitAttribute.h>
+#include <maya/MDistance.h>
 
 MayaCameraWriter::MayaCameraWriter(MDagPath & iDag,
     Alembic::Abc::OObject & iParent, Alembic::Util::uint32_t iTimeIndex,
@@ -107,6 +109,10 @@ MayaCameraWriter::MayaCameraWriter(MDagPath & iDag,
 
 void MayaCameraWriter::write()
 {
+    // nearClippingPlane/farClippingPlane/focusDistance always return centimeters even if  UI units are set to meters
+    MDistance::Unit srcUnits = MDistance::kCentimeters;
+    MDistance::Unit dstUnits = MDistance::uiUnit();
+
     MFnCamera mfnCamera(mDagPath);
 
     mSamp.setFocalLength(mfnCamera.focalLength());
@@ -120,10 +126,13 @@ void MayaCameraWriter::write()
     mSamp.setOverScanRight(overscan);
     mSamp.setOverScanTop(overscan);
     mSamp.setOverScanBottom(overscan);
-    mSamp.setNearClippingPlane(mfnCamera.nearClippingPlane());
-    mSamp.setFarClippingPlane(mfnCamera.farClippingPlane());
+    double nearClippingPlane = mfnCamera.nearClippingPlane();
+    mSamp.setNearClippingPlane(srcUnits != dstUnits ? MDistance(nearClippingPlane, srcUnits).as(dstUnits) : nearClippingPlane);
+    double farClippingPlane = mfnCamera.farClippingPlane();
+    mSamp.setFarClippingPlane(srcUnits != dstUnits ? MDistance(farClippingPlane, srcUnits).as(dstUnits) : farClippingPlane);
     mSamp.setFStop(mfnCamera.fStop());
-    mSamp.setFocusDistance(mfnCamera.focusDistance());
+    double focusDistance = mfnCamera.focusDistance();
+    mSamp.setFocusDistance(srcUnits != dstUnits ? MDistance(focusDistance, srcUnits).as(dstUnits) : focusDistance);
 
     // should this be based on the shutterAngle?  or the settings passed in?
 

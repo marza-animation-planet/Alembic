@@ -37,6 +37,8 @@
 #include "AttributesWriter.h"
 #include "MayaUtility.h"
 #include <maya/MFnParticleSystem.h>
+#include <maya/MFnUnitAttribute.h>
+#include <maya/MDistance.h>
 
 namespace Abc = Alembic::Abc;
 namespace AbcGeom = Alembic::AbcGeom;
@@ -1449,7 +1451,10 @@ bool attributeToScalarPropertyPair(const MObject& iAttr,
     }
     else if (iAttr.hasFn(MFn::kUnitAttribute))
     {
-        double dval = iPlug.asDouble();
+        MFnUnitAttribute unitAttr(iAttr);
+        MDistance::Unit outUnit = MDistance::uiUnit();
+        bool convert = (unitAttr.unitType() == MFnUnitAttribute::kDistance && outUnit != MDistance::kCentimeters);
+        double dval = (convert ? iPlug.asMDistance().as(outUnit) : iPlug.asDouble());
         oProp.set(&dval);
         return true;
     }
@@ -1500,12 +1505,15 @@ bool attributeToArrayPropertyPair(const MObject& iAttr,
     }
     else if (iAttr.hasFn(MFn::kUnitAttribute))
     {
+        MFnUnitAttribute unitAttr(iAttr);
+        MDistance::Unit outUnit = MDistance::uiUnit();
+        bool convert = (unitAttr.unitType() == MFnUnitAttribute::kDistance && outUnit != MDistance::kCentimeters);
         if (iPlug.isArray())
         {
             std::vector<double> vals(iPlug.numElements());
             for (unsigned int i=0; i<iPlug.numElements(); ++i)
             {
-                vals[i] = iPlug[i].asDouble();
+                vals[i] = (convert ? iPlug[i].asMDistance().as(outUnit) : iPlug[i].asDouble());
             }
             AbcA::ArraySample samp(&(vals.front()), oProp.getDataType(),
                 Alembic::Util::Dimensions(vals.size()));
@@ -1513,7 +1521,7 @@ bool attributeToArrayPropertyPair(const MObject& iAttr,
         }
         else
         {
-            double val = iPlug.asDouble();
+            double val = (convert ? iPlug.asMDistance().as(outUnit) : iPlug.asDouble());
             AbcA::ArraySample samp(&val, oProp.getDataType(),
                 Alembic::Util::Dimensions(1));
             oProp.set(samp);

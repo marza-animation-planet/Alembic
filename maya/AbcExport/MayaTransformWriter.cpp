@@ -36,6 +36,8 @@
 
 #include "MayaTransformWriter.h"
 #include "MayaUtility.h"
+#include <maya/MFnUnitAttribute.h>
+#include <maya/MDistance.h>
 
 void addTranslate(const MFnDependencyNode & iTrans,
     MString parentName, MString xName, MString yName, MString zName,
@@ -43,6 +45,9 @@ void addTranslate(const MFnDependencyNode & iTrans,
     bool forceAnimated, Alembic::AbcGeom::XformSample & oSample,
     std::vector < AnimChan > & oAnimChanList)
 {
+    MDistance::Unit dstUnit = MDistance::uiUnit();
+    bool convert = (dstUnit != MDistance::kCentimeters);
+
     Alembic::AbcGeom::XformOp op(Alembic::AbcGeom::kTranslateOperation, iHint);
 
     MPlug xPlug = iTrans.findPlug(xName);
@@ -54,7 +59,7 @@ void addTranslate(const MFnDependencyNode & iTrans,
         else
             xSamp = 1;
     }
-    double xVal = xPlug.asDouble();
+    double xVal = (convert ? xPlug.asMDistance().as(dstUnit) : xPlug.asDouble());
 
     MPlug yPlug = iTrans.findPlug(yName);
     int ySamp = 0;
@@ -65,7 +70,7 @@ void addTranslate(const MFnDependencyNode & iTrans,
         else
             ySamp = 1;
     }
-    double yVal = yPlug.asDouble();
+    double yVal = (convert ? yPlug.asMDistance().as(dstUnit) : yPlug.asDouble());
 
     MPlug zPlug = iTrans.findPlug(zName);
     int zSamp = 0;
@@ -76,7 +81,7 @@ void addTranslate(const MFnDependencyNode & iTrans,
         else
             zSamp = 1;
     }
-    double zVal = zPlug.asDouble();
+    double zVal = (convert ? zPlug.asMDistance().as(dstUnit) : zPlug.asDouble());
 
     // this is to handle the case where there is a connection to the parent
     // plug but not to the child plugs, if the connection is there then all
@@ -116,6 +121,7 @@ void addTranslate(const MFnDependencyNode & iTrans,
         if (xSamp != 0)
         {
             AnimChan chan;
+            chan.distance = true;
             chan.plug = xPlug;
             chan.scale = 1.0;
             if (inverse)
@@ -128,6 +134,7 @@ void addTranslate(const MFnDependencyNode & iTrans,
         if (ySamp != 0)
         {
             AnimChan chan;
+            chan.distance = true;
             chan.plug = yPlug;
             chan.scale = 1.0;
             if (inverse)
@@ -140,6 +147,7 @@ void addTranslate(const MFnDependencyNode & iTrans,
         if (zSamp != 0)
         {
             AnimChan chan;
+            chan.distance = true;
             chan.plug = zPlug;
             chan.scale = 1.0;
             if (inverse)
@@ -213,6 +221,7 @@ void addRotate(const MFnDependencyNode & iTrans,
         if (samp != 0)
         {
             AnimChan chan;
+            chan.distance = false;
             chan.plug = plug;
             chan.scale = Alembic::AbcGeom::RadiansToDegrees(1.0);
             chan.opNum = oSample.getNumOps();
@@ -289,6 +298,7 @@ void addShear(const MFnDependencyNode & iTrans, bool forceStatic,
         if (xySamp != 0)
         {
             AnimChan chan;
+            chan.distance = false;
             chan.plug = xyPlug;
             chan.scale = 1.0;
             chan.opNum = oSample.getNumOps();
@@ -299,6 +309,7 @@ void addShear(const MFnDependencyNode & iTrans, bool forceStatic,
         if (xzSamp != 0)
         {
             AnimChan chan;
+            chan.distance = false;
             chan.plug = xzPlug;
             chan.scale = 1.0;
             chan.opNum = oSample.getNumOps();
@@ -309,6 +320,7 @@ void addShear(const MFnDependencyNode & iTrans, bool forceStatic,
         if (yzSamp != 0)
         {
             AnimChan chan;
+            chan.distance = false;
             chan.plug = yzPlug;
             chan.scale = 1.0;
             chan.opNum = oSample.getNumOps();
@@ -402,6 +414,7 @@ void addScale(const MFnDependencyNode & iTrans,
         if (xSamp != 0)
         {
             AnimChan chan;
+            chan.distance = false;
             chan.plug = xPlug;
             chan.scale = 1.0;
             if (inverse)
@@ -414,6 +427,7 @@ void addScale(const MFnDependencyNode & iTrans,
         if (ySamp != 0)
         {
             AnimChan chan;
+            chan.distance = false;
             chan.plug = yPlug;
             chan.scale = 1.0;
             if (inverse)
@@ -426,6 +440,7 @@ void addScale(const MFnDependencyNode & iTrans,
         if (zSamp != 0)
         {
             AnimChan chan;
+            chan.distance = false;
             chan.plug = zPlug;
             chan.scale = 1.0;
             if (inverse)
@@ -791,12 +806,19 @@ void MayaTransformWriter::write()
     size_t numSamples = mAnimChanList.size();
     if (numSamples > 0)
     {
+        MDistance::Unit srcUnits = MDistance::kCentimeters;
+        MDistance::Unit dstUnits = MDistance::uiUnit();
+        
         std::vector < AnimChan >::iterator it, itEnd;
 
         for (it = mAnimChanList.begin(), itEnd = mAnimChanList.end();
             it != itEnd; ++it)
         {
             double val = it->plug.asDouble();
+            if (it->distance && srcUnits != dstUnits)
+            {
+                val = MDistance(val, srcUnits).as(dstUnits);
+            }
 
             if (it->scale == -std::numeric_limits<double>::infinity())
                 val = util::inverseScale(val);

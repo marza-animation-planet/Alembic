@@ -56,6 +56,7 @@ struct AnimChan
 
     std::size_t opNum;
     Alembic::Util::uint32_t channelNum;
+    bool distance;
 };
 
 // Writes an MFnTransform

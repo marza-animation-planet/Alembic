@@ -36,6 +36,8 @@
 
 #include "MayaLocatorWriter.h"
 #include "MayaUtility.h"
+#include <maya/MFnUnitAttribute.h>
+#include <maya/MDistance.h>
 
 MayaLocatorWriter::MayaLocatorWriter(MDagPath & iDag,
     Alembic::Abc::OObject & iParent,
@@ -92,13 +94,17 @@ MayaLocatorWriter::MayaLocatorWriter(MDagPath & iDag,
             "locator", dType);
     }
 
+    // all those values are in centimeters
+    MDistance::Unit srcUnits = MDistance::kCentimeters;
+    MDistance::Unit dstUnits = MDistance::uiUnit();
+
     double val[6];
-    val[0] = posX.asDouble();
-    val[1] = posY.asDouble();
-    val[2] = posZ.asDouble();
-    val[3] = scaleX.asDouble();
-    val[4] = scaleY.asDouble();
-    val[5] = scaleZ.asDouble();
+    val[0] = (srcUnits != dstUnits ? MDistance(posX.asDouble(), srcUnits).as(dstUnits) : posX.asDouble());
+    val[1] = (srcUnits != dstUnits ? MDistance(posY.asDouble(), srcUnits).as(dstUnits) : posY.asDouble());
+    val[2] = (srcUnits != dstUnits ? MDistance(posZ.asDouble(), srcUnits).as(dstUnits) : posZ.asDouble());
+    val[3] = (srcUnits != dstUnits ? MDistance(scaleX.asDouble(), srcUnits).as(dstUnits) : scaleX.asDouble());
+    val[4] = (srcUnits != dstUnits ? MDistance(scaleY.asDouble(), srcUnits).as(dstUnits) : scaleY.asDouble());
+    val[5] = (srcUnits != dstUnits ? MDistance(scaleZ.asDouble(), srcUnits).as(dstUnits) : scaleZ.asDouble());
     mSp.set(val);
 
     Alembic::Abc::OCompoundProperty arbGeom;
@@ -129,7 +135,7 @@ void MayaLocatorWriter::write()
         MGlobal::displayError(
             "Failed to initialize MFnDagNode object for locator" );
     }
-
+    
     double val[6];
     val[0] = fnLocator.findPlug("localPositionX").asDouble();
     val[1] = fnLocator.findPlug("localPositionY").asDouble();
@@ -137,6 +143,17 @@ void MayaLocatorWriter::write()
     val[3] = fnLocator.findPlug("localScaleX").asDouble();
     val[4] = fnLocator.findPlug("localScaleY").asDouble();
     val[5] = fnLocator.findPlug("localScaleZ").asDouble();
+    
+    MDistance::Unit srcUnits = MDistance::kCentimeters;
+    MDistance::Unit dstUnits = MDistance::uiUnit();
+    
+    if (srcUnits != dstUnits)
+    {
+        for (int i=0; i<6; ++i)
+        {
+            val[i] = MDistance(val[i], srcUnits).as(dstUnits);
+        }
+    }
 
     mSp.set(val);
 }
