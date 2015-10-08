@@ -49,6 +49,7 @@
 #include <maya/MFnDoubleArrayData.h>
 #include <maya/MFnGenericAttribute.h>
 #include <maya/MPlug.h>
+#include <maya/MDistance.h>
 
 MStatus readCurves(double iFrame, const Alembic::AbcGeom::ICurves & iNode,
     std::size_t iExpectedCurves, std::vector<MObject> & ioCurveObjects)
@@ -92,6 +93,12 @@ MStatus readCurves(double iFrame, const Alembic::AbcGeom::ICurves & iNode,
         interp = false;
     }
 
+    float scl = 1.0f;
+    if (MDistance::uiUnit() != MDistance::kCentimeters)
+    {
+        scl = MDistance(1.0, MDistance::uiUnit()).as(MDistance::kCentimeters);
+    }
+
     std::size_t curVert = 0;
     std::size_t curKnot = 0;
     for (std::size_t i = 0; i < iExpectedCurves && i < numCurves; ++i)
@@ -118,13 +125,13 @@ MStatus readCurves(double iFrame, const Alembic::AbcGeom::ICurves & iNode,
             if (interp)
             {
                 Alembic::Abc::V3f ceilPos = (*ceilPoints)[curVert];
-                cvs.append(simpleLerp<float>(alpha, pos.x, ceilPos.x),
-                    simpleLerp<float>(alpha, pos.y, ceilPos.y),
-                    simpleLerp<float>(alpha, pos.z, ceilPos.z));
+                cvs.append(scl * simpleLerp<float>(alpha, pos.x, ceilPos.x),
+                    scl * simpleLerp<float>(alpha, pos.y, ceilPos.y),
+                    scl * simpleLerp<float>(alpha, pos.z, ceilPos.z));
             }
             else
             {
-                cvs.append(pos.x, pos.y, pos.z);
+                cvs.append(scl * pos.x, scl * pos.y, scl * pos.z);
             }
         }
 
@@ -275,6 +282,12 @@ MObject createCurves(const std::string & iName,
         }
     }
 
+    float scl = 1.0f;
+    if (MDistance::uiUnit() != MDistance::kCentimeters)
+    {
+        scl = MDistance(1.0, MDistance::uiUnit()).as(MDistance::kCentimeters);
+    }
+
     std::size_t curVert = 0;
     std::size_t curKnot = 0;
     for (std::size_t i = 0; i < numCurves; ++i)
@@ -298,7 +311,7 @@ MObject createCurves(const std::string & iName,
         for (j = 0; j < numVerts; ++j, ++curVert)
         {
             Alembic::Abc::V3f pos = (*positions)[curVert];
-            cvs.append(pos.x, pos.y, pos.z);
+            cvs.append(scl * pos.x, scl * pos.y, scl * pos.z);
         }
 
         MFnNurbsCurve::Form form = MFnNurbsCurve::kOpen;

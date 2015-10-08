@@ -53,6 +53,7 @@
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MGlobal.h>
 #include <maya/MVector.h>
+#include <maya/MDistance.h>
 
 
 namespace
@@ -219,12 +220,18 @@ namespace
         unsigned int numPoints = static_cast<unsigned int>(iPoints->size());
         oPointArray.setLength(numPoints);
 
+        float scl = 1.0f;
+        if (MDistance::uiUnit() != MDistance::kCentimeters)
+        {
+            scl = MDistance(1.0, MDistance::uiUnit()).as(MDistance::kCentimeters);
+        }
+
         if (alpha == 0 || iCeilPoints == NULL)
         {
             for (unsigned int i = 0; i < numPoints; ++i)
             {
                 oPointArray.set(i,
-                    (*iPoints)[i].x, (*iPoints)[i].y, (*iPoints)[i].z);
+                    scl * (*iPoints)[i].x, scl * (*iPoints)[i].y, scl * (*iPoints)[i].z);
             }
         }
         else
@@ -232,11 +239,11 @@ namespace
             for (unsigned int i = 0; i < numPoints; ++i)
             {
                 oPointArray.set(i,
-                    simpleLerp<float>(alpha,
+                    scl * simpleLerp<float>(alpha,
                         (*iPoints)[i].x, (*iCeilPoints)[i].x),
-                    simpleLerp<float>(alpha,
+                    scl * simpleLerp<float>(alpha,
                         (*iPoints)[i].y, (*iCeilPoints)[i].y),
-                    simpleLerp<float>(alpha,
+                    scl * simpleLerp<float>(alpha,
                         (*iPoints)[i].z, (*iCeilPoints)[i].z));
             }
         }

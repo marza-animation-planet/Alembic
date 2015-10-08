@@ -50,6 +50,7 @@
 #include <maya/MFnTransform.h>
 #include <maya/MCommandResult.h>
 #include <maya/MDagModifier.h>
+#include <maya/MDistance.h>
 
 namespace
 {
@@ -292,6 +293,12 @@ MObject readNurbs(double iFrame, Alembic::AbcGeom::INuPatch & iNode,
     unsigned int numCV = numCVInU*numCVInV;
     unsigned int curPos = 0;
 
+    float scl = 1.0f;
+    if (MDistance::uiUnit() != MDistance::kCentimeters)
+    {
+        scl = MDistance(1.0, MDistance::uiUnit()).as(MDistance::kCentimeters);
+    }
+
     MPointArray controlVertices;
     controlVertices.setLength(numCV);
 
@@ -300,7 +307,7 @@ MObject readNurbs(double iFrame, Alembic::AbcGeom::INuPatch & iNode,
         for (unsigned int u = 0; u < numCVInU; ++u, ++curPos)
         {
             unsigned int mayaIndex = u * numCVInV + (numCVInV - v - 1);
-            MPoint pt((*pos)[curPos].x, (*pos)[curPos].y, (*pos)[curPos].z);
+            MPoint pt(scl * (*pos)[curPos].x, scl * (*pos)[curPos].y, scl * (*pos)[curPos].z);
 
             if (weights)
             {

@@ -48,6 +48,7 @@
 #include <maya/MFnParticleSystem.h>
 #include <maya/MDagModifier.h>
 #include <maya/MFnArrayAttrsData.h>
+#include <maya/MDistance.h>
 
 
 double getWeightIndexAndTime(double iFrame,
@@ -716,6 +717,12 @@ MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & i
     outVel.setLength(pSize);
     outId.setLength(pSize);
     
+    float scl = 1.0f;
+    if (MDistance::uiUnit() != MDistance::kCentimeters)
+    {
+        scl = MDistance(1.0, MDistance::uiUnit()).as(MDistance::kCentimeters);
+    }
+
     if (blend > 0.0)
     {
         schema.get(ceilSamp, ceilSampSel);
@@ -736,13 +743,13 @@ MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & i
         
         for (unsigned int pId = 0; pId < pSize; pId++)
         {
-            MVector p0((*inFloorPos)[pId].x,
-                       (*inFloorPos)[pId].y,
-                       (*inFloorPos)[pId].z);
+            MVector p0(scl * (*inFloorPos)[pId].x,
+                       scl * (*inFloorPos)[pId].y,
+                       scl * (*inFloorPos)[pId].z);
             
-            MVector v0((*inFloorVel)[pId].x,
-                       (*inFloorVel)[pId].y,
-                       (*inFloorVel)[pId].z);
+            MVector v0(scl * (*inFloorVel)[pId].x,
+                       scl * (*inFloorVel)[pId].y,
+                       scl * (*inFloorVel)[pId].z);
             
             outId[pId] = (*inFloorId)[pId];
             
@@ -755,13 +762,13 @@ MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & i
             }
             else
             {
-                MVector p1((*inCeilPos)[idit->second].x,
-                           (*inCeilPos)[idit->second].y,
-                           (*inCeilPos)[idit->second].z);
+                MVector p1(scl * (*inCeilPos)[idit->second].x,
+                           scl * (*inCeilPos)[idit->second].y,
+                           scl * (*inCeilPos)[idit->second].z);
                 
-                MVector v1((*inCeilVel)[idit->second].x,
-                           (*inCeilVel)[idit->second].y,
-                           (*inCeilVel)[idit->second].z);
+                MVector v1(scl * (*inCeilVel)[idit->second].x,
+                           scl * (*inCeilVel)[idit->second].y,
+                           scl * (*inCeilVel)[idit->second].z);
                 
                 outPos[pId] = (1.0 - blend) * p0 + blend * p1;
                 outVel[pId] = (1.0 - blend) * v0 + blend * v1;
@@ -774,13 +781,13 @@ MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & i
     {
         for (unsigned int pId = 0; pId < pSize; pId++)
         {
-            outPos[pId] = MVector((*inFloorPos)[pId].x,
-                                  (*inFloorPos)[pId].y,
-                                  (*inFloorPos)[pId].z);
+            outPos[pId] = MVector(scl * (*inFloorPos)[pId].x,
+                                  scl * (*inFloorPos)[pId].y,
+                                  scl * (*inFloorPos)[pId].z);
             
-            outVel[pId] = MVector((*inFloorVel)[pId].x,
-                                  (*inFloorVel)[pId].y,
-                                  (*inFloorVel)[pId].z);
+            outVel[pId] = MVector(scl * (*inFloorVel)[pId].x,
+                                  scl * (*inFloorVel)[pId].y,
+                                  scl * (*inFloorVel)[pId].z);
             
             outId[pId] = (*inFloorId)[pId];
         }
@@ -840,15 +847,21 @@ MStatus create(double iFrame, const Alembic::AbcGeom::IPoints & iNode,
         Alembic::Abc::V3fArraySamplePtr velPtr = samp.getVelocities();
         Alembic::Abc::UInt64ArraySamplePtr idPtr = samp.getIds();
 
+        float scl = 1.0f;
+        if (MDistance::uiUnit() != MDistance::kCentimeters)
+        {
+            scl = MDistance(1.0, MDistance::uiUnit()).as(MDistance::kCentimeters);
+        }
+
         for (unsigned int pId = 0; pId < pSize; pId++)
         {
-            pArray.append((*posPtr)[pId].x,
-                          (*posPtr)[pId].y,
-                          (*posPtr)[pId].z);
+            pArray.append(scl * (*posPtr)[pId].x,
+                          scl * (*posPtr)[pId].y,
+                          scl * (*posPtr)[pId].z);
             
-            vArray.append(MVector((*velPtr)[pId].x,
-                                  (*velPtr)[pId].y,
-                                  (*velPtr)[pId].z));
+            vArray.append(MVector(scl * (*velPtr)[pId].x,
+                                  scl * (*velPtr)[pId].y,
+                                  scl * (*velPtr)[pId].z));
             
             iArray.append((*idPtr)[pId]);
         }
