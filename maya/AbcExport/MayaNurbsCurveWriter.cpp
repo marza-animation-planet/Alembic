@@ -37,6 +37,7 @@
 #include "MayaNurbsCurveWriter.h"
 #include "MayaUtility.h"
 #include "MayaTransformWriter.h"
+#include <maya/MDistance.h>
 
 namespace
 {
@@ -180,7 +181,7 @@ void MayaNurbsCurveWriter::write()
 
     MMatrix transformMatrix;
     bool useConstWidth = false;
-
+    
     MFnDependencyNode dep(mRootDagPath.transform());
     MPlug constWidthPlug = dep.findPlug("width");
 
@@ -251,6 +252,12 @@ void MayaNurbsCurveWriter::write()
         MPointArray cvArray;
         stat = curve.getCVs(cvArray, MSpace::kObject);
 
+        float scl = 1.0f;
+        if (MDistance::uiUnit() != MDistance::kCentimeters)
+        {
+            scl = MDistance(1.0, MDistance::kCentimeters).as(MDistance::uiUnit());
+        }
+
         mCVCount += numCVs;
         nVertices[i] = numCVs;
 
@@ -266,9 +273,9 @@ void MayaNurbsCurveWriter::write()
                 transformdPt = cvArray[j];
             }
 
-            points.push_back(static_cast<float>(transformdPt.x));
-            points.push_back(static_cast<float>(transformdPt.y));
-            points.push_back(static_cast<float>(transformdPt.z));
+            points.push_back(static_cast<float>(scl * transformdPt.x));
+            points.push_back(static_cast<float>(scl * transformdPt.y));
+            points.push_back(static_cast<float>(scl * transformdPt.z));
         }
 
         MDoubleArray knotsArray;

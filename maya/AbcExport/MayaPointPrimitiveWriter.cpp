@@ -38,6 +38,7 @@
 #include "MayaUtility.h"
 #include <maya/MMatrix.h>
 #include <maya/MPoint.h>
+#include <maya/MDistance.h>
 
 MayaPointPrimitiveWriter::MayaPointPrimitiveWriter(
     double iFrame, MDagPath & iDag, Alembic::AbcGeom::OObject & iParent,
@@ -111,6 +112,12 @@ void MayaPointPrimitiveWriter::write(double iFrame)
     particleIds.reserve(size);
     width.reserve(size);
 
+    float scl = 1.0f;
+    if (MDistance::uiUnit() != MDistance::kCentimeters)
+    {
+        scl = MDistance(1.0f, MDistance::kCentimeters).as(MDistance::uiUnit());
+    }
+
     // get particle position
     MMatrix invWorld = mDagPath.inclusiveMatrix().inverse();
     MVectorArray posArray;
@@ -119,9 +126,9 @@ void MayaPointPrimitiveWriter::write(double iFrame)
     {
         // positions returned by MFnParticleSystem::position are in world space
         MPoint pt = MPoint(posArray[i]) * invWorld;
-        position.push_back(static_cast<float>(pt.x));
-        position.push_back(static_cast<float>(pt.y));
-        position.push_back(static_cast<float>(pt.z));
+        position.push_back(static_cast<float>(scl * pt.x));
+        position.push_back(static_cast<float>(scl * pt.y));
+        position.push_back(static_cast<float>(scl * pt.z));
     }
     samp.setPositions(
         Alembic::Abc::V3fArraySample((const Imath::V3f *) &position.front(),
@@ -133,9 +140,9 @@ void MayaPointPrimitiveWriter::write(double iFrame)
     for (unsigned int i = 0; i < size; i++)
     {
         MVector vec = vecArray[i];
-        velocity.push_back(static_cast<float>(vec.x));
-        velocity.push_back(static_cast<float>(vec.y));
-        velocity.push_back(static_cast<float>(vec.z));
+        velocity.push_back(static_cast<float>(scl * vec.x));
+        velocity.push_back(static_cast<float>(scl * vec.y));
+        velocity.push_back(static_cast<float>(scl * vec.z));
     }
     if (!velocity.empty())
     {

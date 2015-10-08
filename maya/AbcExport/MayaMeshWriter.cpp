@@ -39,6 +39,7 @@
 
 #include <maya/MItSelectionList.h>
 #include <maya/MFnSingleIndexedComponent.h>
+#include <maya/MDistance.h>
 
 namespace {
 
@@ -1085,13 +1086,19 @@ void MayaMeshWriter::fillTopology(
 
     oPoints.resize(pts.length() * 3);
 
+    float scl = 1.0f;
+    if (MDistance::uiUnit() != MDistance::kCentimeters)
+    {
+        scl = MDistance(1.0, MDistance::kCentimeters).as(MDistance::uiUnit());
+    }
+    
     // repack the float
     for (i = 0; i < pts.length(); i++)
     {
         size_t local = i * 3;
-        oPoints[local] = pts[i].x;
-        oPoints[local+1] = pts[i].y;
-        oPoints[local+2] = pts[i].z;
+        oPoints[local] = scl * pts[i].x;
+        oPoints[local+1] = scl * pts[i].y;
+        oPoints[local+2] = scl * pts[i].z;
     }
 
     /*

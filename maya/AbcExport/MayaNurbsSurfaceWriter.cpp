@@ -36,6 +36,7 @@
 
 #include "MayaNurbsSurfaceWriter.h"
 #include "MayaUtility.h"
+#include <maya/MDistance.h>
 
 MayaNurbsSurfaceWriter::MayaNurbsSurfaceWriter(MDagPath & iDag,
     Alembic::Abc::OObject & iParent, Alembic::Util::uint32_t iTimeIndex,
@@ -183,6 +184,12 @@ void MayaNurbsSurfaceWriter::write()
     std::vector<float> sampPosWeights;
     sampPosWeights.reserve(numCVs);
     bool weightsOne = true;
+    
+    float scl = 1.0f;
+    if (MDistance::uiUnit() != MDistance::kCentimeters)
+    {
+        scl = MDistance(1.0, MDistance::kCentimeters).as(MDistance::uiUnit());
+    }
 
     // Maya stores the data where v varies the fastest (v,u order)
     // so we need to pack the data differently u,v order
@@ -193,9 +200,9 @@ void MayaNurbsSurfaceWriter::write()
         {
             int index = u * numCVsInV + v;
             sampPos.push_back(Alembic::Abc::V3f(
-                static_cast<float>(cvArray[index].x),
-                static_cast<float>(cvArray[index].y),
-                static_cast<float>(cvArray[index].z) ));
+                static_cast<float>(scl * cvArray[index].x),
+                static_cast<float>(scl * cvArray[index].y),
+                static_cast<float>(scl * cvArray[index].z) ));
 
             if (cvArray[index].w != 1.0)
             {
