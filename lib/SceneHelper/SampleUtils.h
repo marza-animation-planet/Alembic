@@ -52,9 +52,9 @@ public:
    {
    }
    
-   PntSamplePtr getPositions() const { return (m_rawScaledPositions ? m_scaledPositions : m_positions); }
-   VecSamplePtr getVelocities() const { return (m_rawScaledVelocities ? m_scaledVelocities : m_velocities); }
-   Alembic::Abc::Box3d getSelfBounds() const { return (m_rawScaledPositions ? m_scaledBounds : m_selfBounds); }
+   PntSamplePtr getPositions() const { return (m_rawScaledPositions ? m_scaledPositions : BaseSample::getPositions()); }
+   VecSamplePtr getVelocities() const { return (m_rawScaledVelocities ? m_scaledVelocities : BaseSample::getVelocities()); }
+   Alembic::Abc::Box3d getSelfBounds() const { return (m_rawScaledPositions ? m_scaledBounds : BaseSample::getSelfBounds()); }
    
    void reset()
    {
@@ -75,9 +75,13 @@ public:
    {
       m_scale = scl;
 
-      if (valid() && fabs(1.0f - m_scale) > 0.000001f)
+      if (BaseSample::valid() && fabs(1.0f - m_scale) > 0.000001f)
       {
-         size_t count = m_positions->size();
+         PntSamplePtr positions = BaseSample::getPositions();
+         VecSamplePtr velocities = BaseSample::getVelocities();
+         Alembic::Abc::Box3d bounds = BaseSample::getSelfBounds();
+         
+         size_t count = positions->size();
 
          if (!m_scaledPositions)
          {
@@ -87,19 +91,19 @@ public:
 
          for (size_t i=0; i<count; ++i)
          {
-            m_rawScaledPositions[i] = scl * (*m_positions)[i];
+            m_rawScaledPositions[i] = scl * (*positions)[i];
          }
 
-         m_scaledBounds = Alembic::Abc::Box3d(double(scl) * m_selfBounds.min, double(scl) * m_selfBounds.max);
+         m_scaledBounds = Alembic::Abc::Box3d(double(scl) * bounds.min, double(scl) * bounds.max);
 
-         if (!m_velocities)
+         if (!velocities)
          {
             m_scaledVelocities.reset();
             m_rawScaledVelocities = 0;
          }
          else
          {
-            count = m_velocities->size();
+            count = velocities->size();
 
             if (!m_rawScaledVelocities)
             {
@@ -109,7 +113,7 @@ public:
 
             for (size_t i=0; i<count; ++i)
             {
-               m_rawScaledVelocities[i] = scl * (*m_velocities)[i];
+               m_rawScaledVelocities[i] = scl * (*velocities)[i];
             }
          }
          
@@ -322,7 +326,7 @@ template <> struct SampleOverride<Alembic::AbcGeom::IXformSchema>
 template <class Traits>
 struct SampleOverride<Alembic::AbcGeom::ITypedScalarProperty<Traits> >
 {
-   typedef typename ScaledScalarSample<Traits> Sample;
+   typedef ScaledScalarSample<Traits> Sample;
    typedef typename Alembic::Util::shared_ptr<Sample> SamplePtr;
 };
 
