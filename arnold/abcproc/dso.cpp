@@ -54,6 +54,8 @@ void Dso::CommonParameters::reset()
    verbose = false;
    
    outputReference = false;
+
+   scale = 1.0f;
 }
 
 std::string Dso::CommonParameters::dataString(const char *targetShape) const
@@ -110,6 +112,7 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    oss << " -speed " << speed;
    oss << " -offset " << offset;
    oss << " -fps " << fps;
+   oss << " -scale " << scale;
    if (preserveStartFrame)
    {
       oss << " -preservestartframe";
@@ -200,6 +203,7 @@ std::string Dso::CommonParameters::shapeKey() const
    oss << " -speed " << speed;
    oss << " -offset " << offset;
    oss << " -fps " << fps;
+   oss << " -scale " << scale;
    if (preserveStartFrame)
    {
       oss << " -preservestartframe";
@@ -1379,6 +1383,15 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
    {
       mCommonParams.verbose = true;
    }
+   else if (args[i] == "-scale")
+   {
+      ++i;
+      if (i >= args.size() ||
+          sscanf(args[i].c_str(), "%f", &(mCommonParams.scale)) != 1)
+      {
+         return false;
+      }
+   }
    // Process multi params
    else if (args[i] == "-overrideattribs")
    {
@@ -2165,6 +2178,17 @@ void Dso::readFromUserParams()
          else
          {
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an integer value", pname);
+         }
+      }
+      else if (param == "scale")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
+         {
+            mCommonParams.scale = AiNodeGetFlt(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
          }
       }
    }

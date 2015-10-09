@@ -164,6 +164,11 @@ public:
    {
       return mExpandedTimeSamples;
    }
+
+   inline float scale() const
+   {
+      return mCommonParams.scale;
+   }
    
    double computeTime(double frame) const;
    
@@ -362,6 +367,8 @@ private:
       bool verbose;
       
       bool outputReference;
+
+      float scale;
       
       void reset();
       std::string dataString(const char *targetShape) const;

@@ -375,12 +375,12 @@ public:
    
    template <class ISampledObject>
    bool sample(ISampledObject &target,
-               double t0, double t1,
+               double t0, double t1, float scale,
                TimeSampleList<ISampledObject> &samples,
                bool mergeSamples,
                bool *resampled=0)
    {
-      bool upd = samples.update(target, t0, t1, mergeSamples);
+      bool upd = samples.update(target, t0, t1, scale, mergeSamples);
       
       if (resampled)
       {
@@ -390,7 +390,7 @@ public:
       return samples.validRange(t0, t1);
    }
    
-   bool sampleBounds(double t0, double t1, bool mergeSamples, bool *resampled=0)
+   bool sampleBounds(double t0, double t1, float scale, bool mergeSamples, bool *resampled=0)
    {
       if (type() == AlembicNode::TypeXform)
       {
@@ -400,7 +400,7 @@ public:
             
             if (locatorProp.valid())
             {
-               return sample(locatorProp, t0, t1, mSamples.locatorSamples, mergeSamples, resampled);
+               return sample(locatorProp, t0, t1, scale, mSamples.locatorSamples, mergeSamples, resampled);
             }
             else
             {
@@ -409,7 +409,7 @@ public:
          }
          else
          {
-            return sampleSchema(t0, t1, mergeSamples, resampled);
+            return sampleSchema(t0, t1, scale, mergeSamples, resampled);
          }
       }
       else
@@ -418,7 +418,7 @@ public:
          
          if (boundsProp.valid())
          {
-            return sample(boundsProp, t0, t1, mSamples.boundsSamples, mergeSamples, resampled);
+            return sample(boundsProp, t0, t1, scale, mSamples.boundsSamples, mergeSamples, resampled);
          }
          else
          {
@@ -427,9 +427,9 @@ public:
       }
    }
    
-   bool sampleSchema(double t0, double t1, bool mergeSamples, bool *resampled=0)
+   bool sampleSchema(double t0, double t1, float scale, bool mergeSamples, bool *resampled=0)
    {
-      return sample(mITypedObj.getSchema(), t0, t1, mSamples.schemaSamples, mergeSamples, resampled);
+      return sample(mITypedObj.getSchema(), t0, t1, scale, mSamples.schemaSamples, mergeSamples, resampled);
    }
    
    virtual void reset()

@@ -203,7 +203,7 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
             AiMsgInfo("[abcproc] Sample bounds \"%s\" at t=%lf", node.path().c_str(), t);
          }
          
-         node.sampleBounds(t, t, (i > 0 || instance != 0));
+         node.sampleBounds(t, t, mDso->scale(), (i > 0 || instance != 0));
       }
       
       if (boundsSamples.size() == 0)
@@ -733,24 +733,27 @@ AtNode* MakeShape::generateVolumeBox(Schema &schema)
    {
       double t = mDso->motionSampleTime(i);
       
-      if (boundsSamples.update(boundsProp, t, t, i>0))
+      if (boundsSamples.update(boundsProp, t, t, mDso->scale(), i>0))
       {
          double b = 0.0;
-         
+
          if (boundsSamples.getSamples(t, b0, b1, b))
          {
+            Alembic::Abc::Box3d d0 = b0->data();
+
             if (b > 0.0)
             {
+               Alembic::Abc::Box3d d1 = b1->data();
                double a = 1.0 - b;
                
-               Alembic::Abc::V3d bmin = a * b0->data().min + b * b1->data().min;
-               Alembic::Abc::V3d bmax = a * b0->data().max + b * b1->data().max;
+               Alembic::Abc::V3d bmin = a * d0.min + b * d1.min;
+               Alembic::Abc::V3d bmax = a * d0.max + b * d1.max;
                
                box.extendBy(Alembic::Abc::Box3d(bmin, bmax));
             }
             else
             {
-               box.extendBy(b0->data());
+               box.extendBy(d0);
             }
          }
       }
@@ -796,7 +799,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
    
    if (info.varyingTopology)
    {
-      node.sampleSchema(mDso->renderTime(), mDso->renderTime(), false);
+      node.sampleSchema(mDso->renderTime(), mDso->renderTime(), mDso->scale(), false);
    }
    else
    {
@@ -809,7 +812,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
             AiMsgInfo("[abcproc] Sample mesh \"%s\" at t=%lf", node.path().c_str(), t);
          }
       
-         node.sampleSchema(t, t, i > 0);
+         node.sampleSchema(t, t, mDso->scale(), i > 0);
       }
    }
    
@@ -1323,7 +1326,7 @@ bool MakeShape::computeMeshTangentSpace(AlembicNodeT<Alembic::Abc::ISchemaObject
    typename TimeSampleList<MeshSchema>::ConstIterator samp0, samp1;
    double blend = 0.0;
    
-   if (!node.sampleSchema(mDso->renderTime(), mDso->renderTime(), true))
+   if (!node.sampleSchema(mDso->renderTime(), mDso->renderTime(), mDso->scale(), true))
    {
       return false;
    }
@@ -1492,7 +1495,7 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
          AiMsgInfo("[abcproc] Sample \"%s\" uvs", uvit->first.length() > 0 ? uvit->first.c_str() : "uv");
       }
       
-      if (sampler.update(uvit->second, mDso->renderTime(), mDso->renderTime(), true))
+      if (sampler.update(uvit->second, mDso->renderTime(), mDso->renderTime(), mDso->scale(), true))
       {
          double blend = 0.0;
          AtPoint2 pnt2;

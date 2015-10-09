@@ -329,7 +329,7 @@ bool ReadScalarProperty(ScalarProperty prop, UserAttribute &ua, double t, bool i
    DstT *output = 0;
    double blend = 0.0;
    
-   if (!sampler.update(prop, t, t, false))
+   if (!sampler.update(prop, t, t, 1.0f, false))
    {
       return false;
    }
@@ -347,11 +347,13 @@ bool ReadScalarProperty(ScalarProperty prop, UserAttribute &ua, double t, bool i
    
    output = (DstT*) ua.data;
    
-   vals0 = GetPODPtr(samp0->data());
+   typename ScalarProperty::value_type val0 = samp0->data();
+   vals0 = GetPODPtr(val0);
    
    if (blend > 0.0 && interpolate)
    {
-      vals1 = GetPODPtr(samp1->data());
+      typename ScalarProperty::value_type val1 = samp1->data();
+      vals1 = GetPODPtr(val1);
       
       double a = 1.0 - blend;
       double b = blend;
@@ -381,7 +383,7 @@ bool ReadArrayProperty(ArrayProperty prop, UserAttribute &ua, double t, bool int
    DstT *output = 0;
    double blend = 0.0;
    
-   if (!sampler.update(prop, t, t, false))
+   if (!sampler.update(prop, t, t, 1.0f, false))
    {
       return false;
    }
@@ -456,7 +458,7 @@ bool ReadGeomParam(GeomParam param, UserAttribute &ua, double t, bool interpolat
    DstT *output = 0;
    double blend = 0.0;
    
-   if (!sampler.update(param, t, t, false))
+   if (!sampler.update(param, t, t, 1.0f, false))
    {
       return false;
    }

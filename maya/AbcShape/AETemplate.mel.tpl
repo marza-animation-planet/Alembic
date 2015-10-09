@@ -144,6 +144,7 @@ global proc AE<<NodeName>>Template(string $nodeName)
    editorTemplate -label "Ignore Transforms" -addControl "ignoreXforms";
    editorTemplate -label "Ignore Instances" -addControl "ignoreInstances";
    editorTemplate -label "Ignore Visibility" -addControl "ignoreVisibility";
+   editorTemplate -label "Length Scale" -addControl "lengthScale";
    editorTemplate -endNoOptimize;
    editorTemplate -addSeparator;
    editorTemplate -beginNoOptimize;

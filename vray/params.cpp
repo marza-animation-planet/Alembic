@@ -426,6 +426,7 @@ AlembicLoaderParams::Cache::Cache()
    , psizeMax(1e+30f)
    , time(0.0f)
    , useReferenceObject(0)
+   , scale(1.0f)
 {
 }
 
@@ -512,6 +513,8 @@ void AlembicLoaderParams::Cache::setupCache(VR::VRayParameterList *paramList)
    paramList->setParamCache("time", &time);
    
    paramList->setParamCache("useReferenceObject", &useReferenceObject);
+
+   paramList->setParamCache("scale", &scale);
 }
 
 AlembicLoaderParams::AlembicLoaderParams()
@@ -534,6 +537,7 @@ AlembicLoaderParams::AlembicLoaderParams()
    addParamBool("ignoreInstances", false, -1, "Ignore object instances");
    addParamBool("ignoreDeformBlur", false, -1, "Ignore deformation blur");
    addParamBool("ignoreTransformBlur", false, -1, "Ignore transformation blur");
+   addParamFloat("scale", 1.0f, -1, "Scale factor");
    addParamBool("verbose", false, -1, "Verbose ouput");
   
    // Should have attributes to control how much of the remaining attributes are transfered to generated

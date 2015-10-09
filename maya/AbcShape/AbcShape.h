@@ -99,6 +99,7 @@ public:
     static MObject aOutBoxMax;
     static MObject aAnimated;
     static MObject aUvSetCount;
+    static MObject aScale;
     
 #ifdef ABCSHAPE_VRAY_SUPPORT
     // V-Ray specific attributes
@@ -249,6 +250,7 @@ private:
     MObject aUvSet;
     MObject aUvSetName;
     std::vector<std::string> mUvSetNames;
+    double mScale;
     
 #ifdef ABCSHAPE_VRAY_SUPPORT
     VR::DefStringParam mVRFilename;
@@ -331,6 +333,7 @@ private:
     VR::DefFloatParam mVRPsizeMin;
     VR::DefFloatParam mVRPsizeMax;
     AnimatedFloatParam mVRTime;
+    VR::DefFloatParam mVRScale;
 #endif
 };
 

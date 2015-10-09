@@ -750,6 +750,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
    bool ignoreXforms = FindMayaObjectPlug("ignoreXforms").asBool();
    bool ignoreInstances = FindMayaObjectPlug("ignoreInstances").asBool();
    bool ignoreVisibility = FindMayaObjectPlug("ignoreVisibility").asBool();
+   double scale = FindMayaObjectPlug("lengthScale").asDouble();
    
    MPlug plug = FindMayaPlug("mtoa_constant_abc_relativeSamples");
    
@@ -853,6 +854,8 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          {
             data += " -ignorevisibility";
          }
+
+         data += " -scale " + ToString(scale);
       }
       
       plug = FindMayaObjectPlug("mtoa_constant_abc_outputReference");

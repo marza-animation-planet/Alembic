@@ -21,6 +21,7 @@
 #include <maya/MDGModifier.h>
 #include <maya/MGlobal.h>
 #include <maya/MAnimControl.h>
+#include <maya/MDistance.h>
 
 #ifdef __APPLE__
 #  include <OpenGL/gl.h>
@@ -760,6 +761,7 @@ MObject AbcShape::aOutBoxMin;
 MObject AbcShape::aOutBoxMax;
 MObject AbcShape::aAnimated;
 MObject AbcShape::aUvSetCount;
+MObject AbcShape::aScale;
 #ifdef ABCSHAPE_VRAY_SUPPORT
 MObject AbcShape::aOutApiType;
 MObject AbcShape::aOutApiClassification;
@@ -987,6 +989,14 @@ MStatus AbcShape::initialize()
    nAttr.setHidden(true);
    stat = addAttribute(aUvSetCount);
    MCHECKERROR(stat, "Could not add 'uvSetCount' attribute");
+
+   aScale = nAttr.create("lengthScale", "lscl", MFnNumericData::kDouble, 1.0, &stat);
+   MCHECKERROR(stat, "Could not create 'lengthScale' attribute");
+   nAttr.setWritable(true);
+   nAttr.setStorable(true);
+   nAttr.setInternal(true);
+   stat = addAttribute(aScale);
+   MCHECKERROR(stat, "Could not add 'lengthScale' attribute");
    
 #ifdef ABCSHAPE_VRAY_SUPPORT
    MFnStringData outApiTypeDefault;
@@ -1194,6 +1204,7 @@ MStatus AbcShape::initialize()
    attributeAffects(aOffset, aVRayGeomResult);
    attributeAffects(aPreserveStartFrame, aVRayGeomResult);
    attributeAffects(aCycleType, aVRayGeomResult);
+   attributeAffects(aScale, aVRayGeomResult);
    
    attributeAffects(aVRayAbcVerbose, aVRayGeomResult);
    attributeAffects(aVRayAbcUseReferenceObject, aVRayGeomResult);
@@ -1244,6 +1255,7 @@ MStatus AbcShape::initialize()
    attributeAffects(aIgnoreXforms, aOutBoxMin);
    attributeAffects(aIgnoreInstances, aOutBoxMin);
    attributeAffects(aIgnoreVisibility, aOutBoxMin);
+   attributeAffects(aScale, aOutBoxMin);
    
    attributeAffects(aFilePath, aOutBoxMax);
    attributeAffects(aObjectExpression, aOutBoxMax);
@@ -1258,6 +1270,7 @@ MStatus AbcShape::initialize()
    attributeAffects(aIgnoreXforms, aOutBoxMax);
    attributeAffects(aIgnoreInstances, aOutBoxMax);
    attributeAffects(aIgnoreVisibility, aOutBoxMax);
+   attributeAffects(aScale, aOutBoxMax);
    
    attributeAffects(aFilePath, aUvSetCount);
    attributeAffects(aObjectExpression, aUvSetCount);
@@ -1331,6 +1344,7 @@ AbcShape::AbcShape()
    , mDrawLocators(false)
    , mUpdateLevel(AbcShape::UL_none)
    , mAnimated(false)
+   , mScale(1.0)
 #ifdef ABCSHAPE_VRAY_SUPPORT
    , mVRFilename("filename", "")
    , mVRUseReferenceObject("useReferenceObject", false)
@@ -1408,6 +1422,7 @@ AbcShape::AbcShape()
    , mVRPsizeMin("psize_min", 0.0f)
    , mVRPsizeMax("psize_max", 1e+30f)
    , mVRTime("time")
+   , mVRScale("scale", 1.0f)
 #endif
 {
 }
@@ -1437,6 +1452,11 @@ void AbcShape::postConstructor()
    
    aUvSet = fn.attribute("uvSet");
    aUvSetName = fn.attribute("uvSetName");
+
+   if (MDistance::uiUnit() != MDistance::kCentimeters)
+   {
+      mScale = MDistance(1.0, MDistance::uiUnit()).as(MDistance::kCentimeters);
+   }
 }
 
 bool AbcShape::ignoreCulling() const
@@ -1614,6 +1634,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   mVRPreserveStartFrame.setBool(mPreserveStartFrame, 0, 0.0);
                   mVRCycle.setInt(int(mCycleType), 0, 0.0);
                   mVRFps.setFloat(float(getFPS()), 0, 0.0);
+                  mVRScale.setFloat(float(mScale), 0, 0.0);
                   mVRTime.clear();
                   
                   MPlug pMotionBlur = thisNode.findPlug("motionBlur");
@@ -2144,6 +2165,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   abc->setParameter(&mVRPsizeScale);
                   abc->setParameter(&mVRPsizeMin);
                   abc->setParameter(&mVRPsizeMax);
+                  abc->setParameter(&mVRScale);
                   
                   hOut.setInt(1);
                }
@@ -2206,6 +2228,7 @@ void AbcShape::syncInternals(MDataBlock &block)
    block.inputValue(aIgnoreVisibility).asBool();
    block.inputValue(aDisplayMode).asShort();
    block.inputValue(aPreserveStartFrame).asBool();
+   block.inputValue(aScale).asDouble();
    
    switch (mUpdateLevel)
    {
@@ -2446,8 +2469,8 @@ void AbcShape::updateWorld()
    #ifdef _DEBUG
    std::cout << "[" << PREFIX_NAME("AbcShape") << "] Update world" << std::endl;
    #endif
-   
-   WorldUpdate visitor(mSampleTime, mIgnoreTransforms, mIgnoreInstances, mIgnoreVisibility);
+
+   WorldUpdate visitor(mSampleTime, mIgnoreTransforms, mIgnoreInstances, mIgnoreVisibility, mScale);
    mScene->visit(AlembicNode::VisitDepthFirst, visitor);
    
    // only get number of visible shapes
@@ -2537,7 +2560,7 @@ void AbcShape::updateGeometry()
    std::cout << "[" << PREFIX_NAME("AbcShape") << "] Update geometry" << std::endl;
    #endif
    
-   SampleGeometry visitor(mSampleTime, &mGeometry);
+   SampleGeometry visitor(mSampleTime, &mGeometry, mScale);
    mScene->visit(AlembicNode::VisitDepthFirst, visitor);
 }
 
@@ -2642,6 +2665,11 @@ bool AbcShape::getInternalValueInContext(const MPlug &plug, MDataHandle &handle,
    else if (plug == aDrawLocators)
    {
       handle.setBool(mDrawLocators);
+      return true;
+   }
+   else if (plug == aScale)
+   {
+      handle.setDouble(mScale);
       return true;
    }
    else
@@ -2833,6 +2861,17 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       mDrawLocators = handle.asBool();
       return true;
    }
+   else if (plug == aScale)
+   {
+      mScale = handle.asDouble();
+      
+      if (mScene)
+      {
+         mUpdateLevel = std::max<int>(mUpdateLevel, (mDisplayMode >= DM_points ? UL_geometry : UL_world));
+      }
+
+      return true;
+   }
    else
    {
       return MPxSurfaceShape::setInternalValueInContext(plug, handle, ctx);
@@ -2882,6 +2921,7 @@ void AbcShape::copyInternalData(MPxNode *source)
       mDrawLocators = node->mDrawLocators;
       mAnimated = node->mAnimated;
       mUvSetNames = node->mUvSetNames;
+      mScale = node->mScale;
     
       if (mScene && !AlembicSceneCache::Unref(mScene))
       {

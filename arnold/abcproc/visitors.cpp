@@ -278,7 +278,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicXform &node, AlembicNode 
             AiMsgInfo("[abcproc] Sample xform \"%s\" at t=%lf", node.path().c_str(), t);
          }
          
-         node.sampleBounds(t, t, (i > 0 || instance != 0));
+         node.sampleBounds(t, t, mDso->scale(), (i > 0 || instance != 0));
       }
       
       if (xformSamples.size() == 0)
@@ -422,7 +422,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
          {
             double t = sampleTimes[i];
             
-            wsamples.update(widths, t, t, (i > 0 || instance != 0));
+            wsamples.update(widths, t, t, mDso->scale(), (i > 0 || instance != 0));
          }
          
          for (wsample=wsamples.begin(); wsample!=wsamples.end(); ++wsample)
@@ -494,7 +494,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode
          {
             double t = sampleTimes[i];
             
-            wsamples.update(widths, t, t, (i > 0 || instance != 0));
+            wsamples.update(widths, t, t, mDso->scale(), (i > 0 || instance != 0));
          }
          
          for (wsample=wsamples.begin(); wsample!=wsamples.end(); ++wsample)
@@ -1418,7 +1418,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
          
          if (info.varyingTopology)
          {
-            Nsamples.update(N, mDso->renderTime(), mDso->renderTime(), false);
+            Nsamples.update(N, mDso->renderTime(), mDso->renderTime(), mDso->scale(), false);
          }
          else
          {
@@ -1431,7 +1431,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
                   AiMsgInfo("[abcproc] Sample normals \"%s\" at t=%lf", node.path().c_str(), t);
                }
             
-               Nsamples.update(N, t, t, i>0);
+               Nsamples.update(N, t, t, mDso->scale(), i>0);
             }
          }
          
@@ -2230,11 +2230,11 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
          AiMsgInfo("[abcproc] Sample points \"%s\" at t=%lf", node.path().c_str(), t);
       }
    
-      node.sampleSchema(t, t, i > 0);
+      node.sampleSchema(t, t, mDso->scale(), i > 0);
    }
    
    // renderTime() may not be in the sample list, let's at it just in case
-   node.sampleSchema(mDso->renderTime(), mDso->renderTime(), true);
+   node.sampleSchema(mDso->renderTime(), mDso->renderTime(), mDso->scale(), true);
    
    if (mDso->verbose())
    {
@@ -2571,7 +2571,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
          
          double br = 0.0;
          
-         if (!wsamples.update(widths, mDso->renderTime(), mDso->renderTime(), false))
+         if (!wsamples.update(widths, mDso->renderTime(), mDso->renderTime(), mDso->scale(), false))
          {
             AiMsgWarning("[abcproc] Could not read alembic points \"widths\" property for t = %lf", mDso->renderTime());
             // default to 1?
@@ -3773,16 +3773,16 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
    {
       t = mDso->renderTime();
       
-      node.sampleSchema(t, t, false);
+      node.sampleSchema(t, t, mDso->scale(), false);
       
       if (widths)
       {
-         Wsamples.update(widths, t, t, false);
+         Wsamples.update(widths, t, t, mDso->scale(), false);
       }
       
       if (normals)
       {
-         Nsamples.update(normals, t, t, false);
+         Nsamples.update(normals, t, t, mDso->scale(), false);
       }
    }
    else
@@ -3796,21 +3796,21 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
             AiMsgInfo("[abcproc] Sample curves \"%s\" at t=%lf", node.path().c_str(), t);
          }
       
-         node.sampleSchema(t, t, i > 0);
+         node.sampleSchema(t, t, mDso->scale(), i > 0);
          
          if (widths)
          {
-            Wsamples.update(widths, t, t, i > 0);
+            Wsamples.update(widths, t, t, mDso->scale(), i > 0);
          }
          
          if (normals)
          {
-            Nsamples.update(normals, t, t, i > 0);
+            Nsamples.update(normals, t, t, mDso->scale(), i > 0);
          }
       }
       
       // renderTime() may not be in the sample list, let's at it just in case
-      node.sampleSchema(mDso->renderTime(), mDso->renderTime(), true);
+      node.sampleSchema(mDso->renderTime(), mDso->renderTime(), mDso->scale(), true);
    }
    
    if (mDso->verbose())

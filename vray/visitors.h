@@ -331,7 +331,7 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
       for (size_t i=0; i<ntimes; ++i)
       {
          t = times[i];
-         node.sampleSchema(t, t, i > 0);
+         node.sampleSchema(t, t, mGeoSrc->params()->scale, i > 0);
       }
       
       if (meshSamples.size() == 0)

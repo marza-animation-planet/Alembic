@@ -9,60 +9,397 @@
 #include <map>
 #include <set>
 
+template <class T>
+struct ArrayDeleterT
+{
+   typedef Alembic::AbcCoreAbstract::ArraySample ArraySample;
+
+   void operator()(void* memory) const
+   {
+     ArraySample *arraySample = static_cast<ArraySample*>(memory);
+     if (arraySample)
+     {
+         T *data = reinterpret_cast<T*>(const_cast<void*>(arraySample->getData()));
+         if (data)
+         {
+            delete[] data;
+         }
+         delete arraySample;
+     }
+   }
+};
+
+template <class BaseSample>
+class ScaledPVBSample : public BaseSample
+{
+public:
+   // PVB: (P)ositions, (V)elocities, (B)ounds
+   typedef Alembic::Abc::P3fArraySample PntSample;
+   typedef Alembic::Abc::P3fArraySamplePtr PntSamplePtr;
+
+   typedef Alembic::Abc::V3fArraySample VecSample;
+   typedef Alembic::Abc::V3fArraySamplePtr VecSamplePtr;
+
+   typedef ArrayDeleterT<Alembic::Abc::V3f> Deleter;
+
+   typedef ScaledPVBSample this_type;
+
+   ScaledPVBSample()
+      : BaseSample()
+      , m_rawScaledPositions(0)
+      , m_rawScaledVelocities(0)
+      , m_scale(1.0f)
+   {
+   }
+   
+   PntSamplePtr getPositions() const { return (m_rawScaledPositions ? m_scaledPositions : m_positions); }
+   VecSamplePtr getVelocities() const { return (m_rawScaledVelocities ? m_scaledVelocities : m_velocities); }
+   Alembic::Abc::Box3d getSelfBounds() const { return (m_rawScaledPositions ? m_scaledBounds : m_selfBounds); }
+   
+   void reset()
+   {
+      BaseSample::reset();
+      m_scaledPositions.reset();
+      m_rawScaledPositions = 0;
+      m_scaledVelocities.reset();
+      m_rawScaledVelocities = 0;
+      m_scaledBounds.makeEmpty();
+   }
+
+   float scale() const
+   {
+      return m_scale;
+   }
+
+   void scale(float scl)
+   {
+      m_scale = scl;
+
+      if (valid() && fabs(1.0f - m_scale) > 0.000001f)
+      {
+         size_t count = m_positions->size();
+
+         if (!m_scaledPositions)
+         {
+            m_rawScaledPositions = new Alembic::Abc::V3f[count];
+            m_scaledPositions = PntSamplePtr(new PntSample(m_rawScaledPositions, count), Deleter());
+         }
+
+         for (size_t i=0; i<count; ++i)
+         {
+            m_rawScaledPositions[i] = scl * (*m_positions)[i];
+         }
+
+         m_scaledBounds = Alembic::Abc::Box3d(double(scl) * m_selfBounds.min, double(scl) * m_selfBounds.max);
+
+         if (!m_velocities)
+         {
+            m_scaledVelocities.reset();
+            m_rawScaledVelocities = 0;
+         }
+         else
+         {
+            count = m_velocities->size();
+
+            if (!m_rawScaledVelocities)
+            {
+               m_rawScaledVelocities = new Alembic::Abc::V3f[count];
+               m_scaledVelocities = VecSamplePtr(new VecSample(m_rawScaledVelocities, count), Deleter());
+            }
+
+            for (size_t i=0; i<count; ++i)
+            {
+               m_rawScaledVelocities[i] = scl * (*m_velocities)[i];
+            }
+         }
+         
+         // Note: Keep original positions in order to be able to change scale
+         //       => May want to control that to avoid memory impact
+      }
+      else
+      {
+         m_scaledPositions.reset();
+         m_rawScaledPositions = 0;
+         m_scaledPositions.reset();
+         m_rawScaledVelocities = 0;
+         m_scaledBounds.makeEmpty();
+      }
+   }
+
+protected:
+   PntSamplePtr m_scaledPositions;
+   Alembic::Abc::V3f *m_rawScaledPositions;
+   VecSamplePtr m_scaledVelocities;
+   Alembic::Abc::V3f *m_rawScaledVelocities;
+   Alembic::Abc::Box3d m_scaledBounds;
+   float m_scale;
+};
+
+template <class Traits>
+class ScaledScalarSample
+{
+public:
+   typedef typename Traits::value_type ValueType;
+
+   ScaledScalarSample() {}
+
+   float scale() const { return 1.0f; }
+
+   void scale(float scl) {}
+
+   ValueType& rawValue() { return m_value; }
+
+   operator const ValueType& () const { return m_value; }
+
+protected:
+   ValueType m_value;
+};
+
+template <> class ScaledScalarSample<LocatorTraits>
+{
+public:
+   typedef LocatorTraits::value_type ValueType;
+
+   ScaledScalarSample() : m_scale(1.0f) {}
+
+   float scale() const { return m_scale; }
+   void scale(float scl)
+   {
+      m_scale = scl;
+   }
+
+   ValueType& rawValue() { return m_value; }
+
+   operator ValueType () const
+   {
+      ValueType v = m_value;
+      v.T[0] *= m_scale; v.T[1] *= m_scale; v.T[2] *= m_scale;
+      v.S[0] *= m_scale; v.S[1] *= m_scale; v.S[2] *= m_scale;
+      return v;
+   }
+
+protected:
+   ValueType m_value;
+   float m_scale;
+};
+
+template <> class ScaledScalarSample<Alembic::Abc::Box3dTPTraits>
+{
+public:
+   typedef Alembic::Abc::Box3dTPTraits::value_type ValueType;
+
+   ScaledScalarSample() : m_scale(1.0f) {}
+
+   float scale() const { return m_scale; }
+   void scale(float scl)
+   {
+      m_scale = scl;
+   }
+
+   ValueType& rawValue() { return m_value; }
+
+   operator ValueType () const
+   {
+      return ValueType(double(m_scale) * m_value.min, double(m_scale) * m_value.max);
+   }
+
+protected:
+   ValueType m_value;
+   float m_scale;
+};
+
+// ---
+
+// Adds scaling ability to base sample
+template <class IObject>
+struct SampleOverride
+{
+   typedef typename IObject::Sample BaseSample;
+
+   class Sample : public BaseSample
+   {
+   public:
+      Sample() : BaseSample() {}
+      float scale() const { return 1.0f; }
+      void scale(float) {}
+   };
+
+   typedef typename Alembic::Util::shared_ptr<Sample> SamplePtr;
+};
+
+template <> struct SampleOverride<Alembic::AbcGeom::IPolyMeshSchema>
+{
+   typedef Alembic::AbcGeom::IPolyMeshSchema::Sample BaseSample;
+   typedef ScaledPVBSample<BaseSample> Sample;
+   typedef Alembic::Util::shared_ptr<Sample> SamplePtr;
+};
+
+template <> struct SampleOverride<Alembic::AbcGeom::ISubDSchema>
+{
+   typedef Alembic::AbcGeom::ISubDSchema::Sample BaseSample;
+   typedef ScaledPVBSample<BaseSample> Sample;
+   typedef Alembic::Util::shared_ptr<Sample> SamplePtr;
+};
+
+template <> struct SampleOverride<Alembic::AbcGeom::IPointsSchema>
+{
+   typedef Alembic::AbcGeom::IPointsSchema::Sample BaseSample;
+   typedef ScaledPVBSample<BaseSample> Sample;
+   typedef Alembic::Util::shared_ptr<Sample> SamplePtr;
+};
+
+template <> struct SampleOverride<Alembic::AbcGeom::ICurvesSchema>
+{
+   typedef Alembic::AbcGeom::ICurvesSchema::Sample BaseSample;
+   typedef ScaledPVBSample<BaseSample> Sample;
+   typedef Alembic::Util::shared_ptr<Sample> SamplePtr;
+};
+
+template <> struct SampleOverride<Alembic::AbcGeom::INuPatchSchema>
+{
+   typedef Alembic::AbcGeom::INuPatchSchema::Sample BaseSample;
+   typedef ScaledPVBSample<BaseSample> Sample;
+   typedef Alembic::Util::shared_ptr<Sample> SamplePtr;
+};
+
+template <> struct SampleOverride<Alembic::AbcGeom::IXformSchema>
+{
+   typedef Alembic::AbcGeom::XformSample BaseSample;
+
+   class Sample : public BaseSample
+   {
+   public:
+      Sample()
+         : XformSample()
+         , m_scale(1.0)
+      {
+      }
+
+      float scale() const
+      {
+         return float(m_scale);
+      }
+
+      void scale(float scl)
+      {
+         m_scale = double(scl);
+      }
+
+      // --- Only overrides getters for now
+
+      Alembic::AbcGeom::XformOp getOp(const size_t idx) const
+      {
+         Alembic::AbcGeom::XformOp op = XformSample::getOp(idx);
+         if (op.isTranslateOp())
+         {
+            op.setTranslate(m_scale * op.getTranslate());
+         }
+         return op;
+      }
+
+      Alembic::Abc::V3d getTranslation() const
+      {
+         return m_scale * XformSample::getTranslation();
+      }
+
+      Alembic::Abc::M44d getMatrix() const
+      {
+         Alembic::Abc::M44d m = XformSample::getMatrix();
+         m.x[3][0] *= m_scale;
+         m.x[3][1] *= m_scale;
+         m.x[3][2] *= m_scale;
+         return m;
+      }
+
+   protected:
+      double m_scale;
+      double m_invScale;
+   };
+
+   typedef Alembic::Util::shared_ptr<Sample> SamplePtr;
+};
+
+template <class Traits>
+struct SampleOverride<Alembic::AbcGeom::ITypedScalarProperty<Traits> >
+{
+   typedef typename ScaledScalarSample<Traits> Sample;
+   typedef typename Alembic::Util::shared_ptr<Sample> SamplePtr;
+};
+
+// ITypedArrayProperty?
+// ITypedGeomParam?
+
+// ---
+
 template <class IObject>
 struct SampleUtils
 {
    typedef IObject AlembicType;
-   typedef typename IObject::Sample SampleType;
+   typedef typename SampleOverride<IObject>::Sample SampleType;
    
    static bool IsValid(const SampleType &samp) { return samp.valid(); }
    
    static bool IsConstant(const AlembicType &owner) { return owner.isConstant(); }
    
-   static void Get(const AlembicType &owner, SampleType &out,
+   static void Get(const AlembicType &owner, float scale, SampleType &out,
                    const Alembic::Abc::ISampleSelector &selector = Alembic::Abc::ISampleSelector())
    {
       owner.get(out, selector);
+      out.scale(scale);
    }
-   
+
    static void Reset(SampleType &samp) { samp.reset(); }
+
+   static float GetScale(const SampleType &samp) { return samp.scale(); }
+
+   static void SetScale(SampleType &samp, float scl) { samp.scale(scl); }
 };
 
 template<> struct SampleUtils<Alembic::AbcGeom::IXformSchema>
 {
    typedef Alembic::AbcGeom::IXformSchema AlembicType;
-   typedef Alembic::AbcGeom::IXformSchema::sample_type SampleType;
+   typedef SampleOverride<Alembic::AbcGeom::IXformSchema>::Sample SampleType;
    
    static bool IsValid(const SampleType &samp) { return (samp.getNumOps() > 0); }
    
    static bool IsConstant(const AlembicType &owner) { return owner.isConstant(); }
    
-   static void Get(const AlembicType &owner, SampleType &out,
+   static void Get(const AlembicType &owner, float scale, SampleType &out,
                    const Alembic::Abc::ISampleSelector &selector = Alembic::Abc::ISampleSelector())
    {
       owner.get(out, selector);
+      out.scale(scale);
    }
    
    static void Reset(SampleType &samp) { samp.reset(); }
+
+   static float GetScale(const SampleType &samp) { return samp.scale(); }
+
+   static void SetScale(SampleType &samp, float scl) { samp.scale(scl); }
 };
 
 template <class Traits>
 struct SampleUtils<Alembic::AbcGeom::ITypedScalarProperty<Traits> >
 {
    typedef Alembic::AbcGeom::ITypedScalarProperty<Traits> AlembicType;
-   typedef typename AlembicType::value_type SampleType;
+   typedef typename SampleOverride<AlembicType>::Sample SampleType;
    
    static bool IsValid(const SampleType &) { return true; }
    
    static bool IsConstant(const AlembicType &owner) { return owner.isConstant(); }
    
-   static void Get(const AlembicType &owner, SampleType &out,
+   static void Get(const AlembicType &owner, float scale, SampleType &out,
                    const Alembic::Abc::ISampleSelector &selector = Alembic::Abc::ISampleSelector())
    {
-      owner.get(out, selector);
+      owner.get(out.rawValue(), selector);
+      out.scale(scale);
    }
    
    static void Reset(SampleType &) { }
+
+   static float GetScale(const SampleType &samp) { return samp.scale(); } //return 1.0f; }
+
+   static void SetScale(SampleType &samp, float s) { samp.scale(s); }
 };
 
 template <class Traits>
@@ -75,27 +412,31 @@ struct SampleUtils<Alembic::AbcGeom::ITypedArrayProperty<Traits> >
    
    static bool IsConstant(const AlembicType &owner) { return owner.isConstant(); }
    
-   static void Get(const AlembicType &owner, SampleType &out,
-                  const Alembic::Abc::ISampleSelector &selector = Alembic::Abc::ISampleSelector())
+   static void Get(const AlembicType &owner, float scale, SampleType &out,
+                   const Alembic::Abc::ISampleSelector &selector = Alembic::Abc::ISampleSelector())
    {
       owner.get(out, selector);
    }
    
    static void Reset(SampleType &samp) { samp->reset(); }
+
+   static float GetScale(const SampleType &samp) { return 1.0f; }
+
+   static void SetScale(SampleType &, float) { }
 };
 
 template <class Traits>
 struct SampleUtils<Alembic::AbcGeom::ITypedGeomParam<Traits> >
 {
    typedef Alembic::AbcGeom::ITypedGeomParam<Traits> AlembicType;
-   typedef typename AlembicType::Sample SampleType;
+   typedef typename SampleOverride<AlembicType>::Sample SampleType;
    
    static bool IsValid(const SampleType &samp) { return samp.valid(); }
    
    static bool IsConstant(const AlembicType &owner) { return owner.isConstant(); }
    
-   static void Get(const AlembicType &owner, SampleType &out,
-                  const Alembic::Abc::ISampleSelector &selector = Alembic::Abc::ISampleSelector())
+   static void Get(const AlembicType &owner, float scale, SampleType &out,
+                   const Alembic::Abc::ISampleSelector &selector = Alembic::Abc::ISampleSelector())
    {
       if (owner.getScope() == Alembic::AbcGeom::kFacevaryingScope)
       {
@@ -105,9 +446,14 @@ struct SampleUtils<Alembic::AbcGeom::ITypedGeomParam<Traits> >
       {
          owner.getExpanded(out, selector);
       }
+      out.scale(scale);
    }
    
    static void Reset(SampleType &samp) { samp.reset(); }
+
+   static float GetScale(const SampleType &samp) { return samp.scale(); }
+
+   static void SetScale(SampleType &samp, float scl) { samp.scale(scl); }
 };
 
 // ---
@@ -144,7 +490,7 @@ public:
       mTime = std::numeric_limits<double>::max();
    }
    
-   bool get(const IObject &owner, Alembic::AbcCoreAbstract::index_t i, double *t=0)
+   bool get(const IObject &owner, Alembic::AbcCoreAbstract::index_t i, float scale, double *t=0)
    {
       bool isConstant = SampleUtils<IObject>::IsConstant(owner);
       
@@ -164,7 +510,7 @@ public:
             {
                mIndex = 0;
                mTime = 0.0;
-               SampleUtils<IObject>::Get(owner, mData);
+               SampleUtils<IObject>::Get(owner, scale, mData);
             }
             else
             {
@@ -172,7 +518,7 @@ public:
                {
                   mIndex = i;
                   mTime = (t ? *t : owner.getTimeSampling()->getSampleTime(i));
-                  SampleUtils<IObject>::Get(owner, mData, sampleSelector());
+                  SampleUtils<IObject>::Get(owner, scale, mData, sampleSelector());
                }
                else
                {
@@ -184,7 +530,7 @@ public:
       }
    }
    
-   bool get(const IObject &owner, double t, Alembic::AbcCoreAbstract::index_t *index=0)
+   bool get(const IObject &owner, double t, float scale, Alembic::AbcCoreAbstract::index_t *index=0)
    {
       bool isConstant = SampleUtils<IObject>::IsConstant(owner);
       
@@ -205,7 +551,7 @@ public:
             {
                mIndex = 0;
                mTime = 0.0;
-               SampleUtils<IObject>::Get(owner, mData);
+               SampleUtils<IObject>::Get(owner, scale, mData);
             }
             else
             {
@@ -213,7 +559,7 @@ public:
                {
                   mIndex = *index;
                   mTime = t;
-                  SampleUtils<IObject>::Get(owner, mData, sampleSelector());
+                  SampleUtils<IObject>::Get(owner, scale, mData, sampleSelector());
                }
                else
                {
@@ -228,13 +574,23 @@ public:
                   {
                      mIndex = indexTime.first;
                      mTime = indexTime.second;
-                     SampleUtils<IObject>::Get(owner, mData, sampleSelector());
+                     SampleUtils<IObject>::Get(owner, scale, mData, sampleSelector());
                   }
                }
             }
          }
          return valid();
       }
+   }
+
+   float scale() const
+   {
+      return SampleUtils<IObject>::GetScale(mData);
+   }
+
+   void scale(float scale)
+   {
+      return SampleUtils<IObject>::SetScale(mData, scale);
    }
    
    inline double time() const
@@ -608,7 +964,7 @@ public:
    // Returns true if samples array was modified with respect to given time range
    // Note: samples may have been removed outside of [t0,t1] range if merge is false
    //       still only if samples in [t0,t1] range have changed will true be returned
-   bool update(const IObject &owner, double t0, double t1, bool merge=false)
+   bool update(const IObject &owner, double t0, double t1, float scale, bool merge=false)
    {
       bool modified = false;
       
@@ -658,11 +1014,21 @@ public:
                std::cout << "[TimeSampleList] Read sample " << sampleIndex << std::endl;
                #endif
                
-               indexIt->second->get(owner, sampleIndex);
+               indexIt->second->get(owner, sampleIndex, scale);
                
                modified = true;
             }
-            
+            else if (fabs(scale - indexIt->second->scale()) > 0.000001f)
+            {
+               #ifdef _DEBUG
+               std::cout << "[TimeSampleList] Re-scale sample " << sampleIndex << std::endl;
+               #endif
+
+               indexIt->second->scale(scale);
+
+               modified = true;
+            }
+
             if (!merge)
             {
                usedSamples.insert(indexIt->first);
@@ -679,7 +1045,7 @@ public:
             
             mIndices[sampleIndex] = sampIt;
             
-            sampIt->get(owner, sampleIndex);
+            sampIt->get(owner, sampleIndex, scale);
             
             if (!merge)
             {

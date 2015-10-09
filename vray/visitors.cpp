@@ -793,7 +793,7 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicXform &node, AlembicNode *
       for (size_t i=0; i<sampleCount; ++i)
       {
          double t = sampleTimes[i];
-         node.sampleBounds(t, t, i > 0);
+         node.sampleBounds(t, t, mGeoSrc->params()->scale, i > 0);
       }
       
       if (xformSamples.size() == 0)
@@ -1158,7 +1158,7 @@ bool UpdateGeometry::readMeshNormals(AlembicMesh &node,
       for (size_t i=0; i<ntimes; ++i)
       {
          t = times[i];
-         Nsamples.update(Nparam, t, t, i > 0);
+         Nsamples.update(Nparam, t, t, mGeoSrc->params()->scale, i > 0);
       }
       
       if (Nsamples.size() == 1 || varyingTopology)
@@ -2205,10 +2205,10 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                for (size_t i=0; i<ntimes; ++i)
                {
                   t = times[i];
-                  node.sampleSchema(t, t, i > 0);
+                  node.sampleSchema(t, t, mGeoSrc->params()->scale, i > 0);
                }
                
-               node.sampleSchema(renderTime, renderTime, true);
+               node.sampleSchema(renderTime, renderTime, mGeoSrc->params()->scale, true);
                
                TimeSampleList<Alembic::AbcGeom::IPointsSchema> &samples = node.samples().schemaSamples;
                TimeSampleList<Alembic::AbcGeom::IPointsSchema>::ConstIterator samp0, samp1; // for animated mesh
@@ -2714,7 +2714,7 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
                      
                      double br = 0.0;
                      
-                     wsamples.update(widths, renderTime, renderTime, false);
+                     wsamples.update(widths, renderTime, renderTime, mGeoSrc->params()->scale, false);
                      
                      if (wsamples.getSamples(renderTime, wsamp0, wsamp1, br))
                      {

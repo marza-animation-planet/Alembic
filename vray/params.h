@@ -492,6 +492,8 @@ struct AlembicLoaderParams : VR::VRayParameterListDesc
       float time;
       
       int useReferenceObject;
+
+      float scale;
       
       Cache();
       void setupCache(VR::VRayParameterList *paramList);

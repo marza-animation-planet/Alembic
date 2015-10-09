@@ -15,13 +15,15 @@
 WorldUpdate::WorldUpdate(double t,
                          bool ignoreTransforms,
                          bool ignoreInstances,
-                         bool ignoreVisibility)
+                         bool ignoreVisibility,
+                         float scale)
    : mTime(t)
    , mIgnoreTransforms(ignoreTransforms)
    , mIgnoreInstances(ignoreInstances)
    , mIgnoreVisibility(ignoreVisibility)
    , mNumShapes(0)
    , mNumVisibleShapes(0)
+   , mScale(scale)
 {
 }
 
@@ -34,7 +36,7 @@ AlembicNode::VisitReturn WorldUpdate::enter(AlembicXform &node, AlembicNode *ins
    {
       // sampleBounds utility function will sample locator property
       
-      if (node.sampleBounds(mTime, mTime, false, &updated))
+      if (node.sampleBounds(mTime, mTime, mScale, false, &updated))
       {
          TimeSampleList<ILocatorProperty> &locatorSamples = node.samples().locatorSamples;
          
@@ -45,24 +47,27 @@ AlembicNode::VisitReturn WorldUpdate::enter(AlembicXform &node, AlembicNode *ins
             
             if (locatorSamples.getSamples(mTime, samp0, samp1, blend))
             {
+               Locator L0 = samp0->data();
+
                if (blend > 0.0)
                {
                   Alembic::Abc::V3d v0, v1;
+                  Locator L1 = samp1->data();
                   
-                  v0.setValue(samp0->data().T[0], samp0->data().T[1], samp0->data().T[2]);
-                  v1.setValue(samp1->data().T[0], samp1->data().T[1], samp1->data().T[2]);
+                  v0.setValue(L0.T[0], L0.T[1], L0.T[2]);
+                  v1.setValue(L1.T[0], L1.T[1], L1.T[2]);
                   
                   node.setLocatorPosition((1.0 - blend) * v0 + blend * v1);
                   
-                  v0.setValue(samp0->data().S[0], samp0->data().S[1], samp0->data().S[2]);
-                  v1.setValue(samp1->data().S[0], samp1->data().S[1], samp1->data().S[2]);
+                  v0.setValue(L0.S[0], L0.S[1], L0.S[2]);
+                  v1.setValue(L1.S[0], L1.S[1], L1.S[2]);
                   
                   node.setLocatorScale((1.0 - blend) * v0 + blend * v1);
                }
                else
                {
-                  node.setLocatorPosition(Alembic::Abc::V3d(samp0->data().T[0], samp0->data().T[1], samp0->data().T[2]));
-                  node.setLocatorScale(Alembic::Abc::V3d(samp0->data().S[0], samp0->data().S[1], samp0->data().S[2]));
+                  node.setLocatorPosition(Alembic::Abc::V3d(L0.T[0], L0.T[1], L0.T[2]));
+                  node.setLocatorScale(Alembic::Abc::V3d(L0.S[0], L0.S[1], L0.S[2]));
                }
                
                locatorSamples.lastEvaluationTime = mTime;
@@ -86,7 +91,7 @@ AlembicNode::VisitReturn WorldUpdate::enter(AlembicXform &node, AlembicNode *ins
    {
       if (!mIgnoreTransforms)
       {
-         if (node.sampleBounds(mTime, mTime, false, &updated))
+         if (node.sampleBounds(mTime, mTime, mScale, false, &updated))
          {
             TimeSampleList<Alembic::AbcGeom::IXformSchema> &xformSamples = node.samples().schemaSamples;
             
@@ -461,9 +466,10 @@ void CountShapes::leave(AlembicNode &, AlembicNode *)
 
 // ---
 
-SampleGeometry::SampleGeometry(double t, SceneGeometryData *sceneData)
+SampleGeometry::SampleGeometry(double t, SceneGeometryData *sceneData, float scale)
    : mTime(t)
    , mSceneData(sceneData)
+   , mScale(scale)
 {
 }
 
@@ -488,7 +494,7 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicMesh &node, AlembicNode *)
    bool updated = true;
    bool alreadySampled = hasBeenSampled(node);
    
-   if (!alreadySampled && node.sampleSchema(mTime, mTime, false, &updated))
+   if (!alreadySampled && node.sampleSchema(mTime, mTime, mScale, false, &updated))
    {
       TimeSampleList<Alembic::AbcGeom::IPolyMeshSchema> &samples = node.samples().schemaSamples;
       
@@ -541,7 +547,7 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicSubD &node, AlembicNode *)
    bool updated = true;
    bool alreadySampled = hasBeenSampled(node);
    
-   if (!alreadySampled && node.sampleSchema(mTime, mTime, false, &updated))
+   if (!alreadySampled && node.sampleSchema(mTime, mTime, mScale, false, &updated))
    {
       TimeSampleList<Alembic::AbcGeom::ISubDSchema> &samples = node.samples().schemaSamples;
       
@@ -594,7 +600,7 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicPoints &node, AlembicNode 
    bool updated = true;
    bool alreadySampled = hasBeenSampled(node);
    
-   if (!alreadySampled && node.sampleSchema(mTime, mTime, false, &updated))
+   if (!alreadySampled && node.sampleSchema(mTime, mTime, mScale, false, &updated))
    {
       TimeSampleList<Alembic::AbcGeom::IPointsSchema> &samples = node.samples().schemaSamples;
       
@@ -647,7 +653,7 @@ AlembicNode::VisitReturn SampleGeometry::enter(AlembicCurves &node, AlembicNode 
    bool updated = true;
    bool alreadySampled = hasBeenSampled(node);
    
-   if (!alreadySampled && node.sampleSchema(mTime, mTime, false, &updated))
+   if (!alreadySampled && node.sampleSchema(mTime, mTime, mScale, false, &updated))
    {
       TimeSampleList<Alembic::AbcGeom::ICurvesSchema> &samples = node.samples().schemaSamples;
       

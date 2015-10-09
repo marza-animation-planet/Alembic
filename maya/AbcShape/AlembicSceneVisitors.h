@@ -14,7 +14,8 @@ public:
    WorldUpdate(double t,
                bool ignoreTransforms,
                bool ignoreInstances,
-               bool ignoreVisibility);
+               bool ignoreVisibility,
+               float scale=1.0f);
    
    AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
@@ -52,6 +53,7 @@ private:
    unsigned int mNumVisibleShapes;
    std::vector<bool> mVisibilityStack;
    std::vector<std::string> mUvSetNames;
+   float mScale;
 };
 
 inline const Alembic::Abc::Box3d& WorldUpdate::bounds() const
@@ -77,7 +79,7 @@ AlembicNode::VisitReturn WorldUpdate::shapeEnter(AlembicNodeT<T> &node, AlembicN
    
    TimeSampleList<Alembic::Abc::IBox3dProperty> &boundsSamples = node.samples().boundsSamples;
    
-   if (node.sampleBounds(mTime, mTime, false, &updated))
+   if (node.sampleBounds(mTime, mTime, mScale, false, &updated))
    {
       if (updated || fabs(boundsSamples.lastEvaluationTime - mTime) > 0.0001)
       {
@@ -86,9 +88,10 @@ AlembicNode::VisitReturn WorldUpdate::shapeEnter(AlembicNodeT<T> &node, AlembicN
          
          if (boundsSamples.getSamples(mTime, samp0, samp1, blend))
          {
+            Alembic::Abc::Box3d b0 = samp0->data();
+
             if (blend > 0.0)
             {
-               Alembic::Abc::Box3d b0 = samp0->data();
                Alembic::Abc::Box3d b1 = samp1->data();
                
                node.setSelfBounds(Alembic::Abc::Box3d((1.0 - blend) * b0.min + blend * b1.min,
@@ -96,7 +99,7 @@ AlembicNode::VisitReturn WorldUpdate::shapeEnter(AlembicNodeT<T> &node, AlembicN
             }
             else
             {
-               node.setSelfBounds(samp0->data());
+               node.setSelfBounds(b0);
             }
             
             noData = false;
@@ -407,7 +410,7 @@ class SampleGeometry
 {
 public:
    
-   SampleGeometry(double t, SceneGeometryData *sceneData);
+   SampleGeometry(double t, SceneGeometryData *sceneData, float scale=1.0f);
    
    AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
@@ -429,6 +432,7 @@ private:
    double mTime;
    std::set<std::string> mSampledNodes;
    SceneGeometryData *mSceneData;
+   float mScale;
 };
 
 // ---
