@@ -1375,9 +1375,11 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
    
    if (readNormals)
    {
+      // Arnold requires as many normal samples as position samples
       if (smoothNormals)
       {
-         // output smooth normals (per-point)
+         // Output smooth normals (per-point)
+         // As normals are computed from positions, sample count will match
          
          // build vertex -> point mappings
          nidxs = AiArrayAllocate(info.vertexCount, 1, AI_TYPE_UINT);
@@ -1441,18 +1443,28 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
             double blend = 0.0;
             AtVector vec;
             
-            if (info.varyingTopology || Nsamples.size() == 1)
+            AtArray *vlist = AiNodeGetArray(mNode, "vlist");
+            size_t requiredSamples = size_t(vlist->nkeys);
+            
+            // requiredSamples is either 1 or numMotionSamples()
+            bool unexpectedSampleCount = (requiredSamples != 1 && requiredSamples != mDso->numMotionSamples());
+            if (unexpectedSampleCount)
             {
-               // Only output one sample
-               
+               AiMsgWarning("[abcproc] Unexpected mesh sample count %lu.", requiredSamples);
+            }
+            
+            if (info.varyingTopology || unexpectedSampleCount)
+            {
                Nsamples.getSamples(mDso->renderTime(), n0, n1, blend);
                
                Alembic::Abc::N3fArraySamplePtr vals = n0->data().getVals();
                Alembic::Abc::UInt32ArraySamplePtr idxs = n0->data().getIndices();
                
-               nlist = AiArrayAllocate(vals->size(), 1, AI_TYPE_VECTOR);
+               nlist = AiArrayAllocate(vals->size(), requiredSamples, AI_TYPE_VECTOR);
                
-               for (size_t i=0; i<vals->size(); ++i)
+               size_t ncount = vals->size();
+               
+               for (size_t i=0; i<ncount; ++i)
                {
                   Alembic::Abc::N3f val = vals->get()[i];
                   
@@ -1460,7 +1472,10 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
                   vec.y = val.y;
                   vec.z = val.z;
                   
-                  AiArraySetVec(nlist, i, vec);
+                  for (size_t j=0, k=0; j<requiredSamples; ++j, k+=ncount)
+                  {
+                     AiArraySetVec(nlist, i+k, vec);
+                  }
                }
                
                if (mDso->verbose())
@@ -1524,9 +1539,9 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
             }
             else
             {
-               for (size_t i=0, j=0; i<mDso->numMotionSamples(); ++i)
+               for (size_t i=0, j=0; i<requiredSamples; ++i)
                {
-                  double t = mDso->motionSampleTime(i);
+                  double t = (requiredSamples == 1 ? mDso->renderTime() : mDso->motionSampleTime(i));
                   
                   if (mDso->verbose())
                   {
@@ -1537,7 +1552,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
                   
                   if (!nlist)
                   {
-                     nlist = AiArrayAllocate(info.vertexCount, mDso->numMotionSamples(), AI_TYPE_VECTOR);
+                     nlist = AiArrayAllocate(info.vertexCount, requiredSamples, AI_TYPE_VECTOR);
                   }
                   
                   if (blend > 0.0)
