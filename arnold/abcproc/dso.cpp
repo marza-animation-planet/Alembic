@@ -586,9 +586,22 @@ Dso::Dso(AtNode *node)
                 AiNodeLookUpUserParameter(opts, "motion_end_frame"))
             {
                std::vector<double> samples;
-        
-               mMotionStart = AiNodeGetFlt(opts, "motion_start_frame") / mCommonParams.fps;
-               mMotionEnd = AiNodeGetFlt(opts, "motion_end_frame") / mCommonParams.fps;
+               
+               mMotionStart = AiNodeGetFlt(opts, "motion_start_frame");
+               mMotionEnd = AiNodeGetFlt(opts, "motion_end_frame");
+               
+               if (AiNodeLookUpUserParameter(opts, "frame") &&
+                   AiNodeLookUpUserParameter(opts, "relative_motion_frame") &&
+                   AiNodeGetBool(opts, "relative_motion_frame"))
+               {
+                  float frame = AiNodeGetFlt(opts, "frame");
+                  mMotionStart += frame;
+                  mMotionEnd += frame;
+               }
+               
+               mMotionStart /= mCommonParams.fps;
+               mMotionEnd /= mCommonParams.fps;
+               
                double motionLength = mMotionEnd - mMotionStart;
                
                double shutterOpen = (mMotionStart + AiCameraGetShutterStart() * motionLength);
