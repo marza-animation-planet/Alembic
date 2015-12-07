@@ -3292,9 +3292,9 @@ bool AbcShapeUI::select(MSelectInfo &selectInfo,
       unsigned int izdepth = 0xFFFFFFFF;
       GLuint *curHit = buffer;
       
-      for (int i=hitCount; i>=0; --i)
+      for (int i=hitCount; i>0; --i)
       {
-         if (curHit[0] && izdepth > curHit[1])
+         if (curHit[0] > 0 && izdepth > curHit[1])
          {
             izdepth = curHit[1];
          }
