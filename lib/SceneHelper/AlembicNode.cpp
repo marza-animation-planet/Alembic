@@ -548,13 +548,11 @@ void AlembicNode::setVisible(bool on)
 
 bool AlembicNode::isVisible(bool inherited) const
 {
-   if (mMaster)
+   bool selfVisibility = (mMaster ? mMaster->isVisible(false) : mVisible);
+   
+   if (selfVisibility)
    {
-      return mMaster->isVisible();
-   }
-   else if (mVisible)
-   {
-      return ((inherited && mParent) ? mParent->isVisible() : true);
+      return ((inherited && mParent) ? mParent->isVisible(true) : true);
    }
    else
    {
