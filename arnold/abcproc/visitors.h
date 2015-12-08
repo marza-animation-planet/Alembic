@@ -3,6 +3,7 @@
 
 #include <AlembicNode.h>
 #include <ai.h>
+#include <deque>
 #include "dso.h"
 #include "userattr.h"
 #include "globallock.h"
@@ -144,9 +145,9 @@ private:
 private:
 
    class Dso *mDso;
-   std::vector<std::vector<Alembic::Abc::M44d> > mMatrixSamplesStack;
-   std::vector<AtNode*> mNodes;
-   std::vector<std::string> mPaths;
+   std::deque<std::deque<Alembic::Abc::M44d> > mMatrixSamplesStack;
+   std::deque<AtNode*> mNodes;
+   std::deque<std::string> mPaths;
 };
 
 inline float MakeProcedurals::adjustRadius(float radius) const
@@ -171,6 +172,8 @@ template <class T>
 AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance, bool interpolateBounds, double extraPadding)
 {
    Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
+   
+   node.setVisible(visible);
    
    if (visible)
    {
@@ -304,7 +307,7 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
       
       if (!mDso->ignoreTransforms() && mMatrixSamplesStack.size() > 0)
       {
-         std::vector<Alembic::Abc::M44d> &matrices = mMatrixSamplesStack.back();
+         std::deque<Alembic::Abc::M44d> &matrices = mMatrixSamplesStack.back();
          
          if (mDso->verbose())
          {

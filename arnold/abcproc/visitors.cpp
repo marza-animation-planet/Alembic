@@ -225,14 +225,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicXform &node, AlembicNode 
 {
    Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
    
-   if (instance)
-   {
-      instance->setVisible(visible);
-   }
-   else
-   {
-      node.setVisible(visible);
-   }
+   node.setVisible(visible);
    
    if (!visible)
    {
@@ -244,11 +237,11 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicXform &node, AlembicNode 
       TimeSampleList<Alembic::AbcGeom::IXformSchema> &xformSamples = node.samples().schemaSamples;
       
       // Beware of the inheritsXform when computing world
-      mMatrixSamplesStack.push_back(std::vector<Alembic::Abc::M44d>());
+      mMatrixSamplesStack.push_back(std::deque<Alembic::Abc::M44d>());
       
-      std::vector<Alembic::Abc::M44d> &matrices = mMatrixSamplesStack.back();
+      std::deque<Alembic::Abc::M44d> &matrices = mMatrixSamplesStack.back();
       
-      std::vector<Alembic::Abc::M44d> *parentMatrices = 0;
+      std::deque<Alembic::Abc::M44d> *parentMatrices = 0;
       if (mMatrixSamplesStack.size() >= 2)
       {
          parentMatrices = &(mMatrixSamplesStack[mMatrixSamplesStack.size()-2]);
@@ -397,6 +390,8 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
    {
       Alembic::AbcGeom::IFloatGeomParam widths = node.typedObject().getSchema().getWidthsParam();
       
+      // NOTE: Should be checking for 'radius' and 'size' point/object user attributes too!
+      
       if (widths.valid())
       {
          TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> wsamples;
@@ -456,9 +451,6 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode *instance)
 {
-   //bool interpolate = (node.typedObject().getSchema().getTopologyVariance() != Alembic::AbcGeom::kHeterogenousTopology);
-   //return shapeEnter(node, instance, interpolate, 0.0);
-   
    // Take into account the curve width in the computed bounds
    
    Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
@@ -526,10 +518,12 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode
    return shapeEnter(node, instance, false, extraPadding);
 }
 
-AlembicNode::VisitReturn MakeProcedurals::enter(AlembicNuPatch &, AlembicNode *)
+AlembicNode::VisitReturn MakeProcedurals::enter(AlembicNuPatch &node, AlembicNode *instance)
 {
-   //return shapeEnter(node, instance);
-   return AlembicNode::ContinueVisit;
+   // Not supported yet
+   node.setVisible(false);
+   
+   return AlembicNode::DontVisitChildren;
 }
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicNode &node, AlembicNode *)
@@ -558,7 +552,14 @@ void MakeProcedurals::leave(AlembicXform &node, AlembicNode *instance)
    
    if (visible && !node.isLocator() && !mDso->ignoreTransforms())
    {
-      mMatrixSamplesStack.pop_back();
+      if (mMatrixSamplesStack.size() > 0)
+      {
+         mMatrixSamplesStack.pop_back();
+      }
+      else
+      {
+         AiMsgWarning("[abcproc] Trying to pop empty matrix stack!");
+      }
    }
 }
 
