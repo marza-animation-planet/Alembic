@@ -2308,7 +2308,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    {
       if (V0->size() != P0->size())
       {
-         AiMsgWarning("[abcproc] Velocities count doesn't match points' one. Ignoring it.");
+         AiMsgWarning("[abcproc] (1) Velocities count doesn't match points' one (%lu for %lu). Ignoring it.", V0->size(), P0->size());
       }
       else
       {
@@ -2403,7 +2403,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
       {
          if (V1->size() != P1->size())
          {
-            AiMsgWarning("[abcproc] Velocities count doesn't match points' one. Ignoring it.");
+            AiMsgWarning("[abcproc] (2) Velocities count doesn't match points' one (%lu for %lu). Ignoring it.", V1->size(), P1->size());
          }
          else
          {
