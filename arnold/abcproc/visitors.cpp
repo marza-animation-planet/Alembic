@@ -3977,7 +3977,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
             else if (samp0->data().getVelocities())
             {
                Alembic::Abc::V3fArraySamplePtr V0 = samp0->data().getVelocities();
-               if (V0->size() != P1->size())
+               if (V0->size() != P0->size())
                {
                   AiMsgWarning("[abcproc] Velocities count doesn't match points' one (%lu for %lu). Ignoring it.", V0->size(), P0->size());
                }
