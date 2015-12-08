@@ -2567,6 +2567,13 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
             AiMsgInfo("[abcproc] Ignore alembic \"widths\" property: \"radius\" attribute set");
          }
       }
+      else if (info.pointAttrs.find("size") != info.pointAttrs.end())
+      {
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Ignore alembic \"widths\" property: \"size\" attribute set");
+         }
+      }
       else
       {
          UserAttributes::iterator it = info.objectAttrs.find("radius");
@@ -2576,6 +2583,18 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
             if (mDso->verbose())
             {
                AiMsgInfo("[abcproc] Ignore \"radius\" object attribute");
+            }
+            DestroyUserAttribute(it->second);
+            info.objectAttrs.erase(it);
+         }
+         
+         it = info.objectAttrs.find("size");
+         
+         if (it != info.objectAttrs.end())
+         {
+            if (mDso->verbose())
+            {
+               AiMsgInfo("[abcproc] Ignore \"size\" object attribute");
             }
             DestroyUserAttribute(it->second);
             info.objectAttrs.erase(it);
@@ -2720,11 +2739,25 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    
    if (ait == info.pointAttrs.end())
    {
+      ait = info.pointAttrs.find("size");
+   }
+   
+   if (ait == info.pointAttrs.end())
+   {
       ait = info.objectAttrs.find("radius");
       
       if (ait != info.objectAttrs.end())
       {
          ra = &(ait->second);
+      }
+      else
+      {
+         ait = info.objectAttrs.find("size");
+         
+         if (ait != info.objectAttrs.end())
+         {
+            ra = &(ait->second);
+         }
       }
    }
    else
