@@ -2738,7 +2738,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
          
       for (unsigned int i=0; i<ra->dataCount; ++i)
       {
-         for (unsigned int j=0; i<ra->dataDim; ++j, ++r)
+         for (unsigned int j=0; j<ra->dataDim; ++j, ++r)
          {
             *r = adjustRadius(*r);
          }
