@@ -253,7 +253,8 @@ public:
         bool    iRecreateUVSets = false,
         MString iIncludeFilterString = MString(""),
         MString iExcludeFilterString = MString(""),
-        bool    createInstances = false);
+        bool    createInstances = false,
+        bool    readMeshNormals = false);
     ArgData(const ArgData & rhs);
     ArgData & operator=(const ArgData & rhs);
 
@@ -275,6 +276,7 @@ public:
     MString     mIncludeFilterString;
     MString     mExcludeFilterString;
     bool        mCreateInstances;
+    bool        mReadMeshNormals;
 
     WriterData  mData;
 };  // ArgData

@@ -49,13 +49,13 @@
 
 #include "NodeIteratorVisitorHelper.h"
 
-void readPoly(double iFrame, MFnMesh & ioMesh, MObject & iParent,
+void readPoly(double iFrame, bool iReadNormals, MFnMesh & ioMesh, MObject & iParent,
     PolyMeshAndFriends & iNode, bool iInitialized);
 
 void readSubD(double iFrame, MFnMesh & ioMesh, MObject & iParent,
     SubDAndFriends & iNode, bool iInitialized);
 
-MObject createPoly(double iFrame, PolyMeshAndFriends & iNode,
+MObject createPoly(double iFrame, bool iReadNormals, PolyMeshAndFriends & iNode,
     MObject & iParent);
 
 MObject createSubD(double iFrame, SubDAndFriends & iNode,

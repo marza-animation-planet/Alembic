@@ -107,7 +107,8 @@ public:
         Action iAction = CREATE, MString iRootNodes = MString(),
         MString iFilterString = MString(),
         MString iExcludeFilterString = MString(),
-        bool iCreateInstances = false);
+        bool iCreateInstances = false,
+        bool iReadMeshNormals = false);
 
     ~CreateSceneVisitor();
 
@@ -182,6 +183,7 @@ private:
     regex_t mExceptPattern_;
 
     bool mCreateInstances;
+    bool mReadMeshNormals;
 
     // special map of shaders to selection lists that have selections
     // of parts of meshes.  They are to get around a problem where a shape
