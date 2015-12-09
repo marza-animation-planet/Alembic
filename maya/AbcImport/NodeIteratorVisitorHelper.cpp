@@ -2868,7 +2868,7 @@ ArgData::ArgData(MString iFileName,
     bool iDebugOn, MObject iReparentObj, bool iConnect,
     MString iConnectRootNodes, bool iCreateIfNotFound, bool iRemoveIfNoUpdate,
     bool iRecreateColorSets, bool iRecreateUVSets, MString iFilterString,
-    MString iExcludeFilterString, bool createInstances) :
+    MString iExcludeFilterString, bool createInstances, bool readMeshNormals) :
         mFileName(iFileName),
         mDebugOn(iDebugOn), mReparentObj(iReparentObj),
         mRecreateColorSets(iRecreateColorSets),
@@ -2879,7 +2879,8 @@ ArgData::ArgData(MString iFileName,
         mRemoveIfNoUpdate(iRemoveIfNoUpdate),
         mIncludeFilterString(iFilterString),
         mExcludeFilterString(iExcludeFilterString),
-        mCreateInstances(createInstances)
+        mCreateInstances(createInstances),
+        mReadMeshNormals(readMeshNormals)
 {
     mSequenceStartTime = -DBL_MAX;
     mSequenceEndTime = DBL_MAX;
@@ -2904,6 +2905,7 @@ ArgData & ArgData::operator=(const ArgData & rhs)
     mIncludeFilterString = rhs.mIncludeFilterString;
     mExcludeFilterString = rhs.mExcludeFilterString;
     mCreateInstances = rhs.mCreateInstances;
+    mReadMeshNormals = rhs.mReadMeshNormals;
 
     // optional information for the "connect" flag
     mConnect = rhs.mConnect;
@@ -2946,7 +2948,7 @@ MString createScene(ArgData & iArgData)
     CreateSceneVisitor visitor(iArgData.mSequenceStartTime,
         iArgData.mRecreateColorSets, iArgData.mRecreateUVSets, iArgData.mReparentObj, action,
         iArgData.mConnectRootNodes, iArgData.mIncludeFilterString,
-        iArgData.mExcludeFilterString, iArgData.mCreateInstances);
+        iArgData.mExcludeFilterString, iArgData.mCreateInstances, iArgData.mReadMeshNormals);
 
     visitor.walk(archive);
 
@@ -2985,6 +2987,7 @@ MString connectAttr(ArgData & iArgData)
     {
         alembicNodePtr->setReaderPtrList(iArgData.mData);
         alembicNodePtr->setDebugMode(iArgData.mDebugOn);
+        alembicNodePtr->setReadMeshNormals(iArgData.mReadMeshNormals);
         
         alembicNodeFn.findPlug("regexIncludeFilter").setString(iArgData.mIncludeFilterString);
         alembicNodeFn.findPlug("regexExcludeFilter").setString(iArgData.mExcludeFilterString);

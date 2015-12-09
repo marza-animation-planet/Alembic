@@ -922,7 +922,7 @@ namespace
 
 }  // namespace
 
-void readPoly(double iFrame, MFnMesh & ioMesh, MObject & iParent,
+void readPoly(double iFrame, bool iReadNormals, MFnMesh & ioMesh, MObject & iParent,
     PolyMeshAndFriends & iNode, bool iInitialized)
 {
     Alembic::AbcGeom::IPolyMeshSchema schema = iNode.mMesh.getSchema();
@@ -954,7 +954,7 @@ void readPoly(double iFrame, MFnMesh & ioMesh, MObject & iParent,
         setColorsAndUVs(iFrame, ioMesh, schema.getUVsParam(),
             iNode.mV2s, iNode.mC3s, iNode.mC4s, !iInitialized);
 
-        if (schema.getNormalsParam().getNumSamples() > 1)
+        if (iReadNormals && schema.getNormalsParam().getNumSamples() > 1)
         {
             setPolyNormals(iFrame, ioMesh, schema.getNormalsParam());
         }
@@ -977,7 +977,10 @@ void readPoly(double iFrame, MFnMesh & ioMesh, MObject & iParent,
     fillTopology(ioMesh, iParent, pointArray, samp.getFaceIndices(),
         samp.getFaceCounts());
 
-    setPolyNormals(iFrame, ioMesh, schema.getNormalsParam());
+    if (iReadNormals)
+    {
+        setPolyNormals(iFrame, ioMesh, schema.getNormalsParam());
+    }
     setColorsAndUVs(iFrame, ioMesh, schema.getUVsParam(),
         iNode.mV2s, iNode.mC3s, iNode.mC4s, !iInitialized);
 }
@@ -1057,7 +1060,7 @@ void disconnectMesh(MObject & iMeshObject,
 
 }
 
-MObject createPoly(double iFrame, PolyMeshAndFriends & iNode, MObject & iParent)
+MObject createPoly(double iFrame, bool iReadNormals, PolyMeshAndFriends & iNode, MObject & iParent)
 {
     Alembic::AbcGeom::IPolyMeshSchema schema = iNode.mMesh.getSchema();
     MString name(iNode.mMesh.getName().c_str());
@@ -1097,7 +1100,10 @@ MObject createPoly(double iFrame, PolyMeshAndFriends & iNode, MObject & iParent)
         fillTopology(fnMesh, iParent, ptArray, samp.getFaceIndices(),
             samp.getFaceCounts());
         fnMesh.setName(iNode.mMesh.getName().c_str());
-        setPolyNormals(iFrame, fnMesh, schema.getNormalsParam());
+        if (iReadNormals)
+        {
+            setPolyNormals(iFrame, fnMesh, schema.getNormalsParam());
+        }
         obj = fnMesh.object();
     }
 

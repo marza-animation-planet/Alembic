@@ -72,6 +72,10 @@ NAME_PREFIX "AbcImport  [options] File                                    \n\n"
                     the notUV metadata is set.                              \n\
 -ci / createInstances                                                       \n\
                     Create maya node instances.                             \n\
+-rmn / readMeshNormals                                                      \n\
+                    Set mesh normals if data available.                     \n\
+                    Note that this will lock the normals and, as such, is \
+disabled by default.                                                        \n\
 -ct / connect       string node1 node2 ...                                  \n\
                     The nodes specified in the argument string are supposed to\
  be the names of top level nodes from the input file.                       \n\
@@ -134,6 +138,7 @@ MSyntax AbcImport::createSyntax()
     syntax.addFlag("-rcs",  "-recreateAllColorSets", MSyntax::kNoArg);
     syntax.addFlag("-rus",  "-recreateAllUVSets", MSyntax::kNoArg);
     syntax.addFlag("-ci",   "-createInstances", MSyntax::kNoArg);
+    syntax.addFlag("-rmn",  "-readMeshNormals", MSyntax::kNoArg);
 
     syntax.addFlag("-ct",   "-connect",          MSyntax::kString);
     syntax.addFlag("-crt",  "-createIfNotFound", MSyntax::kNoArg);
@@ -261,6 +266,12 @@ MStatus AbcImport::doIt(const MArgList & args)
     {
         createInstances = true;
     }
+    
+    bool readMeshNormals = false;
+    if (argData.isFlagSet("readMeshNormals"))
+    {
+        readMeshNormals = true;
+    }
 
     status = argData.getCommandArgument(0, filename);
     MString abcNodeName;
@@ -327,7 +338,7 @@ MStatus AbcImport::doIt(const MArgList & args)
             ArgData inputData(filename, debugOn, reparentObj,
                 swap, connectRootNodes, createIfNotFound, removeIfNoUpdate,
                 recreateColorSets, recreateUVSets, filterString, excludeFilterString,
-                createInstances);
+                createInstances, readMeshNormals);
             abcNodeName = createScene(inputData);
 
             if (inputData.mSequenceStartTime != inputData.mSequenceEndTime &&

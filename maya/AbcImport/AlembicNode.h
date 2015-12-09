@@ -55,7 +55,7 @@ class AlembicNode : public MPxNode
 {
 public:
 
-    AlembicNode() : mFileInitialized(0), mDebugOn(false)
+    AlembicNode() : mFileInitialized(0), mDebugOn(false), mReadMeshNormals(false)
     {
         mCurTime = DBL_MAX;
 
@@ -127,6 +127,7 @@ public:
                                            bool markCouldBeImageSequence) const;
 
     void   setDebugMode(bool iDebugOn){ mDebugOn = iDebugOn; }
+    void   setReadMeshNormals(bool iReadMeshNormals) { mReadMeshNormals = iReadMeshNormals; }
 
 private:
     // compute the adjusted time from inputTime, speed and time offset.
@@ -161,6 +162,7 @@ private:
     double   mCurTime;
 
     bool    mDebugOn;
+    bool    mReadMeshNormals;
 
     // bool for each output plug, (the 2 transform plugs are lumped together,
     // when updating) this is to prevent rereading the same

@@ -318,11 +318,12 @@ CreateSceneVisitor::CreateSceneVisitor(double iFrame,
     bool iUnmarkedFaceVaryingColors, bool iUnmarkedFaceVaryingUVs, const MObject & iParent,
     Action iAction, MString iRootNodes,
     MString iIncludeFilterString, MString iExcludeFilterString,
-    bool createInstances) :
+    bool createInstances, bool readMeshNormals) :
     mFrame(iFrame), mParent(iParent),
     mUnmarkedFaceVaryingColors(iUnmarkedFaceVaryingColors),
     mUnmarkedFaceVaryingUVs(iUnmarkedFaceVaryingUVs),
-    mAction(iAction), mOnlyPattern(0), mExceptPattern(0), mCreateInstances(createInstances)
+    mAction(iAction), mOnlyPattern(0), mExceptPattern(0),
+    mCreateInstances(createInstances), mReadMeshNormals(readMeshNormals)
 {
     mAnyRoots = false;
 
@@ -1309,7 +1310,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPolyMesh& iNode)
 
     if (!hasDag && (mAction == CREATE || mAction == CREATE_REMOVE))
     {
-        polyObj = createPoly(mFrame, meshAndFriends, mParent);
+        polyObj = createPoly(mFrame, mReadMeshNormals, meshAndFriends, mParent);
         if (!isConstant || colorAnim)
         {
             mData.mPolyMeshObjList.push_back(polyObj);
@@ -1348,7 +1349,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPolyMesh& iNode)
         disconnectMesh(polyObj, mData.mPropList, firstProp);
         if (isConstant && CONNECT == mAction)
         {
-            readPoly(mFrame, fn, polyObj, meshAndFriends, false);
+            readPoly(mFrame, mReadMeshNormals, fn, polyObj, meshAndFriends, false);
         }
         addToPropList(firstProp, polyObj);
     }

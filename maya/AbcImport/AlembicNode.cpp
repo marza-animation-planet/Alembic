@@ -865,7 +865,7 @@ MStatus AlembicNode::compute(const MPlug & plug, MDataBlock & dataBlock)
                 if (obj.hasFn(MFn::kMesh))
                 {
                     MFnMesh fnMesh(obj);
-                    readPoly(mCurTime, fnMesh, obj, mData.mPolyMeshList[j],
+                    readPoly(mCurTime, mReadMeshNormals, fnMesh, obj, mData.mPolyMeshList[j],
                         mPolyInitialized);
                     outHandle.set(obj);
                 }
