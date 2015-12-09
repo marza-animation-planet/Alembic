@@ -225,14 +225,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicXform &node, AlembicNode 
 {
    Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
    
-   if (instance)
-   {
-      instance->setVisible(visible);
-   }
-   else
-   {
-      node.setVisible(visible);
-   }
+   node.setVisible(visible);
    
    if (!visible)
    {
@@ -244,11 +237,11 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicXform &node, AlembicNode 
       TimeSampleList<Alembic::AbcGeom::IXformSchema> &xformSamples = node.samples().schemaSamples;
       
       // Beware of the inheritsXform when computing world
-      mMatrixSamplesStack.push_back(std::vector<Alembic::Abc::M44d>());
+      mMatrixSamplesStack.push_back(std::deque<Alembic::Abc::M44d>());
       
-      std::vector<Alembic::Abc::M44d> &matrices = mMatrixSamplesStack.back();
+      std::deque<Alembic::Abc::M44d> &matrices = mMatrixSamplesStack.back();
       
-      std::vector<Alembic::Abc::M44d> *parentMatrices = 0;
+      std::deque<Alembic::Abc::M44d> *parentMatrices = 0;
       if (mMatrixSamplesStack.size() >= 2)
       {
          parentMatrices = &(mMatrixSamplesStack[mMatrixSamplesStack.size()-2]);
@@ -397,6 +390,8 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
    {
       Alembic::AbcGeom::IFloatGeomParam widths = node.typedObject().getSchema().getWidthsParam();
       
+      // NOTE: Should be checking for 'radius' and 'size' point/object user attributes too!
+      
       if (widths.valid())
       {
          TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> wsamples;
@@ -456,9 +451,6 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode *instance)
 {
-   //bool interpolate = (node.typedObject().getSchema().getTopologyVariance() != Alembic::AbcGeom::kHeterogenousTopology);
-   //return shapeEnter(node, instance, interpolate, 0.0);
-   
    // Take into account the curve width in the computed bounds
    
    Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
@@ -526,10 +518,12 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode
    return shapeEnter(node, instance, false, extraPadding);
 }
 
-AlembicNode::VisitReturn MakeProcedurals::enter(AlembicNuPatch &, AlembicNode *)
+AlembicNode::VisitReturn MakeProcedurals::enter(AlembicNuPatch &node, AlembicNode *instance)
 {
-   //return shapeEnter(node, instance);
-   return AlembicNode::ContinueVisit;
+   // Not supported yet
+   node.setVisible(false);
+   
+   return AlembicNode::DontVisitChildren;
 }
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicNode &node, AlembicNode *)
@@ -558,7 +552,14 @@ void MakeProcedurals::leave(AlembicXform &node, AlembicNode *instance)
    
    if (visible && !node.isLocator() && !mDso->ignoreTransforms())
    {
-      mMatrixSamplesStack.pop_back();
+      if (mMatrixSamplesStack.size() > 0)
+      {
+         mMatrixSamplesStack.pop_back();
+      }
+      else
+      {
+         AiMsgWarning("[abcproc] Trying to pop empty matrix stack!");
+      }
    }
 }
 
@@ -753,6 +754,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
       specialPointNames.insert("accel");
       specialPointNames.insert("a");
       specialPointNames.insert("velocity");
+      specialPointNames.insert("vel");
       specialPointNames.insert("v");
       if (mDso->outputReference())
       {
@@ -2304,20 +2306,12 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    // Get velocities and accelerations
    std::string vname, aname;
    
-   if (V0)
+   UserAttributes::iterator it = info.pointAttrs.find("velocity");
+   if (it == info.pointAttrs.end() ||
+       it->second.arnoldType != AI_TYPE_VECTOR ||
+       it->second.dataCount != info.pointCount)
    {
-      if (V0->size() != P0->size())
-      {
-         AiMsgWarning("[abcproc] Velocities count doesn't match points' one. Ignoring it.");
-      }
-      else
-      {
-         vel0 = (const float*) V0->getData();
-      }
-   }
-   else
-   {
-      UserAttributes::iterator it = info.pointAttrs.find("velocity");
+      it = info.pointAttrs.find("vel");
       if (it == info.pointAttrs.end() ||
           it->second.arnoldType != AI_TYPE_VECTOR ||
           it->second.dataCount != info.pointCount)
@@ -2325,21 +2319,37 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
          it = info.pointAttrs.find("v");
          if (it != info.pointAttrs.end() &&
              (it->second.arnoldType != AI_TYPE_VECTOR ||
-              it->second.dataCount != info.pointCount))
+             it->second.dataCount != info.pointCount))
          {
             it = info.pointAttrs.end();
          }
       }
-      if (it != info.pointAttrs.end())
+   }
+   
+   if (it != info.pointAttrs.end())
+   {
+      if (mDso->verbose())
       {
-         vname = it->first;
-         vel0 = (const float*) it->second.data;
+         AiMsgInfo("[abcproc] Using user defined attribute \"%s\" for point velocities", it->first.c_str());
+      }
+      vname = it->first;
+      vel0 = (const float*) it->second.data;
+   }
+   else if (V0)
+   {
+      if (V0->size() != P0->size())
+      {
+         AiMsgWarning("[abcproc] (1) Velocities count doesn't match points' one (%lu for %lu). Ignoring it.", V0->size(), P0->size());
+      }
+      else
+      {
+         vel0 = (const float*) V0->getData();
       }
    }
    
    if (vel0)
    {
-      UserAttributes::iterator it = info.pointAttrs.find("acceleration");
+      it = info.pointAttrs.find("acceleration");
       if (it == info.pointAttrs.end() ||
           it->second.arnoldType != AI_TYPE_VECTOR ||
           it->second.dataCount != info.pointCount)
@@ -2399,29 +2409,29 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
       
       // Get velocities and accelerations
       
-      if (V1)
+      if (vname.length() > 0)
+      {
+         it = extraPointAttrs.find(vname);
+         if (it != extraPointAttrs.end() && it->second.dataCount == P1->size())
+         {
+            vel1 = (const float*) it->second.data;
+         }
+      }
+      else if (V1)
       {
          if (V1->size() != P1->size())
          {
-            AiMsgWarning("[abcproc] Velocities count doesn't match points' one. Ignoring it.");
+            AiMsgWarning("[abcproc] (2) Velocities count doesn't match points' one (%lu for %lu). Ignoring it.", V1->size(), P1->size());
          }
          else
          {
             vel1 = (const float*) V1->getData();
          }
       }
-      else if (vname.length() > 0)
-      {
-         UserAttributes::iterator it = extraPointAttrs.find(vname);
-         if (it != extraPointAttrs.end() && it->second.dataCount == P1->size())
-         {
-            vel1 = (const float*) it->second.data;
-         }
-      }
       
       if (aname.length() > 0)
       {
-         UserAttributes::iterator it = extraPointAttrs.find(aname);
+         it = extraPointAttrs.find(aname);
          if (it != extraPointAttrs.end() && it->second.dataCount == P1->size())
          {
             acc1 = (const float*) it->second.data;
@@ -2567,6 +2577,13 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
             AiMsgInfo("[abcproc] Ignore alembic \"widths\" property: \"radius\" attribute set");
          }
       }
+      else if (info.pointAttrs.find("size") != info.pointAttrs.end())
+      {
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Ignore alembic \"widths\" property: \"size\" attribute set");
+         }
+      }
       else
       {
          UserAttributes::iterator it = info.objectAttrs.find("radius");
@@ -2576,6 +2593,18 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
             if (mDso->verbose())
             {
                AiMsgInfo("[abcproc] Ignore \"radius\" object attribute");
+            }
+            DestroyUserAttribute(it->second);
+            info.objectAttrs.erase(it);
+         }
+         
+         it = info.objectAttrs.find("size");
+         
+         if (it != info.objectAttrs.end())
+         {
+            if (mDso->verbose())
+            {
+               AiMsgInfo("[abcproc] Ignore \"size\" object attribute");
             }
             DestroyUserAttribute(it->second);
             info.objectAttrs.erase(it);
@@ -2720,11 +2749,25 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    
    if (ait == info.pointAttrs.end())
    {
+      ait = info.pointAttrs.find("size");
+   }
+   
+   if (ait == info.pointAttrs.end())
+   {
       ait = info.objectAttrs.find("radius");
       
       if (ait != info.objectAttrs.end())
       {
          ra = &(ait->second);
+      }
+      else
+      {
+         ait = info.objectAttrs.find("size");
+         
+         if (ait != info.objectAttrs.end())
+         {
+            ra = &(ait->second);
+         }
       }
    }
    else
@@ -2738,7 +2781,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
          
       for (unsigned int i=0; i<ra->dataCount; ++i)
       {
-         for (unsigned int j=0; i<ra->dataDim; ++j, ++r)
+         for (unsigned int j=0; j<ra->dataDim; ++j, ++r)
          {
             *r = adjustRadius(*r);
          }
@@ -3913,26 +3956,35 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
             
             const float *vel = 0;
             
-            if (samp0->data().getVelocities())
+            UserAttributes::iterator it = info.pointAttrs.find("velocity");
+            
+            if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
             {
-               vel = (const float*) samp0->data().getVelocities()->getData();
-            }
-            else
-            {
-               UserAttributes::iterator it = info.pointAttrs.find("velocity");
-               
-               if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
+               it = info.pointAttrs.find("v");
+               if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
                {
-                  it = info.pointAttrs.find("v");
-                  if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
-                  {
-                     it = info.pointAttrs.end();
-                  }
+                  it = info.pointAttrs.end();
                }
-               
-               if (it != info.pointAttrs.end())
+            }
+            
+            if (it != info.pointAttrs.end())
+            {
+               if (mDso->verbose())
                {
-                  vel = (const float*) it->second.data;
+                  AiMsgInfo("[abcproc] Using user defined attribute \"%s\" for point velocities", it->first.c_str());
+               }
+               vel = (const float*) it->second.data;
+            }
+            else if (samp0->data().getVelocities())
+            {
+               Alembic::Abc::V3fArraySamplePtr V0 = samp0->data().getVelocities();
+               if (V0->size() != P0->size())
+               {
+                  AiMsgWarning("[abcproc] Velocities count doesn't match points' one (%lu for %lu). Ignoring it.", V0->size(), P0->size());
+               }
+               else
+               {
+                  vel = (const float*) V0->getData();
                }
             }
             

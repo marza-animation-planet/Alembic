@@ -3,6 +3,7 @@
 
 #include <AlembicNode.h>
 #include <ai.h>
+#include <deque>
 #include "dso.h"
 #include "userattr.h"
 #include "globallock.h"
@@ -144,9 +145,9 @@ private:
 private:
 
    class Dso *mDso;
-   std::vector<std::vector<Alembic::Abc::M44d> > mMatrixSamplesStack;
-   std::vector<AtNode*> mNodes;
-   std::vector<std::string> mPaths;
+   std::deque<std::deque<Alembic::Abc::M44d> > mMatrixSamplesStack;
+   std::deque<AtNode*> mNodes;
+   std::deque<std::string> mPaths;
 };
 
 inline float MakeProcedurals::adjustRadius(float radius) const
@@ -171,6 +172,8 @@ template <class T>
 AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance, bool interpolateBounds, double extraPadding)
 {
    Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
+   
+   node.setVisible(visible);
    
    if (visible)
    {
@@ -304,7 +307,7 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
       
       if (!mDso->ignoreTransforms() && mMatrixSamplesStack.size() > 0)
       {
-         std::vector<Alembic::Abc::M44d> &matrices = mMatrixSamplesStack.back();
+         std::deque<Alembic::Abc::M44d> &matrices = mMatrixSamplesStack.back();
          
          if (mDso->verbose())
          {
@@ -932,14 +935,12 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
          
          // Get velocity
          const float *vel = 0;
-         if (samp0->data().getVelocities())
+         
+         UserAttributes::iterator it = info.pointAttrs.find("velocity");
+         
+         if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
          {
-            vel = (const float*) samp0->data().getVelocities()->getData();
-         }
-         else
-         {
-            UserAttributes::iterator it = info.pointAttrs.find("velocity");
-            
+            it = info.pointAttrs.find("vel");
             if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
             {
                it = info.pointAttrs.find("v");
@@ -948,10 +949,26 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
                   it = info.pointAttrs.end();
                }
             }
-            
-            if (it != info.pointAttrs.end())
+         }
+         
+         if (it != info.pointAttrs.end())
+         {
+            if (mDso->verbose())
             {
-               vel = (const float*) it->second.data;
+               AiMsgInfo("[abcproc] Using user defined attribute \"%s\" for point velocities", it->first.c_str());
+            }
+            vel = (const float*) it->second.data;
+         }
+         else if (samp0->data().getVelocities())
+         {
+            Alembic::Abc::V3fArraySamplePtr V = samp0->data().getVelocities();
+            if (V->size() == P->size())
+            {
+               vel = (const float*) V->getData();
+            }
+            else
+            {
+               AiMsgWarning("[abcproc] Velocities count doesn't match points' one (%lu for %lu). Ignoring it.", V->size(), P->size());
             }
          }
          
@@ -959,7 +976,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
          const float *acc = 0;
          if (vel)
          {
-            UserAttributes::iterator it = info.pointAttrs.find("acceleration");
+            it = info.pointAttrs.find("acceleration");
             
             if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
             {

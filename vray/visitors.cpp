@@ -747,15 +747,7 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicXform &node, AlembicNode *
    }
    
    bool visible = isVisible(node);
-   
-   if (instance)
-   {
-      instance->setVisible(visible);
-   }
-   else
-   {
-      node.setVisible(visible);
-   }
+   node.setVisible(visible);
    
    if (visible && !node.isLocator() && !mGeoSrc->params()->ignoreTransforms)
    {
@@ -1361,16 +1353,16 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicMesh &node, AlembicNode *i
    }
    
    bool visible = isVisible(node);
+   node.setVisible(visible);
+   
    bool ignore = false;
    
    if (instance)
    {
-      instance->setVisible(visible);
       ignore = !instance->isVisible(true);
    }
    else
    {
-      node.setVisible(visible);
       ignore = !node.isVisible(true);
    }
    
@@ -1694,16 +1686,16 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicSubD &node, AlembicNode *i
    }
    
    bool visible = isVisible(node);
+   node.setVisible(visible);
+   
    bool ignore = false;
    
    if (instance)
    {
-      instance->setVisible(visible);
       ignore = !instance->isVisible(true);
    }
    else
    {
-      node.setVisible(visible);
       ignore = !node.isVisible(true);
    }
    
@@ -1970,16 +1962,16 @@ AlembicNode::VisitReturn UpdateGeometry::enter(AlembicPoints &node, AlembicNode 
    }
    
    bool visible = isVisible(node);
+   node.setVisible(visible);
+   
    bool ignore = false;
    
    if (instance)
    {
-      instance->setVisible(visible);
       ignore = !instance->isVisible(true);
    }
    else
    {
-      node.setVisible(visible);
       ignore = !node.isVisible(true);
    }
    
@@ -2861,7 +2853,14 @@ void UpdateGeometry::leave(AlembicXform &node, AlembicNode *instance)
    
    if (visible && !node.isLocator() && !mGeoSrc->params()->ignoreTransforms)
    {
-      mMatrixSamplesStack.pop_back();
+      if (mMatrixSamplesStack.size() > 0)
+      {
+         mMatrixSamplesStack.pop_back();
+      }
+      else
+      {
+         std::cerr << "[AlembicLoader] Trying to pop empty matrix samples stack (\"" << (instance ? instance->path().c_str() : node.path().c_str()) << "\")" << std::endl;
+      }
    }
 }
 
