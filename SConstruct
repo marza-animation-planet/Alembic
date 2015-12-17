@@ -18,6 +18,10 @@ deps_inc, deps_lib = excons.GetDirs("deps", noexc=True, silent=True)
 
 nameprefix = excons.GetArgument("name-prefix", default="")
 
+cpp11 = excons.GetArgument("c++11", 0, int)
+msc10warn = True
+msc12warn = True
+
 regex_src_dir = "lib/SceneHelper/regex-2.7/src"
 regex_inc = [regex_src_dir + "/regex.h"] if sys.platform == "win32" else []
 regex_src = [regex_src_dir + "/regex.c"] if sys.platform == "win32" else []
@@ -26,12 +30,13 @@ regex_src = [regex_src_dir + "/regex.c"] if sys.platform == "win32" else []
 def RequireAlembic(withPython=False, withGL=False):
    
    def _RequireFunc(env):
-      global deps_inc, deps_lib
+      global deps_inc, deps_lib, msc10warn, msc12warn
       
       if sys.platform == "darwin":
          import platform
          vers = map(int, platform.mac_ver()[0].split("."))
-         if vers[0] > 10 or vers[1] >= 9:
+         # Force c++11 for OSX >= 10.9
+         if cpp11 or (vers[0] > 10 or (vers[0] == 10 and vers[1] >= 9)):
             # clang complains a lot, make it quieter
             env.Append(CPPFLAGS=" ".join([" -std=c++11",
                                           "-Wno-deprecated-register",
@@ -45,11 +50,26 @@ def RequireAlembic(withPython=False, withGL=False):
       elif sys.platform == "win32":
          env.Append(CCFLAGS=" /bigobj")
          env.Append(CPPDEFINES=["NOMINMAX"])
+         
+         mscmaj = int(excons.mscver.split(".")[0])
+         
          # Work around the 2GB file limit with Visual Studio 10.0
          #   https://connect.microsoft.com/VisualStudio/feedback/details/627639/std-fstream-use-32-bit-int-as-pos-type-even-on-x64-platform
          #   https://groups.google.com/forum/#!topic/alembic-discussion/5ElRJkXhi9M
-         if excons.mscver == "10.0":
+         if mscmaj == 10:
             env.Prepend(CPPPATH=["lib/vc10fix"])
+         
+         if mscmaj < 10 and msc10warn:
+            print("You should use at least Visual C 10.0 if you expect reading alembic file above 2GB without crash (use mscver= flag)")
+            msc10warn = False
+         
+         if cpp11 and mscmaj < 12 and msc12warn:
+            print("You should use at least Visual C 12.0 for C++11 support (use mscver= flag)")
+            msc12warn = False
+      
+      else:
+         if cpp11:
+            env.Append(CPPFLAGS=" -std=c++11")
       
       defs = []
       incdirs = ["lib"]
