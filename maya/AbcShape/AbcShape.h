@@ -142,7 +142,8 @@ public:
         CT_hold = 0,
         CT_loop,
         CT_reverse,
-        CT_bounce
+        CT_bounce,
+        CT_clip
     };
     
     enum DisplayMode
@@ -197,8 +198,8 @@ private:
     
     double getFPS() const;
     double computeAdjustedTime(double inputTime, double speed, double timeOffset) const;
-    double computeRetime(double inputTime, double firstTime, double lastTime, CycleType cycleType) const;
-    double getSampleTime() const;
+    double computeRetime(double inputTime, double firstTime, double lastTime, CycleType cycleType, bool *clipped=0) const;
+    double getSampleTime(bool *clipped=0) const;
     
     void printInfo(bool detailed=false) const;
     void printSceneBounds() const;
@@ -249,6 +250,7 @@ private:
     MObject aUvSet;
     MObject aUvSetName;
     std::vector<std::string> mUvSetNames;
+    bool mClipped;
     
 #ifdef ABCSHAPE_VRAY_SUPPORT
     VR::DefStringParam mVRFilename;
