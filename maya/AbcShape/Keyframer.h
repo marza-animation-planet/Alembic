@@ -16,6 +16,16 @@
 #include <vector>
 #include <cstring>
 
+struct MStringLessThan
+{
+   inline bool operator()(const MString &s0, const MString &s1) const
+   {
+      return (strcmp(s0.asChar(), s1.asChar()) < 0);
+   }
+};
+
+typedef std::map<MString, MString, MStringLessThan> MStringDict;
+
 class Keyframer
 {
 public:
@@ -35,7 +45,7 @@ public:
                             bool preserveStart);
    void createCurves(MFnAnimCurve::InfinityType preInf = MFnAnimCurve::kConstant,
                      MFnAnimCurve::InfinityType postInf = MFnAnimCurve::kConstant);
-   void setRotationCurvesInterpolation(const MString &interpType);
+   void setRotationCurvesInterpolation(const MString &interpType, const MStringDict &nodeInterpType);
    void fixCurvesTangents(MFnAnimCurve::AnimCurveType type);
    void fixCurvesTangents();
    
@@ -74,14 +84,6 @@ private:
       bool reverse;
    };
    
-   struct MStringLessThan
-   {
-      inline bool operator()(const MString &s0, const MString &s1) const
-      {
-         return (strcmp(s0.asChar(), s1.asChar()) < 0);
-      }
-   };
-   
    struct MObjectLessThan
    {
       inline bool operator()(const MObject &o0, const MObject &o1) const
@@ -108,7 +110,7 @@ private:
    MTime mTime;
    
    std::set<MString, MStringLessThan> mRetimedCurves;
-   std::map<MString, MString, MStringLessThan> mRetimedCurveInterp;
+   MStringDict mRetimedCurveInterp;
 };
 
 #endif
