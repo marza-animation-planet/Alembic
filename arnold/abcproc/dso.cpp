@@ -10,6 +10,7 @@ const char* CycleTypeNames[] =
    "loop",
    "reverse",
    "bounce",
+   "clip",
    NULL
 };
    
@@ -444,253 +445,262 @@ Dso::Dso(AtNode *node)
          }
       }
       
-      mRenderTime = computeTime(mCommonParams.frame);
+      bool exclude = false;
       
-      if (mCommonParams.verbose)
+      mRenderTime = computeTime(mCommonParams.frame, &exclude);
+      
+      if (!exclude)
       {
-         AiMsgInfo("[abcproc] Render at t = %f [%f, %f]",
-                   mRenderTime,
-                   mCommonParams.startFrame / mCommonParams.fps,
-                   mCommonParams.endFrame / mCommonParams.fps);
-      }
-      
-      CountShapes visitor(mRenderTime,
-                          mCommonParams.ignoreTransforms,
-                          mCommonParams.ignoreInstances,
-                          mCommonParams.ignoreVisibility);
-      
-      mScene->visit(AlembicNode::VisitDepthFirst, visitor);
-      
-      if (mCommonParams.verbose)
-      {
-         AiMsgInfo("[abcproc] %lu shape(s) in scene", visitor.numShapes());
-      }
-      
-      mMode = PM_multi;
-      mNumShapes = visitor.numShapes();
-      setGeneratedNodesCount(mNumShapes);
-      
-      if (mNumShapes == 1 && mCommonParams.ignoreTransforms)
-      {
-         // output a single shape in object space
          if (mCommonParams.verbose)
          {
-            AiMsgInfo("[abcproc] Single shape mode");
+            AiMsgInfo("[abcproc] Render at t = %f [%f, %f]",
+                      mRenderTime,
+                      mCommonParams.startFrame / mCommonParams.fps,
+                      mCommonParams.endFrame / mCommonParams.fps);
          }
-         mMode = PM_single;
-      }
-      
-      
-      mTimeSamples.clear();
-      
-      if (ignoreMotionBlur() || (mMode == PM_single && ignoreDeformBlur()))
-      {
-         mTimeSamples.push_back(mRenderTime);
-      }
-      else
-      {
-         if (mCommonParams.samples.size() == 0)
+         
+         CountShapes visitor(mRenderTime,
+                             mCommonParams.ignoreTransforms,
+                             mCommonParams.ignoreInstances,
+                             mCommonParams.ignoreVisibility);
+         
+         mScene->visit(AlembicNode::VisitDepthFirst, visitor);
+         
+         if (mCommonParams.verbose)
          {
-            //AiMsgWarning("[abcproc] No samples set");
-            if (mShutterOpen <= mShutterClose)
+            AiMsgInfo("[abcproc] %lu shape(s) in scene", visitor.numShapes());
+         }
+         
+         mMode = PM_multi;
+         mNumShapes = visitor.numShapes();
+         setGeneratedNodesCount(mNumShapes);
+         
+         if (mNumShapes == 1 && mCommonParams.ignoreTransforms)
+         {
+            // output a single shape in object space
+            if (mCommonParams.verbose)
             {
-               if (mShutterOpen < mShutterClose)
-               {
-                  double step = mShutterClose - mShutterOpen;
-                  
-                  if (mShutterStep > 1)
-                  {
-                     step /= (mShutterStep - 1);
-                  }
-                  
-                  if (mShutterStep > 0)
-                  {
-                     
-                  }
-                  
-                  for (double relSample=mShutterOpen; relSample<=mShutterClose; relSample+=step)
-                  {
-                     mTimeSamples.push_back(computeTime(mCommonParams.frame + relSample));
-                  }
-               }
-               else
-               {
-                  mTimeSamples.push_back(computeTime(mCommonParams.frame + mShutterOpen));
-               }
+               AiMsgInfo("[abcproc] Single shape mode");
             }
-            else
-            {
-               AiMsgWarning("[abcproc] No samples set, use render frame");
-               mTimeSamples.push_back(mRenderTime);
-            }
+            mMode = PM_single;
+         }
+         
+         
+         mTimeSamples.clear();
+         
+         if (ignoreMotionBlur() || (mMode == PM_single && ignoreDeformBlur()))
+         {
+            mTimeSamples.push_back(mRenderTime);
          }
          else
          {
-            if (mCommonParams.relativeSamples)
+            if (mCommonParams.samples.size() == 0)
             {
-               for (size_t i=0; i<mCommonParams.samples.size(); ++i)
+               //AiMsgWarning("[abcproc] No samples set");
+               if (mShutterOpen <= mShutterClose)
                {
-                  mTimeSamples.push_back(computeTime(mCommonParams.frame + mCommonParams.samples[i]));
-               }
-            }
-            else
-            {
-               for (size_t i=0; i<mCommonParams.samples.size(); ++i)
-               {
-                  mTimeSamples.push_back(computeTime(mCommonParams.samples[i]));
-               }
-            }
-         }
-      }
-      
-      mExpandedTimeSamples = mTimeSamples;
-      
-      // Expand time samples
-      if (mTimeSamples.size() > 1 && mCommonParams.samplesExpandIterations > 0)
-      {
-         std::vector<double> samples;
-         
-         for (int i=0; i<mCommonParams.samplesExpandIterations; ++i)
-         {
-            samples.push_back(mExpandedTimeSamples[0]);
-            
-            for (size_t j=1; j<mExpandedTimeSamples.size(); ++j)
-            {
-               double mid = 0.5 * (mExpandedTimeSamples[j-1] + mExpandedTimeSamples[j]);
-               samples.push_back(mid);
-               samples.push_back(mExpandedTimeSamples[j]);
-            }
-            
-            // Arnold doesn't accept more than 255 motion keys
-            if (samples.size() > 255)
-            {
-               break;
-            }
-            
-            std::swap(mExpandedTimeSamples, samples);
-            samples.clear();
-         }
-      }
-      
-      // Optimize time samples
-      if ((mExpandedTimeSamples.size() > mTimeSamples.size()) && mCommonParams.optimizeSamples)
-      {
-         // Remove samples outside of camera shutter range
-         AtNode *cam = AiUniverseGetCamera();
-         
-         if (cam)
-         {
-            AtNode *opts = AiUniverseGetOptions();
-            
-            if (AiNodeLookUpUserParameter(opts, "motion_start_frame") &&
-                AiNodeLookUpUserParameter(opts, "motion_end_frame"))
-            {
-               std::vector<double> samples;
-               
-               mMotionStart = AiNodeGetFlt(opts, "motion_start_frame");
-               mMotionEnd = AiNodeGetFlt(opts, "motion_end_frame");
-               
-               if (AiNodeLookUpUserParameter(opts, "frame") &&
-                   AiNodeLookUpUserParameter(opts, "relative_motion_frame") &&
-                   AiNodeGetBool(opts, "relative_motion_frame"))
-               {
-                  float frame = AiNodeGetFlt(opts, "frame");
-                  mMotionStart += frame;
-                  mMotionEnd += frame;
-               }
-               
-               mMotionStart /= mCommonParams.fps;
-               mMotionEnd /= mCommonParams.fps;
-               
-               double motionLength = mMotionEnd - mMotionStart;
-               
-               double shutterOpen = (mMotionStart + AiCameraGetShutterStart() * motionLength);
-               double shutterClose = (mMotionStart + AiCameraGetShutterEnd() * motionLength);
-               
-               for (size_t i=0; i<mExpandedTimeSamples.size(); ++i)
-               {
-                  double sample = mExpandedTimeSamples[i];
-                  
-                  if (sample < shutterOpen)
+                  if (mShutterOpen < mShutterClose)
                   {
-                     continue;
-                  }
-                  else if (sample > shutterClose)
-                  {
-                     if (samples.size() > 0 && samples.back() < shutterClose)
+                     double step = mShutterClose - mShutterOpen;
+                     
+                     if (mShutterStep > 1)
                      {
-                        samples.push_back(sample);
+                        step /= (mShutterStep - 1);
+                     }
+                     
+                     if (mShutterStep > 0)
+                     {
+                        
+                     }
+                     
+                     for (double relSample=mShutterOpen; relSample<=mShutterClose; relSample+=step)
+                     {
+                        mTimeSamples.push_back(computeTime(mCommonParams.frame + relSample));
                      }
                   }
                   else
                   {
-                     if (samples.size() == 0 && i > 0 && sample > shutterOpen)
-                     {
-                        samples.push_back(mExpandedTimeSamples[i-1]);
-                     }
-                     samples.push_back(sample);
+                     mTimeSamples.push_back(computeTime(mCommonParams.frame + mShutterOpen));
                   }
                }
-               
-               if (samples.size() > 0 && samples.size() < mExpandedTimeSamples.size())
+               else
                {
-                  std::swap(samples, mExpandedTimeSamples);
-                  mSetTimeSamples = true;
+                  AiMsgWarning("[abcproc] No samples set, use render frame");
+                  mTimeSamples.push_back(mRenderTime);
                }
             }
             else
             {
-              AiMsgWarning("[abcproc] Cannot optimize motion blur samples (missing motion sample range info)");
+               if (mCommonParams.relativeSamples)
+               {
+                  for (size_t i=0; i<mCommonParams.samples.size(); ++i)
+                  {
+                     mTimeSamples.push_back(computeTime(mCommonParams.frame + mCommonParams.samples[i]));
+                  }
+               }
+               else
+               {
+                  for (size_t i=0; i<mCommonParams.samples.size(); ++i)
+                  {
+                     mTimeSamples.push_back(computeTime(mCommonParams.samples[i]));
+                  }
+               }
             }
          }
-         else
-         {
-            AiMsgWarning("[abcproc] Cannot optimize motion blur samples (no camera set)");
-         }
-      }
-      
-      // Compute shape key
-      mShapeKey = shapeKey();
-      
-      if (mCommonParams.verbose)
-      {
-         AiMsgInfo("[abcproc] Procedural parameters: \"%s\"", dataString(0).c_str());
          
-         for (size_t i=0; i<mExpandedTimeSamples.size(); ++i)
-         {
-            AiMsgInfo("[abcproc] Add motion sample time: %lf", mExpandedTimeSamples[i]);
-         }
-      }
-      
-      if (mMode == PM_single)
-      {
-         // Read instance_num attribute
-         mInstanceNum = 0;
+         mExpandedTimeSamples = mTimeSamples;
          
-         const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mProcNode, "instance_num");
+         // Expand time samples
+         if (mTimeSamples.size() > 1 && mCommonParams.samplesExpandIterations > 0)
+         {
+            std::vector<double> samples;
+            
+            for (int i=0; i<mCommonParams.samplesExpandIterations; ++i)
+            {
+               samples.push_back(mExpandedTimeSamples[0]);
+               
+               for (size_t j=1; j<mExpandedTimeSamples.size(); ++j)
+               {
+                  double mid = 0.5 * (mExpandedTimeSamples[j-1] + mExpandedTimeSamples[j]);
+                  samples.push_back(mid);
+                  samples.push_back(mExpandedTimeSamples[j]);
+               }
+               
+               // Arnold doesn't accept more than 255 motion keys
+               if (samples.size() > 255)
+               {
+                  break;
+               }
+               
+               std::swap(mExpandedTimeSamples, samples);
+               samples.clear();
+            }
+         }
+         
+         // Optimize time samples
+         if ((mExpandedTimeSamples.size() > mTimeSamples.size()) && mCommonParams.optimizeSamples)
+         {
+            // Remove samples outside of camera shutter range
+            AtNode *cam = AiUniverseGetCamera();
+            
+            if (cam)
+            {
+               AtNode *opts = AiUniverseGetOptions();
+               
+               if (AiNodeLookUpUserParameter(opts, "motion_start_frame") &&
+                   AiNodeLookUpUserParameter(opts, "motion_end_frame"))
+               {
+                  std::vector<double> samples;
+                  
+                  mMotionStart = AiNodeGetFlt(opts, "motion_start_frame");
+                  mMotionEnd = AiNodeGetFlt(opts, "motion_end_frame");
+                  
+                  if (AiNodeLookUpUserParameter(opts, "frame") &&
+                      AiNodeLookUpUserParameter(opts, "relative_motion_frame") &&
+                      AiNodeGetBool(opts, "relative_motion_frame"))
+                  {
+                     float frame = AiNodeGetFlt(opts, "frame");
+                     mMotionStart += frame;
+                     mMotionEnd += frame;
+                  }
+                  
+                  mMotionStart /= mCommonParams.fps;
+                  mMotionEnd /= mCommonParams.fps;
+                  
+                  double motionLength = mMotionEnd - mMotionStart;
+                  
+                  double shutterOpen = (mMotionStart + AiCameraGetShutterStart() * motionLength);
+                  double shutterClose = (mMotionStart + AiCameraGetShutterEnd() * motionLength);
+                  
+                  for (size_t i=0; i<mExpandedTimeSamples.size(); ++i)
+                  {
+                     double sample = mExpandedTimeSamples[i];
+                     
+                     if (sample < shutterOpen)
+                     {
+                        continue;
+                     }
+                     else if (sample > shutterClose)
+                     {
+                        if (samples.size() > 0 && samples.back() < shutterClose)
+                        {
+                           samples.push_back(sample);
+                        }
+                     }
+                     else
+                     {
+                        if (samples.size() == 0 && i > 0 && sample > shutterOpen)
+                        {
+                           samples.push_back(mExpandedTimeSamples[i-1]);
+                        }
+                        samples.push_back(sample);
+                     }
+                  }
+                  
+                  if (samples.size() > 0 && samples.size() < mExpandedTimeSamples.size())
+                  {
+                     std::swap(samples, mExpandedTimeSamples);
+                     mSetTimeSamples = true;
+                  }
+               }
+               else
+               {
+                 AiMsgWarning("[abcproc] Cannot optimize motion blur samples (missing motion sample range info)");
+               }
+            }
+            else
+            {
+               AiMsgWarning("[abcproc] Cannot optimize motion blur samples (no camera set)");
+            }
+         }
+         
+         // Compute shape key
+         mShapeKey = shapeKey();
+         
+         if (mCommonParams.verbose)
+         {
+            AiMsgInfo("[abcproc] Procedural parameters: \"%s\"", dataString(0).c_str());
+            
+            for (size_t i=0; i<mExpandedTimeSamples.size(); ++i)
+            {
+               AiMsgInfo("[abcproc] Add motion sample time: %lf", mExpandedTimeSamples[i]);
+            }
+         }
+         
+         if (mMode == PM_single)
+         {
+            // Read instance_num attribute
+            mInstanceNum = 0;
+            
+            const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mProcNode, "instance_num");
+            if (pe)
+            {
+               int pt = AiUserParamGetType(pe);
+               if (pt == AI_TYPE_INT)
+               {
+                  mInstanceNum = AiNodeGetInt(mProcNode, "instance_num");
+               }
+               else if (pt == AI_TYPE_UINT)
+               {
+                  mInstanceNum = int(AiNodeGetUInt(mProcNode, "instance_num"));
+               }
+               else if (pt == AI_TYPE_BYTE)
+               {
+                  mInstanceNum = int(AiNodeGetByte(mProcNode, "instance_num"));
+               }
+            }
+         }
+         
+         // Check if we should export a box for volume shading rather than a new procedural or shape
+         const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mProcNode, "step_size");
          if (pe)
          {
-            int pt = AiUserParamGetType(pe);
-            if (pt == AI_TYPE_INT)
-            {
-               mInstanceNum = AiNodeGetInt(mProcNode, "instance_num");
-            }
-            else if (pt == AI_TYPE_UINT)
-            {
-               mInstanceNum = int(AiNodeGetUInt(mProcNode, "instance_num"));
-            }
-            else if (pt == AI_TYPE_BYTE)
-            {
-               mInstanceNum = int(AiNodeGetByte(mProcNode, "instance_num"));
-            }
+            mStepSize = AiNodeGetFlt(mProcNode, "step_size");
          }
       }
-      
-      // Check if we should export a box for volume shading rather than a new procedural or shape
-      const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mProcNode, "step_size");
-      if (pe)
+      else
       {
-         mStepSize = AiNodeGetFlt(mProcNode, "step_size");
+         AiMsgInfo("[abcproc] Out of frame range");
       }
    }
    else
@@ -874,9 +884,13 @@ std::string Dso::uniqueName(const std::string &baseName) const
    return name;
 }
 
-double Dso::computeTime(double frame) const
+double Dso::computeTime(double frame, bool *exclude) const
 {
    // Apply speed / offset
+   if (exclude)
+   {
+      *exclude = false;
+   }
    
    double extraOffset = 0.0;
    
@@ -942,6 +956,24 @@ double Dso::computeTime(double frame) const
          else
          {
             t2 = endTime - fraction * playTime;
+         }
+      }
+      break;
+   case CT_clip:
+      if (t < (startTime - eps))
+      {
+         t2 = startTime;
+         if (exclude)
+         {
+            *exclude = true;
+         }
+      }
+      else if (t > (endTime + eps))
+      {
+         t2 = endTime;
+         if (exclude)
+         {
+            *exclude = true;
          }
       }
       break;

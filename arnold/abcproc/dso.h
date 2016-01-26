@@ -14,6 +14,7 @@ enum CycleType
    CT_loop,
    CT_reverse,
    CT_bounce,
+   CT_clip,
    CT_MAX
 };
 
@@ -165,7 +166,7 @@ public:
       return mExpandedTimeSamples;
    }
    
-   double computeTime(double frame) const;
+   double computeTime(double frame, bool *exclude=0) const;
    
    // Attributes
    
