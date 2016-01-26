@@ -50,9 +50,12 @@ MSyntax AbcShapeImport::createSyntax()
    syntax.addFlag("-psf", "-preserveStartFrame", MSyntax::kBoolean);
    syntax.addFlag("-ct", "-cycleType", MSyntax::kString);
    syntax.addFlag("-ri", "-rotationInterpolation", MSyntax::kString);
+   syntax.addFlag("-nri", "-nodeRotationInterpolation", MSyntax::kString, MSyntax::kString);
    syntax.addFlag("-ft", "-filterObjects", MSyntax::kString);
    syntax.addFlag("-eft", "-excludeFilterObjects", MSyntax::kString);
    syntax.addFlag("-h", "-help", MSyntax::kNoArg);
+   
+   syntax.makeFlagMultiUse("-nri");
    
    syntax.addArg(MSyntax::kString);
    
@@ -206,7 +209,7 @@ public:
 
    const MDagPath& getDag(const std::string &path) const;
    
-   void keyTransforms(const MString &rotationInterpolation);
+   void keyTransforms(const MString &defaultRotationInterpolation, const MStringDict &nodeRotationInterpolation);
    
 private:
 
@@ -2597,7 +2600,7 @@ void CreateTree::leave(AlembicNode &, AlembicNode *)
 {
 }
 
-void CreateTree::keyTransforms(const MString &rotationInterpolation)
+void CreateTree::keyTransforms(const MString &defaultRotationInterpolation, const MStringDict &nodeRotationInterpolation)
 {
    MFnAnimCurve::InfinityType inf = MFnAnimCurve::kConstant;
    
@@ -2615,7 +2618,7 @@ void CreateTree::keyTransforms(const MString &rotationInterpolation)
    }
    
    mKeyframer.createCurves(inf, inf);
-   mKeyframer.setRotationCurvesInterpolation(rotationInterpolation);
+   mKeyframer.setRotationCurvesInterpolation(defaultRotationInterpolation, nodeRotationInterpolation);
 }
 
 // ---
@@ -2645,7 +2648,9 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
    
    MArgParser argData(syntax(), args, &status);
    
+   // default interpoation type
    MString rotInterp("quaternion");
+   MStringDict nodeRotInterp;
    AbcShape::DisplayMode dm = AbcShape::DM_box;
    AbcShape::CycleType ct = AbcShape::CT_hold;
    double speed = 1.0;
@@ -2665,36 +2670,39 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
    {
       MGlobal::displayInfo(MString(PREFIX_NAME("AbcShapeImport")) + " [options] abc_file_path");
       MGlobal::displayInfo("Options:");
-      MGlobal::displayInfo("-r / -reparent               : dagpath");
-      MGlobal::displayInfo("                               Reparent the whole hierarchy under a node in the current Maya scene.");
-      MGlobal::displayInfo("-n / -namespace              : string");
-      MGlobal::displayInfo("                               Namespace to add nodes to (default to current namespace).");
-      MGlobal::displayInfo("-m / -mode                   : string (box|boxes|points|geometry)");
-      MGlobal::displayInfo("                               " + MString(PREFIX_NAME("AbcShape")) + " nodes display mode (default to box).");
-      MGlobal::displayInfo("-s / -speed                  : double");
-      MGlobal::displayInfo("                               " + MString(PREFIX_NAME("AbcShape")) + " nodes speed (default to 1.0).");
-      MGlobal::displayInfo("-o / -offset                 : double");
-      MGlobal::displayInfo("                               " + MString(PREFIX_NAME("AbcShape")) + " nodes offset in frames (default to 0.0).");
-      MGlobal::displayInfo("-psf / -preserveStartFrame   : bool");
-      MGlobal::displayInfo("                               Preserve range start frame when using speed.");
-      MGlobal::displayInfo("-ct / -cycleType             : string (hold|loop|reverse|bounce)");
-      MGlobal::displayInfo("                               " + MString(PREFIX_NAME("AbcShape")) + " nodes cycle type (default to hold).");
-      MGlobal::displayInfo("-ci / -createInstances       :");
-      MGlobal::displayInfo("                               Create maya instances.");
-      MGlobal::displayInfo("-it / -ignoreTransforms      :");
-      MGlobal::displayInfo("                               Do not key transform nodes (but for locators direct parent).");
-      MGlobal::displayInfo("-ri / -rotationInterpolation : string (none|euler|quaternion|quaternionSlerp|quaternionSquad)");
-      MGlobal::displayInfo("                               Set created rotation curves interpolation type (default to quaternion).");
-      MGlobal::displayInfo("-ftr / -fitTimeRange         :");
-      MGlobal::displayInfo("                               Change Maya time slider to fit the range of input file.");
-      MGlobal::displayInfo("-sts / -setToStartFrame      :");
-      MGlobal::displayInfo("                               Set the current time to the start of the frame range.");
-      MGlobal::displayInfo("-ft / -filterObjects         : string");
-      MGlobal::displayInfo("                               Selective import cache objects whose name matches expression.");
-      MGlobal::displayInfo("-eft / -excludeFilterObjects : string");
-      MGlobal::displayInfo("                               Selective exclude cache objects whose name matches expression.");
-      MGlobal::displayInfo("-h / -help                   :");
-      MGlobal::displayInfo("                               Display this help.");
+      MGlobal::displayInfo("-r / -reparent                   : dagpath");
+      MGlobal::displayInfo("                                   Reparent the whole hierarchy under a node in the current Maya scene.");
+      MGlobal::displayInfo("-n / -namespace                  : string");
+      MGlobal::displayInfo("                                   Namespace to add nodes to (default to current namespace).");
+      MGlobal::displayInfo("-m / -mode                       : string (box|boxes|points|geometry)");
+      MGlobal::displayInfo("                                   " + MString(PREFIX_NAME("AbcShape")) + " nodes display mode (default to box).");
+      MGlobal::displayInfo("-s / -speed                      : double");
+      MGlobal::displayInfo("                                   " + MString(PREFIX_NAME("AbcShape")) + " nodes speed (default to 1.0).");
+      MGlobal::displayInfo("-o / -offset                     : double");
+      MGlobal::displayInfo("                                   " + MString(PREFIX_NAME("AbcShape")) + " nodes offset in frames (default to 0.0).");
+      MGlobal::displayInfo("-psf / -preserveStartFrame       : bool");
+      MGlobal::displayInfo("                                   Preserve range start frame when using speed.");
+      MGlobal::displayInfo("-ct / -cycleType                 : string (hold|loop|reverse|bounce)");
+      MGlobal::displayInfo("                                   " + MString(PREFIX_NAME("AbcShape")) + " nodes cycle type (default to hold).");
+      MGlobal::displayInfo("-ci / -createInstances           :");
+      MGlobal::displayInfo("                                   Create maya instances.");
+      MGlobal::displayInfo("-it / -ignoreTransforms          :");
+      MGlobal::displayInfo("                                   Do not key transform nodes (but for locators direct parent).");
+      MGlobal::displayInfo("-ri / -rotationInterpolation     : string (none|euler|quaternion|quaternionSlerp|quaternionSquad)");
+      MGlobal::displayInfo("                                   Set created rotation curves interpolation type (default to quaternion).");
+      MGlobal::displayInfo("-ri / -nodeRotationInterpolation : string string (none|euler|quaternion|quaternionSlerp|quaternionSquad)");
+      MGlobal::displayInfo("                                   Override rotation curves interpolation type (second value) for a specific node (first value).");
+      MGlobal::displayInfo("                                   Node name is the alembic node name.");
+      MGlobal::displayInfo("-ftr / -fitTimeRange             :");
+      MGlobal::displayInfo("                                   Change Maya time slider to fit the range of input file.");
+      MGlobal::displayInfo("-sts / -setToStartFrame          :");
+      MGlobal::displayInfo("                                   Set the current time to the start of the frame range.");
+      MGlobal::displayInfo("-ft / -filterObjects             : string");
+      MGlobal::displayInfo("                                   Selective import cache objects whose name matches expression.");
+      MGlobal::displayInfo("-eft / -excludeFilterObjects     : string");
+      MGlobal::displayInfo("                                   Selective exclude cache objects whose name matches expression.");
+      MGlobal::displayInfo("-h / -help                       :");
+      MGlobal::displayInfo("                                   Display this help.");
       MGlobal::displayInfo("");
       MGlobal::displayInfo("Command also work in edit mode:");
       MGlobal::displayInfo("  -mode, -speed, -offset, -preserveStartFrame, -cycleType, -rotationInterpolation flags are supported.");
@@ -2840,13 +2848,52 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
          }
          else
          {
-            MGlobal::displayWarning(val + " is not a valid rotationInterpolation value");
+            MGlobal::displayWarning("Unsupported interpolation type \"" + val + "\" for rotationInterpolation flag");
          }
       }
       else
       {
          MGlobal::displayWarning("Invalid rotationInterpolation flag argument");
       }
+   }
+   
+   unsigned int count = argData.numberOfFlagUses("nodeRotationInterpolation");
+   for (unsigned int i=0; i<count; ++i)
+   {
+      MArgList argList;
+      
+      argData.getFlagArgumentList("nodeRotationInterpolation", i, argList);
+      
+      if (argList.length() != 2)
+      {
+         MGlobal::displayWarning("Invalid arguments for nodeRotationInterpolation flag");
+         continue;
+      }
+      
+      MString nodeName = argList.asString(0, &status);
+      if (status != MS::kSuccess)
+      {
+         MGlobal::displayWarning("Invalid arguments for nodeRotationInterpolation flag");
+         continue;
+      }
+      
+      MString interpType = argList.asString(1, &status);
+      if (status != MS::kSuccess)
+      {
+         MGlobal::displayWarning("Invalid arguments for nodeRotationInterpolation flag");
+         continue;
+      }
+      else if (interpType != "none" &&
+               interpType != "euler" &&
+               interpType != "quaternion" &&
+               interpType != "quaternionSlerp" &&
+               interpType != "quaternionSquad")
+      {
+         MGlobal::displayWarning("Unsupported interpolation type \"" + interpType + "\" for nodeRotationInterpolation flag");
+         continue;
+      }
+      
+      nodeRotInterp[nodeName] = interpType;
    }
    
    if (argData.isEdit())
@@ -2864,7 +2911,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       MFnDagNode node;
       
       // Keep a list of processed curves
-      bool processCurves = (setSpeed || setOffset || setCycle || setPreserveStart || setInterp);
+      bool processCurves = (setSpeed || setOffset || setCycle || setPreserveStart || setInterp || nodeRotInterp.size() > 0);
       
       Keyframer keyframer;
       MStringArray connectedCurves;
@@ -2936,6 +2983,29 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
                }
             }
             
+            bool setNodeInterp = setInterp;
+            MString nodeInterp = rotInterp;
+            
+            // Get target node name without parent or namespaces
+            MString nodeName = path.partialPathName();
+            int r = nodeName.rindexW(':');
+            if (r == -1)
+            {
+               r = nodeName.rindexW('|');
+            }
+            if (r != -1)
+            {
+               nodeName = nodeName.substringW(r + 1, nodeName.numChars() - 1);
+            }
+            
+            // Check for node specific interpolation override
+            MStringDict::const_iterator it = nodeRotInterp.find(nodeName);
+            if (it != nodeRotInterp.end())
+            {
+               nodeInterp = it->second;
+               setNodeInterp = true;
+            }
+            
             for (unsigned int j=0; j<connectedCurves.length(); ++j)
             {
                tmpSel.clear();
@@ -2962,7 +3032,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
                                      (setPreserveStart ? &preserveStartFrame : 0));
                
                keyframer.adjustCurve(curve,
-                                     (setInterp ? &rotInterp : 0),
+                                     (setNodeInterp ? &nodeInterp : 0),
                                      (setCycle ? &inf : 0),
                                      (setCycle ? &inf : 0));
             }
@@ -3100,7 +3170,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
                CreateTree visitor(abcPath, dm, ignoreTransforms, createInstances, speed, offset, preserveStartFrame, ct);
                scene->visit(AlembicNode::VisitDepthFirst, visitor);
                
-               visitor.keyTransforms(rotInterp);
+               visitor.keyTransforms(rotInterp, nodeRotInterp);
                
                if (parentDag.isValid())
                {

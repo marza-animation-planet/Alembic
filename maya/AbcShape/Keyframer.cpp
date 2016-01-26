@@ -285,11 +285,11 @@ void Keyframer::cleanupCurve(CurveEntry &e, std::vector<unsigned int> &removeKey
    }
 }
 
-void Keyframer::setRotationCurvesInterpolation(const MString &type)
+void Keyframer::setRotationCurvesInterpolation(const MString &type, const MStringDict &nodeInterpType)
 {
    MStatus stat;
-   MSelectionList rotCurves;
-
+   std::map<MString, MSelectionList, MStringLessThan> rotCurvesByInterpType;
+   
    CurveIterator it = mCurves.begin();
 
    while (it != mCurves.end())
@@ -298,24 +298,52 @@ void Keyframer::setRotationCurvesInterpolation(const MString &type)
 
       MFnDependencyNode node(entry.obj);
       MPlug plug = node.findPlug(entry.attr);
-
+      
       MFnAnimCurve curve(plug, &stat);
 
       if (stat == MStatus::kSuccess && curve.animCurveType() == MFnAnimCurve::kAnimCurveTA)
       {
-         rotCurves.add(curve.name());
+         MString interpType = type;
+         
+         // Check for node interpolation type override
+         MString nodeName = node.name();
+         int r = nodeName.rindexW(':');
+         if (r != -1)
+         {
+            nodeName = nodeName.substringW(r + 1, nodeName.numChars() - 1);
+         }
+         
+         MStringDict::const_iterator nit = nodeInterpType.find(nodeName);
+         if (nit != nodeInterpType.end())
+         {
+            interpType = nit->second;
+         }
+         
+         rotCurvesByInterpType[interpType].add(curve.name());
       }
 
       ++it;
    }
    
-   if (rotCurves.length() > 0)
+   if (rotCurvesByInterpType.size() > 0)
    {
       MSelectionList oldSel;
       
       MGlobal::getActiveSelectionList(oldSel);
-      MGlobal::setActiveSelectionList(rotCurves);
-      MGlobal::executeCommand("rotationInterpolation -c " + type);
+      
+      for (std::map<MString, MSelectionList, MStringLessThan>::iterator slit = rotCurvesByInterpType.begin();
+           slit != rotCurvesByInterpType.end();
+           ++slit)
+      {
+         MSelectionList &rotCurves = slit->second;
+         
+         if (rotCurves.length() > 0)
+         {
+            MGlobal::setActiveSelectionList(rotCurves);
+            MGlobal::executeCommand("rotationInterpolation -c " + slit->first);
+         }
+      }
+      
       MGlobal::setActiveSelectionList(oldSel);
    }
 }
@@ -792,7 +820,7 @@ void Keyframer::adjustCurve(MFnAnimCurve &curve,
 void Keyframer::endRetime()
 {
    // Restore rotation curves interpolation type
-   std::map<MString, MString, MStringLessThan>::iterator it = mRetimedCurveInterp.begin();
+   MStringDict::iterator it = mRetimedCurveInterp.begin();
    MString cmd;
    
    while (it != mRetimedCurveInterp.end())
