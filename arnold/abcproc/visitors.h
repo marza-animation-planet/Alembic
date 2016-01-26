@@ -932,18 +932,31 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
          
          // Get velocity
          const float *vel = 0;
+         const char *velName = mDso->velocityName();
+         UserAttributes::iterator it = info.pointAttrs.end();
          
-         UserAttributes::iterator it = info.pointAttrs.find("velocity");
-         
-         if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
+         if (velName)
          {
-            it = info.pointAttrs.find("vel");
+            it = info.pointAttrs.find(velName);
+            if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+            {
+               it = info.pointAttrs.end();
+            }
+         }
+         else
+         {
+            it = info.pointAttrs.find("velocity");
+            
             if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
             {
-               it = info.pointAttrs.find("v");
-               if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+               it = info.pointAttrs.find("vel");
+               if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
                {
-                  it = info.pointAttrs.end();
+                  it = info.pointAttrs.find("v");
+                  if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+                  {
+                     it = info.pointAttrs.end();
+                  }
                }
             }
          }
@@ -973,17 +986,30 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
          const float *acc = 0;
          if (vel)
          {
-            it = info.pointAttrs.find("acceleration");
+            const char *accName = mDso->accelerationName();
             
-            if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
+            if (accName)
             {
-               it = info.pointAttrs.find("accel");
+               it = info.pointAttrs.find(accName);
+               if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+               {
+                  it = info.pointAttrs.end();
+               }
+            }
+            else
+            {
+               it = info.pointAttrs.find("acceleration");
+               
                if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
                {
-                  it = info.pointAttrs.find("a");
-                  if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+                  it = info.pointAttrs.find("accel");
+                  if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
                   {
-                     it = info.pointAttrs.end();
+                     it = info.pointAttrs.find("a");
+                     if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+                     {
+                        it = info.pointAttrs.end();
+                     }
                   }
                }
             }
@@ -1079,6 +1105,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
             for (size_t i=0, j=0; i<mDso->numMotionSamples(); ++i)
             {
                double dt = mDso->motionSampleTime(i) - mDso->renderTime();
+               dt *= mDso->velocityScale();
                
                if (acc)
                {

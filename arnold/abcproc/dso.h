@@ -99,6 +99,11 @@ public:
       return mCommonParams.referenceFilePath;
    }
    
+   inline float referenceFrame() const
+   {
+      return mCommonParams.referenceFrame;
+   }
+   
    inline const std::string& objectPath() const
    {
       return mCommonParams.objectPath;
@@ -164,6 +169,21 @@ public:
    inline const std::vector<double>& motionSampleTimes() const
    {
       return mExpandedTimeSamples;
+   }
+   
+   inline float velocityScale() const
+   {
+      return mCommonParams.velocityScale;
+   }
+   
+   inline const char* velocityName() const
+   {
+      return (mCommonParams.velocityName.length() > 0 ? mCommonParams.velocityName.c_str() : 0);
+   }
+   
+   inline const char* accelerationName() const
+   {
+      return (mCommonParams.accelerationName.length() > 0 ? mCommonParams.accelerationName.c_str() : 0);
    }
    
    double computeTime(double frame, bool *exclude=0) const;
@@ -363,6 +383,14 @@ private:
       bool verbose;
       
       bool outputReference;
+      
+      float velocityScale;
+      std::string velocityName;
+      std::string accelerationName;
+      // max velocity magnitude attribute name
+      // max radius attribute name
+      // referenceframe (first frame of reference scene by default)
+      float referenceFrame;
       
       void reset();
       std::string dataString(const char *targetShape) const;

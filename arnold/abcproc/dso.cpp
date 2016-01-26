@@ -55,6 +55,12 @@ void Dso::CommonParameters::reset()
    verbose = false;
    
    outputReference = false;
+   
+   velocityScale = 1.0f;
+   velocityName = "";
+   accelerationName = "";
+   
+   referenceFrame = -std::numeric_limits<float>::max();
 }
 
 std::string Dso::CommonParameters::dataString(const char *targetShape) const
@@ -74,6 +80,10 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    if (referenceFilePath.length() > 0)
    {
       oss << " -referencefilename " << referenceFilePath;
+   }
+   if (referenceFrame > -std::numeric_limits<float>::max())
+   {
+      oss << " -referenceframe " << referenceFrame;
    }
    if (namePrefix.length() > 0)
    {
@@ -114,6 +124,15 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    if (preserveStartFrame)
    {
       oss << " -preservestartframe";
+   }
+   oss << " -velocityscale " << velocityScale;
+   if (velocityName.length() > 0)
+   {
+      oss << " -velocityname " << velocityName;
+   }
+   if (accelerationName.length() > 0)
+   {
+      oss << " -accelerationname " << accelerationName;
    }
    if (ignoreTransformBlur)
    {
@@ -173,6 +192,10 @@ std::string Dso::CommonParameters::shapeKey() const
    {
       oss << " -referencefilename " << referenceFilePath;
    }
+   if (referenceFrame > -std::numeric_limits<float>::max())
+   {
+      oss << " -referenceframe " << referenceFrame;
+   }
    if (objectPath.length() > 0)
    {
       oss << " -objectpath " << objectPath;
@@ -208,6 +231,18 @@ std::string Dso::CommonParameters::shapeKey() const
    if (ignoreDeformBlur)
    {
       oss << " -ignoredeformblur";
+   }
+   else
+   {
+      oss << " -velocityscale " << velocityScale;
+      if (velocityName.length() > 0)
+      {
+         oss << " -velocityname " << velocityName;
+      }
+      if (accelerationName.length() > 0)
+      {
+         oss << " -accelerationname " << accelerationName;
+      }
    }
    if (samplesExpandIterations > 0)
    {
@@ -1424,6 +1459,40 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
    {
       mCommonParams.verbose = true;
    }
+   else if (args[i] == "-velocityscale")
+   {
+      ++i;
+      if (i >= args.size() ||
+          sscanf(args[i].c_str(), "%f", &(mCommonParams.velocityScale)) != 1)
+      {
+         return false;
+      }
+   }
+   else if (args[i] == "-velocityname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mCommonParams.velocityName = args[i];
+      }
+   }
+   else if (args[i] == "-accelerationname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mCommonParams.accelerationName = args[i];
+      }
+   }
+   else if (args[i] == "-referenceframe")
+   {
+      ++i;
+      if (i >= args.size() ||
+          sscanf(args[i].c_str(), "%f", &(mCommonParams.referenceFrame)) != 1)
+      {
+         return false;
+      }
+   }
    // Process multi params
    else if (args[i] == "-overrideattribs")
    {
@@ -1929,6 +1998,52 @@ void Dso::readFromUserParams()
          else
          {
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
+         }
+      }
+      else if (param == "velocityscale")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
+         {
+            mCommonParams.velocityScale = AiNodeGetFlt(mProcNode, pname);
+         }
+         else
+         {
+            mCommonParams.velocityScale = 1.0f;
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
+         }
+      }
+      else if (param == "velocityname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mCommonParams.velocityName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
+      else if (param == "accelerationname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mCommonParams.accelerationName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
+      else if (param == "referenceframe")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
+         {
+            mCommonParams.referenceFrame = AiNodeGetFlt(mProcNode, pname);
+         }
+         else
+         {
+            mCommonParams.referenceFrame = -std::numeric_limits<float>::max();
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
          }
       }
       else if (param == "overrideattribs")
