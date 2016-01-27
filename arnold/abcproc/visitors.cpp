@@ -898,12 +898,30 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
       std::set<std::string> specialPointNames;
       std::set<std::string> specialVertexNames;
       
-      specialPointNames.insert("acceleration");
-      specialPointNames.insert("accel");
-      specialPointNames.insert("a");
-      specialPointNames.insert("velocity");
-      specialPointNames.insert("vel");
-      specialPointNames.insert("v");
+      const char *accName = mDso->accelerationName();
+      if (!accName)
+      {
+         specialPointNames.insert("acceleration");
+         specialPointNames.insert("accel");
+         specialPointNames.insert("a");
+      }
+      else
+      {
+         specialPointNames.insert(accName);
+      }
+      
+      const char *velName = mDso->velocityName();
+      if (!velName)
+      {
+         specialPointNames.insert("velocity");
+         specialPointNames.insert("vel");
+         specialPointNames.insert("v");
+      }
+      else if (strcmp(velName, "<builtin>") != 0)
+      {
+         specialPointNames.insert(velName);
+      }
+      
       if (mDso->outputReference())
       {
          specialPointNames.insert("Pref");
@@ -2453,23 +2471,41 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    
    // Get velocities and accelerations
    std::string vname, aname;
+   UserAttributes::iterator it= info.pointAttrs.end();
    
-   UserAttributes::iterator it = info.pointAttrs.find("velocity");
-   if (it == info.pointAttrs.end() ||
-       it->second.arnoldType != AI_TYPE_VECTOR ||
-       it->second.dataCount != info.pointCount)
+   const char *velName = mDso->velocityName();
+   if (velName)
    {
-      it = info.pointAttrs.find("vel");
-      if (it == info.pointAttrs.end() ||
-          it->second.arnoldType != AI_TYPE_VECTOR ||
-          it->second.dataCount != info.pointCount)
+      if (strcmp(velName, "<builtin>") != 0)
       {
-         it = info.pointAttrs.find("v");
+         it = info.pointAttrs.find(velName);
          if (it != info.pointAttrs.end() &&
              (it->second.arnoldType != AI_TYPE_VECTOR ||
              it->second.dataCount != info.pointCount))
          {
             it = info.pointAttrs.end();
+         }
+      }
+   }
+   else
+   {
+      it = info.pointAttrs.find("velocity");
+      if (it == info.pointAttrs.end() ||
+          it->second.arnoldType != AI_TYPE_VECTOR ||
+          it->second.dataCount != info.pointCount)
+      {
+         it = info.pointAttrs.find("vel");
+         if (it == info.pointAttrs.end() ||
+             it->second.arnoldType != AI_TYPE_VECTOR ||
+             it->second.dataCount != info.pointCount)
+         {
+            it = info.pointAttrs.find("v");
+            if (it != info.pointAttrs.end() &&
+                (it->second.arnoldType != AI_TYPE_VECTOR ||
+                it->second.dataCount != info.pointCount))
+            {
+               it = info.pointAttrs.end();
+            }
          }
       }
    }
@@ -2497,25 +2533,41 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    
    if (vel0)
    {
-      it = info.pointAttrs.find("acceleration");
-      if (it == info.pointAttrs.end() ||
-          it->second.arnoldType != AI_TYPE_VECTOR ||
-          it->second.dataCount != info.pointCount)
+      const char *accName = mDso->accelerationName();
+      
+      if (accName)
       {
-         it = info.pointAttrs.find("accel");
+         it = info.pointAttrs.find(accName);
+         if (it != info.pointAttrs.end() &&
+             (it->second.arnoldType != AI_TYPE_VECTOR ||
+              it->second.dataCount != info.pointCount))
+         {
+            it = info.pointAttrs.end();
+         }
+      }
+      else
+      {
+         it = info.pointAttrs.find("acceleration");
          if (it == info.pointAttrs.end() ||
              it->second.arnoldType != AI_TYPE_VECTOR ||
              it->second.dataCount != info.pointCount)
          {
-            it = info.pointAttrs.find("a");
-            if (it != info.pointAttrs.end() &&
-                (it->second.arnoldType != AI_TYPE_VECTOR ||
-                 it->second.dataCount != info.pointCount))
+            it = info.pointAttrs.find("accel");
+            if (it == info.pointAttrs.end() ||
+                it->second.arnoldType != AI_TYPE_VECTOR ||
+                it->second.dataCount != info.pointCount)
             {
-               it = info.pointAttrs.end();
+               it = info.pointAttrs.find("a");
+               if (it != info.pointAttrs.end() &&
+                   (it->second.arnoldType != AI_TYPE_VECTOR ||
+                    it->second.dataCount != info.pointCount))
+               {
+                  it = info.pointAttrs.end();
+               }
             }
          }
       }
+      
       if (it != info.pointAttrs.end())
       {
          aname = it->first;
@@ -2618,6 +2670,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
             {
                // Note: a * samp0->time() + b * samp1->time() == renderTime
                double dt = t - mDso->renderTime();
+               dt *= mDso->velocityScale();
                
                size_t off = idit->second * 3;
                
@@ -2648,6 +2701,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
             if (vel0)
             {
                double dt = t - samp0->time();
+               dt *= mDso->velocityScale();
                
                pnt.x += dt * vel0[voff  ];
                pnt.y += dt * vel0[voff+1];
@@ -2680,6 +2734,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
          if (vel1)
          {
             double dt = t - samp1->time();
+            dt *= mDso->velocityScale();
             
             unsigned int voff = 3 * it->second.first;
             
@@ -4116,15 +4171,34 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
             // Get velocity
             
             const float *vel = 0;
+            const char *velName = mDso->velocityName();
+            UserAttributes::iterator it = info.pointAttrs.end();
             
-            UserAttributes::iterator it = info.pointAttrs.find("velocity");
-            
-            if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
+            if (velName)
             {
-               it = info.pointAttrs.find("v");
-               if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+               if (strcmp(velName, "<builtin>") != 0)
                {
-                  it = info.pointAttrs.end();
+                  it = info.pointAttrs.find(velName);
+                  if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+                  {
+                     it = info.pointAttrs.end();
+                  }
+               }
+            }
+            else
+            {
+               it = info.pointAttrs.find("velocity");
+               if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
+               {
+                  it = info.pointAttrs.find("vel");
+                  if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
+                  {
+                     it = info.pointAttrs.find("v");
+                     if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+                     {
+                        it = info.pointAttrs.end();
+                     }
+                  }
                }
             }
             
@@ -4155,17 +4229,30 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
             
             if (vel)
             {
-               UserAttributes::iterator it = info.pointAttrs.find("acceleration");
+               const char *accName = mDso->accelerationName();
+               UserAttributes::iterator it = info.pointAttrs.end();
                
-               if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
+               if (accName)
                {
-                  it = info.pointAttrs.find("accel");
+                  it = info.pointAttrs.find(accName);
+                  if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+                  {
+                     it = info.pointAttrs.end();
+                  }
+               }
+               else
+               {
+                  it = info.pointAttrs.find("acceleration");
                   if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
                   {
-                     it = info.pointAttrs.find("a");
-                     if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+                     it = info.pointAttrs.find("accel");
+                     if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
                      {
-                        it = info.pointAttrs.end();
+                        it = info.pointAttrs.find("a");
+                        if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+                        {
+                           it = info.pointAttrs.end();
+                        }
                      }
                   }
                }
@@ -4185,6 +4272,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
                for (size_t i=0, j=0; i<mDso->numMotionSamples(); ++i)
                {
                   t = mDso->motionSampleTime(i) - mDso->renderTime();
+                  t *= mDso->velocityScale();
                   
                   if (!fillCurvesPositions(info, i, mDso->numMotionSamples(), Nv, P0, W0, P1, W1, vel, acc, t, K, num_points, points))
                   {

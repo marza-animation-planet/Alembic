@@ -166,6 +166,21 @@ public:
       return mExpandedTimeSamples;
    }
    
+   inline float velocityScale() const
+   {
+      return mCommonParams.velocityScale;
+   }
+   
+   inline const char* velocityName() const
+   {
+      return (mCommonParams.velocityName.length() > 0 ? mCommonParams.velocityName.c_str() : 0);
+   }
+   
+   inline const char* accelerationName() const
+   {
+      return (mCommonParams.accelerationName.length() > 0 ? mCommonParams.accelerationName.c_str() : 0);
+   }
+   
    double computeTime(double frame, bool *exclude=0) const;
    
    // Attributes
@@ -363,6 +378,13 @@ private:
       bool verbose;
       
       bool outputReference;
+      
+      float velocityScale;
+      std::string velocityName;
+      std::string accelerationName;
+      // max velocity magnitude attribute name
+      // max radius attribute name
+      // referenceframe (first frame of reference scene by default)
       
       void reset();
       std::string dataString(const char *targetShape) const;
