@@ -937,10 +937,13 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
          
          if (velName)
          {
-            it = info.pointAttrs.find(velName);
-            if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+            if (strcmp(velName, "<builtin>") != 0)
             {
-               it = info.pointAttrs.end();
+               it = info.pointAttrs.find(velName);
+               if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+               {
+                  it = info.pointAttrs.end();
+               }
             }
          }
          else

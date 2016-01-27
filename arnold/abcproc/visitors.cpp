@@ -917,7 +917,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
          specialPointNames.insert("vel");
          specialPointNames.insert("v");
       }
-      else
+      else if (strcmp(velName, "<builtin>") != 0)
       {
          specialPointNames.insert(velName);
       }
@@ -2476,12 +2476,15 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    const char *velName = mDso->velocityName();
    if (velName)
    {
-      it = info.pointAttrs.find(velName);
-      if (it != info.pointAttrs.end() &&
-          (it->second.arnoldType != AI_TYPE_VECTOR ||
-          it->second.dataCount != info.pointCount))
+      if (strcmp(velName, "<builtin>") != 0)
       {
-         it = info.pointAttrs.end();
+         it = info.pointAttrs.find(velName);
+         if (it != info.pointAttrs.end() &&
+             (it->second.arnoldType != AI_TYPE_VECTOR ||
+             it->second.dataCount != info.pointCount))
+         {
+            it = info.pointAttrs.end();
+         }
       }
    }
    else
@@ -4173,10 +4176,13 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
             
             if (velName)
             {
-               it = info.pointAttrs.find(velName);
-               if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+               if (strcmp(velName, "<builtin>") != 0)
                {
-                  it = info.pointAttrs.end();
+                  it = info.pointAttrs.find(velName);
+                  if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+                  {
+                     it = info.pointAttrs.end();
+                  }
                }
             }
             else
