@@ -140,6 +140,25 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.name = "mtoa_constant_abc_optimizeSamples";
    data.shortName = "optsamp";
    helper.MakeInputBoolean(data);
+   
+   data.defaultValue.FLT = 1.0;
+   data.name = "mtoa_constant_abc_velocityScale";
+   data.shortName = "velscl";
+   data.hasSoftMin = true;
+   data.softMin.FLT = 0.0;
+   data.hasSoftMax = true;
+   data.softMin.FLT = 10.0;
+   helper.MakeInputFloat(data);
+   
+   data.defaultValue.STR = "";
+   data.name = "mtoa_constant_abc_velocityName";
+   data.shortName = "velan";
+   helper.MakeInputString(data);
+   
+   data.defaultValue.STR = "";
+   data.name = "mtoa_constant_abc_accelerationName";
+   data.shortName = "accan";
+   helper.MakeInputString(data);
 }
 
 CAbcTranslator::CAbcTranslator()
@@ -964,6 +983,32 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
             {
                data += " -optimizesamples";
             }
+         }
+      }
+      
+      plug = FindMayaPlug("mtoa_constant_abc_velocityScale");
+      if (!plug.isNull())
+      {
+         data += " -velocityScale " + ToString(plug.asFloat());
+      }
+      
+      plug = FindMayaPlug("mtoa_constant_abc_velocityName");
+      if (!plug.isNull())
+      {
+         MString name = plug.asString();
+         if (name.numChars() > 0)
+         {
+            data += " -velocityName " + name;
+         }
+      }
+      
+      plug = FindMayaPlug("mtoa_constant_abc_accelerationName");
+      if (!plug.isNull())
+      {
+         MString name = plug.asString();
+         if (name.numChars() > 0)
+         {
+            data += " -accelerationName " + name;
          }
       }
       

@@ -24,6 +24,11 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       self.addControl("mtoa_constant_abc_nurbsSampleRate", label="NURBS Sample Rate")
       self.addSeparator()
       
+      self.addControl("mtoa_constant_abc_velocityScale", label="Velocity Scale")
+      self.addControl("mtoa_constant_abc_velocityName", label="Velocity Name")
+      self.addControl("mtoa_constant_abc_accelerationName", label="Acceleration Name")
+      self.addSeparator()
+      
       self.addControl("mtoa_constant_abc_overrideAttribs", label="Override Attributes")
       self.addControl("mtoa_constant_abc_removeAttribPrefices", label="Remove Attribute Prefices")
       self.addControl("mtoa_constant_abc_objectAttribs", label="Output Object Attributes")
