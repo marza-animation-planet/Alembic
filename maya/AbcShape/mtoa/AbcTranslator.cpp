@@ -141,13 +141,15 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.shortName = "optsamp";
    helper.MakeInputBoolean(data);
    
-   data.defaultValue.FLT = 1.0;
+   data.defaultValue.FLT = 1.0f;
    data.name = "mtoa_constant_abc_velocityScale";
    data.shortName = "velscl";
+   data.hasMin = false;
    data.hasSoftMin = true;
-   data.softMin.FLT = 0.0;
+   data.softMin.FLT = 0.0f;
+   data.hasMax = false;
    data.hasSoftMax = true;
-   data.softMax.FLT = 10.0;
+   data.softMax.FLT = 10.0f;
    helper.MakeInputFloat(data);
    
    data.defaultValue.STR = "";
