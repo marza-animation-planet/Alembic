@@ -218,7 +218,7 @@ public:
                else
                {
                   // index not provided, figure it out
-                  std::pair<Alembic::AbcCoreAbstract::index_t, double> indexTime = owner.getTimeSampling().getNearIndex(t);
+                  std::pair<Alembic::AbcCoreAbstract::index_t, double> indexTime = owner.getTimeSampling()->getNearIndex(t, owner.getNumSamples());
                   
                   if (fabs(indexTime.second - t) > 0.0001)
                   {
