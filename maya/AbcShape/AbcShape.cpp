@@ -2243,7 +2243,7 @@ MBoundingBox AbcShape::boundingBox() const
       
    this2->syncInternals();
    
-   if (mScene)
+   if (!mClipped && mScene)
    {
       // Use self bounds here as those are taking ignore transform/instance flag into account
       Alembic::Abc::Box3d bounds = mScene->selfBounds();
