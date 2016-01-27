@@ -89,95 +89,6 @@ bool GetTimeRange::getRange(double &start, double &end) const
 
 // ---
 
-// level: 0: object, 1: primitive, 2: point, 3: vertex
-static bool FindUserAttribute(const char *name,
-                              int level,
-                              double t,
-                              Alembic::Abc::ICompoundProperty userProps,
-                              Alembic::Abc::ICompoundProperty geomParams,
-                              UserAttribute &attr)
-{
-   if (geomParams.valid())
-   {
-      for (size_t i=0; i<geomParams.getNumProperties(); ++i)
-      {
-         const Alembic::AbcCoreAbstract::PropertyHeader &header = geomParams.getPropertyHeader(i);
-         
-         if (header.getName() != name)
-         {
-            continue;
-         }
-         
-         Alembic::AbcGeom::GeometryScope scope = Alembic::AbcGeom::GetGeometryScope(header.getMetaData());
-         
-         // Can two properties of different geometry scope and identical names be stored in alembic?
-         // If so the following has to be reviewed
-         
-         bool doRead = false;
-         
-         switch (scope)
-         {
-         case Alembic::AbcGeom::kFacevaryingScope:
-            doRead = (level == 3);
-            break;
-         case Alembic::AbcGeom::kVaryingScope:
-         case Alembic::AbcGeom::kVertexScope:
-            doRead = (level == 2);
-            break;
-         case Alembic::AbcGeom::kUniformScope:
-            doRead = (level == 1);
-            break;
-         case Alembic::AbcGeom::kConstantScope:
-            doRead = (level == 0);
-            break;
-         default:
-            continue;
-         }
-            
-         if (doRead)
-         {
-            if (ReadUserAttribute(attr, geomParams, header, t, true, false))
-            {
-               return true;
-            }
-            else
-            {
-               DestroyUserAttribute(attr);
-               // Don't return but break to allow fallback to userProps
-               break;
-            }
-         }
-      }
-   }
-   
-   if (userProps.valid() && level == 0)
-   {
-      for (size_t i=0; i<userProps.getNumProperties(); ++i)
-      {
-         const Alembic::AbcCoreAbstract::PropertyHeader &header = userProps.getPropertyHeader(i);
-         
-         if (header.getName() != name)
-         {
-            continue;
-         }
-         
-         InitUserAttribute(attr);
-         
-         if (ReadUserAttribute(attr, userProps, header, t, false, false))
-         {
-            return true;
-         }
-         else
-         {
-            DestroyUserAttribute(attr);
-            return false;
-         }
-      }
-   }
-   
-   return false;
-}
-
 bool GetVisibility(Alembic::Abc::ICompoundProperty props, double t)
 {
    Alembic::Util::bool_t visible = true;
@@ -485,7 +396,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
       
       InitUserAttribute(attr);
       
-      if (FindUserAttribute("radius", 2, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
+      if (ReadSingleUserAttribute("radius", PointAttribute, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
       {
          if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
          {
@@ -493,7 +404,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
          }
       }
       
-      if (attr.data == 0 && FindUserAttribute("size", 2, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
+      if (attr.data == 0 && ReadSingleUserAttribute("size", PointAttribute, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
       {
          if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
          {
@@ -562,7 +473,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
       }
       else
       {
-         if (FindUserAttribute("radius", 0, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
+         if (ReadSingleUserAttribute("radius", ObjectAttribute, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
          {
             if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
             {
@@ -570,7 +481,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
             }
          }
          
-         if (attr.data == 0 && FindUserAttribute("size", 0, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
+         if (attr.data == 0 && ReadSingleUserAttribute("size", ObjectAttribute, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
          {
             if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
             {

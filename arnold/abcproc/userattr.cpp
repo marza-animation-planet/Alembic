@@ -1586,3 +1586,91 @@ void SetUserAttributes(AtNode *node, UserAttributes &attribs, unsigned int count
       ++it;
    }
 }
+
+bool ReadSingleUserAttribute(const char *name,
+                             AttributeLevel level,
+                             double t,
+                             Alembic::Abc::ICompoundProperty userProps,
+                             Alembic::Abc::ICompoundProperty geomParams,
+                             UserAttribute &attr)
+{
+   if (geomParams.valid())
+   {
+      for (size_t i=0; i<geomParams.getNumProperties(); ++i)
+      {
+         const Alembic::AbcCoreAbstract::PropertyHeader &header = geomParams.getPropertyHeader(i);
+         
+         if (header.getName() != name)
+         {
+            continue;
+         }
+         
+         Alembic::AbcGeom::GeometryScope scope = Alembic::AbcGeom::GetGeometryScope(header.getMetaData());
+         
+         // Can two properties of different geometry scope and identical names be stored in alembic?
+         // If so the following has to be reviewed
+         
+         bool doRead = false;
+         
+         switch (scope)
+         {
+         case Alembic::AbcGeom::kFacevaryingScope:
+            doRead = (level == VertexAttribute);
+            break;
+         case Alembic::AbcGeom::kVaryingScope:
+         case Alembic::AbcGeom::kVertexScope:
+            doRead = (level == PointAttribute);
+            break;
+         case Alembic::AbcGeom::kUniformScope:
+            doRead = (level == PrimitiveAttribute);
+            break;
+         case Alembic::AbcGeom::kConstantScope:
+            doRead = (level == ObjectAttribute);
+            break;
+         default:
+            continue;
+         }
+            
+         if (doRead)
+         {
+            if (ReadUserAttribute(attr, geomParams, header, t, true, false))
+            {
+               return true;
+            }
+            else
+            {
+               DestroyUserAttribute(attr);
+               // Don't return but break to allow fallback to userProps
+               break;
+            }
+         }
+      }
+   }
+   
+   if (userProps.valid() && level == ObjectAttribute)
+   {
+      for (size_t i=0; i<userProps.getNumProperties(); ++i)
+      {
+         const Alembic::AbcCoreAbstract::PropertyHeader &header = userProps.getPropertyHeader(i);
+         
+         if (header.getName() != name)
+         {
+            continue;
+         }
+         
+         InitUserAttribute(attr);
+         
+         if (ReadUserAttribute(attr, userProps, header, t, false, false))
+         {
+            return true;
+         }
+         else
+         {
+            DestroyUserAttribute(attr);
+            return false;
+         }
+      }
+   }
+   
+   return false;
+}

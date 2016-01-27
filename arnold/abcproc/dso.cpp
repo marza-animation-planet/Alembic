@@ -228,6 +228,8 @@ std::string Dso::CommonParameters::shapeKey() const
 void Dso::MultiParameters::reset()
 {
    overrideAttribs.clear();
+   overrideBoundsMinName = "";
+   overrideBoundsMaxName = "";
 }
 
 std::string Dso::MultiParameters::dataString() const
@@ -243,6 +245,16 @@ std::string Dso::MultiParameters::dataString() const
          oss << " " << *it;
          ++it;
       }
+   }
+   
+   if (overrideBoundsMinName.length() > 0)
+   {
+      oss << " -overrideBoundsMinName " << overrideBoundsMinName;
+   }
+   
+   if (overrideBoundsMaxName.length() > 0)
+   {
+      oss << " -overrideBoundsMaxName " << overrideBoundsMaxName;
    }
    
    return oss.str();
@@ -1435,6 +1447,22 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       }
       --i;
    }
+   else if (args[i] == "-overrideboundsminname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mMultiParams.overrideBoundsMinName = args[i];
+      }
+   }
+   else if (args[i] == "-overrideboundsmaxname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mMultiParams.overrideBoundsMaxName = args[i];
+      }
+   }
    // Process single params
    else if (args[i] == "-objectattribs")
    {
@@ -1980,6 +2008,28 @@ void Dso::readFromUserParams()
          else
          {
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
+         }
+      }
+      else if (param == "overrideboundsminname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mMultiParams.overrideBoundsMinName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
+      else if (param == "overrideboundsmaxname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mMultiParams.overrideBoundsMaxName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
          }
       }
       else if (param == "objectattribs")

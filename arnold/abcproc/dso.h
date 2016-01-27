@@ -207,6 +207,16 @@ public:
    
    bool cleanAttribName(std::string &name) const;
    
+   inline const char* overrideBoundsMinName() const
+   {
+      return (mMultiParams.overrideBoundsMinName.length() > 0 ? mMultiParams.overrideBoundsMinName.c_str() : 0);
+   }
+   
+   inline const char* overrideBoundsMaxName() const
+   {
+      return (mMultiParams.overrideBoundsMaxName.length() > 0 ? mMultiParams.overrideBoundsMaxName.c_str() : 0);
+   }
+   
    // Shapes
    
    inline size_t numShapes() const
@@ -372,7 +382,8 @@ private:
    struct MultiParameters
    {
       std::set<std::string> overrideAttribs;
-      
+      std::string overrideBoundsMinName;
+      std::string overrideBoundsMaxName;
       
       void reset();
       std::string dataString() const;

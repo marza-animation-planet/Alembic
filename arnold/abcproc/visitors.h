@@ -134,10 +134,16 @@ public:
    inline size_t numNodes() const { return mNodes.size(); }
    inline AtNode* node(size_t i) const { return (i < numNodes() ? mNodes[i] : 0); }
    inline const char* path(size_t i) const { return (i < numNodes() ? mPaths[i].c_str() : 0); }
+   inline bool isFloat3(UserAttribute &attr) const { (attr.arnoldType == AI_TYPE_VECTOR && attr.dataDim == 1) ||
+                                                     (attr.arnoldType == AI_TYPE_POINT && attr.dataDim == 1) ||
+                                                     (attr.arnoldType == AI_TYPE_FLOAT && attr.dataDim == 3); }
    
 private:
    
    float adjustRadius(float radius) const;
+
+   template <class Schema>
+   bool overrideBounds(AlembicNodeT<Alembic::Abc::ISchemaObject<Schema> > &node, Alembic::Abc::Box3d &box);
    
    template <class T>
    AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance, bool interpolateBounds, double extraPadding);
@@ -168,6 +174,67 @@ inline float MakeProcedurals::adjustRadius(float radius) const
    }
 }
 
+template <class Schema>
+bool MakeProcedurals::overrideBounds(AlembicNodeT<Alembic::Abc::ISchemaObject<Schema> > &node, Alembic::Abc::Box3d &box)
+{
+   bool rv = false;
+   
+   if (!mDso->ignoreDeformBlur())
+   {
+      const char *minAttrName = mDso->overrideBoundsMinName();
+      if (!minAttrName)
+      {
+         minAttrName = "overrideBoundsMin";
+      }
+      
+      const char *maxAttrName = mDso->overrideBoundsMaxName();
+      if (!maxAttrName)
+      {
+         maxAttrName = "overrideBoundsMax";
+      }
+      
+      Schema schema = node.typedObject().getSchema();
+      
+      Alembic::Abc::ICompoundProperty userProps = schema.getUserProperties();
+      Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
+      double t = mDso->renderTime();
+      
+      UserAttribute minAttr;
+      UserAttribute maxAttr;
+      
+      InitUserAttribute(minAttr);
+      InitUserAttribute(maxAttr);
+      
+      if (ReadSingleUserAttribute(minAttrName, ObjectAttribute, t, userProps, geomParams, minAttr) && isFloat3(minAttr) &&
+          ReadSingleUserAttribute(maxAttrName, ObjectAttribute, t, userProps, geomParams, maxAttr) && isFloat3(maxAttr))
+      {
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Use bounds override for \"%s\"", node.path().c_str());
+         }
+         
+         float *bmin = (float*) minAttr.data;
+         float *bmax = (float*) maxAttr.data;
+         
+         box.min.x = bmin[0];
+         box.min.y = bmin[1];
+         box.min.z = bmin[2];
+         
+         box.max.x = bmax[0];
+         box.max.y = bmax[1];
+         box.max.z = bmax[2];
+         
+         
+         rv = true;
+      }
+      
+      DestroyUserAttribute(minAttr);
+      DestroyUserAttribute(maxAttr);
+   }
+   
+   return rv;
+}
+
 template <class T>
 AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance, bool interpolateBounds, double extraPadding)
 {
@@ -177,96 +244,99 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
    
    if (visible)
    {
-      TimeSampleList<Alembic::Abc::IBox3dProperty> &boundsSamples = node.samples().boundsSamples;
-      
       Alembic::Abc::Box3d box;
       
-      double renderTime = mDso->renderTime();
-      
-      const double *sampleTimes = 0;
-      size_t sampleTimesCount = 0;
-      
-      if (mDso->ignoreDeformBlur())
+      if (!overrideBounds(node, box))
       {
-         sampleTimes = &renderTime;
-         sampleTimesCount = 1;
-      }
-      else
-      {
-         sampleTimes = &(mDso->motionSampleTimes()[0]);
-         sampleTimesCount = mDso->numMotionSamples();
-      }
+         TimeSampleList<Alembic::Abc::IBox3dProperty> &boundsSamples = node.samples().boundsSamples;
          
-      for (size_t i=0; i<sampleTimesCount; ++i)
-      {
-         double t = sampleTimes[i];
+         double renderTime = mDso->renderTime();
          
-         if (mDso->verbose())
+         const double *sampleTimes = 0;
+         size_t sampleTimesCount = 0;
+         
+         if (mDso->ignoreDeformBlur())
          {
-            AiMsgInfo("[abcproc] Sample bounds \"%s\" at t=%lf", node.path().c_str(), t);
+            sampleTimes = &renderTime;
+            sampleTimesCount = 1;
          }
-         
-         node.sampleBounds(t, t, (i > 0 || instance != 0));
-      }
-      
-      if (boundsSamples.size() == 0)
-      {
-         // no data... -> empty box, don't generate node
-         mNodes.push_back(0);
-         mPaths.push_back("");
-         AiMsgWarning("[abcproc] No valid bounds for \"%s\"", node.path().c_str());
-         return AlembicNode::ContinueVisit;
-      }
-      else if (boundsSamples.size() == 1)
-      {
-         box = boundsSamples.begin()->data();
-      }
-      else
-      {
+         else
+         {
+            sampleTimes = &(mDso->motionSampleTimes()[0]);
+            sampleTimesCount = mDso->numMotionSamples();
+         }
+            
          for (size_t i=0; i<sampleTimesCount; ++i)
          {
             double t = sampleTimes[i];
             
-            TimeSampleList<Alembic::Abc::IBox3dProperty>::ConstIterator samp0, samp1;
-            double blend = 0.0;
-            
-            if (boundsSamples.getSamples(t, samp0, samp1, blend))
+            if (mDso->verbose())
             {
-               if (blend > 0.0)
+               AiMsgInfo("[abcproc] Sample bounds \"%s\" at t=%lf", node.path().c_str(), t);
+            }
+            
+            node.sampleBounds(t, t, (i > 0 || instance != 0));
+         }
+         
+         if (boundsSamples.size() == 0)
+         {
+            // no data... -> empty box, don't generate node
+            mNodes.push_back(0);
+            mPaths.push_back("");
+            AiMsgWarning("[abcproc] No valid bounds for \"%s\"", node.path().c_str());
+            return AlembicNode::ContinueVisit;
+         }
+         else if (boundsSamples.size() == 1)
+         {
+            box = boundsSamples.begin()->data();
+         }
+         else
+         {
+            for (size_t i=0; i<sampleTimesCount; ++i)
+            {
+               double t = sampleTimes[i];
+               
+               TimeSampleList<Alembic::Abc::IBox3dProperty>::ConstIterator samp0, samp1;
+               double blend = 0.0;
+               
+               if (boundsSamples.getSamples(t, samp0, samp1, blend))
                {
-                  if (interpolateBounds)
+                  if (blend > 0.0)
                   {
-                     Alembic::Abc::Box3d b0 = samp0->data();
-                     Alembic::Abc::Box3d b1 = samp1->data();
-                     Alembic::Abc::Box3d b2((1.0 - blend) * b0.min + blend * b1.min,
-                                            (1.0 - blend) * b0.max + blend * b1.max);
-                     box.extendBy(b2);
+                     if (interpolateBounds)
+                     {
+                        Alembic::Abc::Box3d b0 = samp0->data();
+                        Alembic::Abc::Box3d b1 = samp1->data();
+                        Alembic::Abc::Box3d b2((1.0 - blend) * b0.min + blend * b1.min,
+                                               (1.0 - blend) * b0.max + blend * b1.max);
+                        box.extendBy(b2);
+                     }
+                     else
+                     {
+                        box.extendBy(samp0->data());
+                        box.extendBy(samp1->data());
+                     }
                   }
                   else
                   {
                      box.extendBy(samp0->data());
-                     box.extendBy(samp1->data());
                   }
-               }
-               else
-               {
-                  box.extendBy(samp0->data());
                }
             }
          }
-      }
-      
-      const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mDso->procNode(), "disp_padding");
-      if (pe && mDso->overrideAttrib("disp_padding"))
-      {
-         float padding = AiNodeGetFlt(mDso->procNode(), "disp_padding");
          
-         if (padding > 0.0f && mDso->verbose())
+         const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mDso->procNode(), "disp_padding");
+         if (pe && mDso->overrideAttrib("disp_padding"))
          {
-            AiMsgInfo("[abcproc] \"disp_padding\" attribute found on procedural, pad bounds by %f", padding);
+            float padding = AiNodeGetFlt(mDso->procNode(), "disp_padding");
+            
+            if (padding > 0.0f && mDso->verbose())
+            {
+               AiMsgInfo("[abcproc] \"disp_padding\" attribute found on procedural, pad bounds by %f", padding);
+            }
+            
+            extraPadding += padding;
          }
-         
-         extraPadding += padding;
       }
       
       if (extraPadding > 0)
