@@ -99,11 +99,6 @@ public:
       return mCommonParams.referenceFilePath;
    }
    
-   inline float referenceFrame() const
-   {
-      return mCommonParams.referenceFrame;
-   }
-   
    inline const std::string& objectPath() const
    {
       return mCommonParams.objectPath;
@@ -390,7 +385,6 @@ private:
       // max velocity magnitude attribute name
       // max radius attribute name
       // referenceframe (first frame of reference scene by default)
-      float referenceFrame;
       
       void reset();
       std::string dataString(const char *targetShape) const;

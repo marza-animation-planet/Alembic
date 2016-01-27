@@ -59,8 +59,6 @@ void Dso::CommonParameters::reset()
    velocityScale = 1.0f;
    velocityName = "";
    accelerationName = "";
-   
-   referenceFrame = -std::numeric_limits<float>::max();
 }
 
 std::string Dso::CommonParameters::dataString(const char *targetShape) const
@@ -80,10 +78,6 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    if (referenceFilePath.length() > 0)
    {
       oss << " -referencefilename " << referenceFilePath;
-   }
-   if (referenceFrame > -std::numeric_limits<float>::max())
-   {
-      oss << " -referenceframe " << referenceFrame;
    }
    if (namePrefix.length() > 0)
    {
@@ -191,10 +185,6 @@ std::string Dso::CommonParameters::shapeKey() const
    if (referenceFilePath.length() > 0)
    {
       oss << " -referencefilename " << referenceFilePath;
-   }
-   if (referenceFrame > -std::numeric_limits<float>::max())
-   {
-      oss << " -referenceframe " << referenceFrame;
    }
    if (objectPath.length() > 0)
    {
@@ -1484,15 +1474,6 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
          mCommonParams.accelerationName = args[i];
       }
    }
-   else if (args[i] == "-referenceframe")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%f", &(mCommonParams.referenceFrame)) != 1)
-      {
-         return false;
-      }
-   }
    // Process multi params
    else if (args[i] == "-overrideattribs")
    {
@@ -2032,18 +2013,6 @@ void Dso::readFromUserParams()
          else
          {
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
-         }
-      }
-      else if (param == "referenceframe")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
-         {
-            mCommonParams.referenceFrame = AiNodeGetFlt(mProcNode, pname);
-         }
-         else
-         {
-            mCommonParams.referenceFrame = -std::numeric_limits<float>::max();
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
          }
       }
       else if (param == "overrideattribs")
