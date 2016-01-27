@@ -147,7 +147,7 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.hasSoftMin = true;
    data.softMin.FLT = 0.0;
    data.hasSoftMax = true;
-   data.softMin.FLT = 10.0;
+   data.softMax.FLT = 10.0;
    helper.MakeInputFloat(data);
    
    data.defaultValue.STR = "";
