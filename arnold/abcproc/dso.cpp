@@ -56,6 +56,9 @@ void Dso::CommonParameters::reset()
    
    outputReference = false;
    referenceFrame = -std::numeric_limits<float>::max();
+   referencePositionName = "";
+   referenceNormalName = "";
+   referenceMatrixName = "";
 }
 
 std::string Dso::CommonParameters::dataString(const char *targetShape) const
@@ -79,6 +82,18 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    if (referenceFrame > -std::numeric_limits<float>::max())
    {
       oss << " -referenceframe " << referenceFrame;
+   }
+   if (referencePositionName.length() > 0)
+   {
+      oss << " -referencepositionname " << referencePositionName;
+   }
+   if (referenceNormalName.length() > 0)
+   {
+      oss << " -referencenormalname " << referenceNormalName;
+   }
+   if (referenceNormalName.length() > 0)
+   {
+      oss << " -referencematrixname " << referenceMatrixName;
    }
    if (namePrefix.length() > 0)
    {
@@ -173,14 +188,26 @@ std::string Dso::CommonParameters::shapeKey() const
    if (outputReference)
    {
       oss << " -outputreference";
-   }
-   if (referenceFilePath.length() > 0)
-   {
-      oss << " -referencefilename " << referenceFilePath;
-   }
-   if (referenceFrame > -std::numeric_limits<float>::max())
-   {
-      oss << " -referenceframe " << referenceFrame;
+      if (referenceFilePath.length() > 0)
+      {
+         oss << " -referencefilename " << referenceFilePath;
+      }
+      if (referenceFrame > -std::numeric_limits<float>::max())
+      {
+         oss << " -referenceframe " << referenceFrame;
+      }
+      if (referencePositionName.length() > 0)
+      {
+         oss << " -referencepositionname " << referencePositionName;
+      }
+      if (referenceNormalName.length() > 0)
+      {
+         oss << " -referencenormalname " << referenceNormalName;
+      }
+      if (referenceMatrixName.length() > 0)
+      {
+         oss << " -referencematrixname " << referenceMatrixName;
+      }
    }
    if (objectPath.length() > 0)
    {
@@ -1442,6 +1469,30 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
          return false;
       }
    }
+   else if (args[i] == "-referencepositionname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mCommonParams.referencePositionName = args[i];
+      }
+   }
+   else if (args[i] == "-referencenormalname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mCommonParams.referenceNormalName = args[i];
+      }
+   }
+   else if (args[i] == "-referencematrixname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mCommonParams.referenceMatrixName = args[i];
+      }
+   }
    // Process multi params
    else if (args[i] == "-overrideattribs")
    {
@@ -1959,6 +2010,39 @@ void Dso::readFromUserParams()
          {
             mCommonParams.referenceFrame = -std::numeric_limits<float>::max();
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
+         }
+      }
+      else if (param == "referencepositionname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mCommonParams.referencePositionName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
+      else if (param == "referencenormalname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mCommonParams.referenceNormalName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
+      else if (param == "referencematrixname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mCommonParams.referenceMatrixName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
          }
       }
       else if (param == "overrideattribs")

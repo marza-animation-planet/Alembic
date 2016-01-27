@@ -99,9 +99,28 @@ public:
       return mCommonParams.referenceFilePath;
    }
    
+   inline bool hasReferenceFrame() const
+   {
+      return (mCommonParams.referenceFrame > -std::numeric_limits<float>::max());
+   }
    inline float referenceFrame() const
    {
       return mCommonParams.referenceFrame;
+   }
+   
+   inline const char* referencePositionName() const
+   {
+      return (mCommonParams.referencePositionName.length() > 0 ? mCommonParams.referencePositionName.c_str() : "Pref");
+   }
+   
+   inline const char* referenceNormalName() const
+   {
+      return (mCommonParams.referenceNormalName.length() > 0 ? mCommonParams.referenceNormalName.c_str() : "Nref");
+   }
+   
+   inline const char* referenceMatrixName() const
+   {
+      return (mCommonParams.referenceMatrixName.length() > 0 ? mCommonParams.referenceNormalName.c_str() : "Mref");
    }
    
    inline const std::string& objectPath() const
@@ -369,6 +388,9 @@ private:
       
       bool outputReference;
       float referenceFrame;
+      std::string referencePositionName;
+      std::string referenceNormalName;
+      std::string referenceMatrixName;
       
       void reset();
       std::string dataString(const char *targetShape) const;

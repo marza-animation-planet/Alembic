@@ -1845,15 +1845,15 @@ bool MakeShape::getReferenceMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSc
    }
    
    // Priority
-   //   1/ "Pref" attribute in current alembic scene
-   //   2/ "Pref" attribute in reference alembic scene
-   //   3/ Positions from reference alembic scene
-   //   4/ Positions from current alembic scene's first frame
+   //   1/ Pref attribute in current alembic scene
+   //   2/ Pref attribute in reference alembic scene
+   //   3/ Positions from reference alembic scene (considered to be static) x Mref
+   //   4/ Positions from current alembic scene's referenceFrame frame (or closest) x Mref
    
    UserAttributes::iterator uait;
    bool hasPref = false;
    
-   uait = info.pointAttrs.find("Pref");
+   uait = info.pointAttrs.find(mDso->referencePositionName());
    
    if (uait != info.pointAttrs.end())
    {
@@ -1883,7 +1883,14 @@ bool MakeShape::getReferenceMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSc
       {
          if (mDso->verbose())
          {
-            AiMsgInfo("[abcproc] Using current alembic scene first sample as reference.");
+            if (mDso->hasReferenceFrame())
+            {
+               AiMsgInfo("[abcproc] Using current alembic scene frame %f as reference", mDso->referenceFrame());
+            }
+            else
+            {
+               AiMsgInfo("[abcproc] Using current alembic scene first sample as reference.");
+            }
          }
          
          refMesh = &node;
@@ -1900,7 +1907,14 @@ bool MakeShape::getReferenceMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSc
             
             if (!refMesh)
             {
-               AiMsgWarning("[abcproc] Node in reference alembic doesn't have the same type. Using current alembic scene first sample as reference");
+               if (mDso->hasReferenceFrame())
+               {
+                  AiMsgWarning("[abcproc] Node in reference alembic doesn't have the same type. Using current alembic scene frame %f as reference", mDso->referenceFrame());
+               }
+               else
+               {
+                  AiMsgWarning("[abcproc] Node in reference alembic doesn't have the same type. Using current alembic scene first sample as reference");
+               }
                
                refMesh = &node;
                pointAttrs = &(info.pointAttrs);
@@ -1917,7 +1931,7 @@ bool MakeShape::getReferenceMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSc
                                      0, 0, pointAttrs, vertexAttrs, 0,
                                      FilterReferenceAttributes);
                
-               uait = pointAttrs->find("Pref");
+               uait = pointAttrs->find(mDso->referencePositionName());
                
                if (uait != pointAttrs->end())
                {
@@ -1932,11 +1946,22 @@ bool MakeShape::getReferenceMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSc
                      pointAttrs->erase(uait);
                   }
                }
+               else
+               {
+                  // using positions from refMesh
+               }
             }
          }
          else
          {
-            AiMsgWarning("[abcproc] Couldn't find node in reference alembic scene. Using current alembic scene first sample as reference");
+            if (mDso->hasReferenceFrame())
+            {
+               AiMsgWarning("[abcproc] Couldn't find node in reference alembic scene. Using current alembic scene first frame %f as reference", mDso->referenceFrame());
+            }
+            else
+            {
+               AiMsgWarning("[abcproc] Couldn't find node in reference alembic scene. Using current alembic scene first sample as reference");
+            }
             
             refMesh = &node;
             pointAttrs = &(info.pointAttrs);
@@ -1960,18 +1985,42 @@ bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<
    }
    
    MeshSchema meshSchema = refMesh->typedObject().getSchema();
-         
-   typename MeshSchema::Sample meshSample = meshSchema.getValue();
    
-   Alembic::Abc::P3fArraySamplePtr Pref = meshSample.getPositions();
+   TimeSample<MeshSchema> meshSampler;
+   typename MeshSchema::Sample meshSample;
+   Alembic::Abc::P3fArraySamplePtr Pref;
+   
+   const char *PrefName = mDso->referencePositionName();
       
-   bool hasPref = (pointAttrs->find("Pref") != pointAttrs->end());
+   bool hasPref = (pointAttrs->find(PrefName) != pointAttrs->end());
+   
+   // only sample if Pref attrib not found
+   if (!hasPref)
+   {
+      // if using positions from current alembic scenes, try to sample at referenceFrame
+      if (pointAttrs == &(info.pointAttrs) &&
+          mDso->hasReferenceFrame() &&
+          meshSampler.get(meshSchema, mDso->computeTime(mDso->referenceFrame())))
+      {
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Sample mesh Pref at t=%f (frame=%f)", mDso->computeTime(mDso->referenceFrame()), mDso->referenceFrame());
+         }
+         meshSample = meshSampler.data();
+      }
+      else
+      {
+         meshSample = meshSchema.getValue();
+      }
+      
+      Pref = meshSample.getPositions();
+   }
    
    if (!hasPref && Pref->size() == info.pointCount)
    {
       float *vals = (float*) AiMalloc(3 * info.pointCount * sizeof(float));
       
-      const AtUserParamEntry *upe = AiNodeLookUpUserParameter(mDso->procNode(), "Mref");
+      const AtUserParamEntry *upe = AiNodeLookUpUserParameter(mDso->procNode(), mDso->referenceMatrixName());
       
       if (upe != 0 &&
           AiUserParamGetCategory(upe) == AI_USERDEF_CONSTANT &&
@@ -1984,7 +2033,7 @@ bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<
          
          AtMatrix mtx;
          
-         AiNodeGetMatrix(mDso->procNode(), "Mref", mtx);
+         AiNodeGetMatrix(mDso->procNode(), mDso->referenceMatrixName(), mtx);
          
          for (int r=0; r<4; ++r)
          {
@@ -2032,7 +2081,7 @@ bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<
          vals[off+2] = P.z;
       }
       
-      UserAttribute &ua = info.pointAttrs["Pref"];
+      UserAttribute &ua = info.pointAttrs[PrefName];
       
       InitUserAttribute(ua);
       
@@ -2053,22 +2102,22 @@ bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<
          if (pointAttrs != &(info.pointAttrs))
          {
             // Transfer from reference shape attributes to current shape attribtues
-            UserAttribute &src = (*pointAttrs)["Pref"];
-            UserAttribute &dst = info.pointAttrs["Pref"];
+            UserAttribute &src = (*pointAttrs)[PrefName];
+            UserAttribute &dst = info.pointAttrs[PrefName];
             
             dst = src;
             
-            pointAttrs->erase(pointAttrs->find("Pref"));
+            pointAttrs->erase(pointAttrs->find(PrefName));
          }
          
          // Little type aliasing
-         UserAttribute &ua = info.pointAttrs["Pref"];
+         UserAttribute &ua = info.pointAttrs[PrefName];
          
          if (ua.dataDim == 1 && ua.dataCount == (3 * info.pointCount))
          {
             if (mDso->verbose())
             {
-               AiMsgInfo("[abcproc] \"Pref\" exported with wrong base type: float instead if float[3]");
+               AiMsgInfo("[abcproc] \"%s\" exported with wrong base type: float instead if float[3]", PrefName);
             }
             
             ua.dataDim = 3;
@@ -2079,16 +2128,16 @@ bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<
          
          if (mDso->referenceScene())
          {
-            AiMsgWarning("[abcproc] \"Pref\" read from user attribute, ignore values from reference alembic");
+            AiMsgWarning("[abcproc] \"%s\" read from user attribute, ignore values from reference alembic", PrefName);
          }
          else if (mDso->verbose())
          {
-            AiMsgInfo("[abcproc] \"Pref\" read from user attribute");
+            AiMsgInfo("[abcproc] \"%s\" read from user attribute", PrefName);
          }
       }
       else
       {
-         AiMsgWarning("[abcproc] Could not generate \"Pref\" for mesh \"%s\"", refMesh->path().c_str());
+         AiMsgWarning("[abcproc] Could not generate \"%s\" for mesh \"%s\"", PrefName, refMesh->path().c_str());
       }
    }
    

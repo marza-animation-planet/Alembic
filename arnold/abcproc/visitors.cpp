@@ -2994,8 +2994,8 @@ bool MakeShape::getReferenceCurves(AlembicCurves &node,
    }
    
    // Priority
-   //   1/ "Pref" attribute in current alembic scene
-   //   2/ "Pref" attribute in reference alembic scene
+   //   1/ Pref attribute in current alembic scene
+   //   2/ Pref attribute in reference alembic scene
    //   3/ Positions from reference alembic scene
    //   4/ Positions from current alembic scene's first frame
    
