@@ -99,6 +99,11 @@ public:
       return mCommonParams.referenceFilePath;
    }
    
+   inline float referenceFrame() const
+   {
+      return mCommonParams.referenceFrame;
+   }
+   
    inline const std::string& objectPath() const
    {
       return mCommonParams.objectPath;
@@ -363,6 +368,7 @@ private:
       bool verbose;
       
       bool outputReference;
+      float referenceFrame;
       
       void reset();
       std::string dataString(const char *targetShape) const;
