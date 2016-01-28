@@ -134,9 +134,9 @@ public:
    inline size_t numNodes() const { return mNodes.size(); }
    inline AtNode* node(size_t i) const { return (i < numNodes() ? mNodes[i] : 0); }
    inline const char* path(size_t i) const { return (i < numNodes() ? mPaths[i].c_str() : 0); }
-   inline bool isFloat3(UserAttribute &attr) const { (attr.arnoldType == AI_TYPE_VECTOR && attr.dataDim == 1) ||
-                                                     (attr.arnoldType == AI_TYPE_POINT && attr.dataDim == 1) ||
-                                                     (attr.arnoldType == AI_TYPE_FLOAT && attr.dataDim == 3); }
+   inline bool isFloat3(UserAttribute &attr) const { return (attr.arnoldType == AI_TYPE_VECTOR ||
+                                                             attr.arnoldType == AI_TYPE_POINT ||
+                                                             (attr.arnoldType == AI_TYPE_FLOAT && attr.dataDim == 3)); }
    
 private:
    
@@ -205,8 +205,73 @@ bool MakeProcedurals::overrideBounds(AlembicNodeT<Alembic::Abc::ISchemaObject<Sc
       InitUserAttribute(minAttr);
       InitUserAttribute(maxAttr);
       
-      if (ReadSingleUserAttribute(minAttrName, ObjectAttribute, t, userProps, geomParams, minAttr) && isFloat3(minAttr) &&
-          ReadSingleUserAttribute(maxAttrName, ObjectAttribute, t, userProps, geomParams, maxAttr) && isFloat3(maxAttr))
+      bool hasMin = ReadSingleUserAttribute(minAttrName, ObjectAttribute, t, userProps, geomParams, minAttr);
+      
+      if (!hasMin && mDso->isPromotedToConstantAttrib(minAttrName))
+      {
+         hasMin = ReadSingleUserAttribute(minAttrName, PrimitiveAttribute, t, userProps, geomParams, minAttr);
+         if (!hasMin)
+         {
+            hasMin = ReadSingleUserAttribute(minAttrName, PointAttribute, t, userProps, geomParams, minAttr);
+            if (!hasMin)
+            {
+               hasMin = ReadSingleUserAttribute(minAttrName, VertexAttribute, t, userProps, geomParams, minAttr);
+            }
+         }
+         if (hasMin)
+         {
+            UserAttribute tmp;
+            
+            bool promoted = PromoteToConstantAttrib(minAttr, tmp);
+            
+            DestroyUserAttribute(minAttr);
+            
+            if (promoted)
+            {
+               hasMin = true;
+               std::swap(tmp, minAttr);
+            }
+            else
+            {
+               hasMin = false;
+            }
+         }
+      }
+      
+      bool hasMax = ReadSingleUserAttribute(maxAttrName, ObjectAttribute, t, userProps, geomParams, maxAttr);
+      
+      if (!hasMax && mDso->isPromotedToConstantAttrib(maxAttrName))
+      {
+         hasMax = ReadSingleUserAttribute(maxAttrName, PrimitiveAttribute, t, userProps, geomParams, maxAttr);
+         if (!hasMax)
+         {
+            hasMax = ReadSingleUserAttribute(maxAttrName, PointAttribute, t, userProps, geomParams, maxAttr);
+            if (!hasMax)
+            {
+               hasMax = ReadSingleUserAttribute(maxAttrName, VertexAttribute, t, userProps, geomParams, maxAttr);
+            }
+         }
+         if (hasMax)
+         {
+            UserAttribute tmp;
+            
+            bool promoted = PromoteToConstantAttrib(maxAttr, tmp);
+            
+            DestroyUserAttribute(maxAttr);
+            
+            if (promoted)
+            {
+               hasMax = true;
+               std::swap(tmp, maxAttr);
+            }
+            else
+            {
+               hasMax = false;
+            }
+         }
+      }
+      
+      if (hasMin && hasMax && isFloat3(minAttr) && isFloat3(maxAttr))
       {
          if (mDso->verbose())
          {

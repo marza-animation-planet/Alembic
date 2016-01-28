@@ -55,6 +55,8 @@ void Dso::CommonParameters::reset()
    verbose = false;
    
    outputReference = false;
+   
+   promoteToConstantAttribs.clear();
 }
 
 std::string Dso::CommonParameters::dataString(const char *targetShape) const
@@ -146,6 +148,16 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    else
    {
       oss << " -samplesexpanditerations 0";
+   }
+   if (promoteToConstantAttribs.size() > 0)
+   {
+      oss << " -promotetoconstantattribs";
+      std::set<std::string>::const_iterator it = promoteToConstantAttribs.begin();
+      while (it != promoteToConstantAttribs.end())
+      {
+         oss << " " << *it;
+         ++it;
+      }
    }
    if (verbose)
    {
@@ -1447,6 +1459,16 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       }
       --i;
    }
+   else if (args[i] == "-promotetoconstantattribs")
+   {
+      ++i;
+      while (i < args.size() && !isFlag(args[i]))
+      {
+         mCommonParams.promoteToConstantAttribs.insert(args[i]);
+         ++i;
+      }
+      --i;
+   }
    else if (args[i] == "-overrideboundsminname")
    {
       ++i;
@@ -2002,6 +2024,57 @@ void Dso::readFromUserParams()
                for (unsigned int i=0; i<names->nelements; ++i)
                {
                   mMultiParams.overrideAttribs.insert(AiArrayGetStr(names, i));
+               }
+            }
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
+         }
+      }
+      else if (param == "promotetoconstantattribs")
+      {
+         mCommonParams.promoteToConstantAttribs.clear();
+         
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            std::string names = AiNodeGetStr(mProcNode, pname);
+            std::string name;
+            
+            size_t p0 = 0;
+            size_t p1 = names.find(' ', p0);
+            
+            while (p1 != std::string::npos)
+            {
+               name = names.substr(p0, p1-p0);
+               strip(name);
+               
+               if (name.length() > 0)
+               {
+                  mCommonParams.promoteToConstantAttribs.insert(name);
+               }
+               
+               p0 = p1 + 1;
+               p1 = names.find(' ', p0);
+            }
+            
+            name = names.substr(p0);
+            strip(name);
+            
+            if (name.length() > 0)
+            {
+               mCommonParams.promoteToConstantAttribs.insert(name);
+            }
+         }
+         else if (AiUserParamGetType(p) == AI_TYPE_ARRAY && AiUserParamGetArrayType(p) == AI_TYPE_STRING)
+         {
+            AtArray *names = AiNodeGetArray(mProcNode, pname);
+            
+            if (names)
+            {
+               for (unsigned int i=0; i<names->nelements; ++i)
+               {
+                  mCommonParams.promoteToConstantAttribs.insert(AiArrayGetStr(names, i));
                }
             }
          }

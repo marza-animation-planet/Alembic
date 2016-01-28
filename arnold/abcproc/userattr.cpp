@@ -1674,3 +1674,114 @@ bool ReadSingleUserAttribute(const char *name,
    
    return false;
 }
+
+bool PromoteToConstantAttrib(const UserAttribute &src, UserAttribute &dst)
+{
+   if (src.arnoldCategory != AI_USERDEF_CONSTANT && src.data && src.dataCount >= 1)
+   {
+      InitUserAttribute(dst);
+      
+      dst.arnoldCategory = AI_USERDEF_CONSTANT;
+      dst.arnoldType = src.arnoldType;
+      dst.arnoldTypeStr = src.arnoldTypeStr;
+      dst.abcType = src.abcType;
+      dst.dataDim = src.dataDim;
+      dst.dataCount = 1;
+      dst.isArray = false; // non-constant user attributes array are not supported
+      
+      switch (src.arnoldType)
+      {
+      case AI_TYPE_BOOLEAN:
+         {
+            dst.data = AiMalloc(sizeof(bool));
+            ((bool*)dst.data)[0] = ((bool*)src.data)[0];
+         }
+         break;
+      case AI_TYPE_BYTE:
+         {
+            dst.data = AiMalloc(sizeof(AtByte));
+            ((AtByte*)dst.data)[0] = ((AtByte*)src.data)[0];
+         }
+         break;
+      case AI_TYPE_INT:
+         {
+            dst.data = AiMalloc(sizeof(int));
+            ((int*)dst.data)[0] = ((int*)src.data)[0];
+         }
+         break;
+      case AI_TYPE_UINT:
+         {
+            dst.data = AiMalloc(sizeof(unsigned int));
+            ((unsigned int*)dst.data)[0] = ((unsigned int*)src.data)[0];
+         }
+         break;
+      case AI_TYPE_FLOAT:
+         {
+            dst.data = AiMalloc(sizeof(float));
+            ((float*)dst.data)[0] = ((float*)src.data)[0];
+         }
+         break;
+      case AI_TYPE_POINT2:
+         {
+            dst.data = AiMalloc(2 * sizeof(float));
+            float *srcf = (float*) src.data;
+            float *dstf = (float*) dst.data;
+            dstf[0] = srcf[0];
+            dstf[1] = srcf[1];
+         }
+         break;
+      case AI_TYPE_POINT:
+      case AI_TYPE_VECTOR:
+      case AI_TYPE_RGB:
+         {
+            dst.data = AiMalloc(3 * sizeof(float));
+            float *srcf = (float*) src.data;
+            float *dstf = (float*) dst.data;
+            dstf[0] = srcf[0];
+            dstf[1] = srcf[1];
+            dstf[2] = srcf[2];
+         }
+         break;
+      case AI_TYPE_RGBA:
+         {
+            dst.data = AiMalloc(4 * sizeof(float));
+            float *srcf = (float*) src.data;
+            float *dstf = (float*) dst.data;
+            dstf[0] = srcf[0];
+            dstf[1] = srcf[1];
+            dstf[2] = srcf[2];
+            dstf[3] = srcf[3];
+         }
+         break;
+      case AI_TYPE_MATRIX:
+         {
+            dst.data = AiMalloc(16 * sizeof(float));
+            float *srcf = (float*) src.data;
+            float *dstf = (float*) dst.data;
+            for (int i=0; i<16; ++i) dstf[i] = srcf[i];
+         }
+         break;
+      case AI_TYPE_STRING:
+         {
+            dst.data = AiMalloc(sizeof(const char*));
+            ((const char**)dst.data)[0] = dst.strings.insert(((const char**)src.data)[0]).first->c_str();
+         }
+         break;
+      default:
+         AiMsgDebug("[abcproc] Failed promoting user attribute to object level");
+         AiMsgDebug("[abcproc]   Unsupported type");
+         DestroyUserAttribute(dst);
+         return false;
+      }
+      
+      return true;
+   }
+   else
+   {
+      AiMsgDebug("[abcproc] Failed promoting user attribute to object level");
+      if (src.arnoldCategory == AI_USERDEF_CONSTANT) AiMsgDebug("[abcproc]   Already constant");
+      if (src.data == 0) AiMsgDebug("[abcproc]   Invalid data");
+      if (src.dataCount == 0) AiMsgDebug("[abcproc]   Empty data");
+      return false;
+   }
+}

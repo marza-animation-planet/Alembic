@@ -50,6 +50,8 @@ bool ReadSingleUserAttribute(const char *name,
                              Alembic::Abc::ICompoundProperty geomParams,
                              UserAttribute &attr);
 
+bool PromoteToConstantAttrib(const UserAttribute &src, UserAttribute &dst);
+
 bool ResizeUserAttribute(UserAttribute &ua, unsigned int newSize);
 
 bool CopyUserAttribute(UserAttribute &src, unsigned int srcIdx, unsigned int count, UserAttribute &dst, unsigned int dstIdx);
