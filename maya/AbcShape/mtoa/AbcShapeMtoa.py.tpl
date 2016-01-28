@@ -24,11 +24,12 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       self.addControl("mtoa_constant_abc_nurbsSampleRate", label="NURBS Sample Rate")
       self.addSeparator()
       
-      self.addControl("mtoa_constant_abc_overrideBoundsMinName", label="Min Bounds Name");
-      self.addControl("mtoa_constant_abc_overrideBoundsMaxName", label="Max Bounds Name");
+      self.addControl("mtoa_constant_useOverrideBounds", label="Use Override Bounds", annotation="Use user defined bounds embedded in ABC file")
+      self.addControl("mtoa_constant_abc_overrideBoundsMinName", label="Override Bounds Min Name");
+      self.addControl("mtoa_constant_abc_overrideBoundsMaxName", label="Override Bounds Max Name");
       self.addSeparator();
       
-      self.addControl("mtoa_constant_abc_promoteToConstantAttribs", label="Force Object Attributes")
+      self.addControl("mtoa_constant_abc_promoteToObjectAttribs", label="Promote To Object Attributes")
       self.addControl("mtoa_constant_abc_overrideAttribs", label="Override Attributes")
       self.addControl("mtoa_constant_abc_removeAttribPrefices", label="Remove Attribute Prefices")
       self.addControl("mtoa_constant_abc_objectAttribs", label="Output Object Attributes")
