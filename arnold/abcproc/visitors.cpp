@@ -402,7 +402,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
          {
             DestroyUserAttribute(attr);
          }
-         else if (mDso->isPromotedToConstantAttrib("radius"))
+         else if (mDso->isPromotedToObjectAttrib("radius"))
          {
             attr.dataCount = (attr.dataCount > 0 ? 1 : 0);
          }
@@ -414,7 +414,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
          {
             DestroyUserAttribute(attr);
          }
-         else if (mDso->isPromotedToConstantAttrib("size"))
+         else if (mDso->isPromotedToObjectAttrib("size"))
          {
             attr.dataCount = (attr.dataCount > 0 ? 1 : 0);
          }
@@ -488,7 +488,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
                DestroyUserAttribute(attr);
             }
          }
-         else if (mDso->isPromotedToConstantAttrib("radius"))
+         else if (mDso->isPromotedToObjectAttrib("radius"))
          {
             if (ReadSingleUserAttribute("radius", PrimitiveAttribute, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
             {
@@ -510,7 +510,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
                DestroyUserAttribute(attr);
             }
          }
-         else if (mDso->isPromotedToConstantAttrib("size"))
+         else if (mDso->isPromotedToObjectAttrib("size"))
          {
             if (ReadSingleUserAttribute("size", PrimitiveAttribute, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
             {
@@ -894,7 +894,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
             mDso->cleanAttribName(ua.first);
             InitUserAttribute(ua.second);
             
-            bool promoteToConstant = mDso->isPromotedToConstantAttrib(ua.first);
+            bool promoteToConstant = mDso->isPromotedToObjectAttrib(ua.first);
             
             switch (scope)
             {

@@ -175,9 +175,9 @@ public:
       return mSingleParams.attribsFrame;
    }
    
-   inline bool isPromotedToConstantAttrib(const std::string &name) const
+   inline bool isPromotedToObjectAttrib(const std::string &name) const
    {
-      return (mCommonParams.promoteToConstantAttribs.find(name) != mCommonParams.promoteToConstantAttribs.end());
+      return (mCommonParams.promoteToObjectAttribs.find(name) != mCommonParams.promoteToObjectAttribs.end());
    }
    
    inline bool readObjectAttribs() const
@@ -379,7 +379,7 @@ private:
       
       bool outputReference;
       
-      std::set<std::string> promoteToConstantAttribs;
+      std::set<std::string> promoteToObjectAttribs;
       
       void reset();
       std::string dataString(const char *targetShape) const;

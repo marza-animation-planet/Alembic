@@ -56,7 +56,7 @@ void Dso::CommonParameters::reset()
    
    outputReference = false;
    
-   promoteToConstantAttribs.clear();
+   promoteToObjectAttribs.clear();
 }
 
 std::string Dso::CommonParameters::dataString(const char *targetShape) const
@@ -149,11 +149,11 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    {
       oss << " -samplesexpanditerations 0";
    }
-   if (promoteToConstantAttribs.size() > 0)
+   if (promoteToObjectAttribs.size() > 0)
    {
-      oss << " -promotetoconstantattribs";
-      std::set<std::string>::const_iterator it = promoteToConstantAttribs.begin();
-      while (it != promoteToConstantAttribs.end())
+      oss << " -promotetoobjectattribs";
+      std::set<std::string>::const_iterator it = promoteToObjectAttribs.begin();
+      while (it != promoteToObjectAttribs.end())
       {
          oss << " " << *it;
          ++it;
@@ -1459,12 +1459,12 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       }
       --i;
    }
-   else if (args[i] == "-promotetoconstantattribs")
+   else if (args[i] == "-promotetoobjectattribs")
    {
       ++i;
       while (i < args.size() && !isFlag(args[i]))
       {
-         mCommonParams.promoteToConstantAttribs.insert(args[i]);
+         mCommonParams.promoteToObjectAttribs.insert(args[i]);
          ++i;
       }
       --i;
@@ -2032,9 +2032,9 @@ void Dso::readFromUserParams()
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
          }
       }
-      else if (param == "promotetoconstantattribs")
+      else if (param == "promotetoobjectattribs")
       {
-         mCommonParams.promoteToConstantAttribs.clear();
+         mCommonParams.promoteToObjectAttribs.clear();
          
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
@@ -2051,7 +2051,7 @@ void Dso::readFromUserParams()
                
                if (name.length() > 0)
                {
-                  mCommonParams.promoteToConstantAttribs.insert(name);
+                  mCommonParams.promoteToObjectAttribs.insert(name);
                }
                
                p0 = p1 + 1;
@@ -2063,7 +2063,7 @@ void Dso::readFromUserParams()
             
             if (name.length() > 0)
             {
-               mCommonParams.promoteToConstantAttribs.insert(name);
+               mCommonParams.promoteToObjectAttribs.insert(name);
             }
          }
          else if (AiUserParamGetType(p) == AI_TYPE_ARRAY && AiUserParamGetArrayType(p) == AI_TYPE_STRING)
@@ -2074,7 +2074,7 @@ void Dso::readFromUserParams()
             {
                for (unsigned int i=0; i<names->nelements; ++i)
                {
-                  mCommonParams.promoteToConstantAttribs.insert(AiArrayGetStr(names, i));
+                  mCommonParams.promoteToObjectAttribs.insert(AiArrayGetStr(names, i));
                }
             }
          }

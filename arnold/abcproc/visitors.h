@@ -207,7 +207,7 @@ bool MakeProcedurals::overrideBounds(AlembicNodeT<Alembic::Abc::ISchemaObject<Sc
       
       bool hasMin = ReadSingleUserAttribute(minAttrName, ObjectAttribute, t, userProps, geomParams, minAttr);
       
-      if (!hasMin && mDso->isPromotedToConstantAttrib(minAttrName))
+      if (!hasMin && mDso->isPromotedToObjectAttrib(minAttrName))
       {
          hasMin = ReadSingleUserAttribute(minAttrName, PrimitiveAttribute, t, userProps, geomParams, minAttr);
          if (!hasMin)
@@ -240,7 +240,7 @@ bool MakeProcedurals::overrideBounds(AlembicNodeT<Alembic::Abc::ISchemaObject<Sc
       
       bool hasMax = ReadSingleUserAttribute(maxAttrName, ObjectAttribute, t, userProps, geomParams, maxAttr);
       
-      if (!hasMax && mDso->isPromotedToConstantAttrib(maxAttrName))
+      if (!hasMax && mDso->isPromotedToObjectAttrib(maxAttrName))
       {
          hasMax = ReadSingleUserAttribute(maxAttrName, PrimitiveAttribute, t, userProps, geomParams, maxAttr);
          if (!hasMax)
