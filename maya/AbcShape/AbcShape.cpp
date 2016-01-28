@@ -760,8 +760,6 @@ MObject AbcShape::aOutBoxMin;
 MObject AbcShape::aOutBoxMax;
 MObject AbcShape::aAnimated;
 MObject AbcShape::aUvSetCount;
-MObject AbcShape::aOutOverrideBoxMin;
-MObject AbcShape::aOutOverrideBoxMax;
 #ifdef ABCSHAPE_VRAY_SUPPORT
 MObject AbcShape::aOutApiType;
 MObject AbcShape::aOutApiClassification;
@@ -974,20 +972,6 @@ MStatus AbcShape::initialize()
    nAttr.setStorable(false);
    stat = addAttribute(aOutBoxMax);
    MCHECKERROR(stat, "Could not add 'outBoxMax' attribute");
-   
-   aOutOverrideBoxMin = nAttr.create("outOverrideBoxMin", "oobmi", MFnNumericData::k3Double, 0.0, &stat);
-   MCHECKERROR(stat, "Could not create 'outOverrideBoxMin' attribute");
-   nAttr.setWritable(false);
-   nAttr.setStorable(false);
-   stat = addAttribute(aOutOverrideBoxMin);
-   MCHECKERROR(stat, "Could not add 'outOverrideBoxMin' attribute");
-   
-   aOutOverrideBoxMax = nAttr.create("outOverrideBoxMax", "oobma", MFnNumericData::k3Double, 0.0, &stat);
-   MCHECKERROR(stat, "Could not create 'outOverrideBoxMax' attribute");
-   nAttr.setWritable(false);
-   nAttr.setStorable(false);
-   stat = addAttribute(aOutOverrideBoxMax);
-   MCHECKERROR(stat, "Could not add 'outOverrideBoxMax' attribute");
    
    aAnimated = nAttr.create("animated", "anm", MFnNumericData::kBoolean, 0, &stat);
    MCHECKERROR(stat, "Could not create 'animated' attribute");
@@ -1275,34 +1259,6 @@ MStatus AbcShape::initialize()
    attributeAffects(aIgnoreXforms, aOutBoxMax);
    attributeAffects(aIgnoreInstances, aOutBoxMax);
    attributeAffects(aIgnoreVisibility, aOutBoxMax);
-   
-   attributeAffects(aFilePath, aOutOverrideBoxMin);
-   attributeAffects(aObjectExpression, aOutOverrideBoxMin);
-   attributeAffects(aDisplayMode, aOutOverrideBoxMin);
-   attributeAffects(aCycleType, aOutOverrideBoxMin);
-   attributeAffects(aTime, aOutOverrideBoxMin);
-   attributeAffects(aSpeed, aOutOverrideBoxMin);
-   attributeAffects(aOffset, aOutOverrideBoxMin);
-   attributeAffects(aPreserveStartFrame, aOutOverrideBoxMin);
-   attributeAffects(aStartFrame, aOutOverrideBoxMin);
-   attributeAffects(aEndFrame, aOutOverrideBoxMin);
-   attributeAffects(aIgnoreXforms, aOutOverrideBoxMin);
-   attributeAffects(aIgnoreInstances, aOutOverrideBoxMin);
-   attributeAffects(aIgnoreVisibility, aOutOverrideBoxMin);
-   
-   attributeAffects(aFilePath, aOutOverrideBoxMax);
-   attributeAffects(aObjectExpression, aOutOverrideBoxMax);
-   attributeAffects(aDisplayMode, aOutOverrideBoxMax);
-   attributeAffects(aCycleType, aOutOverrideBoxMax);
-   attributeAffects(aTime, aOutOverrideBoxMax);
-   attributeAffects(aSpeed, aOutOverrideBoxMax);
-   attributeAffects(aOffset, aOutOverrideBoxMax);
-   attributeAffects(aPreserveStartFrame, aOutOverrideBoxMax);
-   attributeAffects(aStartFrame, aOutOverrideBoxMax);
-   attributeAffects(aEndFrame, aOutOverrideBoxMax);
-   attributeAffects(aIgnoreXforms, aOutOverrideBoxMax);
-   attributeAffects(aIgnoreInstances, aOutOverrideBoxMax);
-   attributeAffects(aIgnoreVisibility, aOutOverrideBoxMax);
    
    attributeAffects(aFilePath, aUvSetCount);
    attributeAffects(aObjectExpression, aUvSetCount);
