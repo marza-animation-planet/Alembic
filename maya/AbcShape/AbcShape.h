@@ -99,6 +99,8 @@ public:
     static MObject aOutBoxMax;
     static MObject aAnimated;
     static MObject aUvSetCount;
+    static MObject aOutOverrideBoxMin;
+    static MObject aOutOverrideBoxMax;
     
 #ifdef ABCSHAPE_VRAY_SUPPORT
     // V-Ray specific attributes

@@ -88,6 +88,16 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    helper.MakeInputInt(data);
    
    data.defaultValue.STR = "";
+   data.name = "mtoa_constant_abc_overrideBoundsMinName";
+   data.shortName = "ovbdmi";
+   helper.MakeInputString(data);
+   
+   data.defaultValue.STR = "";
+   data.name = "mtoa_constant_abc_overrideBoundsMaxName";
+   data.shortName = "ovbdma";
+   helper.MakeInputString(data);
+   
+   data.defaultValue.STR = "";
    data.name = "mtoa_constant_abc_overrideAttribs";
    data.shortName = "ovatrs";
    helper.MakeInputString(data);
@@ -895,6 +905,32 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
       if (!plug.isNull())
       {
          data += " -nurbssamplerate " + ToString(plug.asInt());
+      }
+      
+      plug = FindMayaPlug("mtoa_constant_abc_overrideBoundsMinName");
+      if (!plug.isNull())
+      {
+         MString name = plug.asString();
+         if (name.numChars() > 0)
+         {
+            data += " -overrideboundsminname " + name;
+         }
+      }
+      
+      plug = FindMayaPlug("mtoa_constant_abc_overrideBoundsMaxName");
+      if (!plug.isNull())
+      {
+         MString name = plug.asString();
+         if (name.numChars() > 0)
+         {
+            data += " -overrideboundsmaxname " + name;
+         }
+      }
+      
+      plug = FindMayaPlug("mtoa_constant_abc_promoteToConstantAttribs");
+      if (!plug.isNull())
+      {
+         data += " -promotetoconstantattribs " + plug.asString();
       }
       
       plug = FindMayaPlug("mtoa_constant_abc_overrideAttribs");
