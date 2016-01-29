@@ -591,7 +591,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode
             
             for (size_t i=0; i<vals->size(); ++i)
             {
-               float r = adjustRadius(0.5 * vals->get()[i]);
+               float r = 0.5 * vals->get()[i];
                
                if (r > extraPadding)
                {
@@ -4452,7 +4452,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
                      float w0 = W0->get()[wi];
                      float w1 = W1->get()[wi];
                      
-                     AiArraySetFlt(radius, po + pi, adjustRadius(0.5f * (a * w0 + b * w1)));
+                     AiArraySetFlt(radius, po + pi, 0.5f * (a * w0 + b * w1));
                   }
                }
             }
@@ -4466,7 +4466,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
                   {
                      unsigned int wi = (Wcount == 1 ? 0 : (Wcount == info.curveCount ? ci : pi));
                      
-                     AiArraySetFlt(radius, po + pi, adjustRadius(0.5f * W0->get()[wi]));
+                     AiArraySetFlt(radius, po + pi, 0.5f * W0->get()[wi]);
                   }
                }
             }
@@ -4498,7 +4498,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
                {
                   unsigned int wi = (Wcount == 1 ? 0 : (Wcount == info.curveCount ? ci : pi));
                   
-                  AiArraySetFlt(radius, pi, adjustRadius(0.5f * W0->get()[wi]));
+                  AiArraySetFlt(radius, pi, 0.5f * W0->get()[wi]);
                }
             }
          }
@@ -4507,15 +4507,14 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
    
    if (!radius)
    {
-      AiMsgWarning("[abcproc] Defaulting curve radius to 0.01");
-      
-      float defaultWidth = 0.01f; // maybe an other option for this
+      // defaultRadius = 0.01 (as for particles)
+      AiMsgWarning("[abcproc] Defaulting curve radius to 0.005");
       
       radius = AiArrayAllocate(info.pointCount, 1, AI_TYPE_FLOAT);
       
       for (unsigned int i=0; i<info.pointCount; ++i)
       {
-         AiArraySetFlt(radius, i, adjustRadius(0.5f * defaultWidth));
+         AiArraySetFlt(radius, i, 0.005f);
       }
    }
    
