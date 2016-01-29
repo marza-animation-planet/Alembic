@@ -326,7 +326,7 @@ void PointsData::update(const AlembicPoints &node)
    
    mNumPoints = p0->size();
    
-   if (mNumPoints == 0 || v0->size() != mNumPoints || id0->size() != mNumPoints)
+   if (mNumPoints == 0 || id0->size() != mNumPoints || (v0 && v0->size() != mNumPoints))
    {
       clear();
       return;
@@ -360,7 +360,6 @@ void PointsData::update(const AlembicPoints &node)
       for (size_t i = 0; i < mNumPoints; ++i)
       {
          Alembic::Abc::V3f p = (*p0)[i];
-         Alembic::Abc::V3f v = (*v0)[i];
          
          size_t id = (*id0)[i];
          
@@ -368,7 +367,15 @@ void PointsData::update(const AlembicPoints &node)
          
          if (idit == idmap.end())
          {
-            mLocalPoints[i] = p + dt * v;
+            if (v0)
+            {
+               Alembic::Abc::V3f v = (*v0)[i];
+               mLocalPoints[i] = p + dt * v;
+            }
+            else
+            {
+               mLocalPoints[i] = p;
+            }
          }
          else
          {
