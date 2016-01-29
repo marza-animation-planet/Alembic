@@ -23,45 +23,87 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    CShapeTranslator::MakeCommonAttributes(helper);
 
    CAttrData data;
-
-   data.defaultValue.FLT = 0.0f;
-   data.name = "aiStepSize";
-   data.shortName = "ai_step_size";
-   data.hasMin = true;
-   data.min.FLT = 0.f;
-   data.hasSoftMax = true;
-   data.softMax.FLT = 1.f;
-   helper.MakeInputFloat(data);
+   
+   // reference
    
    data.defaultValue.BOOL = false;
    data.name = "mtoa_constant_abc_outputReference";
    data.shortName = "outref";
    helper.MakeInputBoolean(data);
    
-   data.defaultValue.STR = "";
+   data.stringDefault = "";
    data.name = "mtoa_constant_abc_referenceFilename";
    data.shortName = "reffp";
    helper.MakeInputString(data);
    
+   // velocity
+   
+   data.defaultValue.FLT = 1.0f;
+   data.name = "mtoa_constant_abc_velocityScale";
+   data.shortName = "velscl";
+   data.hasMin = false;
+   data.hasSoftMin = true;
+   data.softMin.FLT = 0.0f;
+   data.hasMax = false;
+   data.hasSoftMax = true;
+   data.softMax.FLT = 10.0f;
+   helper.MakeInputFloat(data);
+   
+   data.stringDefault = "";
+   data.name = "mtoa_constant_abc_velocityName";
+   data.shortName = "velan";
+   helper.MakeInputString(data);
+   
+   data.stringDefault = "";
+   data.name = "mtoa_constant_abc_accelerationName";
+   data.shortName = "accan";
+   helper.MakeInputString(data);
+   
+   // bounding box
+   
    data.defaultValue.FLT = 0.0f;
    data.name = "mtoa_constant_abc_boundsPadding";
    data.shortName = "bndpad";
+   data.hasMin = false;
    data.hasSoftMin = true;
    data.softMin.FLT = 0.0f;
+   data.hasMax = false;
    data.hasSoftMax = true;
    data.softMax.FLT = 100.0f;
    helper.MakeInputFloat(data);
    
-   data.defaultValue.STR = "";
+   data.defaultValue.BOOL = false;
+   data.name = "mtoa_constant_useOverrideBounds";
+   data.shortName = "uovbnd";
+   helper.MakeInputBoolean(data);
+   
+   data.stringDefault = "";
+   data.name = "mtoa_constant_abc_overrideBoundsMinName";
+   data.shortName = "ovbdmi";
+   helper.MakeInputString(data);
+   
+   data.stringDefault = "";
+   data.name = "mtoa_constant_abc_overrideBoundsMaxName";
+   data.shortName = "ovbdma";
+   helper.MakeInputString(data);
+   
+   // mesh
+   
+   data.stringDefault = "";
    data.name = "mtoa_constant_abc_computeTangents";
    data.shortName = "cmptan";
    helper.MakeInputString(data);
+   
+   // particles
    
    data.defaultValue.FLT = 1.0;
    data.name = "mtoa_constant_abc_radiusScale";
    data.shortName = "radscl";
    data.hasMin = true;
    data.min.FLT = 0.0;
+   data.hasSoftMin = false;
+   data.hasMax = false;
+   data.hasSoftMax = false;
    helper.MakeInputFloat(data);
    
    data.defaultValue.FLT = 0.0;
@@ -69,6 +111,9 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.shortName = "radmin";
    data.hasMin = true;
    data.min.FLT = 0.0;
+   data.hasSoftMin = false;
+   data.hasMax = false;
+   data.hasSoftMax = false;
    helper.MakeInputFloat(data);
    
    data.defaultValue.FLT = 1000000.0;
@@ -76,46 +121,25 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.shortName = "radmax";
    data.hasMin = true;
    data.min.FLT = 0.0;
+   data.hasSoftMin = false;
+   data.hasMax = false;
+   data.hasSoftMax = false;
    helper.MakeInputFloat(data);
+   
+   // curves
    
    data.defaultValue.INT = 5;
    data.name = "mtoa_constant_abc_nurbsSampleRate";
    data.shortName = "nurbssr";
    data.hasMin = true;
    data.min.INT = 1;
+   data.hasSoftMin = false;
+   data.hasMax = false;
    data.hasSoftMax = true;
    data.softMax.INT = 10;
    helper.MakeInputInt(data);
    
-   data.defaultValue.BOOL = false;
-   data.name = "mtoa_constant_useOverrideBounds";
-   data.shortName = "uovbnd";
-   helper.MakeInputBoolean(data);
-   
-   data.defaultValue.STR = "";
-   data.name = "mtoa_constant_abc_overrideBoundsMinName";
-   data.shortName = "ovbdmi";
-   helper.MakeInputString(data);
-   
-   data.defaultValue.STR = "";
-   data.name = "mtoa_constant_abc_overrideBoundsMaxName";
-   data.shortName = "ovbdma";
-   helper.MakeInputString(data);
-   
-   data.defaultValue.STR = "";
-   data.name = "mtoa_constant_abc_promoteToObjectAttribs";
-   data.shortName = "probja";
-   helper.MakeInputString(data);
-   
-   data.defaultValue.STR = "";
-   data.name = "mtoa_constant_abc_overrideAttribs";
-   data.shortName = "ovatrs";
-   helper.MakeInputString(data);
-   
-   data.defaultValue.STR = "";
-   data.name = "mtoa_constant_abc_removeAttribPrefices";
-   data.shortName = "rematp";
-   helper.MakeInputString(data);
+   // attributes
    
    data.defaultValue.BOOL = false;
    data.name = "mtoa_constant_abc_objectAttribs";
@@ -137,6 +161,11 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.shortName = "vtxatrs";
    helper.MakeInputBoolean(data);
    
+   data.stringDefault = "";
+   data.name = "mtoa_constant_abc_promoteToObjectAttribs";
+   data.shortName = "probja";
+   helper.MakeInputString(data);
+   
    data.defaultValue.INT = 0;
    data.enums.clear();
    data.enums.append("render");
@@ -147,13 +176,28 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.shortName = "atrsfrm";
    helper.MakeInputEnum(data);
    
+   data.stringDefault = "";
+   data.name = "mtoa_constant_abc_removeAttribPrefices";
+   data.shortName = "rematp";
+   helper.MakeInputString(data);
+   
+   // for multi mode only
+   data.stringDefault = "";
+   data.name = "mtoa_constant_abc_overrideAttribs";
+   data.shortName = "ovatrs";
+   helper.MakeInputString(data);
+   
+   // samples expansion
+   
    data.defaultValue.INT = 0;
    data.name = "mtoa_constant_abc_samplesExpandIterations";
    data.shortName = "sampexpiter";
    data.hasMin = true;
    data.min.INT = 0;
+   data.hasSoftMin = false;
    data.hasMax = true;
    data.max.INT = 10;
+   data.hasSoftMax = false;
    helper.MakeInputInt(data);
    
    data.defaultValue.BOOL = false;
@@ -161,26 +205,24 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.shortName = "optsamp";
    helper.MakeInputBoolean(data);
    
-   data.defaultValue.FLT = 1.0f;
-   data.name = "mtoa_constant_abc_velocityScale";
-   data.shortName = "velscl";
-   data.hasMin = false;
-   data.hasSoftMin = true;
-   data.softMin.FLT = 0.0f;
+   // others
+   
+   // volume
+   data.defaultValue.FLT = 0.0f;
+   data.name = "aiStepSize";
+   data.shortName = "ai_step_size";
+   data.hasMin = true;
+   data.min.FLT = 0.f;
+   data.hasSoftMin = false;
    data.hasMax = false;
    data.hasSoftMax = true;
-   data.softMax.FLT = 10.0f;
+   data.softMax.FLT = 1.f;
    helper.MakeInputFloat(data);
    
-   data.defaultValue.STR = "";
-   data.name = "mtoa_constant_abc_velocityName";
-   data.shortName = "velan";
-   helper.MakeInputString(data);
-   
-   data.defaultValue.STR = "";
-   data.name = "mtoa_constant_abc_accelerationName";
-   data.shortName = "accan";
-   helper.MakeInputString(data);
+   data.defaultValue.BOOL = false;
+   data.name = "mtoa_constant_abc_verbose";
+   data.shortName = "vrbexp";
+   helper.MakeInputBoolean(data);
 }
 
 CAbcTranslator::CAbcTranslator()
@@ -1135,7 +1177,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
    {
       AiNodeSetStr(proc, "dso", "abcproc");
 
-      MString data;
+      MString data, tmp;
       
       data += "-filename " + abcfile;
       if (objpath.length() > 0)
@@ -1218,13 +1260,21 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
       plug = FindMayaObjectPlug("mtoa_constant_abc_referenceFilename");
       if (!plug.isNull())
       {
-         data += " -referencefilename " + plug.asString();
+         tmp = plug.asString();
+         if (tmp.numChars() > 0)
+         {
+            data += " -referencefilename " + tmp;
+         }
       }
       
       plug = FindMayaPlug("mtoa_constant_abc_computeTangents");
       if (!plug.isNull())
       {
-         data += " -computetangents " + plug.asString();
+         tmp = plug.asString();
+         if (tmp.numChars() > 0)
+         {
+            data += " -computetangents " + tmp;
+         }
       }
       
       plug = FindMayaPlug("mtoa_constant_abc_radiusScale");
@@ -1254,39 +1304,51 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
       plug = FindMayaPlug("mtoa_constant_abc_overrideBoundsMinName");
       if (!plug.isNull())
       {
-         MString name = plug.asString();
-         if (name.numChars() > 0)
+         tmp = plug.asString();
+         if (tmp.numChars() > 0)
          {
-            data += " -overrideboundsminname " + name;
+            data += " -overrideboundsminname " + tmp;
          }
       }
       
       plug = FindMayaPlug("mtoa_constant_abc_overrideBoundsMaxName");
       if (!plug.isNull())
       {
-         MString name = plug.asString();
-         if (name.numChars() > 0)
+         tmp = plug.asString();
+         if (tmp.numChars() > 0)
          {
-            data += " -overrideboundsmaxname " + name;
+            data += " -overrideboundsmaxname " + tmp;
          }
       }
       
       plug = FindMayaPlug("mtoa_constant_abc_promoteToObjectAttribs");
       if (!plug.isNull())
       {
-         data += " -promotetoobjectattribs " + plug.asString();
+         tmp = plug.asString();
+         if (tmp.numChars() > 0)
+         {
+            data += " -promotetoobjectattribs " + tmp;
+         }
       }
       
       plug = FindMayaPlug("mtoa_constant_abc_overrideAttribs");
       if (!plug.isNull())
       {
-         data += " -overrideattribs " + plug.asString();
+         tmp = plug.asString();
+         if (tmp.numChars() > 0)
+         {
+            data += " -overrideattribs " + tmp;
+         }
       }
       
       plug = FindMayaPlug("mtoa_constant_abc_removeAttribPrefices");
       if (!plug.isNull())
       {
-         data += " -removeattribprefices " + plug.asString();
+         tmp = plug.asString();
+         if (tmp.numChars() > 0)
+         {
+            data += " -removeattribprefices " + tmp;
+         }
       }
       
       plug = FindMayaPlug("mtoa_constant_abc_objectAttribs");
@@ -1350,26 +1412,26 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
       plug = FindMayaPlug("mtoa_constant_abc_velocityScale");
       if (!plug.isNull())
       {
-         data += " -velocityScale " + ToString(plug.asFloat());
+         data += " -velocityscale " + ToString(plug.asFloat());
       }
       
       plug = FindMayaPlug("mtoa_constant_abc_velocityName");
       if (!plug.isNull())
       {
-         MString name = plug.asString();
-         if (name.numChars() > 0)
+         tmp = plug.asString();
+         if (tmp.numChars() > 0)
          {
-            data += " -velocityName " + name;
+            data += " -velocityname " + tmp;
          }
       }
       
       plug = FindMayaPlug("mtoa_constant_abc_accelerationName");
       if (!plug.isNull())
       {
-         MString name = plug.asString();
-         if (name.numChars() > 0)
+         tmp = plug.asString();
+         if (tmp.numChars() > 0)
          {
-            data += " -accelerationName " + name;
+            data += " -accelerationname " + tmp;
          }
       }
       
