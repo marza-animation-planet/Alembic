@@ -99,6 +99,7 @@ public:
     static MObject aOutBoxMax;
     static MObject aAnimated;
     static MObject aUvSetCount;
+    static MObject aOutSampleTime;
     
 #ifdef ABCSHAPE_VRAY_SUPPORT
     // V-Ray specific attributes

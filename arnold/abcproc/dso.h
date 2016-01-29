@@ -190,6 +190,11 @@ public:
       return mSingleParams.attribsFrame;
    }
    
+   inline bool isPromotedToObjectAttrib(const std::string &name) const
+   {
+      return (mCommonParams.promoteToObjectAttribs.find(name) != mCommonParams.promoteToObjectAttribs.end());
+   }
+   
    inline bool readObjectAttribs() const
    {
       return mSingleParams.readObjectAttribs;
@@ -221,6 +226,16 @@ public:
    }
    
    bool cleanAttribName(std::string &name) const;
+   
+   inline const char* overrideBoundsMinName() const
+   {
+      return (mMultiParams.overrideBoundsMinName.length() > 0 ? mMultiParams.overrideBoundsMinName.c_str() : 0);
+   }
+   
+   inline const char* overrideBoundsMaxName() const
+   {
+      return (mMultiParams.overrideBoundsMaxName.length() > 0 ? mMultiParams.overrideBoundsMaxName.c_str() : 0);
+   }
    
    // Shapes
    
@@ -385,6 +400,7 @@ private:
       // max velocity magnitude attribute name
       // max radius attribute name
       // referenceframe (first frame of reference scene by default)
+      std::set<std::string> promoteToObjectAttribs;
       
       void reset();
       std::string dataString(const char *targetShape) const;
@@ -394,7 +410,8 @@ private:
    struct MultiParameters
    {
       std::set<std::string> overrideAttribs;
-      
+      std::string overrideBoundsMinName;
+      std::string overrideBoundsMaxName;
       
       void reset();
       std::string dataString() const;

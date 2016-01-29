@@ -87,6 +87,26 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.softMax.INT = 10;
    helper.MakeInputInt(data);
    
+   data.defaultValue.BOOL = false;
+   data.name = "mtoa_constant_useOverrideBounds";
+   data.shortName = "uovbnd";
+   helper.MakeInputBoolean(data);
+   
+   data.defaultValue.STR = "";
+   data.name = "mtoa_constant_abc_overrideBoundsMinName";
+   data.shortName = "ovbdmi";
+   helper.MakeInputString(data);
+   
+   data.defaultValue.STR = "";
+   data.name = "mtoa_constant_abc_overrideBoundsMaxName";
+   data.shortName = "ovbdma";
+   helper.MakeInputString(data);
+   
+   data.defaultValue.STR = "";
+   data.name = "mtoa_constant_abc_promoteToObjectAttribs";
+   data.shortName = "probja";
+   helper.MakeInputString(data);
+   
    data.defaultValue.STR = "";
    data.name = "mtoa_constant_abc_overrideAttribs";
    data.shortName = "ovatrs";
@@ -164,12 +184,21 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
 }
 
 CAbcTranslator::CAbcTranslator()
-   : CShapeTranslator(), m_motionBlur(false)
+   : CShapeTranslator()
+   , m_motionBlur(false)
+   , m_overrideBounds(false)
+   , m_boundsOverridden(false)
+   , m_renderTime(0.0)
+   , m_scene(0)
 {
 }
 
 CAbcTranslator::~CAbcTranslator()
 {
+   if (m_scene)
+   {
+      AlembicSceneCache::Unref(m_scene);
+   }
 }
 
 AtNode* CAbcTranslator::Init(CArnoldSession *session, MDagPath& dagPath, MString outputAttr)
@@ -705,6 +734,165 @@ void CAbcTranslator::ExportShader(AtNode *proc, bool update)
    }
 }
 
+bool CAbcTranslator::ReadFloat3Attribute(Alembic::Abc::ICompoundProperty props, const std::string &name, bool geoParam, AtPoint &out)
+{
+   bool rv = false;
+   
+   const Alembic::AbcCoreAbstract::PropertyHeader *header = props.getPropertyHeader(name);
+   
+   if (header)
+   {
+      if (!geoParam)
+      {
+         if (Alembic::Abc::IV3dProperty::matches(*header))
+         {
+            TimeSample<Alembic::Abc::IV3dProperty> sampler;
+            Alembic::Abc::IV3dProperty prop(props, name);
+            
+            sampler.get(prop, m_renderTime);
+            
+            Alembic::Abc::V3d v = sampler.data();
+            
+            out.x = float(v.x);
+            out.y = float(v.y);
+            out.z = float(v.z);
+            
+            rv = true;
+         }
+         else if (Alembic::Abc::IV3fProperty::matches(*header))
+         {
+            TimeSample<Alembic::Abc::IV3fProperty> sampler;
+            Alembic::Abc::IV3fProperty prop(props, name);
+            
+            sampler.get(prop, m_renderTime);
+            
+            Alembic::Abc::V3f v = sampler.data();
+            
+            out.x = v.x;
+            out.y = v.y;
+            out.z = v.z;
+            
+            rv = true;
+         }
+         else if (Alembic::Abc::IP3dProperty::matches(*header))
+         {
+            TimeSample<Alembic::Abc::IP3dProperty> sampler;
+            Alembic::Abc::IP3dProperty prop(props, name);
+            
+            sampler.get(prop, m_renderTime);
+            
+            Alembic::Abc::V3d v = sampler.data();
+            
+            out.x = float(v.x);
+            out.y = float(v.y);
+            out.z = float(v.z);
+            
+            rv = true;
+         }
+         else if (Alembic::Abc::IP3fProperty::matches(*header))
+         {
+            TimeSample<Alembic::Abc::IP3fProperty> sampler;
+            Alembic::Abc::IP3fProperty prop(props, name);
+            
+            sampler.get(prop, m_renderTime);
+            
+            Alembic::Abc::V3f v = sampler.data();
+            
+            out.x = v.x;
+            out.y = v.y;
+            out.z = v.z;
+            
+            rv = true;
+         }
+      }
+      else
+      {
+         if (Alembic::AbcGeom::IV3dGeomParam::matches(*header))
+         {
+            TimeSample<Alembic::AbcGeom::IV3dGeomParam> sampler;
+            Alembic::AbcGeom::IV3dGeomParam prop(props, name);
+            
+            sampler.get(prop, m_renderTime);
+            
+            Alembic::AbcGeom::IV3dGeomParam::Sample::samp_ptr_type vl = sampler.data().getVals();
+            
+            if (vl && vl->size() >= 1)
+            {
+               Alembic::Abc::V3d v = (*vl)[0];
+               
+               out.x = float(v.x);
+               out.y = float(v.y);
+               out.z = float(v.z);
+               
+               rv = true;
+            }
+         }
+         else if (Alembic::AbcGeom::IV3fGeomParam::matches(*header))
+         {
+            TimeSample<Alembic::AbcGeom::IV3fGeomParam> sampler;
+            Alembic::AbcGeom::IV3fGeomParam prop(props, name);
+            
+            sampler.get(prop, m_renderTime);
+            
+            Alembic::AbcGeom::IV3fGeomParam::Sample::samp_ptr_type vl = sampler.data().getVals();
+            
+            if (vl && vl->size() >= 1)
+            {
+               Alembic::Abc::V3f v = (*vl)[0];
+               
+               out.x = v.x;
+               out.y = v.y;
+               out.z = v.z;
+               
+               rv = true;
+            }
+         }
+         else if (Alembic::AbcGeom::IP3dGeomParam::matches(*header))
+         {
+            TimeSample<Alembic::AbcGeom::IP3dGeomParam> sampler;
+            Alembic::AbcGeom::IP3dGeomParam prop(props, name);
+            
+            sampler.get(prop, m_renderTime);
+            
+            Alembic::AbcGeom::IP3dGeomParam::Sample::samp_ptr_type vl = sampler.data().getVals();
+            
+            if (vl && vl->size() >= 1)
+            {
+               Alembic::Abc::V3d v = (*vl)[0];
+               
+               out.x = float(v.x);
+               out.y = float(v.y);
+               out.z = float(v.z);
+               
+               rv = true;
+            }
+         }
+         else if (Alembic::AbcGeom::IP3fGeomParam::matches(*header))
+         {
+            TimeSample<Alembic::AbcGeom::IP3fGeomParam> sampler;
+            Alembic::AbcGeom::IP3fGeomParam prop(props, name);
+            
+            sampler.get(prop, m_renderTime);
+            
+            Alembic::AbcGeom::IP3fGeomParam::Sample::samp_ptr_type vl = sampler.data().getVals();
+            
+            if (vl && vl->size() >= 1)
+            {
+               Alembic::Abc::V3f v = (*vl)[0];
+               
+               out.x = v.x;
+               out.y = v.y;
+               out.z = v.z;
+               
+               rv = true;
+            }
+         }
+      }
+   }
+   
+   return rv;
+}
+
 void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
 {
    MFnDagNode node(m_dagPath.node());
@@ -729,6 +917,10 @@ void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
    {
       if (IsSingleShape())
       {
+         m_renderTime = FindMayaPlug("outSampleTime").asDouble();
+         m_overrideBounds = FindMayaPlug("mtoa_constant_useOverrideBounds").asBool();
+         m_boundsOverridden = false;
+         
          AiNodeSetBool(proc, "load_at_init", false);
          AiNodeSetPnt(proc, "min", static_cast<float>(bmin.x), static_cast<float>(bmin.y), static_cast<float>(bmin.z));
          AiNodeSetPnt(proc, "max", static_cast<float>(bmax.x), static_cast<float>(bmax.y), static_cast<float>(bmax.z));
@@ -742,6 +934,144 @@ void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
    }
    else if (singleShape && (transformBlur || deformBlur))
    {
+      if (step == 1 && m_overrideBounds)
+      {
+         MPlug plug;
+         bool promoteMin = false;
+         bool promoteMax = false;
+         
+         m_overrideBoundsMin = "";
+         m_overrideBoundsMax = "";
+         
+         plug = FindMayaPlug("mtoa_constant_abc_overrideBoundsMinName");
+         if (!plug.isNull())
+         {
+            m_overrideBoundsMin = plug.asString().asChar();
+         }
+         if (m_overrideBoundsMin.length() == 0)
+         {
+            m_overrideBoundsMin = "overrideBoundsMin";
+         }
+         
+         plug = FindMayaPlug("mtoa_constant_abc_overrideBoundsMaxName");
+         if (!plug.isNull())
+         {
+            m_overrideBoundsMax = plug.asString().asChar();
+         }
+         if (m_overrideBoundsMax.length() == 0)
+         {
+            m_overrideBoundsMax = "overrideBoundsMax";
+         }
+         
+         plug = FindMayaPlug("mtoa_constant_abc_promoteToObjectAttribs");
+         if (!plug.isNull())
+         {
+            MString names = plug.asString();
+            
+            int i = 0;
+            int j = names.indexW(' ');
+            
+            while (i != -1)
+            {
+               MString name = (j != -1 ? names.substringW(0, j - 1) : names);
+               
+               if (!strcmp(name.asChar(), m_overrideBoundsMin.c_str()))
+               {
+                  promoteMin = true;
+               }
+               else if (!strcmp(name.asChar(), m_overrideBoundsMax.c_str()))
+               {
+                  promoteMax = true;
+               }
+               
+               if (j != -1)
+               {
+                  names = names.substringW(j + 1, names.numChars() - 1);
+               }
+               
+               i = j;
+               j = names.indexW(' ');
+            }
+         }
+         
+         if (m_scene)
+         {
+            AlembicSceneCache::Unref(m_scene);
+            m_scene = 0;
+         }
+         
+         char msg[512];
+         sprintf(msg, "Check for override bounds in alembic file at t=%f. [%s]", m_renderTime, m_dagPath.partialPathName().asChar());
+         MGlobal::displayInfo(msg);
+         
+         AlembicSceneFilter filter(m_objPath, "");
+         
+         m_scene = AlembicSceneCache::Ref(m_abcPath, filter);
+         
+         if (m_scene)
+         {
+            AlembicNode *node = m_scene->find(m_objPath);
+            
+            if (node)
+            {
+               AtPoint min;
+               
+               Alembic::Abc::IObject iobj = node->object();
+               Alembic::AbcGeom::IGeomBaseObject tobj(iobj, Alembic::Abc::kWrapExisting);
+               Alembic::Abc::ICompoundProperty userProps = tobj.getSchema().getUserProperties();
+               Alembic::Abc::ICompoundProperty geomParams = tobj.getSchema().getArbGeomParams();
+               
+               bool hasMin = ReadFloat3Attribute(userProps, m_overrideBoundsMin, false, min);
+               if (!hasMin && promoteMin)
+               {
+                  MGlobal::displayInfo(MString("[mzAbcShapeMtoa] Check for promoted attribute \"") + m_overrideBoundsMin.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
+                  hasMin = ReadFloat3Attribute(geomParams, m_overrideBoundsMin, true, min);
+               }
+               if (hasMin)
+               {
+                  AtPoint max;
+                  
+                  bool hasMax = ReadFloat3Attribute(userProps, m_overrideBoundsMax, false, max);
+                  if (!hasMax && promoteMax)
+                  {
+                     MGlobal::displayInfo(MString("[mzAbcShapeMtoa] Check for promoted attribute \"") + m_overrideBoundsMax.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
+                     hasMax = ReadFloat3Attribute(geomParams, m_overrideBoundsMax, true, max);
+                  }
+                  if (hasMax)
+                  {
+                     AiNodeSetPnt(proc, "min", min.x, min.y, min.z);
+                     AiNodeSetPnt(proc, "max", max.x, max.y, max.z);
+                     
+                     MGlobal::displayInfo("[mzAbcShapeMtoa] Use bounds overrides contained in alembic file. [" + m_dagPath.partialPathName() + "]");
+                     
+                     m_boundsOverridden = true;
+                  }
+                  else
+                  {
+                     MGlobal::displayWarning(MString("Ignore bounds override: No object (or promoted) property named \"") + m_overrideBoundsMax.c_str() + MString("\" found in alembic file. [" + m_dagPath.partialPathName() + "]"));
+                  }
+               }
+               else
+               {
+                  MGlobal::displayWarning(MString("Ignore bounds override: No object (or promoted) property named \"") + m_overrideBoundsMin.c_str() + MString("\" found in alembic file. [" + m_dagPath.partialPathName() + "]"));
+               }
+            }
+            else
+            {
+               MGlobal::displayWarning(MString("Ignore bounds override: Could not find object in alembic file. [" + m_dagPath.partialPathName() + "]"));
+            }
+         }
+         else
+         {
+            MGlobal::displayWarning(MString("Ignore bounds override: Could not read alembic file. [" + m_dagPath.partialPathName() + "]"));
+         }
+      }
+      
+      if (m_boundsOverridden)
+      {
+         return;
+      }
+      
       AtPoint cmin = AiNodeGetPnt(proc, "min");
       AtPoint cmax = AiNodeGetPnt(proc, "max");
       
@@ -795,6 +1125,9 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
       }
       objpath = tmp.c_str();
    }
+   
+   m_abcPath = abcfile.asChar();
+   m_objPath = objpath.asChar();
    
    // ---
 
@@ -916,6 +1249,32 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
       if (!plug.isNull())
       {
          data += " -nurbssamplerate " + ToString(plug.asInt());
+      }
+      
+      plug = FindMayaPlug("mtoa_constant_abc_overrideBoundsMinName");
+      if (!plug.isNull())
+      {
+         MString name = plug.asString();
+         if (name.numChars() > 0)
+         {
+            data += " -overrideboundsminname " + name;
+         }
+      }
+      
+      plug = FindMayaPlug("mtoa_constant_abc_overrideBoundsMaxName");
+      if (!plug.isNull())
+      {
+         MString name = plug.asString();
+         if (name.numChars() > 0)
+         {
+            data += " -overrideboundsmaxname " + name;
+         }
+      }
+      
+      plug = FindMayaPlug("mtoa_constant_abc_promoteToObjectAttribs");
+      if (!plug.isNull())
+      {
+         data += " -promotetoobjectattribs " + plug.asString();
       }
       
       plug = FindMayaPlug("mtoa_constant_abc_overrideAttribs");

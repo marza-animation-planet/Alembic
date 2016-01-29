@@ -760,6 +760,7 @@ MObject AbcShape::aOutBoxMin;
 MObject AbcShape::aOutBoxMax;
 MObject AbcShape::aAnimated;
 MObject AbcShape::aUvSetCount;
+MObject AbcShape::aOutSampleTime;
 #ifdef ABCSHAPE_VRAY_SUPPORT
 MObject AbcShape::aOutApiType;
 MObject AbcShape::aOutApiClassification;
@@ -988,6 +989,13 @@ MStatus AbcShape::initialize()
    nAttr.setHidden(true);
    stat = addAttribute(aUvSetCount);
    MCHECKERROR(stat, "Could not add 'uvSetCount' attribute");
+   
+   aOutSampleTime = nAttr.create("outSampleTime", "osmpt", MFnNumericData::kDouble, 0.0, &stat);
+   MCHECKERROR(stat, "Could not create 'outSampleTime' attribute");
+   nAttr.setWritable(false);
+   nAttr.setStorable(false);
+   stat = addAttribute(aOutSampleTime);
+   MCHECKERROR(stat, "Could not add 'outSampleTime' attribute");
    
 #ifdef ABCSHAPE_VRAY_SUPPORT
    MFnStringData outApiTypeDefault;
@@ -1273,6 +1281,14 @@ MStatus AbcShape::initialize()
    attributeAffects(aIgnoreInstances, aUvSetCount);
    attributeAffects(aIgnoreVisibility, aUvSetCount);
    
+   attributeAffects(aCycleType, aOutSampleTime);
+   attributeAffects(aTime, aOutSampleTime);
+   attributeAffects(aSpeed, aOutSampleTime);
+   attributeAffects(aOffset, aOutSampleTime);
+   attributeAffects(aPreserveStartFrame, aOutSampleTime);
+   attributeAffects(aStartFrame, aOutSampleTime);
+   attributeAffects(aEndFrame, aOutSampleTime);
+   
    return MS::kSuccess;
 }
 
@@ -1478,6 +1494,18 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
       MDataHandle hOut = block.outputValue(plug.attribute());
       
       hOut.set3Double(out.x, out.y, out.z);
+      
+      block.setClean(plug);
+      
+      return MS::kSuccess;
+   }
+   else if (plug.attribute() == aOutSampleTime)
+   {
+      syncInternals(block);
+      
+      MDataHandle hOut = block.outputValue(plug.attribute());
+      
+      hOut.setDouble(mSampleTime);
       
       block.setClean(plug);
       
@@ -2927,6 +2955,7 @@ void AbcShape::copyInternalData(MPxNode *source)
       mDrawLocators = node->mDrawLocators;
       mAnimated = node->mAnimated;
       mUvSetNames = node->mUvSetNames;
+      mClipped = node->mClipped;
     
       if (mScene && !AlembicSceneCache::Unref(mScene))
       {

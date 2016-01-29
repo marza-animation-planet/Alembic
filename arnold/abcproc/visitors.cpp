@@ -89,95 +89,6 @@ bool GetTimeRange::getRange(double &start, double &end) const
 
 // ---
 
-// level: 0: object, 1: primitive, 2: point, 3: vertex
-static bool FindUserAttribute(const char *name,
-                              int level,
-                              double t,
-                              Alembic::Abc::ICompoundProperty userProps,
-                              Alembic::Abc::ICompoundProperty geomParams,
-                              UserAttribute &attr)
-{
-   if (geomParams.valid())
-   {
-      for (size_t i=0; i<geomParams.getNumProperties(); ++i)
-      {
-         const Alembic::AbcCoreAbstract::PropertyHeader &header = geomParams.getPropertyHeader(i);
-         
-         if (header.getName() != name)
-         {
-            continue;
-         }
-         
-         Alembic::AbcGeom::GeometryScope scope = Alembic::AbcGeom::GetGeometryScope(header.getMetaData());
-         
-         // Can two properties of different geometry scope and identical names be stored in alembic?
-         // If so the following has to be reviewed
-         
-         bool doRead = false;
-         
-         switch (scope)
-         {
-         case Alembic::AbcGeom::kFacevaryingScope:
-            doRead = (level == 3);
-            break;
-         case Alembic::AbcGeom::kVaryingScope:
-         case Alembic::AbcGeom::kVertexScope:
-            doRead = (level == 2);
-            break;
-         case Alembic::AbcGeom::kUniformScope:
-            doRead = (level == 1);
-            break;
-         case Alembic::AbcGeom::kConstantScope:
-            doRead = (level == 0);
-            break;
-         default:
-            continue;
-         }
-            
-         if (doRead)
-         {
-            if (ReadUserAttribute(attr, geomParams, header, t, true, false))
-            {
-               return true;
-            }
-            else
-            {
-               DestroyUserAttribute(attr);
-               // Don't return but break to allow fallback to userProps
-               break;
-            }
-         }
-      }
-   }
-   
-   if (userProps.valid() && level == 0)
-   {
-      for (size_t i=0; i<userProps.getNumProperties(); ++i)
-      {
-         const Alembic::AbcCoreAbstract::PropertyHeader &header = userProps.getPropertyHeader(i);
-         
-         if (header.getName() != name)
-         {
-            continue;
-         }
-         
-         InitUserAttribute(attr);
-         
-         if (ReadUserAttribute(attr, userProps, header, t, false, false))
-         {
-            return true;
-         }
-         else
-         {
-            DestroyUserAttribute(attr);
-            return false;
-         }
-      }
-   }
-   
-   return false;
-}
-
 bool GetVisibility(Alembic::Abc::ICompoundProperty props, double t)
 {
    Alembic::Util::bool_t visible = true;
@@ -485,19 +396,27 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
       
       InitUserAttribute(attr);
       
-      if (FindUserAttribute("radius", 2, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
+      if (ReadSingleUserAttribute("radius", PointAttribute, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
       {
          if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
          {
             DestroyUserAttribute(attr);
          }
+         else if (mDso->isPromotedToObjectAttrib("radius"))
+         {
+            attr.dataCount = (attr.dataCount > 0 ? 1 : 0);
+         }
       }
       
-      if (attr.data == 0 && FindUserAttribute("size", 2, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
+      if (attr.data == 0 && ReadSingleUserAttribute("size", PointAttribute, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
       {
          if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
          {
             DestroyUserAttribute(attr);
+         }
+         else if (mDso->isPromotedToObjectAttrib("size"))
+         {
+            attr.dataCount = (attr.dataCount > 0 ? 1 : 0);
          }
       }
       
@@ -562,25 +481,54 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
       }
       else
       {
-         if (FindUserAttribute("radius", 0, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
+         if (ReadSingleUserAttribute("radius", ObjectAttribute, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
          {
             if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
             {
                DestroyUserAttribute(attr);
             }
          }
+         else if (mDso->isPromotedToObjectAttrib("radius"))
+         {
+            if (ReadSingleUserAttribute("radius", PrimitiveAttribute, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
+            {
+               if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
+               {
+                  DestroyUserAttribute(attr);
+               }
+            }
+            else
+            {
+               attr.dataCount = (attr.dataCount > 0 ? 1 : 0);
+            }
+         }
          
-         if (attr.data == 0 && FindUserAttribute("size", 0, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
+         if (attr.data == 0 && ReadSingleUserAttribute("size", ObjectAttribute, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
          {
             if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
             {
                DestroyUserAttribute(attr);
+            }
+         }
+         else if (mDso->isPromotedToObjectAttrib("size"))
+         {
+            if (ReadSingleUserAttribute("size", PrimitiveAttribute, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
+            {
+               if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
+               {
+                  DestroyUserAttribute(attr);
+               }
+            }
+            else
+            {
+               attr.dataCount = (attr.dataCount > 0 ? 1 : 0);
             }
          }
          
          if (attr.data != 0)
          {
             extraPadding = *((const float*) attr.data);
+            DestroyUserAttribute(attr);
          }
          else
          {
@@ -964,42 +912,89 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
             mDso->cleanAttribName(ua.first);
             InitUserAttribute(ua.second);
             
+            bool promoteToConstant = mDso->isPromotedToObjectAttrib(ua.first);
+            
             switch (scope)
             {
             case Alembic::AbcGeom::kFacevaryingScope:
-               if (vertexAttrs && (mDso->readVertexAttribs() || specialVertexNames.find(ua.first) != specialVertexNames.end()))
+               if (promoteToConstant)
                {
-                  //ua.second.arnoldCategory = AI_USERDEF_INDEXED;
-                  attrs = vertexAttrs;
-                  if (mDso->verbose())
+                  if (objectAttrs && mDso->readObjectAttribs())
                   {
-                     AiMsgInfo("[abcproc] Read \"%s\" vertex attribute as \"%s\"",
-                               header.getName().c_str(), ua.first.c_str());
+                     attrs = objectAttrs;
+                     if (mDso->verbose())
+                     {
+                        AiMsgInfo("[abcproc] Read \"%s\" vertex attribute as \"%s\"",
+                                  header.getName().c_str(), ua.first.c_str());
+                     }
+                  }
+               }
+               else
+               {
+                  if (vertexAttrs && (mDso->readVertexAttribs() || specialVertexNames.find(ua.first) != specialVertexNames.end()))
+                  {
+                     //ua.second.arnoldCategory = AI_USERDEF_INDEXED;
+                     attrs = vertexAttrs;
+                     if (mDso->verbose())
+                     {
+                        AiMsgInfo("[abcproc] Read \"%s\" vertex attribute as \"%s\"",
+                                  header.getName().c_str(), ua.first.c_str());
+                     }
                   }
                }
                break;
             case Alembic::AbcGeom::kVaryingScope:
             case Alembic::AbcGeom::kVertexScope:
-               if (pointAttrs && (mDso->readPointAttribs() || specialPointNames.find(ua.first) != specialPointNames.end()))
+               if (promoteToConstant)
                {
-                  //ua.second.arnoldCategory = AI_USERDEF_VARYING;
-                  attrs = pointAttrs;
-                  if (mDso->verbose())
+                  if (objectAttrs && mDso->readObjectAttribs())
                   {
-                     AiMsgInfo("[abcproc] Read \"%s\" point attribute as \"%s\"",
-                               header.getName().c_str(), ua.first.c_str());
+                     attrs = objectAttrs;
+                     if (mDso->verbose())
+                     {
+                        AiMsgInfo("[abcproc] Read \"%s\" point attribute as \"%s\"",
+                                  header.getName().c_str(), ua.first.c_str());
+                     }
+                  }
+               }
+               else
+               {
+                  if (pointAttrs && (mDso->readPointAttribs() || specialPointNames.find(ua.first) != specialPointNames.end()))
+                  {
+                     //ua.second.arnoldCategory = AI_USERDEF_VARYING;
+                     attrs = pointAttrs;
+                     if (mDso->verbose())
+                     {
+                        AiMsgInfo("[abcproc] Read \"%s\" point attribute as \"%s\"",
+                                  header.getName().c_str(), ua.first.c_str());
+                     }
                   }
                }
                break;
             case Alembic::AbcGeom::kUniformScope:
-               if (primitiveAttrs && mDso->readPrimitiveAttribs())
+               if (promoteToConstant)
                {
-                  //ua.second.arnoldCategory = AI_USERDEF_UNIFORM;
-                  attrs = primitiveAttrs;
-                  if (mDso->verbose())
+                  if (objectAttrs && mDso->readObjectAttribs())
                   {
-                     AiMsgInfo("[abcproc] Read \"%s\" primitive attribute as \"%s\"",
-                               header.getName().c_str(), ua.first.c_str());
+                     attrs = objectAttrs;
+                     if (mDso->verbose())
+                     {
+                        AiMsgInfo("[abcproc] Read \"%s\" primitive attribute as \"%s\"",
+                                  header.getName().c_str(), ua.first.c_str());
+                     }
+                  }
+               }
+               else
+               {
+                  if (primitiveAttrs && mDso->readPrimitiveAttribs())
+                  {
+                     //ua.second.arnoldCategory = AI_USERDEF_UNIFORM;
+                     attrs = primitiveAttrs;
+                     if (mDso->verbose())
+                     {
+                        AiMsgInfo("[abcproc] Read \"%s\" primitive attribute as \"%s\"",
+                                  header.getName().c_str(), ua.first.c_str());
+                     }
                   }
                }
                break;
@@ -1029,7 +1024,37 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
                {
                   if (ReadUserAttribute(ua.second, geomParams, header, t, true, interpolate))
                   {
-                     attrs->insert(ua);
+                     if (!promoteToConstant)
+                     {
+                        attrs->insert(ua);
+                     }
+                     else
+                     {
+                        std::pair<std::string, UserAttribute> pua;
+                        
+                        bool promoted =  PromoteToConstantAttrib(ua.second, pua.second);
+                        
+                        DestroyUserAttribute(ua.second);
+                        
+                        if (!promoted)
+                        {
+                           if (mDso->verbose())
+                           {
+                              AiMsgWarning("[abcproc] Failed (could not promote to constant)");
+                           }
+                        }
+                        else
+                        {
+                           pua.first = ua.first;
+                           
+                           if (mDso->verbose())
+                           {
+                              AiMsgInfo("[abcproc] \"%s\" promoted to constant attribute", pua.first.c_str());
+                           }
+                           
+                           attrs->insert(pua);
+                        }
+                     }
                   }
                   else
                   {

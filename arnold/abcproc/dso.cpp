@@ -59,6 +59,8 @@ void Dso::CommonParameters::reset()
    velocityScale = 1.0f;
    velocityName = "";
    accelerationName = "";
+
+   promoteToObjectAttribs.clear();
 }
 
 std::string Dso::CommonParameters::dataString(const char *targetShape) const
@@ -160,6 +162,16 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    {
       oss << " -samplesexpanditerations 0";
    }
+   if (promoteToObjectAttribs.size() > 0)
+   {
+      oss << " -promotetoobjectattribs";
+      std::set<std::string>::const_iterator it = promoteToObjectAttribs.begin();
+      while (it != promoteToObjectAttribs.end())
+      {
+         oss << " " << *it;
+         ++it;
+      }
+   }
    if (verbose)
    {
       oss << " -verbose";
@@ -253,6 +265,8 @@ std::string Dso::CommonParameters::shapeKey() const
 void Dso::MultiParameters::reset()
 {
    overrideAttribs.clear();
+   overrideBoundsMinName = "";
+   overrideBoundsMaxName = "";
 }
 
 std::string Dso::MultiParameters::dataString() const
@@ -268,6 +282,16 @@ std::string Dso::MultiParameters::dataString() const
          oss << " " << *it;
          ++it;
       }
+   }
+   
+   if (overrideBoundsMinName.length() > 0)
+   {
+      oss << " -overrideBoundsMinName " << overrideBoundsMinName;
+   }
+   
+   if (overrideBoundsMaxName.length() > 0)
+   {
+      oss << " -overrideBoundsMaxName " << overrideBoundsMaxName;
    }
    
    return oss.str();
@@ -1485,6 +1509,32 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       }
       --i;
    }
+   else if (args[i] == "-promotetoobjectattribs")
+   {
+      ++i;
+      while (i < args.size() && !isFlag(args[i]))
+      {
+         mCommonParams.promoteToObjectAttribs.insert(args[i]);
+         ++i;
+      }
+      --i;
+   }
+   else if (args[i] == "-overrideboundsminname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mMultiParams.overrideBoundsMinName = args[i];
+      }
+   }
+   else if (args[i] == "-overrideboundsmaxname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mMultiParams.overrideBoundsMaxName = args[i];
+      }
+   }
    // Process single params
    else if (args[i] == "-objectattribs")
    {
@@ -2064,6 +2114,79 @@ void Dso::readFromUserParams()
          else
          {
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
+         }
+      }
+      else if (param == "promotetoobjectattribs")
+      {
+         mCommonParams.promoteToObjectAttribs.clear();
+         
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            std::string names = AiNodeGetStr(mProcNode, pname);
+            std::string name;
+            
+            size_t p0 = 0;
+            size_t p1 = names.find(' ', p0);
+            
+            while (p1 != std::string::npos)
+            {
+               name = names.substr(p0, p1-p0);
+               strip(name);
+               
+               if (name.length() > 0)
+               {
+                  mCommonParams.promoteToObjectAttribs.insert(name);
+               }
+               
+               p0 = p1 + 1;
+               p1 = names.find(' ', p0);
+            }
+            
+            name = names.substr(p0);
+            strip(name);
+            
+            if (name.length() > 0)
+            {
+               mCommonParams.promoteToObjectAttribs.insert(name);
+            }
+         }
+         else if (AiUserParamGetType(p) == AI_TYPE_ARRAY && AiUserParamGetArrayType(p) == AI_TYPE_STRING)
+         {
+            AtArray *names = AiNodeGetArray(mProcNode, pname);
+            
+            if (names)
+            {
+               for (unsigned int i=0; i<names->nelements; ++i)
+               {
+                  mCommonParams.promoteToObjectAttribs.insert(AiArrayGetStr(names, i));
+               }
+            }
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
+         }
+      }
+      else if (param == "overrideboundsminname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mMultiParams.overrideBoundsMinName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
+      else if (param == "overrideboundsmaxname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mMultiParams.overrideBoundsMaxName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
          }
       }
       else if (param == "objectattribs")
