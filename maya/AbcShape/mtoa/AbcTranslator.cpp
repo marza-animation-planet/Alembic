@@ -96,6 +96,11 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    
    // particles
    
+   data.stringDefault = "";
+   data.name = "mtoa_constant_abc_radiusName";
+   data.shortName = "radnam";
+   helper.MakeInputString(data);
+   
    data.defaultValue.FLT = 1.0;
    data.name = "mtoa_constant_abc_radiusScale";
    data.shortName = "radscl";
@@ -127,6 +132,11 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    helper.MakeInputFloat(data);
    
    // curves
+   
+   data.defaultValue.BOOL = true;
+   data.name = "mtoa_constant_abc_ignoreNurbs";
+   data.shortName = "ignnrb";
+   helper.MakeInputBoolean(data);
    
    data.defaultValue.INT = 5;
    data.name = "mtoa_constant_abc_nurbsSampleRate";
@@ -161,11 +171,6 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.shortName = "vtxatrs";
    helper.MakeInputBoolean(data);
    
-   data.stringDefault = "";
-   data.name = "mtoa_constant_abc_promoteToObjectAttribs";
-   data.shortName = "probja";
-   helper.MakeInputString(data);
-   
    data.defaultValue.INT = 0;
    data.enums.clear();
    data.enums.append("render");
@@ -175,6 +180,11 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.name = "mtoa_constant_abc_attribsFrame";
    data.shortName = "atrsfrm";
    helper.MakeInputEnum(data);
+   
+   data.stringDefault = "";
+   data.name = "mtoa_constant_abc_promoteToObjectAttribs";
+   data.shortName = "probja";
+   helper.MakeInputString(data);
    
    data.stringDefault = "";
    data.name = "mtoa_constant_abc_removeAttribPrefices";
@@ -1277,6 +1287,16 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
+      plug = FindMayaPlug("mtoa_constant_abc_radiusName");
+      if (!plug.isNull())
+      {
+         tmp = plug.asString();
+         if (tmp.numChars() > 0)
+         {
+            data += " -radiusname " + tmp;
+         }
+      }
+      
       plug = FindMayaPlug("mtoa_constant_abc_radiusScale");
       if (!plug.isNull())
       {
@@ -1293,6 +1313,12 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
       if (!plug.isNull())
       {
          data += " -radiusmax " + ToString(plug.asFloat());
+      }
+      
+      plug = FindMayaPlug("mtoa_constant_abc_ignoreNurbs");
+      if (!plug.isNull() && plug.asBool())
+      {
+         data += " -ignorenurbs";
       }
       
       plug = FindMayaPlug("mtoa_constant_abc_nurbsSampleRate");

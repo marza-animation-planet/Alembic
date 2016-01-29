@@ -260,6 +260,11 @@ public:
    
    // Points/Curves
    
+   inline const char* radiusName() const
+   {
+      return (mSingleParams.radiusName.length() > 0 ? mSingleParams.radiusName.c_str() : 0);
+   }
+   
    inline double radiusMin() const
    {
       return mSingleParams.radiusMin;
@@ -276,6 +281,11 @@ public:
    }
    
    // Curves
+   
+   inline bool ignoreNurbs() const
+   {
+      return mCommonParams.ignoreNurbs;
+   }
    
    inline int nurbsSampleRate() const
    {
@@ -402,6 +412,8 @@ private:
       // referenceframe (first frame of reference scene by default)
       std::set<std::string> promoteToObjectAttribs;
       
+      bool ignoreNurbs;
+      
       void reset();
       std::string dataString(const char *targetShape) const;
       std::string shapeKey() const;
@@ -430,14 +442,14 @@ private:
       // mesh
       std::set<std::string> computeTangents;
       
-      // particles/curves
+      // particles
+      std::string radiusName;
       float radiusMin;
       float radiusMax;
       float radiusScale;
       
       // curves
       int nurbsSampleRate;
-      
       
       void reset();
       std::string dataString() const;

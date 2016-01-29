@@ -61,7 +61,7 @@ class CountShapes
 {
 public:
    
-   CountShapes(double renderTime, bool ignoreTransforms, bool ignoreInstances, bool ignoreVisibility);
+   CountShapes(double renderTime, bool ignoreTransforms, bool ignoreInstances, bool ignoreVisibility, bool ignoreNurbs);
    
    AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
@@ -89,6 +89,7 @@ private:
    bool mIgnoreTransforms;
    bool mIgnoreInstances;
    bool mIgnoreVisibility;
+   bool mIgnoreNurbs;
    size_t mNumShapes;
 };
 
@@ -777,6 +778,13 @@ private:
    bool fillReferencePositions(AlembicCurves *refCurves,
                                CurvesInfo &info,
                                UserAttributes *pointAttrs);
+   
+   void removeConflictingAttribs(AtNode *atnode,
+                                 UserAttributes *obja,
+                                 UserAttributes *prma,
+                                 UserAttributes *pnta,
+                                 UserAttributes *vtxa,
+                                 bool verbose=false);
    
 private:
 

@@ -61,6 +61,8 @@ void Dso::CommonParameters::reset()
    accelerationName = "";
 
    promoteToObjectAttribs.clear();
+   
+   ignoreNurbs = false;
 }
 
 std::string Dso::CommonParameters::dataString(const char *targetShape) const
@@ -149,6 +151,10 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    if (targetShape || ignoreVisibility)
    {
       oss << " -ignorevisibility";
+   }
+   if (ignoreNurbs)
+   {
+      oss << " -ignorenurbs";
    }
    if (samplesExpandIterations > 0)
    {
@@ -258,6 +264,10 @@ std::string Dso::CommonParameters::shapeKey() const
    {
       oss << " -samplesexpanditerations 0";
    }
+   if (ignoreNurbs)
+   {
+      oss << " -ignorenurbs";
+   }
    
    return oss.str();
 }
@@ -308,6 +318,7 @@ void Dso::SingleParameters::reset()
    
    computeTangents.clear();
    
+   radiusName = "";
    radiusMin = 0.0f;
    radiusMax = 1000000.0f;
    radiusScale = 1.0f;
@@ -360,6 +371,10 @@ std::string Dso::SingleParameters::dataString() const
          oss << " " << *it;
          ++it;
       }
+   }
+   if (radiusName.length() > 0)
+   {
+      oss << " -radiusname " << radiusName;
    }
    oss << " -radiusmin " << radiusMin;
    oss << " -radiusmax " << radiusMax;
@@ -511,7 +526,8 @@ Dso::Dso(AtNode *node)
          CountShapes visitor(mRenderTime,
                              mCommonParams.ignoreTransforms,
                              mCommonParams.ignoreInstances,
-                             mCommonParams.ignoreVisibility);
+                             mCommonParams.ignoreVisibility,
+                             mCommonParams.ignoreNurbs);
          
          mScene->visit(AlembicNode::VisitDepthFirst, visitor);
          
@@ -1605,6 +1621,14 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       }
       --i;
    }
+   else if (args[i] == "-radiusname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mSingleParams.radiusName = args[i];
+      }
+   }
    else if (args[i] == "-radiusmin")
    {
       ++i;
@@ -1631,6 +1655,10 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       {
          return false;
       }
+   }
+   else if (args[i] == "-ignorenurbs")
+   {
+      mCommonParams.ignoreNurbs = true;
    }
    else if (args[i] == "-nurbssamplerate")
    {
@@ -2375,6 +2403,17 @@ void Dso::readFromUserParams()
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
          }
       }
+      else if (param == "radiusname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mSingleParams.radiusName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
       else if (param == "radiusmin")
       {
          if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
@@ -2406,6 +2445,17 @@ void Dso::readFromUserParams()
          else
          {
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
+         }
+      }
+      else if (param == "ignorenurbs")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
+         {
+            mCommonParams.ignoreNurbs = AiNodeGetBool(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
          }
       }
       else if (param == "nurbssamplerate")

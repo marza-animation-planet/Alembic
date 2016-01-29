@@ -31,12 +31,14 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       self.endLayout()
       
       self.beginLayout("Particles", collapse=True)
+      self.addControl("mtoa_constant_abc_radiusName", label="Radius Name")
       self.addControl("mtoa_constant_abc_radiusScale", label="Radius Scale")
       self.addControl("mtoa_constant_abc_radiusMin", label="Min. Radius")
       self.addControl("mtoa_constant_abc_radiusMax", label="Max. Radius")
       self.endLayout()
       
       self.beginLayout("Curves", collapse=True)
+      self.addControl("mtoa_constant_abc_ignoreNurbs", label="Ignore NURBS")
       self.addControl("mtoa_constant_abc_nurbsSampleRate", label="NURBS Sample Rate")
       self.endLayout()
       
@@ -45,8 +47,8 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       self.addControl("mtoa_constant_abc_primitiveAttribs", label="Output Primitive Attributes")
       self.addControl("mtoa_constant_abc_pointAttribs", label="Output Point Attributes")
       self.addControl("mtoa_constant_abc_vertexAttribs", label="Output Vertex Attributes")
-      self.addControl("mtoa_constant_abc_promoteToObjectAttribs", label="Promote To Object Attributes")
       self.addControl("mtoa_constant_abc_attribsFrame", label="Attributes Frame")
+      self.addControl("mtoa_constant_abc_promoteToObjectAttribs", label="Promote To Object Attributes")
       self.addControl("mtoa_constant_abc_removeAttribPrefices", label="Remove Attribute Prefices")
       self.addSeparator()
       self.addControl("mtoa_constant_abc_overrideAttribs", label="Override Attributes")

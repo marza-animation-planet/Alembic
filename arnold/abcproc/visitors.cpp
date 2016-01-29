@@ -143,11 +143,12 @@ bool GetVisibility(Alembic::Abc::ICompoundProperty props, double t)
 
 // ---
 
-CountShapes::CountShapes(double renderTime, bool ignoreTransforms, bool ignoreInstances, bool ignoreVisibility)
+CountShapes::CountShapes(double renderTime, bool ignoreTransforms, bool ignoreInstances, bool ignoreVisibility, bool ignoreNurbs)
    : mRenderTime(renderTime)
    , mIgnoreTransforms(ignoreTransforms)
    , mIgnoreInstances(ignoreInstances)
    , mIgnoreVisibility(ignoreVisibility)
+   , mIgnoreNurbs(ignoreNurbs)
    , mNumShapes(0)
 {
 }
@@ -181,7 +182,14 @@ AlembicNode::VisitReturn CountShapes::enter(AlembicPoints &node, AlembicNode *)
 
 AlembicNode::VisitReturn CountShapes::enter(AlembicCurves &node, AlembicNode *)
 {
-   return shapeEnter(node);
+   if (!mIgnoreNurbs)
+   {
+      return shapeEnter(node);
+   }
+   else
+   {
+      return AlembicNode::ContinueVisit;
+   }
 }
 
 AlembicNode::VisitReturn CountShapes::enter(AlembicNuPatch &, AlembicNode *)
@@ -389,34 +397,48 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
    if (visible)
    {
       Alembic::AbcGeom::IPointsSchema &schema = node.typedObject().getSchema();
-      
       Alembic::AbcGeom::IFloatGeomParam widths = schema.getWidthsParam();
+      Alembic::Abc::ICompoundProperty userProps = schema.getUserProperties();
+      Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
+      double renderTime = mDso->renderTime();
       
       UserAttribute attr;
       
       InitUserAttribute(attr);
       
-      if (ReadSingleUserAttribute("radius", PointAttribute, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
+      const char *radiusName = mDso->radiusName();
+      bool checkAltName = false;
+      float constantRadius = -1.0f;
+      
+      if (radiusName == 0)
+      {
+         radiusName = "radius";
+         checkAltName = true; // also check for 'size'
+      }
+      
+      if (ReadSingleUserAttribute(radiusName, PointAttribute, renderTime, userProps, geomParams, attr))
       {
          if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
          {
             DestroyUserAttribute(attr);
          }
-         else if (mDso->isPromotedToObjectAttrib("radius"))
+         else if (mDso->isPromotedToObjectAttrib(radiusName) && attr.dataCount >= 1)
          {
-            attr.dataCount = (attr.dataCount > 0 ? 1 : 0);
+            constantRadius = *((const float*) attr.data);
+            DestroyUserAttribute(attr);
          }
       }
       
-      if (attr.data == 0 && ReadSingleUserAttribute("size", PointAttribute, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
+      if (attr.data == 0 && checkAltName && ReadSingleUserAttribute("size", PointAttribute, renderTime, userProps, geomParams, attr))
       {
          if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
          {
             DestroyUserAttribute(attr);
          }
-         else if (mDso->isPromotedToObjectAttrib("size"))
+         else if (mDso->isPromotedToObjectAttrib("size") && attr.dataCount >= 1 && constantRadius < 0.0f)
          {
-            attr.dataCount = (attr.dataCount > 0 ? 1 : 0);
+            constantRadius = *((const float*) attr.data);
+            DestroyUserAttribute(attr);
          }
       }
       
@@ -441,8 +463,6 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
          TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> wsamples;
          TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator wsample;
             
-         double renderTime = mDso->renderTime();
-         
          const double *sampleTimes = 0;
          size_t sampleTimesCount = 0;
          
@@ -481,58 +501,38 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
       }
       else
       {
-         if (ReadSingleUserAttribute("radius", ObjectAttribute, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
+         // constant radius may have been set earlier if attribute was promoted to object level
+         if (constantRadius < 0.0f)
          {
-            if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
+            if (ReadSingleUserAttribute(radiusName, ObjectAttribute, renderTime, userProps, geomParams, attr))
             {
+               if (attr.arnoldType == AI_TYPE_FLOAT && attr.dataDim == 1)
+               {
+                  constantRadius = *((const float*) attr.data);
+               }
                DestroyUserAttribute(attr);
             }
-         }
-         else if (mDso->isPromotedToObjectAttrib("radius"))
-         {
-            if (ReadSingleUserAttribute("radius", PrimitiveAttribute, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
+            
+            if (constantRadius < 0.0f && checkAltName)
             {
-               if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
+               if (ReadSingleUserAttribute("size", ObjectAttribute, renderTime, userProps, geomParams, attr))
                {
+                  if (attr.arnoldType == AI_TYPE_FLOAT && attr.dataDim == 1)
+                  {
+                     constantRadius = *((const float*) attr.data);
+                  }
                   DestroyUserAttribute(attr);
                }
             }
-            else
-            {
-               attr.dataCount = (attr.dataCount > 0 ? 1 : 0);
-            }
          }
          
-         if (attr.data == 0 && ReadSingleUserAttribute("size", ObjectAttribute, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
+         if (constantRadius < 0.0f)
          {
-            if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
-            {
-               DestroyUserAttribute(attr);
-            }
-         }
-         else if (mDso->isPromotedToObjectAttrib("size"))
-         {
-            if (ReadSingleUserAttribute("size", PrimitiveAttribute, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
-            {
-               if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
-               {
-                  DestroyUserAttribute(attr);
-               }
-            }
-            else
-            {
-               attr.dataCount = (attr.dataCount > 0 ? 1 : 0);
-            }
-         }
-         
-         if (attr.data != 0)
-         {
-            extraPadding = *((const float*) attr.data);
-            DestroyUserAttribute(attr);
+            extraPadding = mDso->radiusMin();
          }
          else
          {
-            extraPadding = mDso->radiusMin();
+            extraPadding = adjustRadius(constantRadius);
          }
       }
       
@@ -547,6 +547,11 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode *instance)
 {
+   if (mDso->ignoreNurbs())
+   {
+      return AlembicNode::ContinueVisit;
+   }
+   
    // Take into account the curve width in the computed bounds
    
    Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
@@ -602,7 +607,8 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode
       }
       else
       {
-         extraPadding = mDso->radiusMin();
+         // default width of 0.01 -> radius 0.005
+         extraPadding = 0.005f;
       }
       
       if (mDso->verbose())
@@ -877,6 +883,8 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
          specialVertexNames.insert("Nref");
       }
       
+      // what about 'radius' and 'size'?
+      
       for (size_t i=0; i<geomParams.getNumProperties(); ++i)
       {
          const Alembic::AbcCoreAbstract::PropertyHeader &header = geomParams.getPropertyHeader(i);
@@ -1071,6 +1079,91 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
    }
 }
 
+void MakeShape::removeConflictingAttribs(AtNode *atnode, UserAttributes *obja, UserAttributes *prma, UserAttributes *pnta, UserAttributes *vtxa, bool verbose)
+{
+   const AtNodeEntry *entry = AiNodeGetNodeEntry(atnode);
+   
+   if (!entry)
+   {
+      return;
+   }
+   
+   UserAttributes::iterator attrit;
+   
+   AtParamIterator *paramit = AiNodeEntryGetParamIterator(entry);
+   
+   while (!AiParamIteratorFinished(paramit))
+   {
+      const AtParamEntry *pentry = AiParamIteratorGetNext(paramit);
+      
+      const char *tmp = AiParamGetName(pentry);
+      
+      if (!tmp)
+      {
+         continue;
+      }
+      
+      std::string pname = tmp;
+      
+      if (obja)
+      {
+         attrit = obja->find(pname);
+         if (attrit != obja->end())
+         {
+            if (verbose)
+            {
+               AiMsgInfo("[abcproc] Ignore conflicting object attribute \"%s\".", tmp);
+            }
+            DestroyUserAttribute(attrit->second);
+            obja->erase(attrit);
+         }
+      }
+      
+      if (prma)
+      {
+         attrit = prma->find(pname);
+         if (attrit != prma->end())
+         {
+            if (verbose)
+            {
+               AiMsgInfo("[abcproc] Ignore conflicting primitive attribute \"%s\".", tmp);
+            }
+            DestroyUserAttribute(attrit->second);
+            prma->erase(attrit);
+         }
+      }
+      
+      if (pnta)
+      {
+         attrit = pnta->find(pname);
+         if (attrit != pnta->end())
+         {
+            if (verbose)
+            {
+               AiMsgInfo("[abcproc] Ignore conflicting point attribute \"%s\".", tmp);
+            }
+            DestroyUserAttribute(attrit->second);
+            pnta->erase(attrit);
+         }
+      }
+      
+      if (vtxa)
+      {
+         attrit = vtxa->find(pname);
+         if (attrit != vtxa->end())
+         {
+            if (verbose)
+            {
+               AiMsgInfo("[abcproc] Ignore conflicting vertex attribute \"%s\".", tmp);
+            }
+            DestroyUserAttribute(attrit->second);
+            vtxa->erase(attrit);
+         }
+      }
+   }
+   
+   AiParamIteratorDestroy(paramit);
+}
 
 float* MakeShape::computeMeshSmoothNormals(MakeShape::MeshInfo &info,
                                            const float *P0,
@@ -2218,6 +2311,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
    
    // Output user defined attributes
    
+   removeConflictingAttribs(mNode, &(info.objectAttrs), &(info.primitiveAttrs), &(info.pointAttrs), &(info.vertexAttrs), mDso->verbose());
+   
    SetUserAttributes(mNode, info.objectAttrs, 0);
    SetUserAttributes(mNode, info.primitiveAttrs, info.polygonCount);
    SetUserAttributes(mNode, info.pointAttrs, info.pointCount);
@@ -2395,6 +2490,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
    }
    
    // Output user defined attributes
+   
+   removeConflictingAttribs(mNode, &(info.objectAttrs), &(info.primitiveAttrs), &(info.pointAttrs), &(info.vertexAttrs), mDso->verbose());
    
    SetUserAttributes(mNode, info.objectAttrs, 0);
    SetUserAttributes(mNode, info.primitiveAttrs, info.polygonCount);
@@ -2794,51 +2891,35 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    // give priority to user defined 'radius' 
    bool radiusSet = false;
    
+   const char *radiusName = mDso->radiusName();
+   bool checkAltName = false;
+   
+   if (radiusName == 0)
+   {
+      radiusName = "radius";
+   }
+   
    Alembic::AbcGeom::IFloatGeomParam widths = schema.getWidthsParam();
    if (widths.valid())
    {
       // Convert to point attribute 'radius'
       
-      if (info.pointAttrs.find("radius") != info.pointAttrs.end())
+      if (info.pointAttrs.find(radiusName) != info.pointAttrs.end() && !mDso->isPromotedToObjectAttrib(radiusName))
       {
          if (mDso->verbose())
          {
-            AiMsgInfo("[abcproc] Ignore alembic \"widths\" property: \"radius\" attribute set");
+            AiMsgInfo("[abcproc] Ignore alembic \"widths\" property: use \"%s\" attribute instead.", radiusName);
          }
       }
-      else if (info.pointAttrs.find("size") != info.pointAttrs.end())
+      else if (checkAltName && info.pointAttrs.find("size") != info.pointAttrs.end() && !mDso->isPromotedToObjectAttrib("size"))
       {
          if (mDso->verbose())
          {
-            AiMsgInfo("[abcproc] Ignore alembic \"widths\" property: \"size\" attribute set");
+            AiMsgInfo("[abcproc] Ignore alembic \"widths\" property: use \"size\" attribute instead.");
          }
       }
       else
       {
-         UserAttributes::iterator it = info.objectAttrs.find("radius");
-         
-         if (it != info.objectAttrs.end())
-         {
-            if (mDso->verbose())
-            {
-               AiMsgInfo("[abcproc] Ignore \"radius\" object attribute");
-            }
-            DestroyUserAttribute(it->second);
-            info.objectAttrs.erase(it);
-         }
-         
-         it = info.objectAttrs.find("size");
-         
-         if (it != info.objectAttrs.end())
-         {
-            if (mDso->verbose())
-            {
-               AiMsgInfo("[abcproc] Ignore \"size\" object attribute");
-            }
-            DestroyUserAttribute(it->second);
-            info.objectAttrs.erase(it);
-         }
-         
          TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> wsamples;
          TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator wsamp0, wsamp1;
          
@@ -2979,32 +3060,69 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    {
       UserAttribute *ra = 0;
       UserAttributes *attrs = 0;
+      float constantRadius = -1.0f;
       
-      UserAttributes::iterator ait = info.pointAttrs.find("radius");
-      
-      if (ait == info.pointAttrs.end())
-      {
-         ait = info.pointAttrs.find("size");
-      }
+      UserAttributes::iterator ait = info.pointAttrs.find(radiusName);
       
       if (ait != info.pointAttrs.end())
       {
-         ra = &(ait->second);
-         attrs = &(info.pointAttrs);
-      }
-      else
-      {
-         ait = info.objectAttrs.find("radius");
-         
-         if (ait == info.objectAttrs.end())
+         if (mDso->isPromotedToObjectAttrib(radiusName))
          {
-            ait = info.objectAttrs.find("size");
+            if (ait->second.dataCount >= 1)
+            {
+               constantRadius = *((const float*) ait->second.data);
+            }
+            DestroyUserAttribute(ait->second);
+            info.pointAttrs.erase(ait);
          }
+         else
+         {
+            ra = &(ait->second);
+            attrs = &(info.pointAttrs);
+         }
+      }
+      
+      if (!ra && checkAltName)
+      {
+         ait = info.pointAttrs.find("size");
+         
+         if (ait != info.pointAttrs.end())
+         {
+            if (mDso->isPromotedToObjectAttrib("size"))
+            {
+               if (ait->second.dataCount >= 1 && constantRadius < 0.0f)
+               {
+                  constantRadius = *((const float*) ait->second.data);
+               }
+               DestroyUserAttribute(ait->second);
+               info.pointAttrs.erase(ait);
+            }
+            else
+            {
+               ra = &(ait->second);
+               attrs = &(info.pointAttrs);
+            }
+         }
+      }
+      
+      if (!ra && constantRadius < 0.0f)
+      {
+         ait = info.objectAttrs.find(radiusName);
          
          if (ait != info.objectAttrs.end())
          {
             ra = &(ait->second);
             attrs = &(info.objectAttrs);
+         }
+         else if (checkAltName)
+         {
+            ait = info.objectAttrs.find("size");
+            
+            if (ait != info.objectAttrs.end())
+            {
+               ra = &(ait->second);
+               attrs = &(info.objectAttrs);
+            }
          }
       }
       
@@ -3029,20 +3147,29 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
       }
       else
       {
-         AiMsgInfo("[abcproc] No radius set for points in alembic archive. Create particles with constant radius %lf (can be changed using dso '-radiusmin' data flag or 'abc_radiusmin' user attribute)", mDso->radiusMin());
-         
          AtArray *radius = AiArrayAllocate(1, 1, AI_TYPE_FLOAT);
-         AiArraySetFlt(radius, 0, mDso->radiusMin());
+         
+         if (constantRadius < 0.0f)
+         {
+            AiMsgInfo("[abcproc] No radius set for points in alembic archive. Create particles with constant radius %lf (can be changed using dso '-radiusmin' data flag or 'abc_radiusmin' user attribute)", mDso->radiusMin());
+            AiArraySetFlt(radius, 0, mDso->radiusMin());
+         }
+         else
+         {
+            AiArraySetFlt(radius, 0, adjustRadius(constantRadius));
+         }
          
          AiNodeSetArray(mNode, "radius", radius);
       }
    }
    
    // Note: arnold want particle point attributes as uniform attributes, not varying
-   for (UserAttributes::iterator it = info.pointAttrs.begin(); it != info.pointAttrs.end(); ++it)
+   for (it = info.pointAttrs.begin(); it != info.pointAttrs.end(); ++it)
    {
       it->second.arnoldCategory = AI_USERDEF_UNIFORM;
    }
+   
+   removeConflictingAttribs(mNode, &(info.objectAttrs), 0, &(info.pointAttrs), 0, mDso->verbose());
    
    SetUserAttributes(mNode, info.objectAttrs, 0);
    SetUserAttributes(mNode, info.pointAttrs, info.pointCount);
@@ -4733,6 +4860,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
       
       DestroyUserAttributes(refPointAttrs);
    }
+   
+   removeConflictingAttribs(mNode, &(info.objectAttrs), &(info.primitiveAttrs), &(info.pointAttrs), 0, mDso->verbose());
    
    SetUserAttributes(mNode, info.objectAttrs, 0);
    SetUserAttributes(mNode, info.primitiveAttrs, info.curveCount);
