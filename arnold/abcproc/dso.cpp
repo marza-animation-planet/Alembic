@@ -55,10 +55,19 @@ void Dso::CommonParameters::reset()
    verbose = false;
    
    outputReference = false;
+
    referenceFrame = -std::numeric_limits<float>::max();
    referencePositionName = "";
    referenceNormalName = "";
    referenceMatrixName = "";
+   
+   velocityScale = 1.0f;
+   velocityName = "";
+   accelerationName = "";
+
+   promoteToObjectAttribs.clear();
+   
+   ignoreNurbs = false;
 }
 
 std::string Dso::CommonParameters::dataString(const char *targetShape) const
@@ -135,6 +144,15 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    {
       oss << " -preservestartframe";
    }
+   oss << " -velocityscale " << velocityScale;
+   if (velocityName.length() > 0)
+   {
+      oss << " -velocityname " << velocityName;
+   }
+   if (accelerationName.length() > 0)
+   {
+      oss << " -accelerationname " << accelerationName;
+   }
    if (ignoreTransformBlur)
    {
       oss << " -ignoretransformblur";
@@ -155,6 +173,10 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    {
       oss << " -ignorevisibility";
    }
+   if (ignoreNurbs)
+   {
+      oss << " -ignorenurbs";
+   }
    if (samplesExpandIterations > 0)
    {
       oss << " -samplesexpanditerations " << samplesExpandIterations;
@@ -166,6 +188,16 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    else
    {
       oss << " -samplesexpanditerations 0";
+   }
+   if (promoteToObjectAttribs.size() > 0)
+   {
+      oss << " -promotetoobjectattribs";
+      std::set<std::string>::const_iterator it = promoteToObjectAttribs.begin();
+      while (it != promoteToObjectAttribs.end())
+      {
+         oss << " " << *it;
+         ++it;
+      }
    }
    if (verbose)
    {
@@ -245,6 +277,18 @@ std::string Dso::CommonParameters::shapeKey() const
    {
       oss << " -ignoredeformblur";
    }
+   else
+   {
+      oss << " -velocityscale " << velocityScale;
+      if (velocityName.length() > 0)
+      {
+         oss << " -velocityname " << velocityName;
+      }
+      if (accelerationName.length() > 0)
+      {
+         oss << " -accelerationname " << accelerationName;
+      }
+   }
    if (samplesExpandIterations > 0)
    {
       oss << " -samplesexpanditerations " << samplesExpandIterations;
@@ -257,6 +301,10 @@ std::string Dso::CommonParameters::shapeKey() const
    {
       oss << " -samplesexpanditerations 0";
    }
+   if (ignoreNurbs)
+   {
+      oss << " -ignorenurbs";
+   }
    
    return oss.str();
 }
@@ -264,6 +312,8 @@ std::string Dso::CommonParameters::shapeKey() const
 void Dso::MultiParameters::reset()
 {
    overrideAttribs.clear();
+   overrideBoundsMinName = "";
+   overrideBoundsMaxName = "";
 }
 
 std::string Dso::MultiParameters::dataString() const
@@ -281,6 +331,16 @@ std::string Dso::MultiParameters::dataString() const
       }
    }
    
+   if (overrideBoundsMinName.length() > 0)
+   {
+      oss << " -overrideBoundsMinName " << overrideBoundsMinName;
+   }
+   
+   if (overrideBoundsMaxName.length() > 0)
+   {
+      oss << " -overrideBoundsMaxName " << overrideBoundsMaxName;
+   }
+   
    return oss.str();
 }
 
@@ -295,6 +355,7 @@ void Dso::SingleParameters::reset()
    
    computeTangents.clear();
    
+   radiusName = "";
    radiusMin = 0.0f;
    radiusMax = 1000000.0f;
    radiusScale = 1.0f;
@@ -347,6 +408,10 @@ std::string Dso::SingleParameters::dataString() const
          oss << " " << *it;
          ++it;
       }
+   }
+   if (radiusName.length() > 0)
+   {
+      oss << " -radiusname " << radiusName;
    }
    oss << " -radiusmin " << radiusMin;
    oss << " -radiusmax " << radiusMax;
@@ -498,7 +563,8 @@ Dso::Dso(AtNode *node)
          CountShapes visitor(mRenderTime,
                              mCommonParams.ignoreTransforms,
                              mCommonParams.ignoreInstances,
-                             mCommonParams.ignoreVisibility);
+                             mCommonParams.ignoreVisibility,
+                             mCommonParams.ignoreNurbs);
          
          mScene->visit(AlembicNode::VisitDepthFirst, visitor);
          
@@ -1493,6 +1559,31 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
          mCommonParams.referenceMatrixName = args[i];
       }
    }
+   else if (args[i] == "-velocityscale")
+   {
+      ++i;
+      if (i >= args.size() ||
+          sscanf(args[i].c_str(), "%f", &(mCommonParams.velocityScale)) != 1)
+      {
+         return false;
+      }
+   }
+   else if (args[i] == "-velocityname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mCommonParams.velocityName = args[i];
+      }
+   }
+   else if (args[i] == "-accelerationname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mCommonParams.accelerationName = args[i];
+      }
+   }
    // Process multi params
    else if (args[i] == "-overrideattribs")
    {
@@ -1503,6 +1594,32 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
          ++i;
       }
       --i;
+   }
+   else if (args[i] == "-promotetoobjectattribs")
+   {
+      ++i;
+      while (i < args.size() && !isFlag(args[i]))
+      {
+         mCommonParams.promoteToObjectAttribs.insert(args[i]);
+         ++i;
+      }
+      --i;
+   }
+   else if (args[i] == "-overrideboundsminname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mMultiParams.overrideBoundsMinName = args[i];
+      }
+   }
+   else if (args[i] == "-overrideboundsmaxname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mMultiParams.overrideBoundsMaxName = args[i];
+      }
    }
    // Process single params
    else if (args[i] == "-objectattribs")
@@ -1574,6 +1691,14 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       }
       --i;
    }
+   else if (args[i] == "-radiusname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mSingleParams.radiusName = args[i];
+      }
+   }
    else if (args[i] == "-radiusmin")
    {
       ++i;
@@ -1600,6 +1725,10 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       {
          return false;
       }
+   }
+   else if (args[i] == "-ignorenurbs")
+   {
+      mCommonParams.ignoreNurbs = true;
    }
    else if (args[i] == "-nurbssamplerate")
    {
@@ -2045,6 +2174,40 @@ void Dso::readFromUserParams()
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
          }
       }
+      else if (param == "velocityscale")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
+         {
+            mCommonParams.velocityScale = AiNodeGetFlt(mProcNode, pname);
+         }
+         else
+         {
+            mCommonParams.velocityScale = 1.0f;
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
+         }
+      }
+      else if (param == "velocityname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mCommonParams.velocityName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
+      else if (param == "accelerationname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mCommonParams.accelerationName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
       else if (param == "overrideattribs")
       {
          mMultiParams.overrideAttribs.clear();
@@ -2094,6 +2257,79 @@ void Dso::readFromUserParams()
          else
          {
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
+         }
+      }
+      else if (param == "promotetoobjectattribs")
+      {
+         mCommonParams.promoteToObjectAttribs.clear();
+         
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            std::string names = AiNodeGetStr(mProcNode, pname);
+            std::string name;
+            
+            size_t p0 = 0;
+            size_t p1 = names.find(' ', p0);
+            
+            while (p1 != std::string::npos)
+            {
+               name = names.substr(p0, p1-p0);
+               strip(name);
+               
+               if (name.length() > 0)
+               {
+                  mCommonParams.promoteToObjectAttribs.insert(name);
+               }
+               
+               p0 = p1 + 1;
+               p1 = names.find(' ', p0);
+            }
+            
+            name = names.substr(p0);
+            strip(name);
+            
+            if (name.length() > 0)
+            {
+               mCommonParams.promoteToObjectAttribs.insert(name);
+            }
+         }
+         else if (AiUserParamGetType(p) == AI_TYPE_ARRAY && AiUserParamGetArrayType(p) == AI_TYPE_STRING)
+         {
+            AtArray *names = AiNodeGetArray(mProcNode, pname);
+            
+            if (names)
+            {
+               for (unsigned int i=0; i<names->nelements; ++i)
+               {
+                  mCommonParams.promoteToObjectAttribs.insert(AiArrayGetStr(names, i));
+               }
+            }
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
+         }
+      }
+      else if (param == "overrideboundsminname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mMultiParams.overrideBoundsMinName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
+      else if (param == "overrideboundsmaxname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mMultiParams.overrideBoundsMaxName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
          }
       }
       else if (param == "objectattribs")
@@ -2282,6 +2518,17 @@ void Dso::readFromUserParams()
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
          }
       }
+      else if (param == "radiusname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mSingleParams.radiusName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
       else if (param == "radiusmin")
       {
          if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
@@ -2313,6 +2560,17 @@ void Dso::readFromUserParams()
          else
          {
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
+         }
+      }
+      else if (param == "ignorenurbs")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
+         {
+            mCommonParams.ignoreNurbs = AiNodeGetBool(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
          }
       }
       else if (param == "nurbssamplerate")

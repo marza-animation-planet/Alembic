@@ -103,6 +103,7 @@ public:
    {
       return (mCommonParams.referenceFrame > -std::numeric_limits<float>::max());
    }
+   
    inline float referenceFrame() const
    {
       return mCommonParams.referenceFrame;
@@ -190,6 +191,21 @@ public:
       return mExpandedTimeSamples;
    }
    
+   inline float velocityScale() const
+   {
+      return mCommonParams.velocityScale;
+   }
+   
+   inline const char* velocityName() const
+   {
+      return (mCommonParams.velocityName.length() > 0 ? mCommonParams.velocityName.c_str() : 0);
+   }
+   
+   inline const char* accelerationName() const
+   {
+      return (mCommonParams.accelerationName.length() > 0 ? mCommonParams.accelerationName.c_str() : 0);
+   }
+   
    double computeTime(double frame, bool *exclude=0) const;
    
    // Attributes
@@ -197,6 +213,11 @@ public:
    inline AttributeFrame attribsFrame() const
    {
       return mSingleParams.attribsFrame;
+   }
+   
+   inline bool isPromotedToObjectAttrib(const std::string &name) const
+   {
+      return (mCommonParams.promoteToObjectAttribs.find(name) != mCommonParams.promoteToObjectAttribs.end());
    }
    
    inline bool readObjectAttribs() const
@@ -231,6 +252,16 @@ public:
    
    bool cleanAttribName(std::string &name) const;
    
+   inline const char* overrideBoundsMinName() const
+   {
+      return (mMultiParams.overrideBoundsMinName.length() > 0 ? mMultiParams.overrideBoundsMinName.c_str() : 0);
+   }
+   
+   inline const char* overrideBoundsMaxName() const
+   {
+      return (mMultiParams.overrideBoundsMaxName.length() > 0 ? mMultiParams.overrideBoundsMaxName.c_str() : 0);
+   }
+   
    // Shapes
    
    inline size_t numShapes() const
@@ -254,6 +285,11 @@ public:
    
    // Points/Curves
    
+   inline const char* radiusName() const
+   {
+      return (mSingleParams.radiusName.length() > 0 ? mSingleParams.radiusName.c_str() : 0);
+   }
+   
    inline double radiusMin() const
    {
       return mSingleParams.radiusMin;
@@ -270,6 +306,11 @@ public:
    }
    
    // Curves
+   
+   inline bool ignoreNurbs() const
+   {
+      return mCommonParams.ignoreNurbs;
+   }
    
    inline int nurbsSampleRate() const
    {
@@ -392,6 +433,17 @@ private:
       std::string referenceNormalName;
       std::string referenceMatrixName;
       
+      float velocityScale;
+      std::string velocityName;
+      std::string accelerationName;
+      
+      std::set<std::string> promoteToObjectAttribs;
+      
+      bool ignoreNurbs;
+      
+      // peakRadius attribute name (points)
+      // peakWidth attribute name (curves)
+      
       void reset();
       std::string dataString(const char *targetShape) const;
       std::string shapeKey() const;
@@ -400,7 +452,8 @@ private:
    struct MultiParameters
    {
       std::set<std::string> overrideAttribs;
-      
+      std::string overrideBoundsMinName;
+      std::string overrideBoundsMaxName;
       
       void reset();
       std::string dataString() const;
@@ -419,14 +472,14 @@ private:
       // mesh
       std::set<std::string> computeTangents;
       
-      // particles/curves
+      // particles
+      std::string radiusName;
       float radiusMin;
       float radiusMax;
       float radiusScale;
       
       // curves
       int nurbsSampleRate;
-      
       
       void reset();
       std::string dataString() const;

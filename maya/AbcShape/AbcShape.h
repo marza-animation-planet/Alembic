@@ -99,6 +99,7 @@ public:
     static MObject aOutBoxMax;
     static MObject aAnimated;
     static MObject aUvSetCount;
+    static MObject aOutSampleTime;
     
 #ifdef ABCSHAPE_VRAY_SUPPORT
     // V-Ray specific attributes
@@ -189,6 +190,7 @@ public:
     inline bool drawLocators() const { return mDrawLocators; }
     inline unsigned int numShapes() const { return mNumShapes; }
     inline bool isAnimated() const { return mAnimated; }
+    inline bool isClipped() const { return mClipped; }
     
     bool ignoreCulling() const;
     

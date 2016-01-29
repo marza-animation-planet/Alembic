@@ -210,7 +210,7 @@ public:
    const MDagPath& getDag(const std::string &path) const;
    
    void keyTransforms(const MString &defaultRotationInterpolation, const MStringDict &nodeRotationInterpolation);
-   void keyVisibility(Alembic::AbcGeom::IObject &iobj, MFnDependencyNode &fn);
+   void keyVisibility(Alembic::AbcGeom::IObject iobj, MFnDependencyNode &fn);
    
 private:
 
@@ -702,7 +702,7 @@ void CreateTree::getTransformAtTime(AlembicXform *node, double t, bool worldSpac
    }
 }
 
-void CreateTree::keyVisibility(Alembic::AbcGeom::IObject &iobj, MFnDependencyNode &fn)
+void CreateTree::keyVisibility(Alembic::AbcGeom::IObject iobj, MFnDependencyNode &fn)
 {
    Alembic::Abc::ICompoundProperty props = iobj.getProperties();
 
