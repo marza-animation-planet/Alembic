@@ -57,8 +57,8 @@ void Dso::CommonParameters::reset()
    outputReference = false;
 
    referenceFrame = -std::numeric_limits<float>::max();
-   referencePositionName = "";
-   referenceNormalName = "";
+   referencePositionName = "Pref";
+   referenceNormalName = "Nref";
    
    velocityScale = 1.0f;
    velocityName = "";
@@ -1531,7 +1531,7 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       ++i;
       if (i < args.size() && !isFlag(args[i]))
       {
-         mCommonParams.referencePositionName = args[i];
+         mCommonParams.referencePositionName = (args[i].length() == 0 ? "Pref" : args[i]);
       }
    }
    else if (args[i] == "-referencenormalname")
@@ -1539,7 +1539,7 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       ++i;
       if (i < args.size() && !isFlag(args[i]))
       {
-         mCommonParams.referenceNormalName = args[i];
+         mCommonParams.referenceNormalName = (args[i].length() == 0 ? "Nref" : args[i]);
       }
    }
    else if (args[i] == "-velocityscale")
@@ -2129,6 +2129,10 @@ void Dso::readFromUserParams()
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
             mCommonParams.referencePositionName = AiNodeGetStr(mProcNode, pname);
+            if (mCommonParams.referencePositionName.length() == 0)
+            {
+               mCommonParams.referencePositionName = "Pref";
+            }
          }
          else
          {
@@ -2140,6 +2144,10 @@ void Dso::readFromUserParams()
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
             mCommonParams.referenceNormalName = AiNodeGetStr(mProcNode, pname);
+            if (mCommonParams.referenceNormalName.length() == 0)
+            {
+               mCommonParams.referenceNormalName = "Nref";
+            }
          }
          else
          {

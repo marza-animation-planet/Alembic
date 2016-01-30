@@ -2163,7 +2163,7 @@ bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<
    typename MeshSchema::Sample meshSample;
    Alembic::Abc::P3fArraySamplePtr Pref;
    
-   std::string PrefName = mDso->referencePositionName();
+   const std::string &PrefName = mDso->referencePositionName();
       
    bool hasPref = (pointAttrs->find(PrefName) != pointAttrs->end());
    

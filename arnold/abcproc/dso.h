@@ -109,14 +109,14 @@ public:
       return mCommonParams.referenceFrame;
    }
    
-   inline const char* referencePositionName() const
+   inline const std::string& referencePositionName() const
    {
-      return (mCommonParams.referencePositionName.length() > 0 ? mCommonParams.referencePositionName.c_str() : "Pref");
+      return mCommonParams.referencePositionName;
    }
    
-   inline const char* referenceNormalName() const
+   inline const std::string& referenceNormalName() const
    {
-      return (mCommonParams.referenceNormalName.length() > 0 ? mCommonParams.referenceNormalName.c_str() : "Nref");
+      return mCommonParams.referenceNormalName;
    }
    
    inline const std::string& objectPath() const

@@ -1303,7 +1303,7 @@ bool MakeShape::checkReferenceNormals(MeshInfo &info,
                                       UserAttributes *vertexAttrs)
 {
    bool hasNref = false;
-   std::string NrefName = mDso->referenceNormalName();
+   const std::string &NrefName = mDso->referenceNormalName();
    
    UserAttributes::iterator uait = vertexAttrs->find(NrefName);
    
@@ -1349,7 +1349,7 @@ bool MakeShape::readReferenceNormals(AlembicMesh *refMesh,
    
    Alembic::AbcGeom::IN3fGeomParam Nref = meshSchema.getNormalsParam();
    
-   std::string NrefName = mDso->referenceNormalName();
+   const std::string &NrefName = mDso->referenceNormalName();
    
    if (Nref.valid() && (Nref.getScope() == Alembic::AbcGeom::kFacevaryingScope ||
                         Nref.getScope() == Alembic::AbcGeom::kVertexScope ||
@@ -1516,11 +1516,11 @@ bool MakeShape::fillReferenceNormals(MeshInfo &info,
       return false;
    }
    
-   std::string NrefName = mDso->referenceNormalName();
+   const std::string &NrefName = mDso->referenceNormalName();
    
    if (computeSmoothNormals)
    {
-      std::string PrefName = mDso->referencePositionName();
+      const std::string &PrefName = mDso->referencePositionName();
       
       if (mDso->verbose())
       {
@@ -3222,7 +3222,7 @@ bool MakeShape::getReferenceCurves(AlembicCurves &node,
    
    UserAttributes::iterator uait;
    bool hasPref = false;
-   std::string PrefName = mDso->referencePositionName();
+   const std::string &PrefName = mDso->referencePositionName();
    
    uait = info.pointAttrs.find(PrefName);
    
@@ -3859,7 +3859,7 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
    
    Alembic::Abc::P3fArraySamplePtr Pref = sample.getPositions();
    
-   std::string PrefName = mDso->referencePositionName();
+   const std::string &PrefName = mDso->referencePositionName();
       
    bool hasPref = (pointAttrs->find(PrefName) != pointAttrs->end());
    
