@@ -2163,7 +2163,7 @@ bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<
    typename MeshSchema::Sample meshSample;
    Alembic::Abc::P3fArraySamplePtr Pref;
    
-   const char *PrefName = mDso->referencePositionName();
+   std::string PrefName = mDso->referencePositionName();
       
    bool hasPref = (pointAttrs->find(PrefName) != pointAttrs->end());
    
@@ -2264,7 +2264,7 @@ bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<
          {
             if (mDso->verbose())
             {
-               AiMsgInfo("[abcproc] \"%s\" exported with wrong base type: float instead if float[3]", PrefName);
+               AiMsgInfo("[abcproc] \"%s\" exported with wrong base type: float instead if float[3]", PrefName.c_str());
             }
             
             ua.dataDim = 3;
@@ -2275,16 +2275,16 @@ bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<
          
          if (mDso->referenceScene())
          {
-            AiMsgWarning("[abcproc] \"%s\" read from user attribute, ignore values from reference alembic", PrefName);
+            AiMsgWarning("[abcproc] \"%s\" read from user attribute, ignore values from reference alembic", PrefName.c_str());
          }
          else if (mDso->verbose())
          {
-            AiMsgInfo("[abcproc] \"%s\" read from user attribute", PrefName);
+            AiMsgInfo("[abcproc] \"%s\" read from user attribute", PrefName.c_str());
          }
       }
       else
       {
-         AiMsgWarning("[abcproc] Could not generate \"%s\" for mesh \"%s\"", PrefName, refMesh->path().c_str());
+         AiMsgWarning("[abcproc] Could not generate \"%s\" for mesh \"%s\"", PrefName.c_str(), refMesh->path().c_str());
       }
    }
    
