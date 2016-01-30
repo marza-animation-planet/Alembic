@@ -4007,55 +4007,29 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
          
          Alembic::Abc::M44d Mref;
          
-         const AtUserParamEntry *upe = AiNodeLookUpUserParameter(mDso->procNode(), "Mref");
-         
-         if (upe != 0 &&
-             AiUserParamGetCategory(upe) == AI_USERDEF_CONSTANT &&
-             AiUserParamGetType(upe) == AI_TYPE_MATRIX)
+         // recompute matrix
+         if (mDso->verbose())
          {
-            if (mDso->verbose())
-            {
-               AiMsgInfo("[abcproc] Using provided Mref");
-            }
-         
-            AtMatrix mtx;
-         
-            AiNodeGetMatrix(mDso->procNode(), "Mref", mtx);
-         
-            for (int r=0; r<4; ++r)
-            {
-               for (int c=0; c<4; ++c)
-               {
-                  Mref[r][c] = mtx[r][c];
-               }
-            }
+            AiMsgInfo("[abcproc] Compute reference world matrix");
          }
-         else
+      
+         AlembicXform *refParent = dynamic_cast<AlembicXform*>(refCurves->parent());
+      
+         while (refParent)
          {
-            // recompute matrix
-            if (mDso->verbose())
+            Alembic::AbcGeom::IXformSchema xformSchema = refParent->typedObject().getSchema();
+         
+            Alembic::AbcGeom::XformSample xformSample = xformSchema.getValue();
+         
+            Mref = Mref * xformSample.getMatrix();
+         
+            if (xformSchema.getInheritsXforms())
             {
-               AiMsgInfo("[abcproc] Compute reference world matrix Mref");
+               refParent = dynamic_cast<AlembicXform*>(refParent->parent());
             }
-         
-            AlembicXform *refParent = dynamic_cast<AlembicXform*>(refCurves->parent());
-         
-            while (refParent)
+            else
             {
-               Alembic::AbcGeom::IXformSchema xformSchema = refParent->typedObject().getSchema();
-            
-               Alembic::AbcGeom::XformSample xformSample = xformSchema.getValue();
-            
-               Mref = Mref * xformSample.getMatrix();
-            
-               if (xformSchema.getInheritsXforms())
-               {
-                  refParent = dynamic_cast<AlembicXform*>(refParent->parent());
-               }
-               else
-               {
-                  refParent = 0;
-               }
+               refParent = 0;
             }
          }
          

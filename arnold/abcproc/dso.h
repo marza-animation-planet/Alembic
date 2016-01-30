@@ -119,11 +119,6 @@ public:
       return (mCommonParams.referenceNormalName.length() > 0 ? mCommonParams.referenceNormalName.c_str() : "Nref");
    }
    
-   inline const char* referenceMatrixName() const
-   {
-      return (mCommonParams.referenceMatrixName.length() > 0 ? mCommonParams.referenceNormalName.c_str() : "Mref");
-   }
-   
    inline const std::string& objectPath() const
    {
       return mCommonParams.objectPath;
@@ -431,7 +426,6 @@ private:
       float referenceFrame;
       std::string referencePositionName;
       std::string referenceNormalName;
-      std::string referenceMatrixName;
       
       float velocityScale;
       std::string velocityName;

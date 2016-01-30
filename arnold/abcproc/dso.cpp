@@ -59,7 +59,6 @@ void Dso::CommonParameters::reset()
    referenceFrame = -std::numeric_limits<float>::max();
    referencePositionName = "";
    referenceNormalName = "";
-   referenceMatrixName = "";
    
    velocityScale = 1.0f;
    velocityName = "";
@@ -99,10 +98,6 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    if (referenceNormalName.length() > 0)
    {
       oss << " -referencenormalname " << referenceNormalName;
-   }
-   if (referenceNormalName.length() > 0)
-   {
-      oss << " -referencematrixname " << referenceMatrixName;
    }
    if (namePrefix.length() > 0)
    {
@@ -235,10 +230,6 @@ std::string Dso::CommonParameters::shapeKey() const
       if (referenceNormalName.length() > 0)
       {
          oss << " -referencenormalname " << referenceNormalName;
-      }
-      if (referenceMatrixName.length() > 0)
-      {
-         oss << " -referencematrixname " << referenceMatrixName;
       }
    }
    if (objectPath.length() > 0)
@@ -1551,14 +1542,6 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
          mCommonParams.referenceNormalName = args[i];
       }
    }
-   else if (args[i] == "-referencematrixname")
-   {
-      ++i;
-      if (i < args.size() && !isFlag(args[i]))
-      {
-         mCommonParams.referenceMatrixName = args[i];
-      }
-   }
    else if (args[i] == "-velocityscale")
    {
       ++i;
@@ -2157,17 +2140,6 @@ void Dso::readFromUserParams()
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
             mCommonParams.referenceNormalName = AiNodeGetStr(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
-         }
-      }
-      else if (param == "referencematrixname")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            mCommonParams.referenceMatrixName = AiNodeGetStr(mProcNode, pname);
          }
          else
          {
