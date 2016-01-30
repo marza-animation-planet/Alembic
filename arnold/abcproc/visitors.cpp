@@ -810,7 +810,8 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
                                       UserAttributes *pointAttrs,
                                       UserAttributes *vertexAttrs,
                                       std::map<std::string, Alembic::AbcGeom::IV2fGeomParam> *UVs,
-                                      MakeShape::CollectFilter filter)
+                                      MakeShape::CollectFilter filter,
+                                      void *filterArgs)
 {
    if (userProps.valid() && objectAttrs && mDso->readObjectAttribs())
    {
@@ -818,7 +819,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
       {
          const Alembic::AbcCoreAbstract::PropertyHeader &header = userProps.getPropertyHeader(i);
          
-         if (filter && !filter(header))
+         if (filter && !filter(header, filterArgs))
          {
             continue;
          }
@@ -878,9 +879,9 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
       
       if (mDso->outputReference())
       {
-         specialPointNames.insert("Pref");
-         specialPointNames.insert("Nref");
-         specialVertexNames.insert("Nref");
+         specialPointNames.insert(mDso->referencePositionName());
+         specialPointNames.insert(mDso->referenceNormalName());
+         specialVertexNames.insert(mDso->referenceNormalName());
       }
       
       // what about 'radius' and 'size'?
@@ -897,7 +898,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
              header.getMetaData().get("notUV") != "1")
              //Alembic::AbcGeom::isUV(header))
          {
-            if (filter && !filter(header))
+            if (filter && !filter(header, filterArgs))
             {
                continue;
             }
@@ -1024,7 +1025,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
             
             if (attrs)
             {
-               if (filter && !filter(header))
+               if (filter && !filter(header, filterArgs))
                {
                   DestroyUserAttribute(ua.second);
                }
@@ -1271,15 +1272,21 @@ float* MakeShape::computeMeshSmoothNormals(MakeShape::MeshInfo &info,
    return smoothNormals;
 }
 
-bool MakeShape::FilterReferenceAttributes(const Alembic::AbcCoreAbstract::PropertyHeader &header)
+bool MakeShape::FilterReferenceAttributes(const Alembic::AbcCoreAbstract::PropertyHeader &header, void *args)
 {
-   if (header.getName() == "Pref")
+   Dso *dso = (Dso*) args;
+   
+   if (!dso)
+   {
+      return false;
+   }
+   else if (header.getName() == dso->referencePositionName())
    {
       Alembic::AbcGeom::GeometryScope scope = Alembic::AbcGeom::GetGeometryScope(header.getMetaData());
       
       return (scope == Alembic::AbcGeom::kVaryingScope || scope == Alembic::AbcGeom::kVertexScope);
    }
-   else if (header.getName() == "Nref")
+   else if (header.getName() == dso->referenceNormalName())
    {
       Alembic::AbcGeom::GeometryScope scope = Alembic::AbcGeom::GetGeometryScope(header.getMetaData());
       
@@ -3279,7 +3286,7 @@ bool MakeShape::getReferenceCurves(AlembicCurves &node,
                                      schema.getArbGeomParams(),
                                      reftime, false,
                                      0, 0, pointAttrs, 0, 0,
-                                     FilterReferenceAttributes);
+                                     FilterReferenceAttributes, &mDso);
                
                uait = pointAttrs->find("Pref");
                

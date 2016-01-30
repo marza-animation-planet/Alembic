@@ -666,9 +666,9 @@ private:
 
 private:
    
-   typedef bool (*CollectFilter)(const Alembic::AbcCoreAbstract::PropertyHeader &header);
+   typedef bool (*CollectFilter)(const Alembic::AbcCoreAbstract::PropertyHeader &header, void *args);
    
-   static bool FilterReferenceAttributes(const Alembic::AbcCoreAbstract::PropertyHeader &header);
+   static bool FilterReferenceAttributes(const Alembic::AbcCoreAbstract::PropertyHeader &header, void *args);
    
 private:
    
@@ -690,7 +690,7 @@ private:
                               UserAttributes *pointLevel,
                               UserAttributes *vertexLevel,
                               UVSets *UVs,
-                              CollectFilter filter=0);
+                              CollectFilter filter=0, void *filterArgs=0);
    
    template <class Schema>
    AtNode* generateVolumeBox(Schema &schema);
@@ -2102,7 +2102,7 @@ bool MakeShape::getReferenceMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSc
                collectUserAttributes(meshSchema.getUserProperties(), meshSchema.getArbGeomParams(),
                                      reftime, false,
                                      0, 0, pointAttrs, vertexAttrs, 0,
-                                     FilterReferenceAttributes);
+                                     FilterReferenceAttributes, &mDso);
                
                uait = pointAttrs->find(mDso->referencePositionName());
                
