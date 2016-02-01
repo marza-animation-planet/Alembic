@@ -1675,7 +1675,7 @@ bool ReadSingleUserAttribute(const char *name,
    return false;
 }
 
-bool PromoteToConstantAttrib(const UserAttribute &src, UserAttribute &dst)
+bool PromoteToObjectAttrib(const UserAttribute &src, UserAttribute &dst)
 {
    if (src.arnoldCategory != AI_USERDEF_CONSTANT && src.data && src.dataCount >= 1)
    {

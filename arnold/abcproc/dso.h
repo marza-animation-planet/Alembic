@@ -304,6 +304,11 @@ public:
       return mSingleParams.radiusScale;
    }
    
+   inline const std::string& peakRadiusName() const
+   {
+      return mMultiParams.peakRadiusName;
+   }
+   
    // Curves
    
    inline bool ignoreNurbs() const
@@ -329,6 +334,11 @@ public:
    inline double widthScale() const
    {
       return mSingleParams.widthScale;
+   }
+   
+   inline const std::string& peakWidthName() const
+   {
+      return mMultiParams.peakWidthName;
    }
    
    // Volume
@@ -472,6 +482,10 @@ private:
       std::set<std::string> overrideAttribs;
       std::string overrideBoundsMinName;
       std::string overrideBoundsMaxName;
+      
+      std::string peakRadiusName;
+      
+      std::string peakWidthName;
       
       void reset();
       std::string dataString() const;

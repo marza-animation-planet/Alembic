@@ -327,6 +327,10 @@ void Dso::MultiParameters::reset()
    overrideAttribs.clear();
    overrideBoundsMinName = "";
    overrideBoundsMaxName = "";
+   
+   peakRadiusName = "peakRadius";
+   
+   peakWidthName = "peakWidth";
 }
 
 std::string Dso::MultiParameters::dataString() const
@@ -352,6 +356,16 @@ std::string Dso::MultiParameters::dataString() const
    if (overrideBoundsMaxName.length() > 0)
    {
       oss << " -overrideBoundsMaxName " << overrideBoundsMaxName;
+   }
+   
+   if (peakRadiusName.length() > 0)
+   {
+      oss << " -peakradiusname " << peakRadiusName;
+   }
+   
+   if (peakWidthName.length() > 0)
+   {
+      oss << " -peakwidthname " << peakWidthName;
    }
    
    return oss.str();
@@ -1667,6 +1681,22 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
          mMultiParams.overrideBoundsMaxName = args[i];
       }
    }
+   else if (args[i] == "-peakradiusname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mMultiParams.peakRadiusName = args[i];
+      }
+   }
+   else if (args[i] == "-peakwidthname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mMultiParams.peakWidthName = args[i];
+      }
+   }
    // Process single params
    else if (args[i] == "-objectattribs")
    {
@@ -2435,6 +2465,28 @@ void Dso::readFromUserParams()
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
             mMultiParams.overrideBoundsMaxName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
+      else if (param == "peakradiusname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mMultiParams.peakRadiusName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
+      else if (param == "peakwidthname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mMultiParams.peakWidthName = AiNodeGetStr(mProcNode, pname);
          }
          else
          {

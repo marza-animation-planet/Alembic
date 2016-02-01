@@ -242,7 +242,7 @@ bool MakeProcedurals::overrideBounds(AlembicNodeT<Alembic::Abc::ISchemaObject<Sc
          {
             UserAttribute tmp;
             
-            bool promoted = PromoteToConstantAttrib(minAttr, tmp);
+            bool promoted = PromoteToObjectAttrib(minAttr, tmp);
             
             DestroyUserAttribute(minAttr);
             
@@ -275,7 +275,7 @@ bool MakeProcedurals::overrideBounds(AlembicNodeT<Alembic::Abc::ISchemaObject<Sc
          {
             UserAttribute tmp;
             
-            bool promoted = PromoteToConstantAttrib(maxAttr, tmp);
+            bool promoted = PromoteToObjectAttrib(maxAttr, tmp);
             
             DestroyUserAttribute(maxAttr);
             
