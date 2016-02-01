@@ -178,6 +178,36 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.softMax.INT = 10;
    helper.MakeInputInt(data);
    
+   data.defaultValue.FLT = 1.0;
+   data.name = "mtoa_constant_abc_widthScale";
+   data.shortName = "wdtscl";
+   data.hasMin = true;
+   data.min.FLT = 0.0;
+   data.hasSoftMin = false;
+   data.hasMax = false;
+   data.hasSoftMax = false;
+   helper.MakeInputFloat(data);
+   
+   data.defaultValue.FLT = 0.0;
+   data.name = "mtoa_constant_abc_widthMin";
+   data.shortName = "wdtmin";
+   data.hasMin = true;
+   data.min.FLT = 0.0;
+   data.hasSoftMin = false;
+   data.hasMax = false;
+   data.hasSoftMax = false;
+   helper.MakeInputFloat(data);
+   
+   data.defaultValue.FLT = 1000000.0;
+   data.name = "mtoa_constant_abc_widthMax";
+   data.shortName = "wdtmax";
+   data.hasMin = true;
+   data.min.FLT = 0.0;
+   data.hasSoftMin = false;
+   data.hasMax = false;
+   data.hasSoftMax = false;
+   helper.MakeInputFloat(data);
+   
    // attributes
    
    data.defaultValue.BOOL = false;
@@ -1400,6 +1430,24 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          data += " -nurbssamplerate " + ToString(plug.asInt());
       }
       
+      plug = FindMayaPlug("mtoa_constant_abc_widthScale");
+      if (!plug.isNull())
+      {
+         data += " -widthscale " + ToString(plug.asFloat());
+      }
+      
+      plug = FindMayaPlug("mtoa_constant_abc_widthMin");
+      if (!plug.isNull())
+      {
+         data += " -widthmin " + ToString(plug.asFloat());
+      }
+      
+      plug = FindMayaPlug("mtoa_constant_abc_widthMax");
+      if (!plug.isNull())
+      {
+         data += " -widthmax " + ToString(plug.asFloat());
+      }
+      
       plug = FindMayaPlug("mtoa_constant_abc_overrideBoundsMinName");
       if (!plug.isNull())
       {
@@ -1630,19 +1678,80 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
 
    if (step == 0)
    {
-      MPlug plug = FindMayaPlug("aiStepSize");
-      if (!plug.isNull())
+      MPlug plug;
+      const AtNodeEntry *entry = AiNodeGetNodeEntry(proc);
+      
+      plug = FindMayaPlug("aiStepSize");
+      if (!plug.isNull() && HasParameter(entry, "step_size", proc, "constant FLOAT"))
       {
-         if (HasParameter(AiNodeGetNodeEntry(proc), "step_size", proc, "constant FLOAT"))
-         {
-            AiNodeSetFlt(proc, "step_size", plug.asFloat());
-         }
+         AiNodeSetFlt(proc, "step_size", plug.asFloat());
       }
       
       ExportShader(proc, update);
       ExportVisibility(proc);
       ExportMeshAttribs(proc);
       ExportSubdivAttribs(proc);
+      
+      // For curves/particles
+      
+      plug = FindMayaPlug("aiMinPixelWidth");
+      if (!plug.isNull() && HasParameter(entry, "min_pixel_width", proc, "constant FLOAT"))
+      {
+         AiNodeSetFlt(proc, "min_pixel_width", plug.asFloat());
+      }
+      
+      plug = FindMayaPlug("aiMode");
+      if (!plug.isNull() && HasParameter(entry, "mode", proc, "constant INT"))
+      {
+         AiNodeSetInt(proc, "mode", plug.asInt());
+      }
+      
+      // For curves (overrides)
+      plug = FindMayaPlug("aiRenderCurve");
+      if (!plug.isNull() && HasParameter(entry, "abc_ignoreNurbs", proc, "constant BOOL"))
+      {
+         MGlobal::displayWarning("[mzAbcShape] Override 'abc_ignoreNurbs' from MtoA specific parameter 'aiRenderCurve'");
+         AiNodeSetBool(proc, "abc_ignoreNurbs", !plug.asBool());
+      }
+      
+      plug = FindMayaPlug("aiSampleRate");
+      if (!plug.isNull() && HasParameter(entry, "abc_nurbsSampleRate", proc, "constant INT"))
+      {
+         MGlobal::displayWarning("[mzAbcShape] Override 'abc_nurbsSampleRate' from MtoA specific parameter 'aiSampleRate'");
+         AiNodeSetInt(proc, "abc_nurbsSampleRate", plug.asInt());
+      }
+      
+      plug = FindMayaPlug("aiCurveWidth");
+      if (!plug.isNull() && HasParameter(entry, "abc_widthMin", proc, "constant FLOAT") &&
+                            HasParameter(entry, "abc_widthMax", proc, "constant FLOAT"))
+      {
+         MGlobal::displayWarning("[mzAbcShape] Override 'abc_widthMin' and 'abc_widthMax' from MtoA specific parameter 'aiCurveWidth'");
+         float width = plug.asFloat();
+         AiNodeSetFlt(proc, "abc_widthMin", width);
+         AiNodeSetFlt(proc, "abc_widthMax", width);
+      }
+      
+      // For particles (overrides)
+      plug = FindMayaPlug("aiRadiusMultiplier");
+      if (!plug.isNull() && HasParameter(entry, "abc_radiusScale", proc, "constant FLOAT"))
+      {
+         MGlobal::displayWarning("[mzAbcShape] Override 'abc_radiusScale' from MtoA specific parameter 'aiRadiusMultiplier'");
+         AiNodeSetFlt(proc, "abc_radiusScale", plug.asFloat());
+      }
+      
+      plug = FindMayaPlug("aiMinParticleRadius");
+      if (!plug.isNull() && HasParameter(entry, "abc_radiusMin", proc, "constant FLOAT"))
+      {
+         MGlobal::displayWarning("[mzAbcShape] Override 'abc_radiusMin' from MtoA specific parameter 'aiMinParticleRadius'");
+         AiNodeSetFlt(proc, "abc_radiusMin", plug.asFloat());
+      }
+      
+      plug = FindMayaPlug("aiMaxParticleRadius");
+      if (!plug.isNull() && HasParameter(entry, "abc_radiusMax", proc, "constant FLOAT"))
+      {
+         MGlobal::displayWarning("[mzAbcShape] Override 'abc_radiusMax' from MtoA specific parameter 'aiMaxParticleRadius'");
+         AiNodeSetFlt(proc, "abc_radiusMax", plug.asFloat());
+      }
       
       // Handled in DoExport of base Translator class
       //ExportUserAttribute(proc);

@@ -44,6 +44,9 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       self.beginLayout("Curves", collapse=True)
       self.addControl("mtoa_constant_abc_ignoreNurbs", label="Ignore NURBS")
       self.addControl("mtoa_constant_abc_nurbsSampleRate", label="NURBS Sample Rate")
+      self.addControl("mtoa_constant_abc_widthScale", label="Width Scale")
+      self.addControl("mtoa_constant_abc_widthMin", label="Min. Width")
+      self.addControl("mtoa_constant_abc_widthMax", label="Max. Width")
       self.endLayout()
       
       self.beginLayout("Attributes", collapse=True)
