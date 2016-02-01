@@ -25,7 +25,7 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       
       self.beginLayout("Bounds", collapse=True)
       self.addControl("mtoa_constant_abc_boundsPadding", label="Bounds Padding")
-      self.addControl("mtoa_constant_useOverrideBounds", label="Use Override Bounds", annotation="Use user defined bounds embedded in ABC file")
+      self.addControl("mtoa_constant_abc_useOverrideBounds", label="Use Override Bounds", annotation="Use user defined bounds embedded in ABC file")
       self.addControl("mtoa_constant_abc_overrideBoundsMinName", label="Override Bounds Min Name");
       self.addControl("mtoa_constant_abc_overrideBoundsMaxName", label="Override Bounds Max Name");
       self.endLayout()

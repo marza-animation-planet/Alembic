@@ -102,7 +102,7 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    helper.MakeInputFloat(data);
    
    data.defaultValue.BOOL = false;
-   data.name = "mtoa_constant_useOverrideBounds";
+   data.name = "mtoa_constant_abc_useOverrideBounds";
    data.shortName = "uovbnd";
    helper.MakeInputBoolean(data);
    
@@ -999,7 +999,7 @@ void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
       if (IsSingleShape())
       {
          m_renderTime = FindMayaPlug("outSampleTime").asDouble();
-         m_overrideBounds = FindMayaPlug("mtoa_constant_useOverrideBounds").asBool();
+         m_overrideBounds = FindMayaPlug("mtoa_constant_abc_useOverrideBounds").asBool();
          m_boundsOverridden = false;
          
          AiNodeSetBool(proc, "load_at_init", false);
@@ -1294,6 +1294,24 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
       if (!plug.isNull() && plug.asBool())
       {
          data += " -outputreference";
+      }
+      
+      plug = FindMayaObjectPlug("mtoa_constant_abc_referenceSource");
+      if (!plug.isNull())
+      {
+         switch (plug.asInt())
+         {
+         case 0:
+            data += " -referencesource attributes_then_file"; break;
+         case 1:
+            data += " -referencesource attributes"; break;
+         case 2:
+            data += " -referencesource file"; break;
+         case 3:
+            data += " -referencesource frame"; break;
+         default:
+            break;
+         }
       }
       
       plug = FindMayaObjectPlug("mtoa_constant_abc_referenceFilename");
