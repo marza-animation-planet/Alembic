@@ -23,12 +23,20 @@ const char* AttributeFrameNames[] =
    NULL
 };
 
+const char* ReferenceSourceNames[] =
+{
+   "attributes_then_file",
+   "attributes",
+   "file",
+   "frame",
+   NULL
+};
+
 // ---
 
 void Dso::CommonParameters::reset()
 {
    filePath = "";
-   referenceFilePath = "";
    namePrefix = "";
    objectPath = "";
    
@@ -56,9 +64,11 @@ void Dso::CommonParameters::reset()
    
    outputReference = false;
 
-   referenceFrame = -std::numeric_limits<float>::max();
+   referenceSource = RS_attributes_then_file;
+   referenceFilePath = "";
    referencePositionName = "Pref";
    referenceNormalName = "Nref";
+   referenceFrame = -std::numeric_limits<float>::max();
    
    velocityScale = 1.0f;
    velocityName = "";
@@ -81,23 +91,29 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    }
    if (outputReference)
    {
-      oss << " -outputreference";
-   }
-   if (referenceFilePath.length() > 0)
-   {
-      oss << " -referencefilename " << referenceFilePath;
-   }
-   if (referenceFrame > -std::numeric_limits<float>::max())
-   {
-      oss << " -referenceframe " << referenceFrame;
-   }
-   if (referencePositionName.length() > 0)
-   {
-      oss << " -referencepositionname " << referencePositionName;
-   }
-   if (referenceNormalName.length() > 0)
-   {
-      oss << " -referencenormalname " << referenceNormalName;
+      oss << " -outputreference -referencesource " << ReferenceSourceNames[referenceSource];
+      if (referenceSource == RS_attributes || referenceSource == RS_attributes_then_file)
+      {
+         if (referencePositionName.length() > 0)
+         {
+            oss << " -referencepositionname " << referencePositionName;
+         }
+         if (referenceNormalName.length() > 0)
+         {
+            oss << " -referencenormalname " << referenceNormalName;
+         }
+      }
+      else if (referenceSource == RS_frame)
+      {
+         oss << " -referenceframe " << referenceFrame;
+      }
+      else if (referenceSource == RS_file || referenceSource == RS_attributes_then_file)
+      {
+         if (referenceFilePath.length() > 0)
+         {
+            oss << " -referencefilename " << referenceFilePath;
+         }
+      }
    }
    if (namePrefix.length() > 0)
    {
@@ -214,22 +230,28 @@ std::string Dso::CommonParameters::shapeKey() const
    }
    if (outputReference)
    {
-      oss << " -outputreference";
-      if (referenceFilePath.length() > 0)
+      oss << " -outputreference -referencesource " << ReferenceSourceNames[referenceSource];
+      if (referenceSource == RS_attributes || referenceSource == RS_attributes_then_file)
       {
-         oss << " -referencefilename " << referenceFilePath;
+         if (referencePositionName.length() > 0)
+         {
+            oss << " -referencepositionname " << referencePositionName;
+         }
+         if (referenceNormalName.length() > 0)
+         {
+            oss << " -referencenormalname " << referenceNormalName;
+         }
       }
-      if (referenceFrame > -std::numeric_limits<float>::max())
+      else if (referenceSource == RS_frame)
       {
          oss << " -referenceframe " << referenceFrame;
       }
-      if (referencePositionName.length() > 0)
+      else if (referenceSource == RS_file || referenceSource == RS_attributes_then_file)
       {
-         oss << " -referencepositionname " << referencePositionName;
-      }
-      if (referenceNormalName.length() > 0)
-      {
-         oss << " -referencenormalname " << referenceNormalName;
+         if (referenceFilePath.length() > 0)
+         {
+            oss << " -referencefilename " << referenceFilePath;
+         }
       }
    }
    if (objectPath.length() > 0)
@@ -1517,6 +1539,40 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
    {
       mCommonParams.verbose = true;
    }
+   else if (args[i] == "-referencesource")
+   {
+      ++i;
+      
+      if (i >= args.size())
+      {
+         return false;
+      }
+      
+      std::string rs = args[i];
+      
+      int ival = -1;
+      
+      if (sscanf(rs.c_str(), "%d", &ival) == 1)
+      {
+         if (ival >= 0 && ival < RS_MAX)
+         {
+            mCommonParams.referenceSource = (ReferenceSource) ival;
+         }
+      }
+      else
+      {
+         toLower(rs);
+         
+         for (size_t j=0; j<RS_MAX; ++j)
+         {
+            if (rs == ReferenceSourceNames[j])
+            {
+               mCommonParams.referenceSource = (ReferenceSource)j;
+               break;
+            }
+         }
+      }
+   }
    else if (args[i] == "-referenceframe")
    {
       ++i;
@@ -2112,6 +2168,46 @@ void Dso::readFromUserParams()
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
          }
       }
+      else if (param == "referencesource")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            std::string val = AiNodeGetStr(mProcNode, pname);
+            toLower(val);
+            
+            int i = 0;
+            
+            for (; i<RS_MAX; ++i)
+            {
+               if (val == ReferenceSourceNames[i])
+               {
+                  mCommonParams.referenceSource = (ReferenceSource) i;
+                  break;
+               }
+            }
+            
+            if (i >= RS_MAX)
+            {
+               AiMsgWarning("[abcproc] Ignore parameter \"%s\": Invalid value", pname);
+            }
+         }
+         else if (AiUserParamGetType(p) == AI_TYPE_INT)
+         {
+            int val = AiNodeGetInt(mProcNode, pname);
+            if (val >= 0 && val < RS_MAX)
+            {
+               mCommonParams.referenceSource = (ReferenceSource) val;
+            }
+            else
+            {
+               AiMsgWarning("[abcproc] Ignore parameter \"%s\": Invalid value", pname);
+            }
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an int or string value", pname);
+         }
+      }
       else if (param == "referenceframe")
       {
          if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
@@ -2120,7 +2216,6 @@ void Dso::readFromUserParams()
          }
          else
          {
-            mCommonParams.referenceFrame = -std::numeric_limits<float>::max();
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
          }
       }

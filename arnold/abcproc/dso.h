@@ -27,6 +27,15 @@ enum AttributeFrame
    AF_MAX
 };
 
+enum ReferenceSource
+{
+   RS_attributes_then_file = 0,
+   RS_attributes,
+   RS_file,
+   RS_frame,
+   RS_MAX
+};
+
 enum ProceduralMode
 {
    PM_multi = 0,
@@ -89,19 +98,14 @@ public:
       return mCommonParams.outputReference;
    }
    
-   inline bool hasReference() const
+   inline ReferenceSource referenceSource() const
    {
-      return (mCommonParams.referenceFilePath.length() > 0);
+      return mCommonParams.referenceSource;
    }
    
    inline const std::string& referenceFilePath() const
    {
       return mCommonParams.referenceFilePath;
-   }
-   
-   inline bool hasReferenceFrame() const
-   {
-      return (mCommonParams.referenceFrame > -std::numeric_limits<float>::max());
    }
    
    inline float referenceFrame() const
@@ -423,9 +427,14 @@ private:
       bool verbose;
       
       bool outputReference;
-      float referenceFrame;
+      // When a reference file is not provided, we must generate reference from
+      //   current file by either:
+      // - using a user defined attribute
+      // - use another frame/sample (provided that point count matches)
+      ReferenceSource referenceSource;
       std::string referencePositionName;
       std::string referenceNormalName;
+      float referenceFrame;
       
       float velocityScale;
       std::string velocityName;
