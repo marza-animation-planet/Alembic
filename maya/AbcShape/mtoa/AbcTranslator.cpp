@@ -160,6 +160,11 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.hasSoftMax = false;
    helper.MakeInputFloat(data);
    
+   data.stringDefault = "";
+   data.name = "mtoa_constant_abc_peakRadiusName";
+   data.shortName = "pkrdn";
+   helper.MakeInputString(data);
+   
    // curves
    
    data.defaultValue.BOOL = true;
@@ -207,6 +212,11 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.hasMax = false;
    data.hasSoftMax = false;
    helper.MakeInputFloat(data);
+   
+   data.stringDefault = "";
+   data.name = "mtoa_constant_abc_peakWidthName";
+   data.shortName = "pkwdt";
+   helper.MakeInputString(data);
    
    // attributes
    
@@ -1418,6 +1428,16 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          data += " -radiusmax " + ToString(plug.asFloat());
       }
       
+      plug = FindMayaPlug("mtoa_constant_abc_peakRadiusName");
+      if (!plug.isNull())
+      {
+         tmp = plug.asString();
+         if (tmp.numChars() > 0)
+         {
+            data += " -peakradiusname " + tmp;
+         }
+      }
+      
       plug = FindMayaPlug("mtoa_constant_abc_ignoreNurbs");
       if (!plug.isNull() && plug.asBool())
       {
@@ -1446,6 +1466,16 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
       if (!plug.isNull())
       {
          data += " -widthmax " + ToString(plug.asFloat());
+      }
+      
+      plug = FindMayaPlug("mtoa_constant_abc_peakWidthName");
+      if (!plug.isNull())
+      {
+         tmp = plug.asString();
+         if (tmp.numChars() > 0)
+         {
+            data += " -peakwidthname " + tmp;
+         }
       }
       
       plug = FindMayaPlug("mtoa_constant_abc_overrideBoundsMinName");

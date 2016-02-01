@@ -39,6 +39,7 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       self.addControl("mtoa_constant_abc_radiusScale", label="Radius Scale")
       self.addControl("mtoa_constant_abc_radiusMin", label="Min. Radius")
       self.addControl("mtoa_constant_abc_radiusMax", label="Max. Radius")
+      self.addControl("mtoa_constant_abc_peakRadiusName", label="Peak Radius Name");
       self.endLayout()
       
       self.beginLayout("Curves", collapse=True)
@@ -47,6 +48,7 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       self.addControl("mtoa_constant_abc_widthScale", label="Width Scale")
       self.addControl("mtoa_constant_abc_widthMin", label="Min. Width")
       self.addControl("mtoa_constant_abc_widthMax", label="Max. Width")
+      self.addControl("mtoa_constant_abc_peakWidthName", label="Peak Width Name");
       self.endLayout()
       
       self.beginLayout("Attributes", collapse=True)
