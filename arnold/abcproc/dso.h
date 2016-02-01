@@ -27,6 +27,15 @@ enum AttributeFrame
    AF_MAX
 };
 
+enum ReferenceSource
+{
+   RS_attributes_then_file = 0,
+   RS_attributes,
+   RS_file,
+   RS_frame,
+   RS_MAX
+};
+
 enum ProceduralMode
 {
    PM_multi = 0,
@@ -89,14 +98,29 @@ public:
       return mCommonParams.outputReference;
    }
    
-   inline bool hasReference() const
+   inline ReferenceSource referenceSource() const
    {
-      return (mCommonParams.referenceFilePath.length() > 0);
+      return mCommonParams.referenceSource;
    }
    
    inline const std::string& referenceFilePath() const
    {
       return mCommonParams.referenceFilePath;
+   }
+   
+   inline float referenceFrame() const
+   {
+      return mCommonParams.referenceFrame;
+   }
+   
+   inline const std::string& referencePositionName() const
+   {
+      return mCommonParams.referencePositionName;
+   }
+   
+   inline const std::string& referenceNormalName() const
+   {
+      return mCommonParams.referenceNormalName;
    }
    
    inline const std::string& objectPath() const
@@ -403,16 +427,25 @@ private:
       bool verbose;
       
       bool outputReference;
+      // When a reference file is not provided, we must generate reference from
+      //   current file by either:
+      // - using a user defined attribute
+      // - use another frame/sample (provided that point count matches)
+      ReferenceSource referenceSource;
+      std::string referencePositionName;
+      std::string referenceNormalName;
+      float referenceFrame;
       
       float velocityScale;
       std::string velocityName;
       std::string accelerationName;
-      // max velocity magnitude attribute name
-      // max radius attribute name
-      // referenceframe (first frame of reference scene by default)
+      
       std::set<std::string> promoteToObjectAttribs;
       
       bool ignoreNurbs;
+      
+      // peakRadius attribute name (points)
+      // peakWidth attribute name (curves)
       
       void reset();
       std::string dataString(const char *targetShape) const;

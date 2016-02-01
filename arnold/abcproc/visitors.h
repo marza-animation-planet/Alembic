@@ -666,9 +666,9 @@ private:
 
 private:
    
-   typedef bool (*CollectFilter)(const Alembic::AbcCoreAbstract::PropertyHeader &header);
+   typedef bool (*CollectFilter)(const Alembic::AbcCoreAbstract::PropertyHeader &header, void *args);
    
-   static bool FilterReferenceAttributes(const Alembic::AbcCoreAbstract::PropertyHeader &header);
+   static bool FilterReferenceAttributes(const Alembic::AbcCoreAbstract::PropertyHeader &header, void *args);
    
 private:
    
@@ -690,7 +690,7 @@ private:
                               UserAttributes *pointLevel,
                               UserAttributes *vertexLevel,
                               UVSets *UVs,
-                              CollectFilter filter=0);
+                              CollectFilter filter=0, void *filterArgs=0);
    
    template <class Schema>
    AtNode* generateVolumeBox(Schema &schema);
@@ -725,32 +725,18 @@ private:
    
    template <class MeshSchema>
    bool getReferenceMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node, MeshInfo &info,
-                         AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> >* &refMesh,
-                         UserAttributes* &pointAttrs, UserAttributes* &vertexAttrs);
+                         AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> >* &refMesh);
    
    template <class MeshSchema>
    bool fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > *refMesh,
                                MeshInfo &info,
-                               UserAttributes *pointAttrs,
                                Alembic::Abc::M44d &Mref);
    
-   bool checkReferenceNormals(MeshInfo &info,
-                              UserAttributes *pointAttrs,
-                              UserAttributes *vertexAttrs);
+   bool checkReferenceNormals(MeshInfo &info);
    
    bool readReferenceNormals(AlembicMesh *refMesh,
                              MeshInfo &info,
                              const Alembic::Abc::M44d &Mref);
-   
-   bool fillReferenceNormals(MeshInfo &info,
-                             UserAttributes *pointAttrs,
-                             UserAttributes *vertexAttrs);
-   
-   bool fillReferenceNormals(MeshInfo &info,
-                             bool computeSmoothNormals,
-                             UserAttributes *pointAttrs,
-                             UserAttributes *vertexAttrs);
-   
    
    bool initCurves(CurvesInfo &info,
                    const Alembic::AbcGeom::ICurvesSchema::Sample &sample,
@@ -772,12 +758,13 @@ private:
                             AtArray* &points);
    
    bool getReferenceCurves(AlembicCurves &node, CurvesInfo &info,
-                           AlembicCurves* &refCurves,
-                           UserAttributes* &pointAttrs);
+                           AlembicCurves* &refCurves);
    
    bool fillReferencePositions(AlembicCurves *refCurves,
                                CurvesInfo &info,
-                               UserAttributes *pointAttrs);
+                               Alembic::Abc::Int32ArraySamplePtr Nv,
+                               Alembic::Abc::FloatArraySamplePtr W,
+                               Alembic::Abc::FloatArraySamplePtr K);
    
    void removeConflictingAttribs(AtNode *atnode,
                                  UserAttributes *obja,
@@ -2000,68 +1987,47 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
 
 template <class MeshSchema>
 bool MakeShape::getReferenceMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node, MeshInfo &info,
-                                 AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> >* &refMesh,
-                                 UserAttributes* &pointAttrs, UserAttributes* &vertexAttrs)
+                                 AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> >* &refMesh)
 {
-   if (!pointAttrs || !vertexAttrs)
-   {
-      // pointAttrs and vertexAttrs must be set
-      refMesh = 0;
-      return false;
-   }
-   
-   if (pointAttrs == &(info.pointAttrs) || vertexAttrs == &(info.vertexAttrs))
-   {
-      // pointAttrs and vertexAttrs should point to attribute storage other than current scene's one
-      refMesh = 0;
-      return false;
-   }
-   
-   // Priority
-   //   1/ "Pref" attribute in current alembic scene
-   //   2/ "Pref" attribute in reference alembic scene
-   //   3/ Positions from reference alembic scene
-   //   4/ Positions from current alembic scene's first frame
-   
-   UserAttributes::iterator uait;
+   ReferenceSource refSrc = mDso->referenceSource();
    bool hasPref = false;
    
-   uait = info.pointAttrs.find("Pref");
-   
-   if (uait != info.pointAttrs.end())
+   if (refSrc == RS_attributes || refSrc == RS_attributes_then_file)
    {
-      if (isVaryingFloat3(info, uait->second))
+      UserAttributes::iterator uait = info.pointAttrs.find(mDso->referencePositionName());
+      
+      if (uait != info.pointAttrs.end())
       {
-         hasPref = true;
-      }
-      else
-      {
-         // Pref exists but doesn't match requirements, get rid of it
-         DestroyUserAttribute(uait->second);
-         info.pointAttrs.erase(uait);
+         if (isVaryingFloat3(info, uait->second))
+         {
+            hasPref = true;
+         }
+         else
+         {
+            // Pref exists but doesn't match type requirements, get rid of it
+            DestroyUserAttribute(uait->second);
+            info.pointAttrs.erase(uait);
+         }
       }
    }
    
    if (hasPref)
    {
+      refMesh = 0;
+   }
+   else if (refSrc == RS_frame)
+   {
+      // use a difference sample from current alembic file
       refMesh = &node;
-      pointAttrs = &(info.pointAttrs);
-      vertexAttrs = &(info.vertexAttrs);
    }
    else
    {
+      // refSrc == RS_file || refSrc == RS_attributes_then_file
       AlembicScene *refScene = mDso->referenceScene();
       
       if (!refScene)
       {
-         if (mDso->verbose())
-         {
-            AiMsgInfo("[abcproc] Using current alembic scene first sample as reference.");
-         }
-         
-         refMesh = &node;
-         pointAttrs = &(info.pointAttrs);
-         vertexAttrs = &(info.vertexAttrs);
+         refMesh = 0;
       }
       else
       {
@@ -2070,50 +2036,10 @@ bool MakeShape::getReferenceMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSc
          if (refNode)
          {
             refMesh = dynamic_cast<AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> >*>(refNode);
-            
-            if (!refMesh)
-            {
-               AiMsgWarning("[abcproc] Node in reference alembic doesn't have the same type. Using current alembic scene first sample as reference");
-               
-               refMesh = &node;
-               pointAttrs = &(info.pointAttrs);
-               vertexAttrs = &(info.vertexAttrs);
-            }
-            else
-            {
-               MeshSchema meshSchema = refMesh->typedObject().getSchema();
-               
-               double reftime = meshSchema.getTimeSampling()->getSampleTime(0);
-               
-               collectUserAttributes(meshSchema.getUserProperties(), meshSchema.getArbGeomParams(),
-                                     reftime, false,
-                                     0, 0, pointAttrs, vertexAttrs, 0,
-                                     FilterReferenceAttributes);
-               
-               uait = pointAttrs->find("Pref");
-               
-               if (uait != pointAttrs->end())
-               {
-                  if (isVaryingFloat3(info, uait->second))
-                  {
-                     hasPref = true;
-                  }
-                  else
-                  {
-                     // Pref exists but doesn't match requirements, get rid of it
-                     DestroyUserAttribute(uait->second);
-                     pointAttrs->erase(uait);
-                  }
-               }
-            }
          }
          else
          {
-            AiMsgWarning("[abcproc] Couldn't find node in reference alembic scene. Using current alembic scene first sample as reference");
-            
-            refMesh = &node;
-            pointAttrs = &(info.pointAttrs);
-            vertexAttrs = &(info.vertexAttrs);
+            refMesh = 0;
          }
       }
    }
@@ -2124,56 +2050,103 @@ bool MakeShape::getReferenceMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSc
 template <class MeshSchema>
 bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > *refMesh,
                                        MeshInfo &info,
-                                       UserAttributes* pointAttrs,
                                        Alembic::Abc::M44d &Mref)
 {
-   if (!refMesh || !pointAttrs)
+   TimeSample<MeshSchema> meshSampler;
+   typename MeshSchema::Sample meshSample;
+   Alembic::Abc::P3fArraySamplePtr Pref;
+   const std::string &PrefName = mDso->referencePositionName();
+   UserAttributes::iterator uait = info.pointAttrs.find(PrefName);
+   bool hasPref = false;
+   
+   if (refMesh == 0)
    {
-      return false;
-   }
-   
-   MeshSchema meshSchema = refMesh->typedObject().getSchema();
-         
-   typename MeshSchema::Sample meshSample = meshSchema.getValue();
-   
-   Alembic::Abc::P3fArraySamplePtr Pref = meshSample.getPositions();
+      hasPref = (uait != info.pointAttrs.end());
       
-   bool hasPref = (pointAttrs->find("Pref") != pointAttrs->end());
-   
-   if (!hasPref && Pref->size() == info.pointCount)
-   {
-      float *vals = (float*) AiMalloc(3 * info.pointCount * sizeof(float));
-      
-      const AtUserParamEntry *upe = AiNodeLookUpUserParameter(mDso->procNode(), "Mref");
-      
-      if (upe != 0 &&
-          AiUserParamGetCategory(upe) == AI_USERDEF_CONSTANT &&
-          AiUserParamGetType(upe) == AI_TYPE_MATRIX)
+      // Note: if we reach here, we know that isVaryingFloat3(uait->second) is true
+      if (hasPref)
       {
-         if (mDso->verbose())
+         // Little type aliasing
+         UserAttribute &ua = uait->second;
+         
+         // was ua.dataDim == 1 && ua.dataCount == (3 * info.pointCount)
+         if (ua.arnoldType == AI_TYPE_FLOAT)
          {
-            AiMsgInfo("[abcproc] Using provided Mref");
+            if (mDso->verbose())
+            {
+               AiMsgInfo("[abcproc] \"%s\" exported with wrong base type: float instead if float[3]", PrefName.c_str());
+            }
+            
+            ua.dataDim = 3;
+            ua.dataCount = info.pointCount;
+            ua.arnoldType = AI_TYPE_POINT;
+            ua.arnoldTypeStr = "POINT";
+         }
+         else if (ua.arnoldType == AI_TYPE_VECTOR)
+         {
+            ua.arnoldType = AI_TYPE_POINT;
+            ua.arnoldTypeStr = "POINT";
          }
          
-         AtMatrix mtx;
-         
-         AiNodeGetMatrix(mDso->procNode(), "Mref", mtx);
-         
-         for (int r=0; r<4; ++r)
+         if (mDso->verbose())
          {
-            for (int c=0; c<4; ++c)
+            AiMsgInfo("[abcproc] Reference positions read from user attribute \"%s\".", PrefName.c_str());
+         }
+      }
+   }
+   else
+   {
+      MeshSchema meshSchema = refMesh->typedObject().getSchema();
+      
+      if (mDso->referenceSource() == RS_frame)
+      {
+         size_t n = meshSchema.getNumSamples();
+         
+         if (n > 0)
+         {
+            double refTime = mDso->referenceFrame() / mDso->fps();
+            
+            // Note: TimeSample::get will fail if refTime doesn't match an existing sample
+            
+            double minTime = meshSchema.getTimeSampling()->getSampleTime(0);
+            double maxTime = meshSchema.getTimeSampling()->getSampleTime(n-1);
+            
+            if (refTime < minTime) refTime = minTime;
+            if (refTime > maxTime) refTime = maxTime;
+            
+            if (meshSampler.get(meshSchema, refTime))
             {
-               Mref[r][c] = mtx[r][c];
+               meshSample = meshSampler.data();
+               Pref = meshSample.getPositions();
+               
+               if (mDso->verbose())
+               {
+                  AiMsgInfo("[abcproc] Read reference positions from frame %f.", mDso->referenceFrame());
+               }
             }
          }
       }
       else
       {
-         // recompute matrix
+         meshSample = meshSchema.getValue();
+         Pref = meshSample.getPositions();
+         
          if (mDso->verbose())
          {
-            AiMsgInfo("[abcproc] Compute reference world matrix Mref");
+            AiMsgInfo("[abcproc] Read reference positions from separate file.");
          }
+      }
+      
+      if (Pref && Pref->size() == info.pointCount)
+      {
+         // Compute world matrix
+         
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Compute reference world matrix.");
+         }
+         
+         Mref.makeIdentity();
          
          AlembicXform *refParent = dynamic_cast<AlembicXform*>(refMesh->parent());
          
@@ -2194,75 +2167,63 @@ bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<
                refParent = 0;
             }
          }
-      }
-      
-      for (unsigned int p=0, off=0; p<info.pointCount; ++p, off+=3)
-      {
-         Alembic::Abc::V3f P = Pref->get()[p] * Mref;
          
-         vals[off] = P.x;
-         vals[off+1] = P.y;
-         vals[off+2] = P.z;
-      }
-      
-      UserAttribute &ua = info.pointAttrs["Pref"];
-      
-      InitUserAttribute(ua);
-      
-      ua.arnoldCategory = AI_USERDEF_VARYING;
-      ua.arnoldType = AI_TYPE_POINT;
-      ua.arnoldTypeStr = "POINT";
-      ua.isArray = true;
-      ua.dataDim = 3;
-      ua.dataCount = info.pointCount;
-      ua.data = vals;
-      
-      hasPref = true;
-   }
-   else
-   {
-      if (hasPref)
-      {
-         if (pointAttrs != &(info.pointAttrs))
+         float *vals = 0;
+         
+         if (uait != info.pointAttrs.end())
          {
-            // Transfer from reference shape attributes to current shape attribtues
-            UserAttribute &src = (*pointAttrs)["Pref"];
-            UserAttribute &dst = info.pointAttrs["Pref"];
-            
-            dst = src;
-            
-            pointAttrs->erase(pointAttrs->find("Pref"));
+            // in this case, attribute has not been checked to be varying yet
+            if (isVaryingFloat3(info, uait->second))
+            {
+               // Reference position attributes already exists, overwrite it
+               vals = (float*) uait->second.data;
+               
+               // Aliasing (maybe a float[3 * info.pointCount])
+               uait->second.dataDim = 3;
+               uait->second.dataCount = info.pointCount;
+               uait->second.arnoldType = AI_TYPE_POINT;
+               uait->second.arnoldTypeStr = "POINT";
+            }
+            else
+            {
+               DestroyUserAttribute(uait->second);
+               info.pointAttrs.erase(uait);
+            }
          }
          
-         // Little type aliasing
-         UserAttribute &ua = info.pointAttrs["Pref"];
-         
-         if (ua.dataDim == 1 && ua.dataCount == (3 * info.pointCount))
+         if (!vals)
          {
-            if (mDso->verbose())
-            {
-               AiMsgInfo("[abcproc] \"Pref\" exported with wrong base type: float instead if float[3]");
-            }
+            vals = (float*) AiMalloc(3 * info.pointCount * sizeof(float));
             
-            ua.dataDim = 3;
-            ua.dataCount = info.pointCount;
+            UserAttribute &ua = info.pointAttrs[PrefName];
+            
+            InitUserAttribute(ua);
+            
+            ua.arnoldCategory = AI_USERDEF_VARYING;
             ua.arnoldType = AI_TYPE_POINT;
             ua.arnoldTypeStr = "POINT";
+            ua.isArray = true;
+            ua.dataDim = 3;
+            ua.dataCount = info.pointCount;
+            ua.data = vals;
          }
          
-         if (mDso->referenceScene())
+         for (unsigned int p=0, off=0; p<info.pointCount; ++p, off+=3)
          {
-            AiMsgWarning("[abcproc] \"Pref\" read from user attribute, ignore values from reference alembic");
+            Alembic::Abc::V3f P = Pref->get()[p] * Mref;
+            
+            vals[off] = P.x;
+            vals[off+1] = P.y;
+            vals[off+2] = P.z;
          }
-         else if (mDso->verbose())
-         {
-            AiMsgInfo("[abcproc] \"Pref\" read from user attribute");
-         }
+         
+         hasPref = true;
       }
-      else
-      {
-         AiMsgWarning("[abcproc] Could not generate \"Pref\" for mesh \"%s\"", refMesh->path().c_str());
-      }
+   }
+   
+   if (!hasPref)
+   {
+      AiMsgWarning("[abcproc] Invalid reference object specification (%s).", mDso->objectPath().c_str());
    }
    
    return hasPref;

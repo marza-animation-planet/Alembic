@@ -31,10 +31,39 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.shortName = "outref";
    helper.MakeInputBoolean(data);
    
+   data.defaultValue.INT = 0;
+   data.enums.clear();
+   data.enums.append("attributes_then_file");
+   data.enums.append("attributes");
+   data.enums.append("file");
+   data.enums.append("frame");
+   data.name = "mtoa_constant_abc_referenceSource";
+   data.shortName = "refsrc";
+   helper.MakeInputEnum(data);
+   
+   data.stringDefault = "";
+   data.name = "mtoa_constant_abc_referencePositionName";
+   data.shortName = "refpna";
+   helper.MakeInputString(data);
+   
+   data.stringDefault = "";
+   data.name = "mtoa_constant_abc_referenceNormalName";
+   data.shortName = "refnna";
+   helper.MakeInputString(data);
+   
    data.stringDefault = "";
    data.name = "mtoa_constant_abc_referenceFilename";
    data.shortName = "reffp";
    helper.MakeInputString(data);
+   
+   data.defaultValue.FLT = 0.0f;
+   data.name = "mtoa_constant_abc_referenceFrame";
+   data.shortName = "reffrm";
+   data.hasMin = false;
+   data.hasSoftMin = false;
+   data.hasMax = false;
+   data.hasSoftMax = false;
+   helper.MakeInputFloat(data);
    
    // velocity
    
@@ -73,7 +102,7 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    helper.MakeInputFloat(data);
    
    data.defaultValue.BOOL = false;
-   data.name = "mtoa_constant_useOverrideBounds";
+   data.name = "mtoa_constant_abc_useOverrideBounds";
    data.shortName = "uovbnd";
    helper.MakeInputBoolean(data);
    
@@ -970,7 +999,7 @@ void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
       if (IsSingleShape())
       {
          m_renderTime = FindMayaPlug("outSampleTime").asDouble();
-         m_overrideBounds = FindMayaPlug("mtoa_constant_useOverrideBounds").asBool();
+         m_overrideBounds = FindMayaPlug("mtoa_constant_abc_useOverrideBounds").asBool();
          m_boundsOverridden = false;
          
          AiNodeSetBool(proc, "load_at_init", false);
@@ -1267,6 +1296,24 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          data += " -outputreference";
       }
       
+      plug = FindMayaObjectPlug("mtoa_constant_abc_referenceSource");
+      if (!plug.isNull())
+      {
+         switch (plug.asInt())
+         {
+         case 0:
+            data += " -referencesource attributes_then_file"; break;
+         case 1:
+            data += " -referencesource attributes"; break;
+         case 2:
+            data += " -referencesource file"; break;
+         case 3:
+            data += " -referencesource frame"; break;
+         default:
+            break;
+         }
+      }
+      
       plug = FindMayaObjectPlug("mtoa_constant_abc_referenceFilename");
       if (!plug.isNull())
       {
@@ -1275,6 +1322,32 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          {
             data += " -referencefilename " + tmp;
          }
+      }
+      
+      plug = FindMayaObjectPlug("mtoa_constant_abc_referencePositionName");
+      if (!plug.isNull())
+      {
+         tmp = plug.asString();
+         if (tmp.numChars() > 0)
+         {
+            data += " -referencepositionname " + tmp;
+         }
+      }
+      
+      plug = FindMayaObjectPlug("mtoa_constant_abc_referenceNormalName");
+      if (!plug.isNull())
+      {
+         tmp = plug.asString();
+         if (tmp.numChars() > 0)
+         {
+            data += " -referencenormalname " + tmp;
+         }
+      }
+      
+      plug = FindMayaObjectPlug("mtoa_constant_abc_referenceFrame");
+      if (!plug.isNull())
+      {
+         data += " -referenceframe " + ToString(plug.asFloat());
       }
       
       plug = FindMayaPlug("mtoa_constant_abc_computeTangents");

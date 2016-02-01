@@ -10,7 +10,11 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       
       self.beginLayout("Reference Object", collapse=True)
       self.addControl("mtoa_constant_abc_outputReference", label="Output Reference")
+      self.addControl("mtoa_constant_abc_referenceSource", label="Reference Source")
+      self.addControl("mtoa_constant_abc_referencePositionName", label="Reference Position Name")
+      self.addControl("mtoa_constant_abc_referenceNormalName", label="Reference Normal Name")
       self.addControl("mtoa_constant_abc_referenceFilename", label="Reference ABC File")
+      self.addControl("mtoa_constant_abc_referenceFrame", label="Reference Frame")
       self.endLayout()
       
       self.beginLayout("Velocity", collapse=True)
@@ -21,7 +25,7 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       
       self.beginLayout("Bounds", collapse=True)
       self.addControl("mtoa_constant_abc_boundsPadding", label="Bounds Padding")
-      self.addControl("mtoa_constant_useOverrideBounds", label="Use Override Bounds", annotation="Use user defined bounds embedded in ABC file")
+      self.addControl("mtoa_constant_abc_useOverrideBounds", label="Use Override Bounds", annotation="Use user defined bounds embedded in ABC file")
       self.addControl("mtoa_constant_abc_overrideBoundsMinName", label="Override Bounds Min Name");
       self.addControl("mtoa_constant_abc_overrideBoundsMaxName", label="Override Bounds Max Name");
       self.endLayout()
