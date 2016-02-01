@@ -142,6 +142,7 @@ public:
 private:
    
    float adjustRadius(float radius) const;
+   float adjustWidth(float width) const;
 
    template <class Schema>
    bool overrideBounds(AlembicNodeT<Alembic::Abc::ISchemaObject<Schema> > &node, Alembic::Abc::Box3d &box);
@@ -172,6 +173,24 @@ inline float MakeProcedurals::adjustRadius(float radius) const
    else
    {
       return radius;
+   }
+}
+
+inline float MakeProcedurals::adjustWidth(float width) const
+{
+   width *= mDso->widthScale();
+   
+   if (width < mDso->widthMin())
+   {
+      return mDso->widthMin();
+   }
+   else if (width > mDso->widthMax())
+   {
+      return mDso->widthMax();
+   }
+   else
+   {
+      return width;
    }
 }
 
@@ -673,6 +692,7 @@ private:
 private:
    
    float adjustRadius(float radius) const;
+   float adjustWidth(float width) const;
    
    AtNode* createArnoldNode(const char *nodeType, AlembicNode &node, bool useProcName=false) const;
    
@@ -824,6 +844,24 @@ inline float MakeShape::adjustRadius(float radius) const
    else
    {
       return radius;
+   }
+}
+
+inline float MakeShape::adjustWidth(float width) const
+{
+   width *= mDso->widthScale();
+   
+   if (width < mDso->widthMin())
+   {
+      return mDso->widthMin();
+   }
+   else if (width > mDso->widthMax())
+   {
+      return mDso->widthMax();
+   }
+   else
+   {
+      return width;
    }
 }
 

@@ -282,7 +282,7 @@ public:
       return (mSingleParams.computeTangents.find(uvname) != mSingleParams.computeTangents.end());
    }
    
-   // Points/Curves
+   // Points
    
    inline const char* radiusName() const
    {
@@ -314,6 +314,21 @@ public:
    inline int nurbsSampleRate() const
    {
       return mSingleParams.nurbsSampleRate;
+   }
+   
+   inline double widthMin() const
+   {
+      return mSingleParams.widthMin;
+   }
+   
+   inline double widthMax() const
+   {
+      return mSingleParams.widthMax;
+   }
+   
+   inline double widthScale() const
+   {
+      return mSingleParams.widthScale;
    }
    
    // Volume
@@ -483,6 +498,9 @@ private:
       
       // curves
       int nurbsSampleRate;
+      float widthMin;
+      float widthMax;
+      float widthScale;
       
       void reset();
       std::string dataString() const;

@@ -373,6 +373,10 @@ void Dso::SingleParameters::reset()
    radiusMax = 1000000.0f;
    radiusScale = 1.0f;
    
+   widthMin = 0.0f;
+   widthMax = 1000000.0f;
+   widthScale = 1.0f;
+   
    nurbsSampleRate = 5;
 }
 
@@ -430,6 +434,9 @@ std::string Dso::SingleParameters::dataString() const
    oss << " -radiusmax " << radiusMax;
    oss << " -radiusscale " << radiusScale;
    oss << " -nurbssamplerate " << nurbsSampleRate;
+   oss << " -widthmin " << widthMin;
+   oss << " -widthmax " << widthMax;
+   oss << " -widthscale " << widthScale;
    
    return oss.str();
 }
@@ -1765,6 +1772,33 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
          return false;
       }
    }
+   else if (args[i] == "-widthmin")
+   {
+      ++i;
+      if (i >= args.size() ||
+          sscanf(args[i].c_str(), "%f", &(mSingleParams.widthMin)) != 1)
+      {
+         return false;
+      }
+   }
+   else if (args[i] == "-widthmax")
+   {
+      ++i;
+      if (i >= args.size() ||
+          sscanf(args[i].c_str(), "%f", &(mSingleParams.widthMax)) != 1)
+      {
+         return false;
+      }
+   }
+   else if (args[i] == "-widthscale")
+   {
+      ++i;
+      if (i >= args.size() ||
+          sscanf(args[i].c_str(), "%f", &(mSingleParams.widthScale)) != 1)
+      {
+         return false;
+      }
+   }
    else if (args[i] == "-ignorenurbs")
    {
       mCommonParams.ignoreNurbs = true;
@@ -2631,6 +2665,39 @@ void Dso::readFromUserParams()
          if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
          {
             mSingleParams.radiusScale = AiNodeGetFlt(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
+         }
+      }
+      else if (param == "widthmin")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
+         {
+            mSingleParams.widthMin = AiNodeGetFlt(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
+         }
+      }
+      else if (param == "widthmax")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
+         {
+            mSingleParams.widthMax = AiNodeGetFlt(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
+         }
+      }
+      else if (param == "widthscale")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
+         {
+            mSingleParams.widthScale = AiNodeGetFlt(mProcNode, pname);
          }
          else
          {
