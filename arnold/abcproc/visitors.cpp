@@ -2273,6 +2273,11 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
          // Tref?
          // Bref?
       }
+      
+      if (!hasPref)
+      {
+         AiMsgWarning("[abcproc] Invalid reference object specification (%s).", mDso->objectPath().c_str());
+      }
    }
    
    // Output user defined attributes
@@ -2485,6 +2490,11 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
          
          // Tref?
          // Bref?
+      }
+      
+      if (!hasPref)
+      {
+         AiMsgWarning("[abcproc] Invalid reference object specification (%s).", mDso->objectPath().c_str());
       }
    }
    
@@ -3223,7 +3233,6 @@ bool MakeShape::getReferenceCurves(AlembicCurves &node,
       
       if (!refScene)
       {
-         AiMsgWarning("[abcproc] No reference attributes to output (invalid scene).");
          refCurves = 0;
       }
       else
@@ -3233,15 +3242,9 @@ bool MakeShape::getReferenceCurves(AlembicCurves &node,
          if (refNode)
          {
             refCurves = dynamic_cast<AlembicCurves*>(refNode);
-            
-            if (!refCurves)
-            {
-               AiMsgWarning("[abcproc] No reference attributes to output (node type mismatch in reference alembic).");
-            }
          }
          else
          {
-            AiMsgWarning("[abcproc] No reference attributes to output (node not found in reference alembic).");
             refCurves = 0;
          }
       }
@@ -3901,7 +3904,7 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
       
       if (mDso->verbose())
       {
-         AiMsgInfo("[abcproc] \"%s\" read from user attribute.", PrefName.c_str());
+         AiMsgInfo("[abcproc] Read reference positions from user attribute \"%s\".", PrefName.c_str());
       }
    }
    else
@@ -3932,10 +3935,20 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
          }
          
          sample = sampler.data();
+         
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Read reference positions from user frame %f.", mDso->referenceFrame());
+         }
       }
       else
       {
          sample = schema.getValue();
+         
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Read reference positions from separate file.");
+         }
       }
       
       Alembic::Abc::P3fArraySamplePtr Pref = sample.getPositions();
@@ -4764,11 +4777,12 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
       
       if (hasPref || refCurves)
       {
-         fillReferencePositions(refCurves, info, Nv, W0, K);
+         hasPref = fillReferencePositions(refCurves, info, Nv, W0, K);
       }
-      else
+      
+      if (!hasPref)
       {
-         AiMsgWarning("[abcproc] No valid reference curve found");
+         AiMsgWarning("[abcproc] Invalid reference object specification (%s).", mDso->objectPath().c_str());
       }
    }
    

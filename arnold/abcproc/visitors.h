@@ -2027,7 +2027,6 @@ bool MakeShape::getReferenceMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSc
       
       if (!refScene)
       {
-         AiMsgWarning("[abcproc] No reference attributes to output (invalid scene).");
          refMesh = 0;
       }
       else
@@ -2037,15 +2036,9 @@ bool MakeShape::getReferenceMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSc
          if (refNode)
          {
             refMesh = dynamic_cast<AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> >*>(refNode);
-            
-            if (!refMesh)
-            {
-               AiMsgWarning("[abcproc] No reference attributes to output (node type mismatch in reference alembic).");
-            }
          }
          else
          {
-            AiMsgWarning("[abcproc] No reference attributes to output (node not found in reference alembic).");
             refMesh = 0;
          }
       }
@@ -2131,14 +2124,6 @@ bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<
                   AiMsgInfo("[abcproc] Read reference positions from frame %f.", mDso->referenceFrame());
                }
             }
-            else
-            {
-               AiMsgWarning("[abcproc] Invalid reference positions sample frame %f.", mDso->referenceFrame());
-            }
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] No samples to get reference positions from.");
          }
       }
       else
@@ -2148,7 +2133,7 @@ bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<
          
          if (mDso->verbose())
          {
-            AiMsgInfo("[abcproc] Read reference positions from first sample.");
+            AiMsgInfo("[abcproc] Read reference positions from separate file.");
          }
       }
       
@@ -2238,7 +2223,7 @@ bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<
    
    if (!hasPref)
    {
-      AiMsgWarning("[abcproc] Could not generate reference positions \"%s\".", PrefName.c_str());
+      AiMsgWarning("[abcproc] Invalid reference object specification (%s).", mDso->objectPath().c_str());
    }
    
    return hasPref;

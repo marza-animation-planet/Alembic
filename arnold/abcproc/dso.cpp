@@ -103,11 +103,11 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
             oss << " -referencenormalname " << referenceNormalName;
          }
       }
-      else if (referenceSource == RS_frame)
+      if (referenceSource == RS_frame)
       {
          oss << " -referenceframe " << referenceFrame;
       }
-      else if (referenceSource == RS_file || referenceSource == RS_attributes_then_file)
+      if (referenceSource == RS_file || referenceSource == RS_attributes_then_file)
       {
          if (referenceFilePath.length() > 0)
          {
@@ -242,11 +242,11 @@ std::string Dso::CommonParameters::shapeKey() const
             oss << " -referencenormalname " << referenceNormalName;
          }
       }
-      else if (referenceSource == RS_frame)
+      if (referenceSource == RS_frame)
       {
          oss << " -referenceframe " << referenceFrame;
       }
-      else if (referenceSource == RS_file || referenceSource == RS_attributes_then_file)
+      if (referenceSource == RS_file || referenceSource == RS_attributes_then_file)
       {
          if (referenceFilePath.length() > 0)
          {
