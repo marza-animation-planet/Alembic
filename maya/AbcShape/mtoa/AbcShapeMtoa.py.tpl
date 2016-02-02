@@ -8,6 +8,29 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       
       self.renderStatsAttributes()
       
+      self.beginLayout("Bounds", collapse=True)
+      self.addControl("mtoa_constant_abc_boundsPadding", label="Bounds Padding")
+      self.addControl("mtoa_constant_abc_useOverrideBounds", label="Use Override Bounds", annotation="Use user defined bounds embedded in ABC file")
+      self.addControl("mtoa_constant_abc_overrideBoundsMinName", label="Override Bounds Min Name")
+      self.addControl("mtoa_constant_abc_overrideBoundsMaxName", label="Override Bounds Max Name")
+      self.addControl("mtoa_constant_abc_padBoundsWithPeakRadius", label="Pad With Peak Radius")
+      self.addControl("mtoa_constant_abc_peakRadiusName", label="Peak Radius Name")
+      self.addControl("mtoa_constant_abc_padBoundsWithPeakWidth", label="Pad With Peak Width")
+      self.addControl("mtoa_constant_abc_peakWidthName", label="Peak Width Name")
+      self.endLayout()
+      
+      self.beginLayout("Attributes", collapse=True)
+      self.addControl("mtoa_constant_abc_objectAttribs", label="Output Object Attributes")
+      self.addControl("mtoa_constant_abc_primitiveAttribs", label="Output Primitive Attributes")
+      self.addControl("mtoa_constant_abc_pointAttribs", label="Output Point Attributes")
+      self.addControl("mtoa_constant_abc_vertexAttribs", label="Output Vertex Attributes")
+      self.addControl("mtoa_constant_abc_attribsFrame", label="Attributes Frame")
+      self.addControl("mtoa_constant_abc_promoteToObjectAttribs", label="Promote To Object Attributes")
+      self.addControl("mtoa_constant_abc_removeAttribPrefices", label="Remove Attribute Prefices")
+      self.addSeparator()
+      self.addControl("mtoa_constant_abc_overrideAttribs", label="Override Attributes")
+      self.endLayout()
+      
       self.beginLayout("Reference Object", collapse=True)
       self.addControl("mtoa_constant_abc_outputReference", label="Output Reference")
       self.addControl("mtoa_constant_abc_referenceSource", label="Reference Source")
@@ -23,13 +46,6 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       self.addControl("mtoa_constant_abc_accelerationName", label="Acceleration Name")
       self.endLayout()
       
-      self.beginLayout("Bounds", collapse=True)
-      self.addControl("mtoa_constant_abc_boundsPadding", label="Bounds Padding")
-      self.addControl("mtoa_constant_abc_useOverrideBounds", label="Use Override Bounds", annotation="Use user defined bounds embedded in ABC file")
-      self.addControl("mtoa_constant_abc_overrideBoundsMinName", label="Override Bounds Min Name");
-      self.addControl("mtoa_constant_abc_overrideBoundsMaxName", label="Override Bounds Max Name");
-      self.endLayout()
-      
       self.beginLayout("Mesh", collapse=True)
       self.addControl("mtoa_constant_abc_computeTangents", label="Compute Tangents")
       self.endLayout()
@@ -39,7 +55,6 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       self.addControl("mtoa_constant_abc_radiusScale", label="Radius Scale")
       self.addControl("mtoa_constant_abc_radiusMin", label="Min. Radius")
       self.addControl("mtoa_constant_abc_radiusMax", label="Max. Radius")
-      self.addControl("mtoa_constant_abc_peakRadiusName", label="Peak Radius Name");
       self.endLayout()
       
       self.beginLayout("Curves", collapse=True)
@@ -48,19 +63,6 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       self.addControl("mtoa_constant_abc_widthScale", label="Width Scale")
       self.addControl("mtoa_constant_abc_widthMin", label="Min. Width")
       self.addControl("mtoa_constant_abc_widthMax", label="Max. Width")
-      self.addControl("mtoa_constant_abc_peakWidthName", label="Peak Width Name");
-      self.endLayout()
-      
-      self.beginLayout("Attributes", collapse=True)
-      self.addControl("mtoa_constant_abc_objectAttribs", label="Output Object Attributes")
-      self.addControl("mtoa_constant_abc_primitiveAttribs", label="Output Primitive Attributes")
-      self.addControl("mtoa_constant_abc_pointAttribs", label="Output Point Attributes")
-      self.addControl("mtoa_constant_abc_vertexAttribs", label="Output Vertex Attributes")
-      self.addControl("mtoa_constant_abc_attribsFrame", label="Attributes Frame")
-      self.addControl("mtoa_constant_abc_promoteToObjectAttribs", label="Promote To Object Attributes")
-      self.addControl("mtoa_constant_abc_removeAttribPrefices", label="Remove Attribute Prefices")
-      self.addSeparator()
-      self.addControl("mtoa_constant_abc_overrideAttribs", label="Override Attributes")
       self.endLayout()
       
       self.beginLayout("Samples Expansion", collapse=True)
