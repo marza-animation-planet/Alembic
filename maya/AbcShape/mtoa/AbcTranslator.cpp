@@ -1313,10 +1313,10 @@ void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
       
       if (IsSingleShape())
       {
-         MPlug plug = FindMayaObjectPlug("outSampleTime").asDouble();
+         MPlug plug = FindMayaObjectPlug("outSampleTime");
          if (!plug.isNull())
          {
-            m_renderTime = plug.asFloat();
+            m_renderTime = plug.asDouble();
             m_overrideBounds = FindMayaPlug("mtoa_constant_abc_useOverrideBounds").asBool();
             m_padBoundsWithPeakRadius = FindMayaPlug("mtoa_constant_abc_padBoundsWithPeakRadius").asBool();
             m_padBoundsWithPeakWidth = FindMayaPlug("mtoa_constant_abc_padBoundsWithPeakWidth").asBool();
