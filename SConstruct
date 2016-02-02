@@ -419,7 +419,7 @@ if excons.GetArgument("with-maya", default=None) is not None:
                       "libdirs": [mtoa_lib],
                       "libs": ["mtoa_api"],
                       "install": {"maya/plug-ins/mtoa": [AbcShapeMtoa]},
-                      "custom": [arnold.Require, maya.Require]})
+                      "custom": [arnold.Require, maya.Require, RequireAlembicHelper()]})
 
 
 excons.DeclareTargets(env, prjs)

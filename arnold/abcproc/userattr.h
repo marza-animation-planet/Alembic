@@ -24,6 +24,14 @@ struct UserAttribute
    std::set<std::string> strings;
 };
 
+enum AttributeLevel
+{
+   ObjectAttribute = 0,
+   PrimitiveAttribute,
+   PointAttribute,
+   VertexAttribute
+};
+
 typedef std::map<std::string, UserAttribute> UserAttributes;
 
 void InitUserAttribute(UserAttribute &);
@@ -34,6 +42,15 @@ bool ReadUserAttribute(UserAttribute &ua,
                        double t,
                        bool geoparam,
                        bool interpolate);
+
+bool ReadSingleUserAttribute(const char *name,
+                             AttributeLevel level,
+                             double t,
+                             Alembic::Abc::ICompoundProperty userProps,
+                             Alembic::Abc::ICompoundProperty geomParams,
+                             UserAttribute &attr);
+
+bool PromoteToObjectAttrib(const UserAttribute &src, UserAttribute &dst);
 
 bool ResizeUserAttribute(UserAttribute &ua, unsigned int newSize);
 

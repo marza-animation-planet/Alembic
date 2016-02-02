@@ -232,11 +232,12 @@ bool GetVisibility(Alembic::Abc::ICompoundProperty props, double t)
 
 // ---
 
-CountShapes::CountShapes(double renderTime, bool ignoreTransforms, bool ignoreInstances, bool ignoreVisibility)
+CountShapes::CountShapes(double renderTime, bool ignoreTransforms, bool ignoreInstances, bool ignoreVisibility, bool ignoreNurbs)
    : mRenderTime(renderTime)
    , mIgnoreTransforms(ignoreTransforms)
    , mIgnoreInstances(ignoreInstances)
    , mIgnoreVisibility(ignoreVisibility)
+   , mIgnoreNurbs(ignoreNurbs)
    , mNumShapes(0)
 {
 }
@@ -270,7 +271,14 @@ AlembicNode::VisitReturn CountShapes::enter(AlembicPoints &node, AlembicNode *)
 
 AlembicNode::VisitReturn CountShapes::enter(AlembicCurves &node, AlembicNode *)
 {
-   return shapeEnter(node);
+   if (!mIgnoreNurbs)
+   {
+      return shapeEnter(node);
+   }
+   else
+   {
+      return AlembicNode::ContinueVisit;
+   }
 }
 
 AlembicNode::VisitReturn CountShapes::enter(AlembicNuPatch &, AlembicNode *)
@@ -478,115 +486,184 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
    if (visible)
    {
       Alembic::AbcGeom::IPointsSchema &schema = node.typedObject().getSchema();
-      
       Alembic::AbcGeom::IFloatGeomParam widths = schema.getWidthsParam();
+      Alembic::Abc::ICompoundProperty userProps = schema.getUserProperties();
+      Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
+      double renderTime = mDso->renderTime();
       
-      UserAttribute attr;
+      const std::string &peakRadiusName = mDso->peakRadiusName();
+      UserAttribute peakRadiusAttr;
       
-      InitUserAttribute(attr);
+      InitUserAttribute(peakRadiusAttr);
       
-      if (FindUserAttribute("radius", 2, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
+      bool hasPeakRadius = ReadSingleUserAttribute(peakRadiusName.c_str(), ObjectAttribute, renderTime, userProps, geomParams, peakRadiusAttr);
+      
+      if (!hasPeakRadius && mDso->isPromotedToObjectAttrib(peakRadiusName))
       {
-         if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
-         {
-            DestroyUserAttribute(attr);
-         }
-      }
-      
-      if (attr.data == 0 && FindUserAttribute("size", 2, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
-      {
-         if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
-         {
-            DestroyUserAttribute(attr);
-         }
-      }
-      
-      if (attr.data != 0)
-      {
-         const float *ptr = (const float*) attr.data;
+         hasPeakRadius = ReadSingleUserAttribute(peakRadiusName.c_str(), PointAttribute, renderTime, userProps, geomParams, peakRadiusAttr);
          
-         for (unsigned int i=0; i<attr.dataCount; ++i)
+         if (hasPeakRadius)
          {
-            float r = adjustRadius(ptr[i]);
+            UserAttribute tmp;
             
-            if (r > extraPadding)
+            bool promoted = PromoteToObjectAttrib(peakRadiusAttr, tmp);
+            
+            DestroyUserAttribute(peakRadiusAttr);
+            
+            if (promoted)
             {
-               extraPadding = r;
+               hasPeakRadius = true;
+               std::swap(tmp, peakRadiusAttr);
+            }
+            else
+            {
+               hasPeakRadius = false;
             }
          }
-         
-         DestroyUserAttribute(attr);
       }
-      else if (widths.valid())
+      
+      if (hasPeakRadius && peakRadiusAttr.arnoldType == AI_TYPE_FLOAT)
       {
-         TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> wsamples;
-         TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator wsample;
-            
-         double renderTime = mDso->renderTime();
-         
-         const double *sampleTimes = 0;
-         size_t sampleTimesCount = 0;
-         
-         if (mDso->ignoreDeformBlur())
-         {
-            sampleTimes = &renderTime;
-            sampleTimesCount = 1;
-         }
-         else
-         {
-            sampleTimes = &(mDso->motionSampleTimes()[0]);
-            sampleTimesCount = mDso->numMotionSamples();
-         }
-            
-         for (size_t i=0; i<sampleTimesCount; ++i)
-         {
-            double t = sampleTimes[i];
-            
-            wsamples.update(widths, t, t, mDso->scale(), (i > 0 || instance != 0));
-         }
-         
-         for (wsample=wsamples.begin(); wsample!=wsamples.end(); ++wsample)
-         {
-            Alembic::Abc::FloatArraySamplePtr vals = wsample->data().getVals();
-            
-            for (size_t i=0; i<vals->size(); ++i)
-            {
-               float r = adjustRadius(vals->get()[i]);
-               
-               if (r > extraPadding)
-               {
-                  extraPadding = r;
-               }
-            }
-         }
+         extraPadding = adjustRadius(mDso->scale() * *((float*)peakRadiusAttr.data));
       }
       else
       {
-         if (FindUserAttribute("radius", 0, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
+         UserAttribute attr;
+         
+         InitUserAttribute(attr);
+         
+         const char *radiusName = mDso->radiusName();
+         bool checkAltName = false;
+         float constantRadius = -1.0f;
+         
+         if (radiusName == 0)
+         {
+            radiusName = "radius";
+            checkAltName = true; // also check for 'size'
+         }
+         
+         if (ReadSingleUserAttribute(radiusName, PointAttribute, renderTime, userProps, geomParams, attr))
          {
             if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
             {
                DestroyUserAttribute(attr);
             }
+            else if (mDso->isPromotedToObjectAttrib(radiusName) && attr.dataCount >= 1)
+            {
+               constantRadius = *((const float*) attr.data);
+               DestroyUserAttribute(attr);
+            }
          }
          
-         if (attr.data == 0 && FindUserAttribute("size", 0, mDso->renderTime(), schema.getUserProperties(), schema.getArbGeomParams(), attr))
+         if (attr.data == 0 && checkAltName && ReadSingleUserAttribute("size", PointAttribute, renderTime, userProps, geomParams, attr))
          {
             if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
             {
+               DestroyUserAttribute(attr);
+            }
+            else if (mDso->isPromotedToObjectAttrib("size") && attr.dataCount >= 1 && constantRadius < 0.0f)
+            {
+               constantRadius = *((const float*) attr.data);
                DestroyUserAttribute(attr);
             }
          }
          
          if (attr.data != 0)
          {
-            extraPadding = *((const float*) attr.data);
+            const float *ptr = (const float*) attr.data;
+            
+            for (unsigned int i=0; i<attr.dataCount; ++i)
+            {
+               float r = adjustRadius(mDso->scale() * ptr[i]);
+               
+               if (r > extraPadding)
+               {
+                  extraPadding = r;
+               }
+            }
+            
+            DestroyUserAttribute(attr);
+         }
+         else if (widths.valid())
+         {
+            TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> wsamples;
+            TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator wsample;
+               
+            const double *sampleTimes = 0;
+            size_t sampleTimesCount = 0;
+            
+            if (mDso->ignoreDeformBlur())
+            {
+               sampleTimes = &renderTime;
+               sampleTimesCount = 1;
+            }
+            else
+            {
+               sampleTimes = &(mDso->motionSampleTimes()[0]);
+               sampleTimesCount = mDso->numMotionSamples();
+            }
+               
+            for (size_t i=0; i<sampleTimesCount; ++i)
+            {
+               double t = sampleTimes[i];
+               
+               wsamples.update(widths, t, t, mDso->scale(), (i > 0 || instance != 0));
+            }
+            
+            for (wsample=wsamples.begin(); wsample!=wsamples.end(); ++wsample)
+            {
+               Alembic::Abc::FloatArraySamplePtr vals = wsample->data().getVals();
+               
+               for (size_t i=0; i<vals->size(); ++i)
+               {
+                  float r = adjustRadius(vals->get()[i]);
+                  
+                  if (r > extraPadding)
+                  {
+                     extraPadding = r;
+                  }
+               }
+            }
          }
          else
          {
-            extraPadding = mDso->radiusMin();
+            // constant radius may have been set earlier if attribute was promoted to object level
+            if (constantRadius < 0.0f)
+            {
+               if (ReadSingleUserAttribute(radiusName, ObjectAttribute, renderTime, userProps, geomParams, attr))
+               {
+                  if (attr.arnoldType == AI_TYPE_FLOAT && attr.dataDim == 1)
+                  {
+                     constantRadius = *((const float*) attr.data);
+                  }
+                  DestroyUserAttribute(attr);
+               }
+               
+               if (constantRadius < 0.0f && checkAltName)
+               {
+                  if (ReadSingleUserAttribute("size", ObjectAttribute, renderTime, userProps, geomParams, attr))
+                  {
+                     if (attr.arnoldType == AI_TYPE_FLOAT && attr.dataDim == 1)
+                     {
+                        constantRadius = *((const float*) attr.data);
+                     }
+                     DestroyUserAttribute(attr);
+                  }
+               }
+            }
+            
+            if (constantRadius < 0.0f)
+            {
+               extraPadding = mDso->radiusMin();
+            }
+            else
+            {
+               extraPadding = adjustRadius(mDso->scale() * constantRadius);
+            }
          }
       }
+      
+      DestroyUserAttribute(peakRadiusAttr);
       
       if (mDso->verbose())
       {
@@ -599,6 +676,11 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode *instance)
 {
+   if (mDso->ignoreNurbs())
+   {
+      return AlembicNode::ContinueVisit;
+   }
+   
    // Take into account the curve width in the computed bounds
    
    Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
@@ -607,55 +689,105 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode
    
    if (visible)
    {
-      Alembic::AbcGeom::IFloatGeomParam widths = node.typedObject().getSchema().getWidthsParam();
+      Alembic::AbcGeom::ICurvesSchema schema = node.typedObject().getSchema();
+      Alembic::Abc::ICompoundProperty userProps = schema.getUserProperties();
+      Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
       
-      if (widths.valid())
+      double t = mDso->renderTime();
+      const std::string &peakWidthName = mDso->peakWidthName();
+      UserAttribute peakWidthAttr;
+      
+      InitUserAttribute(peakWidthAttr);
+      
+      bool hasPeakWidth = ReadSingleUserAttribute(peakWidthName.c_str(), ObjectAttribute, t, userProps, geomParams, peakWidthAttr);
+      
+      if (!hasPeakWidth && mDso->isPromotedToObjectAttrib(peakWidthName))
       {
-         TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> wsamples;
-         TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator wsample;
-            
-         double renderTime = mDso->renderTime();
+         hasPeakWidth = ReadSingleUserAttribute(peakWidthName.c_str(), PrimitiveAttribute, t, userProps, geomParams, peakWidthAttr);
          
-         const double *sampleTimes = 0;
-         size_t sampleTimesCount = 0;
-         
-         if (mDso->ignoreDeformBlur())
+         if (!hasPeakWidth)
          {
-            sampleTimes = &renderTime;
-            sampleTimesCount = 1;
-         }
-         else
-         {
-            sampleTimes = &(mDso->motionSampleTimes()[0]);
-            sampleTimesCount = mDso->numMotionSamples();
-         }
-            
-         for (size_t i=0; i<sampleTimesCount; ++i)
-         {
-            double t = sampleTimes[i];
-            
-            wsamples.update(widths, t, t, mDso->scale(), (i > 0 || instance != 0));
+            hasPeakWidth = ReadSingleUserAttribute(peakWidthName.c_str(), PointAttribute, t, userProps, geomParams, peakWidthAttr);
          }
          
-         for (wsample=wsamples.begin(); wsample!=wsamples.end(); ++wsample)
+         if (hasPeakWidth)
          {
-            Alembic::Abc::FloatArraySamplePtr vals = wsample->data().getVals();
+            UserAttribute tmp;
             
-            for (size_t i=0; i<vals->size(); ++i)
+            bool promoted = PromoteToObjectAttrib(peakWidthAttr, tmp);
+            
+            DestroyUserAttribute(peakWidthAttr);
+            
+            if (promoted)
             {
-               float r = adjustRadius(0.5 * vals->get()[i]);
-               
-               if (r > extraPadding)
-               {
-                  extraPadding = r;
-               }
+               hasPeakWidth = true;
+               std::swap(tmp, peakWidthAttr);
+            }
+            else
+            {
+               hasPeakWidth = false;
             }
          }
       }
+      
+      if (hasPeakWidth && peakWidthAttr.arnoldType == AI_TYPE_FLOAT)
+      {
+         extraPadding = 0.5 * adjustWidth(mDso->scale() * *((float*)peakWidthAttr.data));
+      }
       else
       {
-         extraPadding = mDso->radiusMin();
+         Alembic::AbcGeom::IFloatGeomParam widths = node.typedObject().getSchema().getWidthsParam();
+         
+         if (widths.valid())
+         {
+            TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> wsamples;
+            TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator wsample;
+               
+            double renderTime = mDso->renderTime();
+            
+            const double *sampleTimes = 0;
+            size_t sampleTimesCount = 0;
+            
+            if (mDso->ignoreDeformBlur())
+            {
+               sampleTimes = &renderTime;
+               sampleTimesCount = 1;
+            }
+            else
+            {
+               sampleTimes = &(mDso->motionSampleTimes()[0]);
+               sampleTimesCount = mDso->numMotionSamples();
+            }
+               
+            for (size_t i=0; i<sampleTimesCount; ++i)
+            {
+               double t = sampleTimes[i];
+               
+               wsamples.update(widths, t, t, mDso->scale(), (i > 0 || instance != 0));
+            }
+            
+            for (wsample=wsamples.begin(); wsample!=wsamples.end(); ++wsample)
+            {
+               Alembic::Abc::FloatArraySamplePtr vals = wsample->data().getVals();
+               
+               for (size_t i=0; i<vals->size(); ++i)
+               {
+                  float r = 0.5f * adjustWidth(vals->get()[i]);
+                  
+                  if (r > extraPadding)
+                  {
+                     extraPadding = r;
+                  }
+               }
+            }
+         }
+         else
+         {
+            extraPadding = 0.5f * mDso->widthMin();
+         }
       }
+      
+      DestroyUserAttribute(peakWidthAttr);
       
       if (mDso->verbose())
       {
@@ -856,7 +988,8 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
                                       UserAttributes *pointAttrs,
                                       UserAttributes *vertexAttrs,
                                       std::map<std::string, Alembic::AbcGeom::IV2fGeomParam> *UVs,
-                                      MakeShape::CollectFilter filter)
+                                      MakeShape::CollectFilter filter,
+                                      void *filterArgs)
 {
    if (userProps.valid() && objectAttrs && mDso->readObjectAttribs())
    {
@@ -864,7 +997,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
       {
          const Alembic::AbcCoreAbstract::PropertyHeader &header = userProps.getPropertyHeader(i);
          
-         if (filter && !filter(header))
+         if (filter && !filter(header, filterArgs))
          {
             continue;
          }
@@ -898,18 +1031,38 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
       std::set<std::string> specialPointNames;
       std::set<std::string> specialVertexNames;
       
-      specialPointNames.insert("acceleration");
-      specialPointNames.insert("accel");
-      specialPointNames.insert("a");
-      specialPointNames.insert("velocity");
-      specialPointNames.insert("vel");
-      specialPointNames.insert("v");
+      const char *accName = mDso->accelerationName();
+      if (!accName)
+      {
+         specialPointNames.insert("acceleration");
+         specialPointNames.insert("accel");
+         specialPointNames.insert("a");
+      }
+      else
+      {
+         specialPointNames.insert(accName);
+      }
+      
+      const char *velName = mDso->velocityName();
+      if (!velName)
+      {
+         specialPointNames.insert("velocity");
+         specialPointNames.insert("vel");
+         specialPointNames.insert("v");
+      }
+      else if (strcmp(velName, "<builtin>") != 0)
+      {
+         specialPointNames.insert(velName);
+      }
+      
       if (mDso->outputReference())
       {
-         specialPointNames.insert("Pref");
-         specialPointNames.insert("Nref");
-         specialVertexNames.insert("Nref");
+         specialPointNames.insert(mDso->referencePositionName());
+         specialPointNames.insert(mDso->referenceNormalName());
+         specialVertexNames.insert(mDso->referenceNormalName());
       }
+      
+      // what about 'radius' and 'size'?
       
       for (size_t i=0; i<geomParams.getNumProperties(); ++i)
       {
@@ -923,7 +1076,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
              header.getMetaData().get("notUV") != "1")
              //Alembic::AbcGeom::isUV(header))
          {
-            if (filter && !filter(header))
+            if (filter && !filter(header, filterArgs))
             {
                continue;
             }
@@ -946,42 +1099,89 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
             mDso->cleanAttribName(ua.first);
             InitUserAttribute(ua.second);
             
+            bool promoteToObject = mDso->isPromotedToObjectAttrib(ua.first);
+            
             switch (scope)
             {
             case Alembic::AbcGeom::kFacevaryingScope:
-               if (vertexAttrs && (mDso->readVertexAttribs() || specialVertexNames.find(ua.first) != specialVertexNames.end()))
+               if (promoteToObject)
                {
-                  //ua.second.arnoldCategory = AI_USERDEF_INDEXED;
-                  attrs = vertexAttrs;
-                  if (mDso->verbose())
+                  if (objectAttrs && mDso->readObjectAttribs())
                   {
-                     AiMsgInfo("[abcproc] Read \"%s\" vertex attribute as \"%s\"",
-                               header.getName().c_str(), ua.first.c_str());
+                     attrs = objectAttrs;
+                     if (mDso->verbose())
+                     {
+                        AiMsgInfo("[abcproc] Read \"%s\" vertex attribute as \"%s\"",
+                                  header.getName().c_str(), ua.first.c_str());
+                     }
+                  }
+               }
+               else
+               {
+                  if (vertexAttrs && (mDso->readVertexAttribs() || specialVertexNames.find(ua.first) != specialVertexNames.end()))
+                  {
+                     //ua.second.arnoldCategory = AI_USERDEF_INDEXED;
+                     attrs = vertexAttrs;
+                     if (mDso->verbose())
+                     {
+                        AiMsgInfo("[abcproc] Read \"%s\" vertex attribute as \"%s\"",
+                                  header.getName().c_str(), ua.first.c_str());
+                     }
                   }
                }
                break;
             case Alembic::AbcGeom::kVaryingScope:
             case Alembic::AbcGeom::kVertexScope:
-               if (pointAttrs && (mDso->readPointAttribs() || specialPointNames.find(ua.first) != specialPointNames.end()))
+               if (promoteToObject)
                {
-                  //ua.second.arnoldCategory = AI_USERDEF_VARYING;
-                  attrs = pointAttrs;
-                  if (mDso->verbose())
+                  if (objectAttrs && mDso->readObjectAttribs())
                   {
-                     AiMsgInfo("[abcproc] Read \"%s\" point attribute as \"%s\"",
-                               header.getName().c_str(), ua.first.c_str());
+                     attrs = objectAttrs;
+                     if (mDso->verbose())
+                     {
+                        AiMsgInfo("[abcproc] Read \"%s\" point attribute as \"%s\"",
+                                  header.getName().c_str(), ua.first.c_str());
+                     }
+                  }
+               }
+               else
+               {
+                  if (pointAttrs && (mDso->readPointAttribs() || specialPointNames.find(ua.first) != specialPointNames.end()))
+                  {
+                     //ua.second.arnoldCategory = AI_USERDEF_VARYING;
+                     attrs = pointAttrs;
+                     if (mDso->verbose())
+                     {
+                        AiMsgInfo("[abcproc] Read \"%s\" point attribute as \"%s\"",
+                                  header.getName().c_str(), ua.first.c_str());
+                     }
                   }
                }
                break;
             case Alembic::AbcGeom::kUniformScope:
-               if (primitiveAttrs && mDso->readPrimitiveAttribs())
+               if (promoteToObject)
                {
-                  //ua.second.arnoldCategory = AI_USERDEF_UNIFORM;
-                  attrs = primitiveAttrs;
-                  if (mDso->verbose())
+                  if (objectAttrs && mDso->readObjectAttribs())
                   {
-                     AiMsgInfo("[abcproc] Read \"%s\" primitive attribute as \"%s\"",
-                               header.getName().c_str(), ua.first.c_str());
+                     attrs = objectAttrs;
+                     if (mDso->verbose())
+                     {
+                        AiMsgInfo("[abcproc] Read \"%s\" primitive attribute as \"%s\"",
+                                  header.getName().c_str(), ua.first.c_str());
+                     }
+                  }
+               }
+               else
+               {
+                  if (primitiveAttrs && mDso->readPrimitiveAttribs())
+                  {
+                     //ua.second.arnoldCategory = AI_USERDEF_UNIFORM;
+                     attrs = primitiveAttrs;
+                     if (mDso->verbose())
+                     {
+                        AiMsgInfo("[abcproc] Read \"%s\" primitive attribute as \"%s\"",
+                                  header.getName().c_str(), ua.first.c_str());
+                     }
                   }
                }
                break;
@@ -1003,7 +1203,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
             
             if (attrs)
             {
-               if (filter && !filter(header))
+               if (filter && !filter(header, filterArgs))
                {
                   DestroyUserAttribute(ua.second);
                }
@@ -1011,7 +1211,37 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
                {
                   if (ReadUserAttribute(ua.second, geomParams, header, t, true, interpolate))
                   {
-                     attrs->insert(ua);
+                     if (!promoteToObject)
+                     {
+                        attrs->insert(ua);
+                     }
+                     else
+                     {
+                        std::pair<std::string, UserAttribute> pua;
+                        
+                        bool promoted =  PromoteToObjectAttrib(ua.second, pua.second);
+                        
+                        DestroyUserAttribute(ua.second);
+                        
+                        if (!promoted)
+                        {
+                           if (mDso->verbose())
+                           {
+                              AiMsgWarning("[abcproc] Failed (could not promote to constant)");
+                           }
+                        }
+                        else
+                        {
+                           pua.first = ua.first;
+                           
+                           if (mDso->verbose())
+                           {
+                              AiMsgInfo("[abcproc] \"%s\" promoted to constant attribute", pua.first.c_str());
+                           }
+                           
+                           attrs->insert(pua);
+                        }
+                     }
                   }
                   else
                   {
@@ -1028,6 +1258,91 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
    }
 }
 
+void MakeShape::removeConflictingAttribs(AtNode *atnode, UserAttributes *obja, UserAttributes *prma, UserAttributes *pnta, UserAttributes *vtxa, bool verbose)
+{
+   const AtNodeEntry *entry = AiNodeGetNodeEntry(atnode);
+   
+   if (!entry)
+   {
+      return;
+   }
+   
+   UserAttributes::iterator attrit;
+   
+   AtParamIterator *paramit = AiNodeEntryGetParamIterator(entry);
+   
+   while (!AiParamIteratorFinished(paramit))
+   {
+      const AtParamEntry *pentry = AiParamIteratorGetNext(paramit);
+      
+      const char *tmp = AiParamGetName(pentry);
+      
+      if (!tmp)
+      {
+         continue;
+      }
+      
+      std::string pname = tmp;
+      
+      if (obja)
+      {
+         attrit = obja->find(pname);
+         if (attrit != obja->end())
+         {
+            if (verbose)
+            {
+               AiMsgInfo("[abcproc] Ignore conflicting object attribute \"%s\".", tmp);
+            }
+            DestroyUserAttribute(attrit->second);
+            obja->erase(attrit);
+         }
+      }
+      
+      if (prma)
+      {
+         attrit = prma->find(pname);
+         if (attrit != prma->end())
+         {
+            if (verbose)
+            {
+               AiMsgInfo("[abcproc] Ignore conflicting primitive attribute \"%s\".", tmp);
+            }
+            DestroyUserAttribute(attrit->second);
+            prma->erase(attrit);
+         }
+      }
+      
+      if (pnta)
+      {
+         attrit = pnta->find(pname);
+         if (attrit != pnta->end())
+         {
+            if (verbose)
+            {
+               AiMsgInfo("[abcproc] Ignore conflicting point attribute \"%s\".", tmp);
+            }
+            DestroyUserAttribute(attrit->second);
+            pnta->erase(attrit);
+         }
+      }
+      
+      if (vtxa)
+      {
+         attrit = vtxa->find(pname);
+         if (attrit != vtxa->end())
+         {
+            if (verbose)
+            {
+               AiMsgInfo("[abcproc] Ignore conflicting vertex attribute \"%s\".", tmp);
+            }
+            DestroyUserAttribute(attrit->second);
+            vtxa->erase(attrit);
+         }
+      }
+   }
+   
+   AiParamIteratorDestroy(paramit);
+}
 
 float* MakeShape::computeMeshSmoothNormals(MakeShape::MeshInfo &info,
                                            const float *P0,
@@ -1135,15 +1450,21 @@ float* MakeShape::computeMeshSmoothNormals(MakeShape::MeshInfo &info,
    return smoothNormals;
 }
 
-bool MakeShape::FilterReferenceAttributes(const Alembic::AbcCoreAbstract::PropertyHeader &header)
+bool MakeShape::FilterReferenceAttributes(const Alembic::AbcCoreAbstract::PropertyHeader &header, void *args)
 {
-   if (header.getName() == "Pref")
+   Dso *dso = (Dso*) args;
+   
+   if (!dso)
+   {
+      return false;
+   }
+   else if (header.getName() == dso->referencePositionName())
    {
       Alembic::AbcGeom::GeometryScope scope = Alembic::AbcGeom::GetGeometryScope(header.getMetaData());
       
       return (scope == Alembic::AbcGeom::kVaryingScope || scope == Alembic::AbcGeom::kVertexScope);
    }
-   else if (header.getName() == "Nref")
+   else if (header.getName() == dso->referenceNormalName())
    {
       Alembic::AbcGeom::GeometryScope scope = Alembic::AbcGeom::GetGeometryScope(header.getMetaData());
       
@@ -1155,32 +1476,38 @@ bool MakeShape::FilterReferenceAttributes(const Alembic::AbcCoreAbstract::Proper
    }
 }
 
-bool MakeShape::checkReferenceNormals(MeshInfo &info,
-                                      UserAttributes *pointAttrs,
-                                      UserAttributes *vertexAttrs)
+bool MakeShape::checkReferenceNormals(MeshInfo &info)
 {
    bool hasNref = false;
+   const std::string &NrefName = mDso->referenceNormalName();
+   UserAttributes::iterator uait = info.vertexAttrs.find(NrefName);
    
-   UserAttributes::iterator uait = vertexAttrs->find("Nref");
-   
-   if (uait != vertexAttrs->end())
+   if (uait != info.vertexAttrs.end())
    {
       if (isIndexedFloat3(info, uait->second))
       {
          hasNref = true;
+         
+         // destroy point class data if any
+         uait = info.pointAttrs.find(NrefName);
+         if (uait != info.pointAttrs.end())
+         {
+            DestroyUserAttribute(uait->second);
+            info.pointAttrs.erase(uait);
+         }
       }
       else
       {
          DestroyUserAttribute(uait->second);
-         vertexAttrs->erase(uait);
+         info.vertexAttrs.erase(uait);
       }
    }
    
    if (!hasNref)
    {
-      uait = pointAttrs->find("Nref");
+      uait = info.pointAttrs.find(NrefName);
       
-      if (uait != pointAttrs->end())
+      if (uait != info.pointAttrs.end())
       {
          if (isVaryingFloat3(info, uait->second))
          {
@@ -1189,7 +1516,7 @@ bool MakeShape::checkReferenceNormals(MeshInfo &info,
          else
          {
             DestroyUserAttribute(uait->second);
-            pointAttrs->erase(uait);
+            info.pointAttrs.erase(uait);
          }
       }
    }
@@ -1205,11 +1532,38 @@ bool MakeShape::readReferenceNormals(AlembicMesh *refMesh,
    
    Alembic::AbcGeom::IN3fGeomParam Nref = meshSchema.getNormalsParam();
    
+   const std::string &NrefName = mDso->referenceNormalName();
+   
    if (Nref.valid() && (Nref.getScope() == Alembic::AbcGeom::kFacevaryingScope ||
                         Nref.getScope() == Alembic::AbcGeom::kVertexScope ||
                         Nref.getScope() == Alembic::AbcGeom::kVaryingScope))
    {
-      Alembic::AbcGeom::IN3fGeomParam::Sample sample = Nref.getIndexedValue();
+      TimeSample<Alembic::AbcGeom::IN3fGeomParam> sampler;
+      Alembic::AbcGeom::IN3fGeomParam::Sample sample;
+      
+      size_t n = Nref.getNumSamples();
+      
+      if (n == 0)
+      {
+         return false;
+      }
+      
+      double minTime = Nref.getTimeSampling()->getSampleTime(0);
+      double maxTime = Nref.getTimeSampling()->getSampleTime(n-1);
+      double refTime = minTime;
+      
+      if (mDso->referenceSource() == RS_frame)
+      {
+         refTime = mDso->referenceFrame() / mDso->fps();
+         if (refTime < minTime) refTime = minTime;
+         if (refTime > maxTime) refTime = maxTime;
+      }
+      
+      if (!sampler.get(Nref, refTime, mDso->scale()))
+      {
+         return false;
+      }
+      sample = sampler.data();
       
       Alembic::Abc::N3fArraySamplePtr vals = sample.getVals();
       Alembic::Abc::UInt32ArraySamplePtr idxs = sample.getIndices();
@@ -1297,19 +1651,25 @@ bool MakeShape::readReferenceNormals(AlembicMesh *refMesh,
             }
          }
          
-         if (mDso->verbose())
+         // Destroy existing values
+         UserAttributes::iterator uait;
+         
+         uait = info.vertexAttrs.find(NrefName);
+         if (uait != info.vertexAttrs.end())
          {
-            if (mDso->referenceScene())
-            {
-               AiMsgInfo("[abcproc] Use reference alembic world space normals as \"Nref\"");
-            }
-            else
-            {
-               AiMsgInfo("[abcproc] Use first sample world space normals as \"Nref\"");
-            }
+            DestroyUserAttribute(uait->second);
+            info.vertexAttrs.erase(uait);
          }
          
-         UserAttribute &ua = (NrefPerPoint ? info.pointAttrs["Nref"] : info.vertexAttrs["Nref"]);
+         uait = info.pointAttrs.find(NrefName);
+         if (uait != info.pointAttrs.end())
+         {
+            DestroyUserAttribute(uait->second);
+            info.pointAttrs.erase(uait);
+         }
+         
+         // Create new reference normals attribute of the right class
+         UserAttribute &ua = (NrefPerPoint ? info.pointAttrs[NrefName] : info.vertexAttrs[NrefName]);
    
          InitUserAttribute(ua);
          
@@ -1327,100 +1687,12 @@ bool MakeShape::readReferenceNormals(AlembicMesh *refMesh,
       }
       else
       {
-         if (mDso->referenceScene())
-         {
-            AiMsgWarning("[abcproc] Cannot use reference alembic normals as \"Nref\"");
-         }
-         
          return false;
       }
    }
    else
    {
-      if (mDso->referenceScene())
-      {
-         AiMsgWarning("[abcproc] Cannot use reference alembic normals as \"Nref\"");
-      }
-      
       return false;
-   }
-}
-
-bool MakeShape::fillReferenceNormals(MeshInfo &info,
-                                     UserAttributes *pointAttrs,
-                                     UserAttributes *vertexAttrs)
-{
-   if (!pointAttrs || !vertexAttrs)
-   {
-      return false;
-   }
-   
-   bool hasNref = checkReferenceNormals(info, pointAttrs, vertexAttrs);
-   
-   return fillReferenceNormals(info, !hasNref, pointAttrs, vertexAttrs);
-}
-
-bool MakeShape::fillReferenceNormals(MeshInfo &info,
-                                     bool computeSmoothNormals,
-                                     UserAttributes *pointAttrs,
-                                     UserAttributes *vertexAttrs)
-{
-   if (!pointAttrs || !vertexAttrs)
-   {
-      return false;
-   }
-   
-   if (computeSmoothNormals)
-   {
-      if (mDso->verbose())
-      {
-         AiMsgInfo("[abcproc] Compute smooth \"Nref\" from \"Pref\"");
-      }
-      
-      UserAttribute &ua = info.pointAttrs["Nref"];
-      
-      InitUserAttribute(ua);
-               
-      ua.arnoldCategory = AI_USERDEF_VARYING;
-      ua.arnoldType = AI_TYPE_VECTOR;
-      ua.arnoldTypeStr = "VECTOR";
-      ua.isArray = true;
-      ua.dataDim = 3;
-      ua.dataCount = info.pointCount;
-      ua.data = computeMeshSmoothNormals(info, (const float*) info.pointAttrs["Pref"].data, 0, 0.0f);
-      
-      return true;
-   }
-   else
-   {
-      bool NrefPerPoint = (vertexAttrs->find("Nref") == vertexAttrs->end());
-      
-      if (NrefPerPoint)
-      {
-         if (pointAttrs != &(info.pointAttrs))
-         {
-            UserAttribute &src = (*pointAttrs)["Nref"];
-            UserAttribute &dst = info.pointAttrs["Nref"];
-            
-            dst = src;
-            
-            pointAttrs->erase(pointAttrs->find("Nref"));
-         }
-      }
-      else
-      {
-         if (vertexAttrs != &(info.vertexAttrs))
-         {
-            UserAttribute &src = (*vertexAttrs)["Nref"];
-            UserAttribute &dst = info.vertexAttrs["Nref"];
-            
-            dst = src;
-            
-            vertexAttrs->erase(vertexAttrs->find("Nref"));
-         }
-      }
-      
-      return true;
    }
 }
 
@@ -2117,63 +2389,74 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
          AiMsgInfo("[abcproc] Generate reference attributes");
       }
       
-      UserAttributes refPointAttrs;
-      UserAttributes refVertexAttrs;
-      UserAttributes *pointAttrs = &refPointAttrs;
-      UserAttributes *vertexAttrs = &refVertexAttrs;
       AlembicMesh *refMesh = 0;
       
-      bool hasPref = getReferenceMesh(node, info, refMesh, pointAttrs, vertexAttrs);
+      bool hasPref = getReferenceMesh(node, info, refMesh);
+      // Note: if hasPref is true, refMesh is null
       
-      if (refMesh)
+      if (hasPref || refMesh)
       {
-         // Generate Pref
+         // World matrix to apply to points from reference (applies to both P and N)
+         Alembic::Abc::M44d Mref;
          
-         Alembic::Abc::M44d Mref;  // World matrix to apply to points from reference (applies to both P and N)
+         // fillReferencePositions may fail if data doesn't fit
+         hasPref = fillReferencePositions(refMesh, info, Mref);
          
-         bool hadPref = hasPref;
-         
-         hasPref = fillReferencePositions(refMesh, info, pointAttrs, Mref);
+         // Now we are guarantied to have a Pref attribute in info.pointAttrs
          
          // Generate Nref
          
          if (hasPref && readNormals)
          {
-            bool hasNref = checkReferenceNormals(info, pointAttrs, vertexAttrs);
+            bool hasNref = false;
+            
+            if (refMesh)
+            {
+               hasNref = readReferenceNormals(refMesh, info, Mref);
+            }
+            else
+            {
+               hasNref = checkReferenceNormals(info);
+            }
             
             if (!hasNref)
             {
-               if (hadPref)
+               // Generate Nref from Pref
+               const std::string &NrefName = mDso->referenceNormalName();
+               const std::string &PrefName = mDso->referencePositionName();
+               
+               if (mDso->verbose())
                {
-                  // Pref coming from user defined attribute, use it to compute Nref
-                  // rather than reading a standard normal sample
+                  AiMsgInfo("[abcproc] Compute smooth \"%s\" from \"%s\"", NrefName.c_str(), PrefName.c_str());
                }
-               else
-               {
-                  hasNref = readReferenceNormals(refMesh, info, Mref);
-                  
-                  if (hasNref)
-                  {
-                     // Nref is set in info's attribute stores
-                     vertexAttrs = &(info.vertexAttrs);
-                     pointAttrs = &(info.pointAttrs);
-                  }
-               }
+               
+               UserAttribute &ua = info.pointAttrs[NrefName];
+               
+               InitUserAttribute(ua);
+                        
+               ua.arnoldCategory = AI_USERDEF_VARYING;
+               ua.arnoldType = AI_TYPE_VECTOR;
+               ua.arnoldTypeStr = "VECTOR";
+               ua.isArray = true;
+               ua.dataDim = 3;
+               ua.dataCount = info.pointCount;
+               ua.data = computeMeshSmoothNormals(info, (const float*) info.pointAttrs[PrefName].data, 0, 0.0f);
             }
-            
-            fillReferenceNormals(info, !hasNref, pointAttrs, vertexAttrs);
          }
          
          // Tref?
          // Bref?
       }
       
-      // Cleanup read reference attributes 
-      DestroyUserAttributes(refPointAttrs);
-      DestroyUserAttributes(refVertexAttrs);
+      if (!hasPref)
+      {
+         AiMsgWarning("[abcproc] Invalid reference object specification (%s).", mDso->objectPath().c_str());
+      }
    }
    
    // Output user defined attributes
+   
+   removeConflictingAttribs(mNode, &(info.objectAttrs), &(info.primitiveAttrs), &(info.pointAttrs), &(info.vertexAttrs), mDso->verbose());
    
    SetUserAttributes(mNode, info.objectAttrs, 0);
    SetUserAttributes(mNode, info.primitiveAttrs, info.polygonCount);
@@ -2319,39 +2602,79 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
          AiMsgInfo("[abcproc] Generate reference attributes");
       }
       
-      UserAttributes refPointAttrs;
-      UserAttributes refVertexAttrs;
-      UserAttributes *pointAttrs = &refPointAttrs;
-      UserAttributes *vertexAttrs = &refVertexAttrs;
       AlembicSubD *refMesh = 0;
       
-      bool hasPref = getReferenceMesh(node, info, refMesh, pointAttrs, vertexAttrs);
+      bool hasPref = getReferenceMesh(node, info, refMesh);
       
-      if (refMesh)
+      if (hasPref || refMesh)
       {
          // Generate Pref
          
-         Alembic::Abc::M44d Mref;  // World matrix to apply to points from reference (applies to both P and N)
+         // World matrix to apply to points from reference (applies to both P and N)
+         Alembic::Abc::M44d Mref;
          
-         hasPref = fillReferencePositions(refMesh, info, pointAttrs, Mref);
+         hasPref = fillReferencePositions(refMesh, info, Mref);
          
          // Generate Nref
-         
          if (hasPref && readNormals)
          {
-            fillReferenceNormals(info, pointAttrs, vertexAttrs);
+            // Check for attribute if Pref is also coming from an attribute
+            bool hasNref = (!refMesh && checkReferenceNormals(info));
+            
+            if (!hasNref)
+            {
+               // Generate Nref from Pref
+               const std::string &NrefName = mDso->referenceNormalName();
+               const std::string &PrefName = mDso->referencePositionName();
+               
+               if (mDso->verbose())
+               {
+                  AiMsgInfo("[abcproc] Compute smooth \"%s\" from \"%s\"", NrefName.c_str(), PrefName.c_str());
+               }
+               
+               UserAttributes::iterator uait;
+               
+               uait = info.vertexAttrs.find(NrefName);
+               if (uait != info.vertexAttrs.end())
+               {
+                  DestroyUserAttribute(uait->second);
+                  info.vertexAttrs.erase(uait);
+               }
+               
+               uait = info.pointAttrs.find(NrefName);
+               if (uait != info.pointAttrs.end())
+               {
+                  DestroyUserAttribute(uait->second);
+                  info.pointAttrs.erase(uait);
+               }
+               
+               UserAttribute &ua = info.pointAttrs[NrefName];
+               
+               InitUserAttribute(ua);
+                        
+               ua.arnoldCategory = AI_USERDEF_VARYING;
+               ua.arnoldType = AI_TYPE_VECTOR;
+               ua.arnoldTypeStr = "VECTOR";
+               ua.isArray = true;
+               ua.dataDim = 3;
+               ua.dataCount = info.pointCount;
+               ua.data = computeMeshSmoothNormals(info, (const float*) info.pointAttrs[PrefName].data, 0, 0.0f);
+            }
          }
          
          // Tref?
          // Bref?
       }
       
-      // Cleanup read reference attributes 
-      DestroyUserAttributes(refPointAttrs);
-      DestroyUserAttributes(refVertexAttrs);
+      if (!hasPref)
+      {
+         AiMsgWarning("[abcproc] Invalid reference object specification (%s).", mDso->objectPath().c_str());
+      }
    }
    
    // Output user defined attributes
+   
+   removeConflictingAttribs(mNode, &(info.objectAttrs), &(info.primitiveAttrs), &(info.pointAttrs), &(info.vertexAttrs), mDso->verbose());
    
    SetUserAttributes(mNode, info.objectAttrs, 0);
    SetUserAttributes(mNode, info.primitiveAttrs, info.polygonCount);
@@ -2453,23 +2776,41 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    
    // Get velocities and accelerations
    std::string vname, aname;
+   UserAttributes::iterator it= info.pointAttrs.end();
    
-   UserAttributes::iterator it = info.pointAttrs.find("velocity");
-   if (it == info.pointAttrs.end() ||
-       it->second.arnoldType != AI_TYPE_VECTOR ||
-       it->second.dataCount != info.pointCount)
+   const char *velName = mDso->velocityName();
+   if (velName)
    {
-      it = info.pointAttrs.find("vel");
-      if (it == info.pointAttrs.end() ||
-          it->second.arnoldType != AI_TYPE_VECTOR ||
-          it->second.dataCount != info.pointCount)
+      if (strcmp(velName, "<builtin>") != 0)
       {
-         it = info.pointAttrs.find("v");
+         it = info.pointAttrs.find(velName);
          if (it != info.pointAttrs.end() &&
              (it->second.arnoldType != AI_TYPE_VECTOR ||
              it->second.dataCount != info.pointCount))
          {
             it = info.pointAttrs.end();
+         }
+      }
+   }
+   else
+   {
+      it = info.pointAttrs.find("velocity");
+      if (it == info.pointAttrs.end() ||
+          it->second.arnoldType != AI_TYPE_VECTOR ||
+          it->second.dataCount != info.pointCount)
+      {
+         it = info.pointAttrs.find("vel");
+         if (it == info.pointAttrs.end() ||
+             it->second.arnoldType != AI_TYPE_VECTOR ||
+             it->second.dataCount != info.pointCount)
+         {
+            it = info.pointAttrs.find("v");
+            if (it != info.pointAttrs.end() &&
+                (it->second.arnoldType != AI_TYPE_VECTOR ||
+                it->second.dataCount != info.pointCount))
+            {
+               it = info.pointAttrs.end();
+            }
          }
       }
    }
@@ -2497,25 +2838,41 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    
    if (vel0)
    {
-      it = info.pointAttrs.find("acceleration");
-      if (it == info.pointAttrs.end() ||
-          it->second.arnoldType != AI_TYPE_VECTOR ||
-          it->second.dataCount != info.pointCount)
+      const char *accName = mDso->accelerationName();
+      
+      if (accName)
       {
-         it = info.pointAttrs.find("accel");
+         it = info.pointAttrs.find(accName);
+         if (it != info.pointAttrs.end() &&
+             (it->second.arnoldType != AI_TYPE_VECTOR ||
+              it->second.dataCount != info.pointCount))
+         {
+            it = info.pointAttrs.end();
+         }
+      }
+      else
+      {
+         it = info.pointAttrs.find("acceleration");
          if (it == info.pointAttrs.end() ||
              it->second.arnoldType != AI_TYPE_VECTOR ||
              it->second.dataCount != info.pointCount)
          {
-            it = info.pointAttrs.find("a");
-            if (it != info.pointAttrs.end() &&
-                (it->second.arnoldType != AI_TYPE_VECTOR ||
-                 it->second.dataCount != info.pointCount))
+            it = info.pointAttrs.find("accel");
+            if (it == info.pointAttrs.end() ||
+                it->second.arnoldType != AI_TYPE_VECTOR ||
+                it->second.dataCount != info.pointCount)
             {
-               it = info.pointAttrs.end();
+               it = info.pointAttrs.find("a");
+               if (it != info.pointAttrs.end() &&
+                   (it->second.arnoldType != AI_TYPE_VECTOR ||
+                    it->second.dataCount != info.pointCount))
+               {
+                  it = info.pointAttrs.end();
+               }
             }
          }
       }
+      
       if (it != info.pointAttrs.end())
       {
          aname = it->first;
@@ -2618,6 +2975,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
             {
                // Note: a * samp0->time() + b * samp1->time() == renderTime
                double dt = t - mDso->renderTime();
+               dt *= mDso->velocityScale();
                
                size_t off = idit->second * 3;
                
@@ -2648,6 +3006,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
             if (vel0)
             {
                double dt = t - samp0->time();
+               dt *= mDso->velocityScale();
                
                pnt.x += dt * vel0[voff  ];
                pnt.y += dt * vel0[voff+1];
@@ -2680,6 +3039,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
          if (vel1)
          {
             double dt = t - samp1->time();
+            dt *= mDso->velocityScale();
             
             unsigned int voff = 3 * it->second.first;
             
@@ -2714,51 +3074,35 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    // give priority to user defined 'radius' 
    bool radiusSet = false;
    
+   const char *radiusName = mDso->radiusName();
+   bool checkAltName = false;
+   
+   if (radiusName == 0)
+   {
+      radiusName = "radius";
+   }
+   
    Alembic::AbcGeom::IFloatGeomParam widths = schema.getWidthsParam();
    if (widths.valid())
    {
       // Convert to point attribute 'radius'
       
-      if (info.pointAttrs.find("radius") != info.pointAttrs.end())
+      if (info.pointAttrs.find(radiusName) != info.pointAttrs.end() && !mDso->isPromotedToObjectAttrib(radiusName))
       {
          if (mDso->verbose())
          {
-            AiMsgInfo("[abcproc] Ignore alembic \"widths\" property: \"radius\" attribute set");
+            AiMsgInfo("[abcproc] Ignore alembic \"widths\" property: use \"%s\" attribute instead.", radiusName);
          }
       }
-      else if (info.pointAttrs.find("size") != info.pointAttrs.end())
+      else if (checkAltName && info.pointAttrs.find("size") != info.pointAttrs.end() && !mDso->isPromotedToObjectAttrib("size"))
       {
          if (mDso->verbose())
          {
-            AiMsgInfo("[abcproc] Ignore alembic \"widths\" property: \"size\" attribute set");
+            AiMsgInfo("[abcproc] Ignore alembic \"widths\" property: use \"size\" attribute instead.");
          }
       }
       else
       {
-         UserAttributes::iterator it = info.objectAttrs.find("radius");
-         
-         if (it != info.objectAttrs.end())
-         {
-            if (mDso->verbose())
-            {
-               AiMsgInfo("[abcproc] Ignore \"radius\" object attribute");
-            }
-            DestroyUserAttribute(it->second);
-            info.objectAttrs.erase(it);
-         }
-         
-         it = info.objectAttrs.find("size");
-         
-         if (it != info.objectAttrs.end())
-         {
-            if (mDso->verbose())
-            {
-               AiMsgInfo("[abcproc] Ignore \"size\" object attribute");
-            }
-            DestroyUserAttribute(it->second);
-            info.objectAttrs.erase(it);
-         }
-         
          TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> wsamples;
          TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator wsamp0, wsamp1;
          
@@ -2899,32 +3243,69 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    {
       UserAttribute *ra = 0;
       UserAttributes *attrs = 0;
+      float constantRadius = -1.0f;
       
-      UserAttributes::iterator ait = info.pointAttrs.find("radius");
-      
-      if (ait == info.pointAttrs.end())
-      {
-         ait = info.pointAttrs.find("size");
-      }
+      UserAttributes::iterator ait = info.pointAttrs.find(radiusName);
       
       if (ait != info.pointAttrs.end())
       {
-         ra = &(ait->second);
-         attrs = &(info.pointAttrs);
-      }
-      else
-      {
-         ait = info.objectAttrs.find("radius");
-         
-         if (ait == info.objectAttrs.end())
+         if (mDso->isPromotedToObjectAttrib(radiusName))
          {
-            ait = info.objectAttrs.find("size");
+            if (ait->second.dataCount >= 1)
+            {
+               constantRadius = *((const float*) ait->second.data);
+            }
+            DestroyUserAttribute(ait->second);
+            info.pointAttrs.erase(ait);
          }
+         else
+         {
+            ra = &(ait->second);
+            attrs = &(info.pointAttrs);
+         }
+      }
+      
+      if (!ra && checkAltName)
+      {
+         ait = info.pointAttrs.find("size");
+         
+         if (ait != info.pointAttrs.end())
+         {
+            if (mDso->isPromotedToObjectAttrib("size"))
+            {
+               if (ait->second.dataCount >= 1 && constantRadius < 0.0f)
+               {
+                  constantRadius = *((const float*) ait->second.data);
+               }
+               DestroyUserAttribute(ait->second);
+               info.pointAttrs.erase(ait);
+            }
+            else
+            {
+               ra = &(ait->second);
+               attrs = &(info.pointAttrs);
+            }
+         }
+      }
+      
+      if (!ra && constantRadius < 0.0f)
+      {
+         ait = info.objectAttrs.find(radiusName);
          
          if (ait != info.objectAttrs.end())
          {
             ra = &(ait->second);
             attrs = &(info.objectAttrs);
+         }
+         else if (checkAltName)
+         {
+            ait = info.objectAttrs.find("size");
+            
+            if (ait != info.objectAttrs.end())
+            {
+               ra = &(ait->second);
+               attrs = &(info.objectAttrs);
+            }
          }
       }
       
@@ -2936,7 +3317,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
          {
             for (unsigned int j=0; j<ra->dataDim; ++j, ++r)
             {
-               *r = adjustRadius(*r);
+               *r = adjustRadius(mDso->scale() * *r);
             }
          }
          
@@ -2949,20 +3330,29 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
       }
       else
       {
-         AiMsgInfo("[abcproc] No radius set for points in alembic archive. Create particles with constant radius %lf (can be changed using dso '-radiusmin' data flag or 'abc_radiusmin' user attribute)", mDso->radiusMin());
-         
          AtArray *radius = AiArrayAllocate(1, 1, AI_TYPE_FLOAT);
-         AiArraySetFlt(radius, 0, mDso->radiusMin());
+         
+         if (constantRadius < 0.0f)
+         {
+            AiMsgInfo("[abcproc] No radius set for points in alembic archive. Create particles with constant radius %lf (can be changed using dso '-radiusmin' data flag or 'abc_radiusmin' user attribute)", mDso->radiusMin());
+            AiArraySetFlt(radius, 0, mDso->radiusMin());
+         }
+         else
+         {
+            AiArraySetFlt(radius, 0, adjustRadius(mDso->scale() * constantRadius));
+         }
          
          AiNodeSetArray(mNode, "radius", radius);
       }
    }
    
    // Note: arnold want particle point attributes as uniform attributes, not varying
-   for (UserAttributes::iterator it = info.pointAttrs.begin(); it != info.pointAttrs.end(); ++it)
+   for (it = info.pointAttrs.begin(); it != info.pointAttrs.end(); ++it)
    {
       it->second.arnoldCategory = AI_USERDEF_UNIFORM;
    }
+   
+   removeConflictingAttribs(mNode, &(info.objectAttrs), 0, &(info.pointAttrs), 0, mDso->verbose());
    
    SetUserAttributes(mNode, info.objectAttrs, 0);
    SetUserAttributes(mNode, info.pointAttrs, info.pointCount);
@@ -2976,62 +3366,40 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
 
 bool MakeShape::getReferenceCurves(AlembicCurves &node,
                                    CurvesInfo &info,
-                                   AlembicCurves* &refCurves,
-                                   UserAttributes* &pointAttrs)
+                                   AlembicCurves* &refCurves)
 {
-   if (!pointAttrs)
-   {
-      // pointAttrs must be set
-      refCurves = 0;
-      return false;
-   }
-   
-   if (pointAttrs == &(info.pointAttrs))
-   {
-      // pointAttrs should point to attribute storage other than current scene's one
-      refCurves = 0;
-      return false;
-   }
-   
-   // Priority
-   //   1/ "Pref" attribute in current alembic scene
-   //   2/ "Pref" attribute in reference alembic scene
-   //   3/ Positions from reference alembic scene
-   //   4/ Positions from current alembic scene's first frame
-   
-   UserAttributes::iterator uait;
+   ReferenceSource refSrc = mDso->referenceSource();
    bool hasPref = false;
+   const std::string &PrefName = mDso->referencePositionName();
    
-   uait = info.pointAttrs.find("Pref");
-   
-   if (uait != info.pointAttrs.end())
+   if (refSrc == RS_attributes || refSrc == RS_attributes_then_file)
    {
-      if (isVaryingFloat3(info, uait->second))
+      UserAttributes::iterator uait;
+      
+      uait = info.pointAttrs.find(PrefName);
+      
+      if (uait != info.pointAttrs.end())
       {
-         if (mDso->verbose())
+         if (isVaryingFloat3(info, uait->second))
          {
-            AiMsgInfo("[abcproc] Using 'Pref' attribute found in alembic file");
+            hasPref = true;
          }
-         
-         hasPref = true;
-      }
-      else
-      {
-         if (mDso->verbose())
+         else
          {
-            AiMsgInfo("[abcproc] Ignore 'Pref' attribute found in alembic file");
+            // Pref exists but doesn't match requirements, get rid of it
+            DestroyUserAttribute(uait->second);
+            info.pointAttrs.erase(uait);
          }
-         
-         // Pref exists but doesn't match requirements, get rid of it
-         DestroyUserAttribute(uait->second);
-         info.pointAttrs.erase(uait);
       }
    }
    
    if (hasPref)
    {
+      refCurves = 0;
+   }
+   else if (refSrc == RS_frame)
+   {
       refCurves = &node;
-      pointAttrs = &(info.pointAttrs);
    }
    else
    {
@@ -3039,13 +3407,7 @@ bool MakeShape::getReferenceCurves(AlembicCurves &node,
       
       if (!refScene)
       {
-         if (mDso->verbose())
-         {
-            AiMsgInfo("[abcproc] Using current alembic scene first sample as reference.");
-         }
-         
-         refCurves = &node;
-         pointAttrs = &(info.pointAttrs);
+         refCurves = 0;
       }
       else
       {
@@ -3054,49 +3416,10 @@ bool MakeShape::getReferenceCurves(AlembicCurves &node,
          if (refNode)
          {
             refCurves = dynamic_cast<AlembicCurves*>(refNode);
-            
-            if (!refCurves)
-            {
-               AiMsgWarning("[abcproc] Node in reference alembic doesn't have the same type. Using current alembic scene first sample as reference");
-               
-               refCurves = &node;
-               pointAttrs = &(info.pointAttrs);
-            }
-            else
-            {
-               Alembic::AbcGeom::ICurvesSchema schema = refCurves->typedObject().getSchema();
-               
-               double reftime = schema.getTimeSampling()->getSampleTime(0);
-               
-               collectUserAttributes(schema.getUserProperties(),
-                                     schema.getArbGeomParams(),
-                                     reftime, false,
-                                     0, 0, pointAttrs, 0, 0,
-                                     FilterReferenceAttributes);
-               
-               uait = pointAttrs->find("Pref");
-               
-               if (uait != pointAttrs->end())
-               {
-                  if (isVaryingFloat3(info, uait->second))
-                  {
-                     hasPref = true;
-                  }
-                  else
-                  {
-                     // Pref exists but doesn't match requirements, get rid of it
-                     DestroyUserAttribute(uait->second);
-                     pointAttrs->erase(uait);
-                  }
-               }
-            }
          }
          else
          {
-            AiMsgWarning("[abcproc] Couldn't find node in reference alembic scene. Using current alembic scene first sample as reference");
-            
-            refCurves = &node;
-            pointAttrs = &(info.pointAttrs);
+            refCurves = 0;
          }
       }
    }
@@ -3624,49 +3947,32 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
 
 bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
                                        CurvesInfo &info,
-                                       UserAttributes *pointAttrs)
+                                       Alembic::Abc::Int32ArraySamplePtr Nv,
+                                       Alembic::Abc::FloatArraySamplePtr W,
+                                       Alembic::Abc::FloatArraySamplePtr K)
 {
-   if (!refCurves || !pointAttrs)
-   {
-      return false;
-   }
-   
-   Alembic::AbcGeom::ICurvesSchema schema = refCurves->typedObject().getSchema();
-         
-   Alembic::AbcGeom::ICurvesSchema::Sample sample = schema.getValue();
-   
-   Alembic::Abc::P3fArraySamplePtr Pref = sample.getPositions();
+   const std::string &PrefName = mDso->referencePositionName();
       
-   bool hasPref = (pointAttrs->find("Pref") != pointAttrs->end());
+   bool hasPref = false;
    
-   if (hasPref)
+   if (!refCurves)
    {
-      if (pointAttrs != &(info.pointAttrs))
+      UserAttributes::iterator uait = info.pointAttrs.find(PrefName);
+      hasPref = (uait != info.pointAttrs.end());
+      
+      if (!hasPref)
       {
-         bool destroyDst = (info.pointAttrs.find("Pref") != info.pointAttrs.end());
-         
-         // Transfer from reference shape attributes to current shape attribtues
-         UserAttribute &src = (*pointAttrs)["Pref"];
-         UserAttribute &dst = info.pointAttrs["Pref"];
-         
-         if (destroyDst)
-         {
-            DestroyUserAttribute(dst);
-         }
-         
-         dst = src;
-         
-         pointAttrs->erase(pointAttrs->find("Pref"));
+         return false;
       }
       
-      UserAttribute &ua = info.pointAttrs["Pref"];
+      UserAttribute &ua = uait->second;
       
       unsigned int count = (info.nurbs ? info.cvCount : info.pointCount);
       
       // Little type aliasing: float[1][3n] -> float[3][n]
       if (ua.dataDim == 1 && ua.dataCount == (3 * count))
       {
-         AiMsgWarning("[abcproc] \"Pref\" exported with wrong base type: float instead if float[3]");
+         AiMsgWarning("[abcproc] \"%s\" exported with wrong base type: float instead if float[3]", PrefName.c_str());
          
          ua.dataDim = 3;
          ua.dataCount = count;
@@ -3677,38 +3983,28 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
       // Check valid point count
       if (ua.dataCount != count || ua.dataDim != 3)
       {
-         AiMsgWarning("[abcproc] \"Pref\" exported with incompatible size and/or dimension");
+         AiMsgWarning("[abcproc] \"%s\" exported with incompatible size and/or dimension", PrefName.c_str());
          
          DestroyUserAttribute(ua);
-         info.pointAttrs.erase(info.pointAttrs.find("Pref"));
+         info.pointAttrs.erase(info.pointAttrs.find(PrefName));
          return false;
       }
       
       if (info.nurbs)
       {
-         Alembic::Abc::Int32ArraySamplePtr Nv = sample.getCurvesNumVertices();
-         
-         if (Nv->size() != info.curveCount)
+         if (!Nv || Nv->size() != info.curveCount)
          {
-            AiMsgWarning("[abcproc] Incompatible curve count in reference object");
-            
             DestroyUserAttribute(ua);
-            info.pointAttrs.erase(info.pointAttrs.find("Pref"));
+            info.pointAttrs.erase(info.pointAttrs.find(PrefName));
             return false;
          }
          
-         if (Pref->size() != count)
+         if (!W || W->size() != count)
          {
-            AiMsgWarning("[abcproc] Incompatible point count in reference object");
-            
             DestroyUserAttribute(ua);
-            info.pointAttrs.erase(info.pointAttrs.find("Pref"));
+            info.pointAttrs.erase(info.pointAttrs.find(PrefName));
             return false;
          }
-         
-         Alembic::Abc::FloatArraySamplePtr W = sample.getPositionWeights();
-         Alembic::Abc::FloatArraySamplePtr K;
-         schema.getKnotsProperty().get(K);
          
          NURBS<3> curve;
          NURBS<3>::CV cv;
@@ -3780,17 +4076,54 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
          ua.dataCount = info.pointCount;
       }
       
-      if (mDso->referenceScene())
+      if (mDso->verbose())
       {
-         AiMsgWarning("[abcproc] \"Pref\" read from user attribute, ignore values from reference alembic");
-      }
-      else if (mDso->verbose())
-      {
-         AiMsgInfo("[abcproc] \"Pref\" read from user attribute");
+         AiMsgInfo("[abcproc] Read reference positions from user attribute \"%s\".", PrefName.c_str());
       }
    }
    else
    {
+      TimeSample<Alembic::AbcGeom::ICurvesSchema> sampler;
+      Alembic::AbcGeom::ICurvesSchema schema = refCurves->typedObject().getSchema();
+      Alembic::AbcGeom::ICurvesSchema::Sample sample;
+      
+      size_t n = schema.getNumSamples();
+      
+      if (n == 0)
+      {
+         return false;
+      }
+      
+      double minTime = schema.getTimeSampling()->getSampleTime(0);
+      double maxTime = schema.getTimeSampling()->getSampleTime(n-1);
+      double refTime = minTime;
+      
+      if (mDso->referenceSource() == RS_frame)
+      {
+         refTime = mDso->referenceFrame() / mDso->fps();
+         if (refTime < minTime) refTime = minTime;
+         if (refTime > maxTime) refTime = maxTime;
+         
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Read reference positions from user frame %f.", mDso->referenceFrame());
+         }
+      }
+      else
+      {
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Read reference positions from separate file.");
+         }
+      }
+      
+      if (!sampler.get(schema, refTime, mDso->scale()))
+      {
+         return false;
+      }
+      sample = sampler.data();
+      
+      Alembic::Abc::P3fArraySamplePtr Pref = sample.getPositions();
       Alembic::Abc::Int32ArraySamplePtr Nv = sample.getCurvesNumVertices();
       
       if (Nv->size() == info.curveCount &&
@@ -3800,55 +4133,29 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
          
          Alembic::Abc::M44d Mref;
          
-         const AtUserParamEntry *upe = AiNodeLookUpUserParameter(mDso->procNode(), "Mref");
-         
-         if (upe != 0 &&
-             AiUserParamGetCategory(upe) == AI_USERDEF_CONSTANT &&
-             AiUserParamGetType(upe) == AI_TYPE_MATRIX)
+         // recompute matrix
+         if (mDso->verbose())
          {
-            if (mDso->verbose())
-            {
-               AiMsgInfo("[abcproc] Using provided Mref");
-            }
-         
-            AtMatrix mtx;
-         
-            AiNodeGetMatrix(mDso->procNode(), "Mref", mtx);
-         
-            for (int r=0; r<4; ++r)
-            {
-               for (int c=0; c<4; ++c)
-               {
-                  Mref[r][c] = mtx[r][c];
-               }
-            }
+            AiMsgInfo("[abcproc] Compute reference world matrix");
          }
-         else
+      
+         AlembicXform *refParent = dynamic_cast<AlembicXform*>(refCurves->parent());
+      
+         while (refParent)
          {
-            // recompute matrix
-            if (mDso->verbose())
+            Alembic::AbcGeom::IXformSchema xformSchema = refParent->typedObject().getSchema();
+         
+            Alembic::AbcGeom::XformSample xformSample = xformSchema.getValue();
+         
+            Mref = Mref * xformSample.getMatrix();
+         
+            if (xformSchema.getInheritsXforms())
             {
-               AiMsgInfo("[abcproc] Compute reference world matrix Mref");
+               refParent = dynamic_cast<AlembicXform*>(refParent->parent());
             }
-         
-            AlembicXform *refParent = dynamic_cast<AlembicXform*>(refCurves->parent());
-         
-            while (refParent)
+            else
             {
-               Alembic::AbcGeom::IXformSchema xformSchema = refParent->typedObject().getSchema();
-            
-               Alembic::AbcGeom::XformSample xformSample = xformSchema.getValue();
-            
-               Mref = Mref * xformSample.getMatrix();
-            
-               if (xformSchema.getInheritsXforms())
-               {
-                  refParent = dynamic_cast<AlembicXform*>(refParent->parent());
-               }
-               else
-               {
-                  refParent = 0;
-               }
+               refParent = 0;
             }
          }
          
@@ -3936,7 +4243,7 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
             }
          }
          
-         UserAttribute &ua = info.pointAttrs["Pref"];
+         UserAttribute &ua = info.pointAttrs[PrefName];
          
          InitUserAttribute(ua);
          
@@ -3952,7 +4259,7 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
       }
       else
       {
-         AiMsgWarning("[abcproc] Could not generate \"Pref\" for curves \"%s\"", refCurves->path().c_str());
+         AiMsgWarning("[abcproc] Could not generate \"%s\" for curves \"%s\"", PrefName.c_str(), refCurves->path().c_str());
       }
    }
    
@@ -4116,15 +4423,35 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
             // Get velocity
             
             const float *vel = 0;
+            const char *velName = mDso->velocityName();
+            UserAttributes::iterator it = info.pointAttrs.end();
             
-            UserAttributes::iterator it = info.pointAttrs.find("velocity");
-            
-            if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
+            if (velName)
             {
-               it = info.pointAttrs.find("v");
-               if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+               if (strcmp(velName, "<builtin>") != 0)
                {
-                  it = info.pointAttrs.end();
+                  it = info.pointAttrs.find(velName);
+                  if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+                  {
+                     it = info.pointAttrs.end();
+                  }
+               }
+            }
+            
+            if (it != info.pointAttrs.end())
+            {
+               it = info.pointAttrs.find("velocity");
+               if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
+               {
+                  it = info.pointAttrs.find("vel");
+                  if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
+                  {
+                     it = info.pointAttrs.find("v");
+                     if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+                     {
+                        it = info.pointAttrs.end();
+                     }
+                  }
                }
             }
             
@@ -4155,17 +4482,30 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
             
             if (vel)
             {
-               UserAttributes::iterator it = info.pointAttrs.find("acceleration");
+               const char *accName = mDso->accelerationName();
+               UserAttributes::iterator it = info.pointAttrs.end();
                
-               if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
+               if (accName)
                {
-                  it = info.pointAttrs.find("accel");
+                  it = info.pointAttrs.find(accName);
+                  if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+                  {
+                     it = info.pointAttrs.end();
+                  }
+               }
+               else
+               {
+                  it = info.pointAttrs.find("acceleration");
                   if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
                   {
-                     it = info.pointAttrs.find("a");
-                     if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+                     it = info.pointAttrs.find("accel");
+                     if (it == info.pointAttrs.end() || !isVaryingFloat3(info, it->second))
                      {
-                        it = info.pointAttrs.end();
+                        it = info.pointAttrs.find("a");
+                        if (it != info.pointAttrs.end() && !isVaryingFloat3(info, it->second))
+                        {
+                           it = info.pointAttrs.end();
+                        }
                      }
                   }
                }
@@ -4185,6 +4525,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
                for (size_t i=0, j=0; i<mDso->numMotionSamples(); ++i)
                {
                   t = mDso->motionSampleTime(i) - mDso->renderTime();
+                  t *= mDso->velocityScale();
                   
                   if (!fillCurvesPositions(info, i, mDso->numMotionSamples(), Nv, P0, W0, P1, W1, vel, acc, t, K, num_points, points))
                   {
@@ -4339,7 +4680,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
                      float w0 = W0->get()[wi];
                      float w1 = W1->get()[wi];
                      
-                     AiArraySetFlt(radius, po + pi, adjustRadius(0.5f * (a * w0 + b * w1)));
+                     AiArraySetFlt(radius, po + pi, 0.5f * adjustWidth((a * w0 + b * w1)));
                   }
                }
             }
@@ -4353,7 +4694,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
                   {
                      unsigned int wi = (Wcount == 1 ? 0 : (Wcount == info.curveCount ? ci : pi));
                      
-                     AiArraySetFlt(radius, po + pi, adjustRadius(0.5f * W0->get()[wi]));
+                     AiArraySetFlt(radius, po + pi, 0.5f * adjustWidth(W0->get()[wi]));
                   }
                }
             }
@@ -4385,7 +4726,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
                {
                   unsigned int wi = (Wcount == 1 ? 0 : (Wcount == info.curveCount ? ci : pi));
                   
-                  AiArraySetFlt(radius, pi, adjustRadius(0.5f * W0->get()[wi]));
+                  AiArraySetFlt(radius, pi, 0.5f * adjustWidth(W0->get()[wi]));
                }
             }
          }
@@ -4394,15 +4735,13 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
    
    if (!radius)
    {
-      AiMsgWarning("[abcproc] Defaulting curve radius to 0.01");
-      
-      float defaultWidth = 0.01f; // maybe an other option for this
+      AiMsgWarning("[abcproc] Defaulting curve width to minimum width (use -widthmin parameter to override)");
       
       radius = AiArrayAllocate(info.pointCount, 1, AI_TYPE_FLOAT);
       
       for (unsigned int i=0; i<info.pointCount; ++i)
       {
-         AiArraySetFlt(radius, i, adjustRadius(0.5f * defaultWidth));
+         AiArraySetFlt(radius, i, 0.5f * mDso->widthMin());
       }
    }
    
@@ -4604,23 +4943,22 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
          AiMsgInfo("[abcproc] Generate reference attributes");
       }
       
-      UserAttributes refPointAttrs;
-      UserAttributes *pointAttrs = &refPointAttrs;
       AlembicCurves *refCurves = 0;
       
-      getReferenceCurves(node, info, refCurves, pointAttrs);
+      bool hasPref = getReferenceCurves(node, info, refCurves);
       
-      if (refCurves)
+      if (hasPref || refCurves)
       {
-         fillReferencePositions(refCurves, info, pointAttrs);
-      }
-      else
-      {
-         AiMsgWarning("[abcproc] No valid reference curve found");
+         hasPref = fillReferencePositions(refCurves, info, Nv, W0, K);
       }
       
-      DestroyUserAttributes(refPointAttrs);
+      if (!hasPref)
+      {
+         AiMsgWarning("[abcproc] Invalid reference object specification (%s).", mDso->objectPath().c_str());
+      }
    }
+   
+   removeConflictingAttribs(mNode, &(info.objectAttrs), &(info.primitiveAttrs), &(info.pointAttrs), 0, mDso->verbose());
    
    SetUserAttributes(mNode, info.objectAttrs, 0);
    SetUserAttributes(mNode, info.primitiveAttrs, info.curveCount);

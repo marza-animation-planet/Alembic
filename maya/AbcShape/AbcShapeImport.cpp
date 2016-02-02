@@ -343,6 +343,7 @@ public:
    const MDagPath& getDag(const std::string &path) const;
    
    void keyTransforms(const MString &defaultRotationInterpolation, const MStringDict &nodeRotationInterpolation);
+   void keyVisibility(Alembic::AbcGeom::IObject iobj, MFnDependencyNode &fn);
    
 private:
 
@@ -683,6 +684,9 @@ AlembicNode::VisitReturn CreateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
       dgmod.doIt();
    }
    
+   // also key shape level visibilty
+   keyVisibility(node.object(), dagNode);
+   
    addUserProps(node, instance);
    
    return AlembicNode::ContinueVisit;
@@ -847,6 +851,118 @@ void CreateTree::getTransformAtTime(AlembicXform *node, double t, bool worldSpac
       else
       {
          outM = M;
+      }
+   }
+}
+
+void CreateTree::keyVisibility(Alembic::AbcGeom::IObject iobj, MFnDependencyNode &fn)
+{
+   Alembic::Abc::ICompoundProperty props = iobj.getProperties();
+
+   if (props.valid())
+   {
+      const Alembic::Abc::PropertyHeader *header = props.getPropertyHeader("visible");
+      
+      if (header)
+      {
+         MObject mobj = fn.object();
+         
+         if (Alembic::Abc::ICharProperty::matches(*header))
+         {
+            MPlug pVis = fn.findPlug("visibility");
+            
+            Alembic::Abc::ICharProperty prop(props, "visible");
+            Alembic::Util::int8_t v = 1;
+            
+            prop.get(v);
+            pVis.setBool(v != 0);
+               
+            if (!prop.isConstant() && fabs(mSpeed) > 0.0001)
+            {
+               Alembic::AbcCoreAbstract::TimeSamplingPtr ts = prop.getTimeSampling();
+               
+               size_t numSamples = prop.getNumSamples();
+               
+               double invSpeed = 1.0 / mSpeed;
+               double secStart = ts->getSampleTime(0);
+               double secEnd = ts->getSampleTime(numSamples-1);
+               double secOffset = MTime(mOffset, MTime::uiUnit()).as(MTime::kSeconds);
+               
+               double offset = secOffset;
+               if (mPreserveStartFrame)
+               {
+                  offset += secStart * (mSpeed - 1.0) * invSpeed;
+               }
+               
+               for (size_t i=0; i<numSamples; ++i)
+               {
+                  Alembic::AbcCoreAbstract::index_t idx = i;
+                  
+                  double t = ts->getSampleTime(idx);
+                  if (mCycleType == AbcShape::CT_reverse)
+                  {
+                     t = secEnd - (t - secStart);
+                  }
+                  t = offset + invSpeed * t;
+                  
+                  prop.get(v, Alembic::Abc::ISampleSelector(idx));
+                  
+                  mKeyframer.setCurrentTime(t);
+                  mKeyframer.addVisibilityKey(mobj, v != 0);
+               }
+               
+               mKeyframer.addCurvesImportInfo(mobj, "visibility", mSpeed, secOffset, secStart, secEnd,
+                                              (mCycleType == AbcShape::CT_reverse), mPreserveStartFrame);
+            }
+         }
+         else if (Alembic::Abc::IBoolProperty::matches(*header))
+         {
+            MPlug pVis = fn.findPlug("visibility");
+            
+            Alembic::Abc::IBoolProperty prop(props, "visible");
+            Alembic::Util::bool_t v = true;
+            
+            prop.get(v);
+            pVis.setBool(v);
+               
+            if (!prop.isConstant() && fabs(mSpeed) > 0.0001)
+            {
+               Alembic::AbcCoreAbstract::TimeSamplingPtr ts = prop.getTimeSampling();
+               
+               size_t numSamples = prop.getNumSamples();
+               
+               double invSpeed = 1.0 / mSpeed;
+               double secStart = ts->getSampleTime(0);
+               double secEnd = ts->getSampleTime(numSamples-1);
+               double secOffset = MTime(mOffset, MTime::uiUnit()).as(MTime::kSeconds);
+               
+               double offset = secOffset;
+               if (mPreserveStartFrame)
+               {
+                  offset += secStart * (mSpeed - 1.0) * invSpeed;
+               }
+               
+               for (size_t i=0; i<numSamples; ++i)
+               {
+                  Alembic::AbcCoreAbstract::index_t idx = i;
+                  
+                  double t = ts->getSampleTime(idx);
+                  if (mCycleType == AbcShape::CT_reverse)
+                  {
+                     t = secEnd - (t - secStart);
+                  }
+                  t = offset + invSpeed * t;
+                  
+                  prop.get(v, Alembic::Abc::ISampleSelector(idx));
+                  
+                  mKeyframer.setCurrentTime(t);
+                  mKeyframer.addVisibilityKey(mobj, v);
+               }
+               
+               mKeyframer.addCurvesImportInfo(mobj, "visibility", mSpeed, secOffset, secStart, secEnd,
+                                              (mCycleType == AbcShape::CT_reverse), mPreserveStartFrame);
+            }
+         }
       }
    }
 }
@@ -1091,112 +1207,7 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
          // Leave transform to identity (AbcShape will handle it)
       }
       
-      Alembic::Abc::ICompoundProperty props = node.object().getProperties();
-   
-      if (props.valid())
-      {
-         const Alembic::Abc::PropertyHeader *header = props.getPropertyHeader("visible");
-         
-         if (header)
-         {
-            if (Alembic::Abc::ICharProperty::matches(*header))
-            {
-               MPlug pVis = xform.findPlug("visibility");
-               
-               Alembic::Abc::ICharProperty prop(props, "visible");
-               Alembic::Util::int8_t v = 1;
-               
-               prop.get(v);
-               pVis.setBool(v != 0);
-                  
-               if (!prop.isConstant() && fabs(mSpeed) > 0.0001)
-               {
-                  Alembic::AbcCoreAbstract::TimeSamplingPtr ts = prop.getTimeSampling();
-                  
-                  size_t numSamples = prop.getNumSamples();
-                  
-                  double invSpeed = 1.0 / mSpeed;
-                  double secStart = ts->getSampleTime(0);
-                  double secEnd = ts->getSampleTime(numSamples-1);
-                  double secOffset = MTime(mOffset, MTime::uiUnit()).as(MTime::kSeconds);
-                  
-                  double offset = secOffset;
-                  if (mPreserveStartFrame)
-                  {
-                     offset += secStart * (mSpeed - 1.0) * invSpeed;
-                  }
-                  
-                  for (size_t i=0; i<numSamples; ++i)
-                  {
-                     Alembic::AbcCoreAbstract::index_t idx = i;
-                     
-                     double t = ts->getSampleTime(idx);
-                     if (mCycleType == AbcShape::CT_reverse)
-                     {
-                        t = secEnd - (t - secStart);
-                     }
-                     t = offset + invSpeed * t;
-                     
-                     prop.get(v, Alembic::Abc::ISampleSelector(idx));
-                     
-                     mKeyframer.setCurrentTime(t);
-                     mKeyframer.addVisibilityKey(xformObj, v != 0);
-                  }
-                  
-                  mKeyframer.addCurvesImportInfo(xformObj, "visibility", mSpeed, secOffset, secStart, secEnd,
-                                                 (mCycleType == AbcShape::CT_reverse), mPreserveStartFrame);
-               }
-            }
-            else if (Alembic::Abc::IBoolProperty::matches(*header))
-            {
-               MPlug pVis = xform.findPlug("visibility");
-               
-               Alembic::Abc::IBoolProperty prop(props, "visible");
-               Alembic::Util::bool_t v = true;
-               
-               prop.get(v);
-               pVis.setBool(v);
-                  
-               if (!prop.isConstant() && fabs(mSpeed) > 0.0001)
-               {
-                  Alembic::AbcCoreAbstract::TimeSamplingPtr ts = prop.getTimeSampling();
-                  
-                  size_t numSamples = prop.getNumSamples();
-                  
-                  double invSpeed = 1.0 / mSpeed;
-                  double secStart = ts->getSampleTime(0);
-                  double secEnd = ts->getSampleTime(numSamples-1);
-                  double secOffset = MTime(mOffset, MTime::uiUnit()).as(MTime::kSeconds);
-                  
-                  double offset = secOffset;
-                  if (mPreserveStartFrame)
-                  {
-                     offset += secStart * (mSpeed - 1.0) * invSpeed;
-                  }
-                  
-                  for (size_t i=0; i<numSamples; ++i)
-                  {
-                     Alembic::AbcCoreAbstract::index_t idx = i;
-                     
-                     double t = ts->getSampleTime(idx);
-                     if (mCycleType == AbcShape::CT_reverse)
-                     {
-                        t = secEnd - (t - secStart);
-                     }
-                     t = offset + invSpeed * t;
-                     
-                     prop.get(v, Alembic::Abc::ISampleSelector(idx));
-                     
-                     mKeyframer.setCurrentTime(t);
-                     mKeyframer.addVisibilityKey(xformObj, v);
-                  }
-                  
-                  mKeyframer.addCurvesImportInfo(xformObj, "visibility", mSpeed, secOffset, secStart, secEnd,
-                                                 (mCycleType == AbcShape::CT_reverse), mPreserveStartFrame);
-               }
-            }
-         }
-      }
+      keyVisibility(node.object(), xform);
    }
    
    addUserProps(node, instance);

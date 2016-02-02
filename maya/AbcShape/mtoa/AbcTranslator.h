@@ -10,6 +10,7 @@
 
 #include "translators/shape/ShapeTranslator.h"
 #include "extension/Extension.h"
+#include "AlembicSceneCache.h"
 #include <maya/MDagPath.h>
 #include <maya/MPlug.h>
 
@@ -56,10 +57,32 @@ private:
    MString ToString(int val);
 
    bool HasParameter(const AtNodeEntry *anodeEntry, const char *param, AtNode *anode=NULL, const char *decl=NULL);
+   
+   void ReadAlembicAttributes();
+   bool ReadFloat3Attribute(Alembic::Abc::ICompoundProperty props, const std::string &name, bool geoParam, float scale, AtPoint &out);
+   bool ReadFloatAttribute(Alembic::Abc::ICompoundProperty props, const std::string &name, bool geoParam, float scale, float &out);
 
 private:
 
    bool m_motionBlur;
+   std::string m_abcPath;
+   std::string m_objPath;
+   bool m_overrideBounds;
+   bool m_boundsOverridden;
+   double m_renderTime;
+   std::string m_overrideBoundsMin;
+   std::string m_overrideBoundsMax;
+   AtPoint m_min;
+   AtPoint m_max;
+   AlembicScene *m_scene;
+   bool m_padBoundsWithPeakRadius;
+   std::string m_peakRadius;
+   float m_radiusSclMinMax[3];
+   bool m_padBoundsWithPeakWidth;
+   std::string m_peakWidth;
+   float m_widthSclMinMax[3];
+   float m_peakPadding;
+   std::string m_promoteToObjAttr;
 };
 
 #endif

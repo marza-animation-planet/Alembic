@@ -100,6 +100,7 @@ public:
     static MObject aAnimated;
     static MObject aUvSetCount;
     static MObject aScale;
+    static MObject aOutSampleTime;
     
 #ifdef ABCSHAPE_VRAY_SUPPORT
     // V-Ray specific attributes
@@ -143,7 +144,8 @@ public:
         CT_hold = 0,
         CT_loop,
         CT_reverse,
-        CT_bounce
+        CT_bounce,
+        CT_clip
     };
     
     enum DisplayMode
@@ -189,6 +191,7 @@ public:
     inline bool drawLocators() const { return mDrawLocators; }
     inline unsigned int numShapes() const { return mNumShapes; }
     inline bool isAnimated() const { return mAnimated; }
+    inline bool isClipped() const { return mClipped; }
     
     bool ignoreCulling() const;
     
@@ -198,8 +201,8 @@ private:
     
     double getFPS() const;
     double computeAdjustedTime(double inputTime, double speed, double timeOffset) const;
-    double computeRetime(double inputTime, double firstTime, double lastTime, CycleType cycleType) const;
-    double getSampleTime() const;
+    double computeRetime(double inputTime, double firstTime, double lastTime, CycleType cycleType, bool *clipped=0) const;
+    double getSampleTime(bool *clipped=0) const;
     
     void printInfo(bool detailed=false) const;
     void printSceneBounds() const;
@@ -251,6 +254,7 @@ private:
     MObject aUvSetName;
     std::vector<std::string> mUvSetNames;
     double mScale;
+    bool mClipped;
     
 #ifdef ABCSHAPE_VRAY_SUPPORT
     VR::DefStringParam mVRFilename;

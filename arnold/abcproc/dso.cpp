@@ -10,6 +10,7 @@ const char* CycleTypeNames[] =
    "loop",
    "reverse",
    "bounce",
+   "clip",
    NULL
 };
    
@@ -22,12 +23,20 @@ const char* AttributeFrameNames[] =
    NULL
 };
 
+const char* ReferenceSourceNames[] =
+{
+   "attributes_then_file",
+   "attributes",
+   "file",
+   "frame",
+   NULL
+};
+
 // ---
 
 void Dso::CommonParameters::reset()
 {
    filePath = "";
-   referenceFilePath = "";
    namePrefix = "";
    objectPath = "";
    
@@ -56,6 +65,20 @@ void Dso::CommonParameters::reset()
    outputReference = false;
 
    scale = 1.0f;
+
+   referenceSource = RS_attributes_then_file;
+   referenceFilePath = "";
+   referencePositionName = "Pref";
+   referenceNormalName = "Nref";
+   referenceFrame = -std::numeric_limits<float>::max();
+   
+   velocityScale = 1.0f;
+   velocityName = "";
+   accelerationName = "";
+
+   promoteToObjectAttribs.clear();
+   
+   ignoreNurbs = false;
 }
 
 std::string Dso::CommonParameters::dataString(const char *targetShape) const
@@ -70,11 +93,29 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    }
    if (outputReference)
    {
-      oss << " -outputreference";
-   }
-   if (referenceFilePath.length() > 0)
-   {
-      oss << " -referencefilename " << referenceFilePath;
+      oss << " -outputreference -referencesource " << ReferenceSourceNames[referenceSource];
+      if (referenceSource == RS_attributes || referenceSource == RS_attributes_then_file)
+      {
+         if (referencePositionName.length() > 0)
+         {
+            oss << " -referencepositionname " << referencePositionName;
+         }
+         if (referenceNormalName.length() > 0)
+         {
+            oss << " -referencenormalname " << referenceNormalName;
+         }
+      }
+      if (referenceSource == RS_frame)
+      {
+         oss << " -referenceframe " << referenceFrame;
+      }
+      if (referenceSource == RS_file || referenceSource == RS_attributes_then_file)
+      {
+         if (referenceFilePath.length() > 0)
+         {
+            oss << " -referencefilename " << referenceFilePath;
+         }
+      }
    }
    if (namePrefix.length() > 0)
    {
@@ -117,6 +158,15 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    {
       oss << " -preservestartframe";
    }
+   oss << " -velocityscale " << velocityScale;
+   if (velocityName.length() > 0)
+   {
+      oss << " -velocityname " << velocityName;
+   }
+   if (accelerationName.length() > 0)
+   {
+      oss << " -accelerationname " << accelerationName;
+   }
    if (ignoreTransformBlur)
    {
       oss << " -ignoretransformblur";
@@ -137,6 +187,10 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    {
       oss << " -ignorevisibility";
    }
+   if (ignoreNurbs)
+   {
+      oss << " -ignorenurbs";
+   }
    if (samplesExpandIterations > 0)
    {
       oss << " -samplesexpanditerations " << samplesExpandIterations;
@@ -148,6 +202,16 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
    else
    {
       oss << " -samplesexpanditerations 0";
+   }
+   if (promoteToObjectAttribs.size() > 0)
+   {
+      oss << " -promotetoobjectattribs";
+      std::set<std::string>::const_iterator it = promoteToObjectAttribs.begin();
+      while (it != promoteToObjectAttribs.end())
+      {
+         oss << " " << *it;
+         ++it;
+      }
    }
    if (verbose)
    {
@@ -169,11 +233,29 @@ std::string Dso::CommonParameters::shapeKey() const
    }
    if (outputReference)
    {
-      oss << " -outputreference";
-   }
-   if (referenceFilePath.length() > 0)
-   {
-      oss << " -referencefilename " << referenceFilePath;
+      oss << " -outputreference -referencesource " << ReferenceSourceNames[referenceSource];
+      if (referenceSource == RS_attributes || referenceSource == RS_attributes_then_file)
+      {
+         if (referencePositionName.length() > 0)
+         {
+            oss << " -referencepositionname " << referencePositionName;
+         }
+         if (referenceNormalName.length() > 0)
+         {
+            oss << " -referencenormalname " << referenceNormalName;
+         }
+      }
+      if (referenceSource == RS_frame)
+      {
+         oss << " -referenceframe " << referenceFrame;
+      }
+      if (referenceSource == RS_file || referenceSource == RS_attributes_then_file)
+      {
+         if (referenceFilePath.length() > 0)
+         {
+            oss << " -referencefilename " << referenceFilePath;
+         }
+      }
    }
    if (objectPath.length() > 0)
    {
@@ -212,6 +294,18 @@ std::string Dso::CommonParameters::shapeKey() const
    {
       oss << " -ignoredeformblur";
    }
+   else
+   {
+      oss << " -velocityscale " << velocityScale;
+      if (velocityName.length() > 0)
+      {
+         oss << " -velocityname " << velocityName;
+      }
+      if (accelerationName.length() > 0)
+      {
+         oss << " -accelerationname " << accelerationName;
+      }
+   }
    if (samplesExpandIterations > 0)
    {
       oss << " -samplesexpanditerations " << samplesExpandIterations;
@@ -224,6 +318,10 @@ std::string Dso::CommonParameters::shapeKey() const
    {
       oss << " -samplesexpanditerations 0";
    }
+   if (ignoreNurbs)
+   {
+      oss << " -ignorenurbs";
+   }
    
    return oss.str();
 }
@@ -231,6 +329,12 @@ std::string Dso::CommonParameters::shapeKey() const
 void Dso::MultiParameters::reset()
 {
    overrideAttribs.clear();
+   overrideBoundsMinName = "";
+   overrideBoundsMaxName = "";
+   
+   peakRadiusName = "peakRadius";
+   
+   peakWidthName = "peakWidth";
 }
 
 std::string Dso::MultiParameters::dataString() const
@@ -248,6 +352,26 @@ std::string Dso::MultiParameters::dataString() const
       }
    }
    
+   if (overrideBoundsMinName.length() > 0)
+   {
+      oss << " -overrideBoundsMinName " << overrideBoundsMinName;
+   }
+   
+   if (overrideBoundsMaxName.length() > 0)
+   {
+      oss << " -overrideBoundsMaxName " << overrideBoundsMaxName;
+   }
+   
+   if (peakRadiusName.length() > 0)
+   {
+      oss << " -peakradiusname " << peakRadiusName;
+   }
+   
+   if (peakWidthName.length() > 0)
+   {
+      oss << " -peakwidthname " << peakWidthName;
+   }
+   
    return oss.str();
 }
 
@@ -262,9 +386,14 @@ void Dso::SingleParameters::reset()
    
    computeTangents.clear();
    
+   radiusName = "";
    radiusMin = 0.0f;
    radiusMax = 1000000.0f;
    radiusScale = 1.0f;
+   
+   widthMin = 0.0f;
+   widthMax = 1000000.0f;
+   widthScale = 1.0f;
    
    nurbsSampleRate = 5;
 }
@@ -315,10 +444,17 @@ std::string Dso::SingleParameters::dataString() const
          ++it;
       }
    }
+   if (radiusName.length() > 0)
+   {
+      oss << " -radiusname " << radiusName;
+   }
    oss << " -radiusmin " << radiusMin;
    oss << " -radiusmax " << radiusMax;
    oss << " -radiusscale " << radiusScale;
    oss << " -nurbssamplerate " << nurbsSampleRate;
+   oss << " -widthmin " << widthMin;
+   oss << " -widthmax " << widthMax;
+   oss << " -widthscale " << widthScale;
    
    return oss.str();
 }
@@ -448,253 +584,261 @@ Dso::Dso(AtNode *node)
          }
       }
       
-      mRenderTime = computeTime(mCommonParams.frame);
+      bool exclude = false;
       
-      if (mCommonParams.verbose)
+      mRenderTime = computeTime(mCommonParams.frame, &exclude);
+      
+      if (!exclude)
       {
-         AiMsgInfo("[abcproc] Render at t = %f [%f, %f]",
-                   mRenderTime,
-                   mCommonParams.startFrame / mCommonParams.fps,
-                   mCommonParams.endFrame / mCommonParams.fps);
-      }
-      
-      CountShapes visitor(mRenderTime,
-                          mCommonParams.ignoreTransforms,
-                          mCommonParams.ignoreInstances,
-                          mCommonParams.ignoreVisibility);
-      
-      mScene->visit(AlembicNode::VisitDepthFirst, visitor);
-      
-      if (mCommonParams.verbose)
-      {
-         AiMsgInfo("[abcproc] %lu shape(s) in scene", visitor.numShapes());
-      }
-      
-      mMode = PM_multi;
-      mNumShapes = visitor.numShapes();
-      setGeneratedNodesCount(mNumShapes);
-      
-      if (mNumShapes == 1 && mCommonParams.ignoreTransforms)
-      {
-         // output a single shape in object space
          if (mCommonParams.verbose)
          {
-            AiMsgInfo("[abcproc] Single shape mode");
+            AiMsgInfo("[abcproc] Render at t = %f [%f, %f]",
+                      mRenderTime,
+                      mCommonParams.startFrame / mCommonParams.fps,
+                      mCommonParams.endFrame / mCommonParams.fps);
          }
-         mMode = PM_single;
-      }
-      
-      
-      mTimeSamples.clear();
-      
-      if (ignoreMotionBlur() || (mMode == PM_single && ignoreDeformBlur()))
-      {
-         mTimeSamples.push_back(mRenderTime);
-      }
-      else
-      {
-         if (mCommonParams.samples.size() == 0)
+         
+         CountShapes visitor(mRenderTime,
+                             mCommonParams.ignoreTransforms,
+                             mCommonParams.ignoreInstances,
+                             mCommonParams.ignoreVisibility,
+                             mCommonParams.ignoreNurbs);
+         
+         mScene->visit(AlembicNode::VisitDepthFirst, visitor);
+         
+         if (mCommonParams.verbose)
          {
-            //AiMsgWarning("[abcproc] No samples set");
-            if (mShutterOpen <= mShutterClose)
+            AiMsgInfo("[abcproc] %lu shape(s) in scene", visitor.numShapes());
+         }
+         
+         mMode = PM_multi;
+         mNumShapes = visitor.numShapes();
+         setGeneratedNodesCount(mNumShapes);
+         
+         if (mNumShapes == 1 && mCommonParams.ignoreTransforms)
+         {
+            // output a single shape in object space
+            if (mCommonParams.verbose)
             {
-               if (mShutterOpen < mShutterClose)
-               {
-                  double step = mShutterClose - mShutterOpen;
-                  
-                  if (mShutterStep > 1)
-                  {
-                     step /= (mShutterStep - 1);
-                  }
-                  
-                  if (mShutterStep > 0)
-                  {
-                     
-                  }
-                  
-                  for (double relSample=mShutterOpen; relSample<=mShutterClose; relSample+=step)
-                  {
-                     mTimeSamples.push_back(computeTime(mCommonParams.frame + relSample));
-                  }
-               }
-               else
-               {
-                  mTimeSamples.push_back(computeTime(mCommonParams.frame + mShutterOpen));
-               }
+               AiMsgInfo("[abcproc] Single shape mode");
             }
-            else
-            {
-               AiMsgWarning("[abcproc] No samples set, use render frame");
-               mTimeSamples.push_back(mRenderTime);
-            }
+            mMode = PM_single;
+         }
+         
+         
+         mTimeSamples.clear();
+         
+         if (ignoreMotionBlur() || (mMode == PM_single && ignoreDeformBlur()))
+         {
+            mTimeSamples.push_back(mRenderTime);
          }
          else
          {
-            if (mCommonParams.relativeSamples)
+            if (mCommonParams.samples.size() == 0)
             {
-               for (size_t i=0; i<mCommonParams.samples.size(); ++i)
+               //AiMsgWarning("[abcproc] No samples set");
+               if (mShutterOpen <= mShutterClose)
                {
-                  mTimeSamples.push_back(computeTime(mCommonParams.frame + mCommonParams.samples[i]));
-               }
-            }
-            else
-            {
-               for (size_t i=0; i<mCommonParams.samples.size(); ++i)
-               {
-                  mTimeSamples.push_back(computeTime(mCommonParams.samples[i]));
-               }
-            }
-         }
-      }
-      
-      mExpandedTimeSamples = mTimeSamples;
-      
-      // Expand time samples
-      if (mTimeSamples.size() > 1 && mCommonParams.samplesExpandIterations > 0)
-      {
-         std::vector<double> samples;
-         
-         for (int i=0; i<mCommonParams.samplesExpandIterations; ++i)
-         {
-            samples.push_back(mExpandedTimeSamples[0]);
-            
-            for (size_t j=1; j<mExpandedTimeSamples.size(); ++j)
-            {
-               double mid = 0.5 * (mExpandedTimeSamples[j-1] + mExpandedTimeSamples[j]);
-               samples.push_back(mid);
-               samples.push_back(mExpandedTimeSamples[j]);
-            }
-            
-            // Arnold doesn't accept more than 255 motion keys
-            if (samples.size() > 255)
-            {
-               break;
-            }
-            
-            std::swap(mExpandedTimeSamples, samples);
-            samples.clear();
-         }
-      }
-      
-      // Optimize time samples
-      if ((mExpandedTimeSamples.size() > mTimeSamples.size()) && mCommonParams.optimizeSamples)
-      {
-         // Remove samples outside of camera shutter range
-         AtNode *cam = AiUniverseGetCamera();
-         
-         if (cam)
-         {
-            AtNode *opts = AiUniverseGetOptions();
-            
-            if (AiNodeLookUpUserParameter(opts, "motion_start_frame") &&
-                AiNodeLookUpUserParameter(opts, "motion_end_frame"))
-            {
-               std::vector<double> samples;
-               
-               mMotionStart = AiNodeGetFlt(opts, "motion_start_frame");
-               mMotionEnd = AiNodeGetFlt(opts, "motion_end_frame");
-               
-               if (AiNodeLookUpUserParameter(opts, "frame") &&
-                   AiNodeLookUpUserParameter(opts, "relative_motion_frame") &&
-                   AiNodeGetBool(opts, "relative_motion_frame"))
-               {
-                  float frame = AiNodeGetFlt(opts, "frame");
-                  mMotionStart += frame;
-                  mMotionEnd += frame;
-               }
-               
-               mMotionStart /= mCommonParams.fps;
-               mMotionEnd /= mCommonParams.fps;
-               
-               double motionLength = mMotionEnd - mMotionStart;
-               
-               double shutterOpen = (mMotionStart + AiCameraGetShutterStart() * motionLength);
-               double shutterClose = (mMotionStart + AiCameraGetShutterEnd() * motionLength);
-               
-               for (size_t i=0; i<mExpandedTimeSamples.size(); ++i)
-               {
-                  double sample = mExpandedTimeSamples[i];
-                  
-                  if (sample < shutterOpen)
+                  if (mShutterOpen < mShutterClose)
                   {
-                     continue;
-                  }
-                  else if (sample > shutterClose)
-                  {
-                     if (samples.size() > 0 && samples.back() < shutterClose)
+                     double step = mShutterClose - mShutterOpen;
+                     
+                     if (mShutterStep > 1)
                      {
-                        samples.push_back(sample);
+                        step /= (mShutterStep - 1);
+                     }
+                     
+                     if (mShutterStep > 0)
+                     {
+                        
+                     }
+                     
+                     for (double relSample=mShutterOpen; relSample<=mShutterClose; relSample+=step)
+                     {
+                        mTimeSamples.push_back(computeTime(mCommonParams.frame + relSample));
                      }
                   }
                   else
                   {
-                     if (samples.size() == 0 && i > 0 && sample > shutterOpen)
-                     {
-                        samples.push_back(mExpandedTimeSamples[i-1]);
-                     }
-                     samples.push_back(sample);
+                     mTimeSamples.push_back(computeTime(mCommonParams.frame + mShutterOpen));
                   }
                }
-               
-               if (samples.size() > 0 && samples.size() < mExpandedTimeSamples.size())
+               else
                {
-                  std::swap(samples, mExpandedTimeSamples);
-                  mSetTimeSamples = true;
+                  AiMsgWarning("[abcproc] No samples set, use render frame");
+                  mTimeSamples.push_back(mRenderTime);
                }
             }
             else
             {
-              AiMsgWarning("[abcproc] Cannot optimize motion blur samples (missing motion sample range info)");
+               if (mCommonParams.relativeSamples)
+               {
+                  for (size_t i=0; i<mCommonParams.samples.size(); ++i)
+                  {
+                     mTimeSamples.push_back(computeTime(mCommonParams.frame + mCommonParams.samples[i]));
+                  }
+               }
+               else
+               {
+                  for (size_t i=0; i<mCommonParams.samples.size(); ++i)
+                  {
+                     mTimeSamples.push_back(computeTime(mCommonParams.samples[i]));
+                  }
+               }
             }
          }
-         else
-         {
-            AiMsgWarning("[abcproc] Cannot optimize motion blur samples (no camera set)");
-         }
-      }
-      
-      // Compute shape key
-      mShapeKey = shapeKey();
-      
-      if (mCommonParams.verbose)
-      {
-         AiMsgInfo("[abcproc] Procedural parameters: \"%s\"", dataString(0).c_str());
          
-         for (size_t i=0; i<mExpandedTimeSamples.size(); ++i)
-         {
-            AiMsgInfo("[abcproc] Add motion sample time: %lf", mExpandedTimeSamples[i]);
-         }
-      }
-      
-      if (mMode == PM_single)
-      {
-         // Read instance_num attribute
-         mInstanceNum = 0;
+         mExpandedTimeSamples = mTimeSamples;
          
-         const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mProcNode, "instance_num");
+         // Expand time samples
+         if (mTimeSamples.size() > 1 && mCommonParams.samplesExpandIterations > 0)
+         {
+            std::vector<double> samples;
+            
+            for (int i=0; i<mCommonParams.samplesExpandIterations; ++i)
+            {
+               samples.push_back(mExpandedTimeSamples[0]);
+               
+               for (size_t j=1; j<mExpandedTimeSamples.size(); ++j)
+               {
+                  double mid = 0.5 * (mExpandedTimeSamples[j-1] + mExpandedTimeSamples[j]);
+                  samples.push_back(mid);
+                  samples.push_back(mExpandedTimeSamples[j]);
+               }
+               
+               // Arnold doesn't accept more than 255 motion keys
+               if (samples.size() > 255)
+               {
+                  break;
+               }
+               
+               std::swap(mExpandedTimeSamples, samples);
+               samples.clear();
+            }
+         }
+         
+         // Optimize time samples
+         if ((mExpandedTimeSamples.size() > mTimeSamples.size()) && mCommonParams.optimizeSamples)
+         {
+            // Remove samples outside of camera shutter range
+            AtNode *cam = AiUniverseGetCamera();
+            
+            if (cam)
+            {
+               if (AiNodeLookUpUserParameter(opts, "motion_start_frame") &&
+                   AiNodeLookUpUserParameter(opts, "motion_end_frame"))
+               {
+                  std::vector<double> samples;
+                  
+                  mMotionStart = AiNodeGetFlt(opts, "motion_start_frame");
+                  mMotionEnd = AiNodeGetFlt(opts, "motion_end_frame");
+                  
+                  if (AiNodeLookUpUserParameter(opts, "frame") &&
+                      AiNodeLookUpUserParameter(opts, "relative_motion_frame") &&
+                      AiNodeGetBool(opts, "relative_motion_frame"))
+                  {
+                     float frame = AiNodeGetFlt(opts, "frame");
+                     mMotionStart += frame;
+                     mMotionEnd += frame;
+                  }
+                  
+                  mMotionStart /= mCommonParams.fps;
+                  mMotionEnd /= mCommonParams.fps;
+                  
+                  double motionLength = mMotionEnd - mMotionStart;
+                  
+                  double shutterOpen = (mMotionStart + AiCameraGetShutterStart() * motionLength);
+                  double shutterClose = (mMotionStart + AiCameraGetShutterEnd() * motionLength);
+                  
+                  for (size_t i=0; i<mExpandedTimeSamples.size(); ++i)
+                  {
+                     double sample = mExpandedTimeSamples[i];
+                     
+                     if (sample < shutterOpen)
+                     {
+                        continue;
+                     }
+                     else if (sample > shutterClose)
+                     {
+                        if (samples.size() > 0 && samples.back() < shutterClose)
+                        {
+                           samples.push_back(sample);
+                        }
+                     }
+                     else
+                     {
+                        if (samples.size() == 0 && i > 0 && sample > shutterOpen)
+                        {
+                           samples.push_back(mExpandedTimeSamples[i-1]);
+                        }
+                        samples.push_back(sample);
+                     }
+                  }
+                  
+                  if (samples.size() > 0 && samples.size() < mExpandedTimeSamples.size())
+                  {
+                     std::swap(samples, mExpandedTimeSamples);
+                     mSetTimeSamples = true;
+                  }
+               }
+               else
+               {
+                 AiMsgWarning("[abcproc] Cannot optimize motion blur samples (missing motion sample range info)");
+               }
+            }
+            else
+            {
+               AiMsgWarning("[abcproc] Cannot optimize motion blur samples (no camera set)");
+            }
+         }
+         
+         // Compute shape key
+         mShapeKey = shapeKey();
+         
+         if (mCommonParams.verbose)
+         {
+            AiMsgInfo("[abcproc] Procedural parameters: \"%s\"", dataString(0).c_str());
+            
+            for (size_t i=0; i<mExpandedTimeSamples.size(); ++i)
+            {
+               AiMsgInfo("[abcproc] Add motion sample time: %lf", mExpandedTimeSamples[i]);
+            }
+         }
+         
+         if (mMode == PM_single)
+         {
+            // Read instance_num attribute
+            mInstanceNum = 0;
+            
+            const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mProcNode, "instance_num");
+            if (pe)
+            {
+               int pt = AiUserParamGetType(pe);
+               if (pt == AI_TYPE_INT)
+               {
+                  mInstanceNum = AiNodeGetInt(mProcNode, "instance_num");
+               }
+               else if (pt == AI_TYPE_UINT)
+               {
+                  mInstanceNum = int(AiNodeGetUInt(mProcNode, "instance_num"));
+               }
+               else if (pt == AI_TYPE_BYTE)
+               {
+                  mInstanceNum = int(AiNodeGetByte(mProcNode, "instance_num"));
+               }
+            }
+         }
+         
+         // Check if we should export a box for volume shading rather than a new procedural or shape
+         const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mProcNode, "step_size");
          if (pe)
          {
-            int pt = AiUserParamGetType(pe);
-            if (pt == AI_TYPE_INT)
-            {
-               mInstanceNum = AiNodeGetInt(mProcNode, "instance_num");
-            }
-            else if (pt == AI_TYPE_UINT)
-            {
-               mInstanceNum = int(AiNodeGetUInt(mProcNode, "instance_num"));
-            }
-            else if (pt == AI_TYPE_BYTE)
-            {
-               mInstanceNum = int(AiNodeGetByte(mProcNode, "instance_num"));
-            }
+            mStepSize = AiNodeGetFlt(mProcNode, "step_size");
          }
       }
-      
-      // Check if we should export a box for volume shading rather than a new procedural or shape
-      const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mProcNode, "step_size");
-      if (pe)
+      else
       {
-         mStepSize = AiNodeGetFlt(mProcNode, "step_size");
+         AiMsgInfo("[abcproc] Out of frame range");
       }
    }
    else
@@ -878,9 +1022,13 @@ std::string Dso::uniqueName(const std::string &baseName) const
    return name;
 }
 
-double Dso::computeTime(double frame) const
+double Dso::computeTime(double frame, bool *exclude) const
 {
    // Apply speed / offset
+   if (exclude)
+   {
+      *exclude = false;
+   }
    
    double extraOffset = 0.0;
    
@@ -946,6 +1094,24 @@ double Dso::computeTime(double frame) const
          else
          {
             t2 = endTime - fraction * playTime;
+         }
+      }
+      break;
+   case CT_clip:
+      if (t < (startTime - eps))
+      {
+         t2 = startTime;
+         if (exclude)
+         {
+            *exclude = true;
+         }
+      }
+      else if (t > (endTime + eps))
+      {
+         t2 = endTime;
+         if (exclude)
+         {
+            *exclude = true;
          }
       }
       break;
@@ -1406,6 +1572,91 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       }
    }
    // Process multi params
+   else if (args[i] == "-referencesource")
+   {
+      ++i;
+      
+      if (i >= args.size())
+      {
+         return false;
+      }
+      
+      std::string rs = args[i];
+      
+      int ival = -1;
+      
+      if (sscanf(rs.c_str(), "%d", &ival) == 1)
+      {
+         if (ival >= 0 && ival < RS_MAX)
+         {
+            mCommonParams.referenceSource = (ReferenceSource) ival;
+         }
+      }
+      else
+      {
+         toLower(rs);
+         
+         for (size_t j=0; j<RS_MAX; ++j)
+         {
+            if (rs == ReferenceSourceNames[j])
+            {
+               mCommonParams.referenceSource = (ReferenceSource)j;
+               break;
+            }
+         }
+      }
+   }
+   else if (args[i] == "-referenceframe")
+   {
+      ++i;
+      if (i >= args.size() ||
+          sscanf(args[i].c_str(), "%f", &(mCommonParams.referenceFrame)) != 1)
+      {
+         return false;
+      }
+   }
+   else if (args[i] == "-referencepositionname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mCommonParams.referencePositionName = (args[i].length() == 0 ? "Pref" : args[i]);
+      }
+   }
+   else if (args[i] == "-referencenormalname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mCommonParams.referenceNormalName = (args[i].length() == 0 ? "Nref" : args[i]);
+      }
+   }
+   else if (args[i] == "-velocityscale")
+   {
+      ++i;
+      if (i >= args.size() ||
+          sscanf(args[i].c_str(), "%f", &(mCommonParams.velocityScale)) != 1)
+      {
+         return false;
+      }
+   }
+   else if (args[i] == "-velocityname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mCommonParams.velocityName = args[i];
+      }
+   }
+   else if (args[i] == "-accelerationname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mCommonParams.accelerationName = args[i];
+      }
+   }
+   // Process multi params
    else if (args[i] == "-overrideattribs")
    {
       ++i;
@@ -1415,6 +1666,48 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
          ++i;
       }
       --i;
+   }
+   else if (args[i] == "-promotetoobjectattribs")
+   {
+      ++i;
+      while (i < args.size() && !isFlag(args[i]))
+      {
+         mCommonParams.promoteToObjectAttribs.insert(args[i]);
+         ++i;
+      }
+      --i;
+   }
+   else if (args[i] == "-overrideboundsminname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mMultiParams.overrideBoundsMinName = args[i];
+      }
+   }
+   else if (args[i] == "-overrideboundsmaxname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mMultiParams.overrideBoundsMaxName = args[i];
+      }
+   }
+   else if (args[i] == "-peakradiusname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mMultiParams.peakRadiusName = args[i];
+      }
+   }
+   else if (args[i] == "-peakwidthname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mMultiParams.peakWidthName = args[i];
+      }
    }
    // Process single params
    else if (args[i] == "-objectattribs")
@@ -1486,6 +1779,14 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       }
       --i;
    }
+   else if (args[i] == "-radiusname")
+   {
+      ++i;
+      if (i < args.size() && !isFlag(args[i]))
+      {
+         mSingleParams.radiusName = args[i];
+      }
+   }
    else if (args[i] == "-radiusmin")
    {
       ++i;
@@ -1512,6 +1813,37 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       {
          return false;
       }
+   }
+   else if (args[i] == "-widthmin")
+   {
+      ++i;
+      if (i >= args.size() ||
+          sscanf(args[i].c_str(), "%f", &(mSingleParams.widthMin)) != 1)
+      {
+         return false;
+      }
+   }
+   else if (args[i] == "-widthmax")
+   {
+      ++i;
+      if (i >= args.size() ||
+          sscanf(args[i].c_str(), "%f", &(mSingleParams.widthMax)) != 1)
+      {
+         return false;
+      }
+   }
+   else if (args[i] == "-widthscale")
+   {
+      ++i;
+      if (i >= args.size() ||
+          sscanf(args[i].c_str(), "%f", &(mSingleParams.widthScale)) != 1)
+      {
+         return false;
+      }
+   }
+   else if (args[i] == "-ignorenurbs")
+   {
+      mCommonParams.ignoreNurbs = true;
    }
    else if (args[i] == "-nurbssamplerate")
    {
@@ -1912,6 +2244,121 @@ void Dso::readFromUserParams()
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
          }
       }
+      else if (param == "referencesource")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            std::string val = AiNodeGetStr(mProcNode, pname);
+            toLower(val);
+            
+            int i = 0;
+            
+            for (; i<RS_MAX; ++i)
+            {
+               if (val == ReferenceSourceNames[i])
+               {
+                  mCommonParams.referenceSource = (ReferenceSource) i;
+                  break;
+               }
+            }
+            
+            if (i >= RS_MAX)
+            {
+               AiMsgWarning("[abcproc] Ignore parameter \"%s\": Invalid value", pname);
+            }
+         }
+         else if (AiUserParamGetType(p) == AI_TYPE_INT)
+         {
+            int val = AiNodeGetInt(mProcNode, pname);
+            if (val >= 0 && val < RS_MAX)
+            {
+               mCommonParams.referenceSource = (ReferenceSource) val;
+            }
+            else
+            {
+               AiMsgWarning("[abcproc] Ignore parameter \"%s\": Invalid value", pname);
+            }
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an int or string value", pname);
+         }
+      }
+      else if (param == "referenceframe")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
+         {
+            mCommonParams.referenceFrame = AiNodeGetFlt(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
+         }
+      }
+      else if (param == "referencepositionname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mCommonParams.referencePositionName = AiNodeGetStr(mProcNode, pname);
+            if (mCommonParams.referencePositionName.length() == 0)
+            {
+               mCommonParams.referencePositionName = "Pref";
+            }
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
+      else if (param == "referencenormalname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mCommonParams.referenceNormalName = AiNodeGetStr(mProcNode, pname);
+            if (mCommonParams.referenceNormalName.length() == 0)
+            {
+               mCommonParams.referenceNormalName = "Nref";
+            }
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
+      else if (param == "velocityscale")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
+         {
+            mCommonParams.velocityScale = AiNodeGetFlt(mProcNode, pname);
+         }
+         else
+         {
+            mCommonParams.velocityScale = 1.0f;
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
+         }
+      }
+      else if (param == "velocityname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mCommonParams.velocityName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
+      else if (param == "accelerationname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mCommonParams.accelerationName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
       else if (param == "overrideattribs")
       {
          mMultiParams.overrideAttribs.clear();
@@ -1961,6 +2408,101 @@ void Dso::readFromUserParams()
          else
          {
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
+         }
+      }
+      else if (param == "promotetoobjectattribs")
+      {
+         mCommonParams.promoteToObjectAttribs.clear();
+         
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            std::string names = AiNodeGetStr(mProcNode, pname);
+            std::string name;
+            
+            size_t p0 = 0;
+            size_t p1 = names.find(' ', p0);
+            
+            while (p1 != std::string::npos)
+            {
+               name = names.substr(p0, p1-p0);
+               strip(name);
+               
+               if (name.length() > 0)
+               {
+                  mCommonParams.promoteToObjectAttribs.insert(name);
+               }
+               
+               p0 = p1 + 1;
+               p1 = names.find(' ', p0);
+            }
+            
+            name = names.substr(p0);
+            strip(name);
+            
+            if (name.length() > 0)
+            {
+               mCommonParams.promoteToObjectAttribs.insert(name);
+            }
+         }
+         else if (AiUserParamGetType(p) == AI_TYPE_ARRAY && AiUserParamGetArrayType(p) == AI_TYPE_STRING)
+         {
+            AtArray *names = AiNodeGetArray(mProcNode, pname);
+            
+            if (names)
+            {
+               for (unsigned int i=0; i<names->nelements; ++i)
+               {
+                  mCommonParams.promoteToObjectAttribs.insert(AiArrayGetStr(names, i));
+               }
+            }
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
+         }
+      }
+      else if (param == "overrideboundsminname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mMultiParams.overrideBoundsMinName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
+      else if (param == "overrideboundsmaxname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mMultiParams.overrideBoundsMaxName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
+      else if (param == "peakradiusname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mMultiParams.peakRadiusName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
+      else if (param == "peakwidthname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mMultiParams.peakWidthName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
          }
       }
       else if (param == "objectattribs")
@@ -2149,6 +2691,17 @@ void Dso::readFromUserParams()
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
          }
       }
+      else if (param == "radiusname")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         {
+            mSingleParams.radiusName = AiNodeGetStr(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
       else if (param == "radiusmin")
       {
          if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
@@ -2180,6 +2733,50 @@ void Dso::readFromUserParams()
          else
          {
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
+         }
+      }
+      else if (param == "widthmin")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
+         {
+            mSingleParams.widthMin = AiNodeGetFlt(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
+         }
+      }
+      else if (param == "widthmax")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
+         {
+            mSingleParams.widthMax = AiNodeGetFlt(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
+         }
+      }
+      else if (param == "widthscale")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
+         {
+            mSingleParams.widthScale = AiNodeGetFlt(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
+         }
+      }
+      else if (param == "ignorenurbs")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
+         {
+            mCommonParams.ignoreNurbs = AiNodeGetBool(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
          }
       }
       else if (param == "nurbssamplerate")

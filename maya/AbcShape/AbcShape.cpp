@@ -762,6 +762,7 @@ MObject AbcShape::aOutBoxMax;
 MObject AbcShape::aAnimated;
 MObject AbcShape::aUvSetCount;
 MObject AbcShape::aScale;
+MObject AbcShape::aOutSampleTime;
 #ifdef ABCSHAPE_VRAY_SUPPORT
 MObject AbcShape::aOutApiType;
 MObject AbcShape::aOutApiClassification;
@@ -871,6 +872,7 @@ MStatus AbcShape::initialize()
    eAttr.addField("Loop", CT_loop);
    eAttr.addField("Reverse", CT_reverse);
    eAttr.addField("Bounce", CT_bounce);
+   eAttr.addField("Clip", CT_clip);
    eAttr.setWritable(true);
    eAttr.setStorable(true);
    eAttr.setKeyable(true);
@@ -997,6 +999,13 @@ MStatus AbcShape::initialize()
    nAttr.setInternal(true);
    stat = addAttribute(aScale);
    MCHECKERROR(stat, "Could not add 'lengthScale' attribute");
+   
+   aOutSampleTime = nAttr.create("outSampleTime", "osmpt", MFnNumericData::kDouble, 0.0, &stat);
+   MCHECKERROR(stat, "Could not create 'outSampleTime' attribute");
+   nAttr.setWritable(false);
+   nAttr.setStorable(false);
+   stat = addAttribute(aOutSampleTime);
+   MCHECKERROR(stat, "Could not add 'outSampleTime' attribute");
    
 #ifdef ABCSHAPE_VRAY_SUPPORT
    MFnStringData outApiTypeDefault;
@@ -1285,6 +1294,14 @@ MStatus AbcShape::initialize()
    attributeAffects(aIgnoreInstances, aUvSetCount);
    attributeAffects(aIgnoreVisibility, aUvSetCount);
    
+   attributeAffects(aCycleType, aOutSampleTime);
+   attributeAffects(aTime, aOutSampleTime);
+   attributeAffects(aSpeed, aOutSampleTime);
+   attributeAffects(aOffset, aOutSampleTime);
+   attributeAffects(aPreserveStartFrame, aOutSampleTime);
+   attributeAffects(aStartFrame, aOutSampleTime);
+   attributeAffects(aEndFrame, aOutSampleTime);
+   
    return MS::kSuccess;
 }
 
@@ -1345,6 +1362,7 @@ AbcShape::AbcShape()
    , mUpdateLevel(AbcShape::UL_none)
    , mAnimated(false)
    , mScale(1.0)
+   , mClipped(false)
 #ifdef ABCSHAPE_VRAY_SUPPORT
    , mVRFilename("filename", "")
    , mVRUseReferenceObject("useReferenceObject", false)
@@ -1481,7 +1499,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
       
       Alembic::Abc::V3d out(0, 0, 0);
       
-      if (mScene)
+      if (!mClipped && mScene)
       {
          if (plug.attribute() == aOutBoxMin)
          {
@@ -1496,6 +1514,18 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
       MDataHandle hOut = block.outputValue(plug.attribute());
       
       hOut.set3Double(out.x, out.y, out.z);
+      
+      block.setClean(plug);
+      
+      return MS::kSuccess;
+   }
+   else if (plug.attribute() == aOutSampleTime)
+   {
+      syncInternals(block);
+      
+      MDataHandle hOut = block.outputValue(plug.attribute());
+      
+      hOut.setDouble(mSampleTime);
       
       block.setClean(plug);
       
@@ -1592,9 +1622,14 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
       MDataHandle hIn = block.inputValue(aVRayGeomInfo);
       MDataHandle hOut = block.outputValue(aVRayGeomResult);
       
-      void *ptr = hIn.asAddr();
+      VR::VRayGeomInfo *geomInfo = 0;
       
-      VR::VRayGeomInfo *geomInfo = reinterpret_cast<VR::VRayGeomInfo*>(ptr);
+      if (!mClipped)
+      {
+         void *ptr = hIn.asAddr();
+         
+         geomInfo = reinterpret_cast<VR::VRayGeomInfo*>(ptr);
+      }
       
       if (geomInfo)
       {
@@ -2236,13 +2271,13 @@ void AbcShape::syncInternals(MDataBlock &block)
       updateObjects();
       break;
    case UL_range:
-      if (mScene) updateRange();
+      if (mScene && !mClipped) updateRange();
       break;
    case UL_world:
-      if (mScene) updateWorld();
+      if (mScene && !mClipped) updateWorld();
       break;
    case UL_geometry:
-      if (mScene) updateGeometry();
+      if (mScene && !mClipped) updateGeometry();
       break;
    default:
       break;
@@ -2259,7 +2294,7 @@ MBoundingBox AbcShape::boundingBox() const
       
    this2->syncInternals();
    
-   if (mScene)
+   if (!mClipped && mScene)
    {
       // Use self bounds here as those are taking ignore transform/instance flag into account
       Alembic::Abc::Box3d bounds = mScene->selfBounds();
@@ -2305,11 +2340,17 @@ double AbcShape::computeAdjustedTime(const double inputTime, const double speed,
 double AbcShape::computeRetime(const double inputTime,
                                const double firstTime,
                                const double lastTime,
-                               AbcShape::CycleType cycleType) const
+                               AbcShape::CycleType cycleType,
+                               bool *clipped) const
 {
    const double playTime = lastTime - firstTime;
    static const double eps = 0.001;
    double retime = inputTime;
+   
+   if (clipped)
+   {
+      *clipped = false;
+   }
 
    switch (cycleType)
    {
@@ -2360,6 +2401,24 @@ double AbcShape::computeRetime(const double inputTime,
          }
       }
       break;
+   case CT_clip:
+      if (inputTime < (firstTime - eps))
+      {
+         retime = firstTime;
+         if (clipped)
+         {
+            *clipped = true;
+         }
+      }
+      else if (inputTime > (lastTime + eps))
+      {
+         retime = lastTime;
+         if (clipped)
+         {
+            *clipped = true;
+         }
+      }
+      break;
    case CT_hold:
    default:
       if (inputTime < (firstTime - eps))
@@ -2380,7 +2439,7 @@ double AbcShape::computeRetime(const double inputTime,
    return retime;
 }
 
-double AbcShape::getSampleTime() const
+double AbcShape::getSampleTime(bool *clipped) const
 {
    double invFPS = 1.0 / getFPS();
    double startOffset = 0.0f;
@@ -2389,7 +2448,7 @@ double AbcShape::getSampleTime() const
       startOffset = (mStartFrame * (mSpeed - 1.0) / mSpeed);
    }
    double sampleTime = computeAdjustedTime(mTime.as(MTime::kSeconds), mSpeed, (startOffset + mOffset) * invFPS);
-   return computeRetime(sampleTime, mStartFrame * invFPS, mEndFrame * invFPS, mCycleType);
+   return computeRetime(sampleTime, mStartFrame * invFPS, mEndFrame * invFPS, mCycleType, clipped);
 }
 
 void AbcShape::updateObjects()
@@ -2402,20 +2461,23 @@ void AbcShape::updateObjects()
    mAnimated = false;
    mNumShapes = 0;
    
-   mSceneFilter.set(mObjectExpression.asChar(), "");
-   
-   AlembicScene *scene = AlembicSceneCache::Ref(mFilePath.asChar(), mSceneFilter);
-   
-   if (mScene && !AlembicSceneCache::Unref(mScene))
+   if (!mClipped)
    {
-      delete mScene;
-   }
-   
-   mScene = scene;
-   
-   if (mScene)
-   {
-      updateRange();
+      mSceneFilter.set(mObjectExpression.asChar(), "");
+      
+      AlembicScene *scene = AlembicSceneCache::Ref(mFilePath.asChar(), mSceneFilter);
+      
+      if (mScene && !AlembicSceneCache::Unref(mScene))
+      {
+         delete mScene;
+      }
+      
+      mScene = scene;
+      
+      if (mScene)
+      {
+         updateRange();
+      }
    }
 }
 
@@ -2879,9 +2941,20 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
    
    if (sampleTimeUpdate)
    {
-      double sampleTime = getSampleTime();
+      bool clipped = false;
       
-      if (fabs(mSampleTime - sampleTime) > 0.0001)
+      double sampleTime = getSampleTime(&clipped);
+      
+      if (clipped != mClipped)
+      {
+         mClipped = clipped;
+         
+         if (mScene)
+         {
+            mUpdateLevel = UL_objects;
+         }
+      }
+      else if (!clipped && fabs(mSampleTime - sampleTime) > 0.0001)
       {
          mSampleTime = sampleTime;
          
@@ -2922,6 +2995,7 @@ void AbcShape::copyInternalData(MPxNode *source)
       mAnimated = node->mAnimated;
       mUvSetNames = node->mUvSetNames;
       mScale = node->mScale;
+      mClipped = node->mClipped;
     
       if (mScene && !AlembicSceneCache::Unref(mScene))
       {

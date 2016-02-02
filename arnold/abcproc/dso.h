@@ -14,6 +14,7 @@ enum CycleType
    CT_loop,
    CT_reverse,
    CT_bounce,
+   CT_clip,
    CT_MAX
 };
 
@@ -24,6 +25,15 @@ enum AttributeFrame
    AF_shutter_open,
    AF_shutter_close,
    AF_MAX
+};
+
+enum ReferenceSource
+{
+   RS_attributes_then_file = 0,
+   RS_attributes,
+   RS_file,
+   RS_frame,
+   RS_MAX
 };
 
 enum ProceduralMode
@@ -88,14 +98,29 @@ public:
       return mCommonParams.outputReference;
    }
    
-   inline bool hasReference() const
+   inline ReferenceSource referenceSource() const
    {
-      return (mCommonParams.referenceFilePath.length() > 0);
+      return mCommonParams.referenceSource;
    }
    
    inline const std::string& referenceFilePath() const
    {
       return mCommonParams.referenceFilePath;
+   }
+   
+   inline float referenceFrame() const
+   {
+      return mCommonParams.referenceFrame;
+   }
+   
+   inline const std::string& referencePositionName() const
+   {
+      return mCommonParams.referencePositionName;
+   }
+   
+   inline const std::string& referenceNormalName() const
+   {
+      return mCommonParams.referenceNormalName;
    }
    
    inline const std::string& objectPath() const
@@ -170,13 +195,33 @@ public:
       return mCommonParams.scale;
    }
    
-   double computeTime(double frame) const;
+   inline float velocityScale() const
+   {
+      return mCommonParams.velocityScale;
+   }
+   
+   inline const char* velocityName() const
+   {
+      return (mCommonParams.velocityName.length() > 0 ? mCommonParams.velocityName.c_str() : 0);
+   }
+   
+   inline const char* accelerationName() const
+   {
+      return (mCommonParams.accelerationName.length() > 0 ? mCommonParams.accelerationName.c_str() : 0);
+   }
+   
+   double computeTime(double frame, bool *exclude=0) const;
    
    // Attributes
    
    inline AttributeFrame attribsFrame() const
    {
       return mSingleParams.attribsFrame;
+   }
+   
+   inline bool isPromotedToObjectAttrib(const std::string &name) const
+   {
+      return (mCommonParams.promoteToObjectAttribs.find(name) != mCommonParams.promoteToObjectAttribs.end());
    }
    
    inline bool readObjectAttribs() const
@@ -211,6 +256,16 @@ public:
    
    bool cleanAttribName(std::string &name) const;
    
+   inline const char* overrideBoundsMinName() const
+   {
+      return (mMultiParams.overrideBoundsMinName.length() > 0 ? mMultiParams.overrideBoundsMinName.c_str() : 0);
+   }
+   
+   inline const char* overrideBoundsMaxName() const
+   {
+      return (mMultiParams.overrideBoundsMaxName.length() > 0 ? mMultiParams.overrideBoundsMaxName.c_str() : 0);
+   }
+   
    // Shapes
    
    inline size_t numShapes() const
@@ -232,7 +287,12 @@ public:
       return (mSingleParams.computeTangents.find(uvname) != mSingleParams.computeTangents.end());
    }
    
-   // Points/Curves
+   // Points
+   
+   inline const char* radiusName() const
+   {
+      return (mSingleParams.radiusName.length() > 0 ? mSingleParams.radiusName.c_str() : 0);
+   }
    
    inline double radiusMin() const
    {
@@ -249,11 +309,41 @@ public:
       return mSingleParams.radiusScale;
    }
    
+   inline const std::string& peakRadiusName() const
+   {
+      return mMultiParams.peakRadiusName;
+   }
+   
    // Curves
+   
+   inline bool ignoreNurbs() const
+   {
+      return mCommonParams.ignoreNurbs;
+   }
    
    inline int nurbsSampleRate() const
    {
       return mSingleParams.nurbsSampleRate;
+   }
+   
+   inline double widthMin() const
+   {
+      return mSingleParams.widthMin;
+   }
+   
+   inline double widthMax() const
+   {
+      return mSingleParams.widthMax;
+   }
+   
+   inline double widthScale() const
+   {
+      return mSingleParams.widthScale;
+   }
+   
+   inline const std::string& peakWidthName() const
+   {
+      return mMultiParams.peakWidthName;
    }
    
    // Volume
@@ -370,6 +460,23 @@ private:
 
       float scale;
       
+      // When a reference file is not provided, we must generate reference from
+      //   current file by either:
+      // - using a user defined attribute
+      // - use another frame/sample (provided that point count matches)
+      ReferenceSource referenceSource;
+      std::string referencePositionName;
+      std::string referenceNormalName;
+      float referenceFrame;
+      
+      float velocityScale;
+      std::string velocityName;
+      std::string accelerationName;
+      
+      std::set<std::string> promoteToObjectAttribs;
+      
+      bool ignoreNurbs;
+      
       void reset();
       std::string dataString(const char *targetShape) const;
       std::string shapeKey() const;
@@ -378,7 +485,12 @@ private:
    struct MultiParameters
    {
       std::set<std::string> overrideAttribs;
+      std::string overrideBoundsMinName;
+      std::string overrideBoundsMaxName;
       
+      std::string peakRadiusName;
+      
+      std::string peakWidthName;
       
       void reset();
       std::string dataString() const;
@@ -397,14 +509,17 @@ private:
       // mesh
       std::set<std::string> computeTangents;
       
-      // particles/curves
+      // particles
+      std::string radiusName;
       float radiusMin;
       float radiusMax;
       float radiusScale;
       
       // curves
       int nurbsSampleRate;
-      
+      float widthMin;
+      float widthMax;
+      float widthScale;
       
       void reset();
       std::string dataString() const;
