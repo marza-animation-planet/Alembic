@@ -181,6 +181,12 @@ int ProcCleanup(void *user_ptr)
 #else
 
 #include <pthread.h>
+#include <H5public.h>
+
+static int __attribute__((constructor)) on_dlopen(void)
+{
+   H5dont_atexit();
+}
 
 static int __attribute__((destructor)) on_dlclose(void)
 {
