@@ -2136,42 +2136,38 @@ bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<
    {
       MeshSchema meshSchema = refMesh->typedObject().getSchema();
       
-      if (mDso->referenceSource() == RS_frame)
+      size_t n = meshSchema.getNumSamples();
+      
+      if (n > 0)
       {
-         size_t n = meshSchema.getNumSamples();
+         double refTime = meshSchema.getTimeSampling()->getSampleTime(0);
          
-         if (n > 0)
+         if (mDso->referenceSource() == RS_frame)
          {
-            double refTime = mDso->referenceFrame() / mDso->fps();
-            
-            // Note: TimeSample::get will fail if refTime doesn't match an existing sample
-            
-            double minTime = meshSchema.getTimeSampling()->getSampleTime(0);
+            double minTime = refTime;
             double maxTime = meshSchema.getTimeSampling()->getSampleTime(n-1);
             
+            refTime = mDso->referenceFrame() / mDso->fps();
             if (refTime < minTime) refTime = minTime;
             if (refTime > maxTime) refTime = maxTime;
             
-            if (meshSampler.get(meshSchema, refTime))
+            if (mDso->verbose())
             {
-               meshSample = meshSampler.data();
-               Pref = meshSample.getPositions();
-               
-               if (mDso->verbose())
-               {
-                  AiMsgInfo("[abcproc] Read reference positions from frame %f.", mDso->referenceFrame());
-               }
+               AiMsgInfo("[abcproc] Read reference positions from frame %f.", mDso->referenceFrame());
             }
          }
-      }
-      else
-      {
-         meshSample = meshSchema.getValue();
-         Pref = meshSample.getPositions();
-         
-         if (mDso->verbose())
+         else
          {
-            AiMsgInfo("[abcproc] Read reference positions from separate file.");
+            if (mDso->verbose())
+            {
+               AiMsgInfo("[abcproc] Read reference positions from separate file.");
+            }
+         }
+         
+         if (meshSampler.get(meshSchema, refTime))
+         {
+            meshSample = meshSampler.data();
+            Pref = meshSample.getPositions();
          }
       }
       

@@ -1452,33 +1452,31 @@ bool MakeShape::readReferenceNormals(AlembicMesh *refMesh,
       TimeSample<Alembic::AbcGeom::IN3fGeomParam> sampler;
       Alembic::AbcGeom::IN3fGeomParam::Sample sample;
       
+      size_t n = Nref.getNumSamples();
+      
+      if (n == 0)
+      {
+         return false;
+      }
+      
+      double refTime = Nref.getTimeSampling()->getSampleTime(0);
+      
       if (mDso->referenceSource() == RS_frame)
       {
-         size_t n = Nref.getNumSamples();
-         
-         if (n == 0)
-         {
-            return false;
-         }
-         
-         double refTime = mDso->referenceFrame() / mDso->fps();
-         
-         double minTime = Nref.getTimeSampling()->getSampleTime(0);
+         double minTime = refTime;
          double maxTime = Nref.getTimeSampling()->getSampleTime(n-1);
+         
+         refTime = mDso->referenceFrame() / mDso->fps();
          if (refTime < minTime) refTime = minTime;
          if (refTime > maxTime) refTime = maxTime;
-         
-         if (!sampler.get(Nref, refTime))
-         {
-            return false;
-         }
-         
-         sample = sampler.data();
       }
-      else
+      
+      if (!sampler.get(Nref, refTime))
       {
-         sample = Nref.getIndexedValue();
+         return false;
       }
+      
+      sample = sampler.data();
       
       Alembic::Abc::N3fArraySamplePtr vals = sample.getVals();
       Alembic::Abc::UInt32ArraySamplePtr idxs = sample.getIndices();
@@ -4002,28 +4000,23 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
       Alembic::AbcGeom::ICurvesSchema schema = refCurves->typedObject().getSchema();
       Alembic::AbcGeom::ICurvesSchema::Sample sample;
       
+      size_t n = schema.getNumSamples();
+      
+      if (n == 0)
+      {
+         return false;
+      }
+      
+      double refTime = schema.getTimeSampling()->getSampleTime(0);
+      
       if (mDso->referenceSource() == RS_frame)
       {
-         size_t n = schema.getNumSamples();
-         
-         if (n == 0)
-         {
-            return false;
-         }
-         
-         double refTime = mDso->referenceFrame() / mDso->fps();
-         
-         double minTime = schema.getTimeSampling()->getSampleTime(0);
+         double minTime = refTime;
          double maxTime = schema.getTimeSampling()->getSampleTime(n-1);
+         
+         refTime = mDso->referenceFrame() / mDso->fps();
          if (refTime < minTime) refTime = minTime;
          if (refTime > maxTime) refTime = maxTime;
-         
-         if (!sampler.get(schema, refTime))
-         {
-            return false;
-         }
-         
-         sample = sampler.data();
          
          if (mDso->verbose())
          {
@@ -4032,13 +4025,18 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
       }
       else
       {
-         sample = schema.getValue();
-         
          if (mDso->verbose())
          {
             AiMsgInfo("[abcproc] Read reference positions from separate file.");
          }
       }
+      
+      if (!sampler.get(schema, refTime))
+      {
+         return false;
+      }
+      
+      sample = sampler.data();
       
       Alembic::Abc::P3fArraySamplePtr Pref = sample.getPositions();
       Alembic::Abc::Int32ArraySamplePtr Nv = sample.getCurvesNumVertices();
