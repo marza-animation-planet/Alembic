@@ -1306,14 +1306,22 @@ void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
    if (step == 0)
    {
       m_peakPadding = 0.0f;
+      m_overrideBounds = false;
+      m_padBoundsWithPeakWidth = false;
+      m_padBoundsWithPeakRadius = false;
+      m_boundsOverridden = false;
       
       if (IsSingleShape())
       {
-         m_renderTime = FindMayaPlug("outSampleTime").asDouble();
-         m_overrideBounds = FindMayaPlug("mtoa_constant_abc_useOverrideBounds").asBool();
-         m_padBoundsWithPeakRadius = FindMayaPlug("mtoa_constant_abc_padBoundsWithPeakRadius").asBool();
-         m_padBoundsWithPeakWidth = FindMayaPlug("mtoa_constant_abc_padBoundsWithPeakWidth").asBool();
-         m_boundsOverridden = false;
+         MPlug plug = FindMayaObjectPlug("outSampleTime").asDouble();
+         if (!plug.isNull())
+         {
+            m_renderTime = plug.asFloat();
+            m_overrideBounds = FindMayaPlug("mtoa_constant_abc_useOverrideBounds").asBool();
+            m_padBoundsWithPeakRadius = FindMayaPlug("mtoa_constant_abc_padBoundsWithPeakRadius").asBool();
+            m_padBoundsWithPeakWidth = FindMayaPlug("mtoa_constant_abc_padBoundsWithPeakWidth").asBool();
+         }
+         
          
          if (m_padBoundsWithPeakRadius || m_padBoundsWithPeakWidth)
          {
@@ -1422,37 +1430,37 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
       
       if (!isGpuCache)
       {
-         plug = FindMayaPlug("speed");
+         plug = FindMayaObjectPlug("speed");
          if (!plug.isNull())
          {
             data += " -speed " + ToString(plug.asFloat());
          }
          
-         plug = FindMayaPlug("offset");
+         plug = FindMayaObjectPlug("offset");
          if (!plug.isNull())
          {
             data += " -offset " + ToString(plug.asFloat());
          }
          
-         plug = FindMayaPlug("preserveStartFrame");
+         plug = FindMayaObjectPlug("preserveStartFrame");
          if (!plug.isNull() && plug.asBool())
          {
             data += " -preservestartframe";
          }
          
-         plug = FindMayaPlug("startFrame");
+         plug = FindMayaObjectPlug("startFrame");
          if (!plug.isNull())
          {
             data += " -startframe " + ToString(plug.asFloat());
          }
          
-         plug = FindMayaPlug("endFrame");
+         plug = FindMayaObjectPlug("endFrame");
          if (!plug.isNull())
          {
             data += " -endframe " + ToString(plug.asFloat());
          }
          
-         plug = FindMayaPlug("cycleType");
+         plug = FindMayaObjectPlug("cycleType");
          if (!plug.isNull())
          {
             data += " -cycle " + ToString(plug.asInt());
@@ -1484,13 +1492,13 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaObjectPlug("mtoa_constant_abc_outputReference");
+      plug = FindMayaPlug("mtoa_constant_abc_outputReference");
       if (!plug.isNull() && plug.asBool())
       {
          data += " -outputreference";
       }
       
-      plug = FindMayaObjectPlug("mtoa_constant_abc_referenceSource");
+      plug = FindMayaPlug("mtoa_constant_abc_referenceSource");
       if (!plug.isNull())
       {
          switch (plug.asInt())
@@ -1508,7 +1516,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaObjectPlug("mtoa_constant_abc_referenceFilename");
+      plug = FindMayaPlug("mtoa_constant_abc_referenceFilename");
       if (!plug.isNull())
       {
          tmp = plug.asString();
@@ -1518,7 +1526,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaObjectPlug("mtoa_constant_abc_referencePositionName");
+      plug = FindMayaPlug("mtoa_constant_abc_referencePositionName");
       if (!plug.isNull())
       {
          tmp = plug.asString();
@@ -1528,7 +1536,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaObjectPlug("mtoa_constant_abc_referenceNormalName");
+      plug = FindMayaPlug("mtoa_constant_abc_referenceNormalName");
       if (!plug.isNull())
       {
          tmp = plug.asString();
@@ -1538,7 +1546,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaObjectPlug("mtoa_constant_abc_referenceFrame");
+      plug = FindMayaPlug("mtoa_constant_abc_referenceFrame");
       if (!plug.isNull())
       {
          data += " -referenceframe " + ToString(plug.asFloat());
