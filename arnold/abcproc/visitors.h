@@ -423,6 +423,10 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
             extraPadding += padding;
          }
       }
+      else
+      {
+         extraPadding = 0.0f;
+      }
       
       if (extraPadding > 0)
       {
