@@ -403,9 +403,13 @@ if excons.GetArgument("with-maya", default=None) is not None:
             mtoa_ext = ".so"
          
          AbcShapeMtoa = "maya/AbcShape/mtoa/%sMtoa.py" % AbcShapeName
+         AbcShapeHelper = "maya/AbcShape/mtoa/%sHelper.py" % AbcShapeName
          
          if not os.path.exists(AbcShapeMtoa) or os.stat(AbcShapeMtoa).st_mtime < os.stat("maya/AbcShape/mtoa/AbcShapeMtoa.py.tpl").st_mtime:
             replace_in_file("maya/AbcShape/mtoa/AbcShapeMtoa.py.tpl", AbcShapeMtoa, "<<NodeName>>", AbcShapeName)
+         
+         if not os.path.exists(AbcShapeHelper) or os.stat(AbcShapeHelper).st_mtime < os.stat("maya/AbcShape/mtoa/AbcShapeHelper.py.tpl").st_mtime:
+            replace_in_file("maya/AbcShape/mtoa/AbcShapeHelper.py.tpl", AbcShapeHelper, "<<NodeName>>", AbcShapeName)
          
          prjs.append({"name": "%sAbcShapeMtoa" % nameprefix,
                       "type": "dynamicmodule",
@@ -416,7 +420,8 @@ if excons.GetArgument("with-maya", default=None) is not None:
                       "incdirs": [mtoa_inc],
                       "libdirs": [mtoa_lib],
                       "libs": ["mtoa_api"],
-                      "install": {"maya/plug-ins/mtoa": [AbcShapeMtoa]},
+                      "install": {"maya/plug-ins/mtoa": [AbcShapeMtoa],
+                                  "maya/python": [AbcShapeHelper]},
                       "custom": [arnold.Require, maya.Require, RequireAlembicHelper()]})
 
 

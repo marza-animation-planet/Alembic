@@ -59,8 +59,16 @@ private:
    bool HasParameter(const AtNodeEntry *anodeEntry, const char *param, AtNode *anode=NULL, const char *decl=NULL);
    
    void ReadAlembicAttributes();
-   bool ReadFloat3Attribute(Alembic::Abc::ICompoundProperty props, const std::string &name, bool geoParam, AtPoint &out);
-   bool ReadFloatAttribute(Alembic::Abc::ICompoundProperty props, const std::string &name, bool geoParam, float &out);
+   bool ReadFloat3Attribute(Alembic::Abc::ICompoundProperty userProps,
+                            Alembic::Abc::ICompoundProperty geomParams,
+                            const std::string &name,
+                            Alembic::AbcGeom::GeometryScope geoScope,
+                            AtPoint &out);
+   bool ReadFloatAttribute(Alembic::Abc::ICompoundProperty userProps,
+                           Alembic::Abc::ICompoundProperty geomParams,
+                           const std::string &name,
+                           Alembic::AbcGeom::GeometryScope geoScope,
+                           float &out);
 
 private:
 

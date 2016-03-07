@@ -875,83 +875,24 @@ void CAbcTranslator::ExportShader(AtNode *proc, bool update)
    }
 }
 
-bool CAbcTranslator::ReadFloat3Attribute(Alembic::Abc::ICompoundProperty props, const std::string &name, bool geoParam, AtPoint &out)
+bool CAbcTranslator::ReadFloat3Attribute(Alembic::Abc::ICompoundProperty userProps,
+                                         Alembic::Abc::ICompoundProperty geomParams,
+                                         const std::string &name,
+                                         Alembic::AbcGeom::GeometryScope geoScope,
+                                         AtPoint &out)
 {
    bool rv = false;
    
-   const Alembic::AbcCoreAbstract::PropertyHeader *header = props.getPropertyHeader(name);
-   
-   if (header)
+   if (geomParams.valid())
    {
-      if (!geoParam)
-      {
-         if (Alembic::Abc::IV3dProperty::matches(*header))
-         {
-            TimeSample<Alembic::Abc::IV3dProperty> sampler;
-            Alembic::Abc::IV3dProperty prop(props, name);
-            
-            sampler.get(prop, m_renderTime);
-            
-            Alembic::Abc::V3d v = sampler.data();
-            
-            out.x = float(v.x);
-            out.y = float(v.y);
-            out.z = float(v.z);
-            
-            rv = true;
-         }
-         else if (Alembic::Abc::IV3fProperty::matches(*header))
-         {
-            TimeSample<Alembic::Abc::IV3fProperty> sampler;
-            Alembic::Abc::IV3fProperty prop(props, name);
-            
-            sampler.get(prop, m_renderTime);
-            
-            Alembic::Abc::V3f v = sampler.data();
-            
-            out.x = v.x;
-            out.y = v.y;
-            out.z = v.z;
-            
-            rv = true;
-         }
-         else if (Alembic::Abc::IP3dProperty::matches(*header))
-         {
-            TimeSample<Alembic::Abc::IP3dProperty> sampler;
-            Alembic::Abc::IP3dProperty prop(props, name);
-            
-            sampler.get(prop, m_renderTime);
-            
-            Alembic::Abc::V3d v = sampler.data();
-            
-            out.x = float(v.x);
-            out.y = float(v.y);
-            out.z = float(v.z);
-            
-            rv = true;
-         }
-         else if (Alembic::Abc::IP3fProperty::matches(*header))
-         {
-            TimeSample<Alembic::Abc::IP3fProperty> sampler;
-            Alembic::Abc::IP3fProperty prop(props, name);
-            
-            sampler.get(prop, m_renderTime);
-            
-            Alembic::Abc::V3f v = sampler.data();
-            
-            out.x = v.x;
-            out.y = v.y;
-            out.z = v.z;
-            
-            rv = true;
-         }
-      }
-      else
+      const Alembic::AbcCoreAbstract::PropertyHeader *header = geomParams.getPropertyHeader(name);
+   
+      if (header && Alembic::AbcGeom::GetGeometryScope(header->getMetaData()) == geoScope)
       {
          if (Alembic::AbcGeom::IV3dGeomParam::matches(*header))
          {
             TimeSample<Alembic::AbcGeom::IV3dGeomParam> sampler;
-            Alembic::AbcGeom::IV3dGeomParam prop(props, name);
+            Alembic::AbcGeom::IV3dGeomParam prop(geomParams, name);
             
             sampler.get(prop, m_renderTime);
             
@@ -971,7 +912,7 @@ bool CAbcTranslator::ReadFloat3Attribute(Alembic::Abc::ICompoundProperty props, 
          else if (Alembic::AbcGeom::IV3fGeomParam::matches(*header))
          {
             TimeSample<Alembic::AbcGeom::IV3fGeomParam> sampler;
-            Alembic::AbcGeom::IV3fGeomParam prop(props, name);
+            Alembic::AbcGeom::IV3fGeomParam prop(geomParams, name);
             
             sampler.get(prop, m_renderTime);
             
@@ -991,7 +932,7 @@ bool CAbcTranslator::ReadFloat3Attribute(Alembic::Abc::ICompoundProperty props, 
          else if (Alembic::AbcGeom::IP3dGeomParam::matches(*header))
          {
             TimeSample<Alembic::AbcGeom::IP3dGeomParam> sampler;
-            Alembic::AbcGeom::IP3dGeomParam prop(props, name);
+            Alembic::AbcGeom::IP3dGeomParam prop(geomParams, name);
             
             sampler.get(prop, m_renderTime);
             
@@ -1011,7 +952,7 @@ bool CAbcTranslator::ReadFloat3Attribute(Alembic::Abc::ICompoundProperty props, 
          else if (Alembic::AbcGeom::IP3fGeomParam::matches(*header))
          {
             TimeSample<Alembic::AbcGeom::IP3fGeomParam> sampler;
-            Alembic::AbcGeom::IP3fGeomParam prop(props, name);
+            Alembic::AbcGeom::IP3fGeomParam prop(geomParams, name);
             
             sampler.get(prop, m_renderTime);
             
@@ -1031,48 +972,96 @@ bool CAbcTranslator::ReadFloat3Attribute(Alembic::Abc::ICompoundProperty props, 
       }
    }
    
-   return rv;
-}
-
-bool CAbcTranslator::ReadFloatAttribute(Alembic::Abc::ICompoundProperty props, const std::string &name, bool geoParam, float &out)
-{
-   bool rv = false;
-   
-   const Alembic::AbcCoreAbstract::PropertyHeader *header = props.getPropertyHeader(name);
-   
-   if (header)
+   if (!rv && userProps.valid())
    {
-      if (!geoParam)
+      const Alembic::AbcCoreAbstract::PropertyHeader *header = userProps.getPropertyHeader(name);
+      
+      if (header)
       {
-         if (Alembic::Abc::IFloatProperty::matches(*header))
+         if (Alembic::Abc::IV3dProperty::matches(*header))
          {
-            TimeSample<Alembic::Abc::IFloatProperty> sampler;
-            Alembic::Abc::IFloatProperty prop(props, name);
+            TimeSample<Alembic::Abc::IV3dProperty> sampler;
+            Alembic::Abc::IV3dProperty prop(userProps, name);
             
             sampler.get(prop, m_renderTime);
             
-            out = sampler.data();
+            Alembic::Abc::V3d v = sampler.data();
+            
+            out.x = float(v.x);
+            out.y = float(v.y);
+            out.z = float(v.z);
             
             rv = true;
          }
-         else if (Alembic::Abc::IDoubleProperty::matches(*header))
+         else if (Alembic::Abc::IV3fProperty::matches(*header))
          {
-            TimeSample<Alembic::Abc::IDoubleProperty> sampler;
-            Alembic::Abc::IDoubleProperty prop(props, name);
+            TimeSample<Alembic::Abc::IV3fProperty> sampler;
+            Alembic::Abc::IV3fProperty prop(userProps, name);
             
             sampler.get(prop, m_renderTime);
             
-            out = (float) sampler.data();
+            Alembic::Abc::V3f v = sampler.data();
+            
+            out.x = v.x;
+            out.y = v.y;
+            out.z = v.z;
+            
+            rv = true;
+         }
+         else if (Alembic::Abc::IP3dProperty::matches(*header))
+         {
+            TimeSample<Alembic::Abc::IP3dProperty> sampler;
+            Alembic::Abc::IP3dProperty prop(userProps, name);
+            
+            sampler.get(prop, m_renderTime);
+            
+            Alembic::Abc::V3d v = sampler.data();
+            
+            out.x = float(v.x);
+            out.y = float(v.y);
+            out.z = float(v.z);
+            
+            rv = true;
+         }
+         else if (Alembic::Abc::IP3fProperty::matches(*header))
+         {
+            TimeSample<Alembic::Abc::IP3fProperty> sampler;
+            Alembic::Abc::IP3fProperty prop(userProps, name);
+            
+            sampler.get(prop, m_renderTime);
+            
+            Alembic::Abc::V3f v = sampler.data();
+            
+            out.x = v.x;
+            out.y = v.y;
+            out.z = v.z;
             
             rv = true;
          }
       }
-      else
+   }
+   
+   return rv;
+}
+
+bool CAbcTranslator::ReadFloatAttribute(Alembic::Abc::ICompoundProperty userProps,
+                                        Alembic::Abc::ICompoundProperty geomParams,
+                                        const std::string &name,
+                                        Alembic::AbcGeom::GeometryScope geoScope,
+                                        float &out)
+{
+   bool rv = false;
+   
+   if (geomParams.valid())
+   {
+      const Alembic::AbcCoreAbstract::PropertyHeader *header = geomParams.getPropertyHeader(name);
+      
+      if (header && Alembic::AbcGeom::GetGeometryScope(header->getMetaData()) == geoScope)
       {
          if (Alembic::AbcGeom::IFloatGeomParam::matches(*header))
          {
             TimeSample<Alembic::AbcGeom::IFloatGeomParam> sampler;
-            Alembic::AbcGeom::IFloatGeomParam prop(props, name);
+            Alembic::AbcGeom::IFloatGeomParam prop(geomParams, name);
             
             sampler.get(prop, m_renderTime);
             
@@ -1088,7 +1077,7 @@ bool CAbcTranslator::ReadFloatAttribute(Alembic::Abc::ICompoundProperty props, c
          else if (Alembic::AbcGeom::IDoubleGeomParam::matches(*header))
          {
             TimeSample<Alembic::AbcGeom::IDoubleGeomParam> sampler;
-            Alembic::AbcGeom::IDoubleGeomParam prop(props, name);
+            Alembic::AbcGeom::IDoubleGeomParam prop(geomParams, name);
             
             sampler.get(prop, m_renderTime);
             
@@ -1100,6 +1089,37 @@ bool CAbcTranslator::ReadFloatAttribute(Alembic::Abc::ICompoundProperty props, c
                
                rv = true;
             }
+         }
+      }
+   }
+   
+   if (!rv && userProps.valid())
+   {
+      const Alembic::AbcCoreAbstract::PropertyHeader *header = userProps.getPropertyHeader(name);
+      
+      if (header)
+      {
+         if (Alembic::Abc::IFloatProperty::matches(*header))
+         {
+            TimeSample<Alembic::Abc::IFloatProperty> sampler;
+            Alembic::Abc::IFloatProperty prop(userProps, name);
+            
+            sampler.get(prop, m_renderTime);
+            
+            out = sampler.data();
+            
+            rv = true;
+         }
+         else if (Alembic::Abc::IDoubleProperty::matches(*header))
+         {
+            TimeSample<Alembic::Abc::IDoubleProperty> sampler;
+            Alembic::Abc::IDoubleProperty prop(userProps, name);
+            
+            sampler.get(prop, m_renderTime);
+            
+            out = (float) sampler.data();
+            
+            rv = true;
          }
       }
    }
@@ -1191,6 +1211,7 @@ void CAbcTranslator::ReadAlembicAttributes()
       {
          Alembic::Abc::IObject iobj = node->object();
          Alembic::AbcGeom::IGeomBaseObject tobj(iobj, Alembic::Abc::kWrapExisting);
+         Alembic::Abc::ICompoundProperty emptyProp;
          Alembic::Abc::ICompoundProperty userProps = tobj.getSchema().getUserProperties();
          Alembic::Abc::ICompoundProperty geomParams = tobj.getSchema().getArbGeomParams();
          
@@ -1198,21 +1219,21 @@ void CAbcTranslator::ReadAlembicAttributes()
          {
             AtPoint min, max;
             
-            bool hasMin = ReadFloat3Attribute(userProps, m_overrideBoundsMin, false, m_min);
+            bool hasMin = ReadFloat3Attribute(userProps, geomParams, m_overrideBoundsMin, Alembic::AbcGeom::kConstantScope, m_min);
             if (!hasMin && promoteMin)
             {
                MGlobal::displayInfo(MString("[mzAbcShapeMtoa] Check for promoted attribute \"") + m_overrideBoundsMin.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
-               hasMin = ReadFloat3Attribute(geomParams, m_overrideBoundsMin, true, m_min);
+               hasMin = ReadFloat3Attribute(emptyProp, geomParams, m_overrideBoundsMin, Alembic::AbcGeom::kUniformScope, m_min);
             }
             if (hasMin)
             {
                AtPoint max;
                
-               bool hasMax = ReadFloat3Attribute(userProps, m_overrideBoundsMax, false, m_max);
+               bool hasMax = ReadFloat3Attribute(userProps, geomParams, m_overrideBoundsMax, Alembic::AbcGeom::kConstantScope, m_max);
                if (!hasMax && promoteMax)
                {
                   MGlobal::displayInfo(MString("[mzAbcShapeMtoa] Check for promoted attribute \"") + m_overrideBoundsMax.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
-                  hasMax = ReadFloat3Attribute(geomParams, m_overrideBoundsMax, true, m_max);
+                  hasMax = ReadFloat3Attribute(emptyProp, geomParams, m_overrideBoundsMax, Alembic::AbcGeom::kUniformScope, m_max);
                }
                if (hasMax)
                {
@@ -1237,11 +1258,11 @@ void CAbcTranslator::ReadAlembicAttributes()
             
             if (m_padBoundsWithPeakRadius)
             {
-               bool hasPeakRadius = ReadFloatAttribute(userProps, m_peakRadius, false, peakRadius);
+               bool hasPeakRadius = ReadFloatAttribute(userProps, geomParams, m_peakRadius, Alembic::AbcGeom::kConstantScope, peakRadius);
                if (!hasPeakRadius && promotePeakRadius)
                {
                   MGlobal::displayInfo(MString("[mzAbcShapeMtoa] Check for promoted attribute \"") + m_peakRadius.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
-                  hasPeakRadius = ReadFloatAttribute(geomParams, m_peakRadius, true, peakRadius);
+                  hasPeakRadius = ReadFloatAttribute(emptyProp, geomParams, m_peakRadius, Alembic::AbcGeom::kUniformScope, peakRadius);
                }
                if (hasPeakRadius)
                {
@@ -1255,11 +1276,11 @@ void CAbcTranslator::ReadAlembicAttributes()
             
             if (m_padBoundsWithPeakWidth)
             {
-               bool hasPeakWidth = ReadFloatAttribute(userProps, m_peakWidth, false, peakWidth);
+               bool hasPeakWidth = ReadFloatAttribute(userProps, geomParams, m_peakWidth, Alembic::AbcGeom::kConstantScope, peakWidth);
                if (!hasPeakWidth && promotePeakWidth)
                {
                   MGlobal::displayInfo(MString("[mzAbcShapeMtoa] Check for promoted attribute \"") + m_peakWidth.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
-                  hasPeakWidth = ReadFloatAttribute(geomParams, m_peakWidth, true, peakWidth);
+                  hasPeakWidth = ReadFloatAttribute(emptyProp, geomParams, m_peakWidth, Alembic::AbcGeom::kUniformScope, peakWidth);
                }
                if (hasPeakWidth)
                {
