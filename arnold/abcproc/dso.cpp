@@ -515,9 +515,12 @@ Dso::Dso(AtNode *node)
    }
    
    // Check frame and get from options node if needed? ('frame' user attribute)
+   bool useReferenceFile = mCommonParams.outputReference &&
+                           (mCommonParams.referenceSource == RS_file ||
+                            mCommonParams.referenceSource == RS_attributes_then_file);
    
    normalizeFilePath(mCommonParams.filePath);
-   if (mCommonParams.referenceFilePath.length() == 0)
+   if (useReferenceFile && mCommonParams.referenceFilePath.length() == 0)
    {
       // look if we have a .ref file alongside the abc file path
       // this file if it exists, should contain the path to the 'reference' alembic file
@@ -544,7 +547,7 @@ Dso::Dso(AtNode *node)
       
       mScene = AlembicSceneCache::Ref(mCommonParams.filePath, id, filter, true);
    
-      if (mCommonParams.referenceFilePath.length() > 0)
+      if (useReferenceFile && mCommonParams.referenceFilePath.length() > 0)
       {
          mRefScene = AlembicSceneCache::Ref(mCommonParams.referenceFilePath, id, filter, true);
       }
@@ -891,11 +894,14 @@ std::string Dso::getReferencePath(const std::string &basePath) const
          {
             AiMsgInfo("[abcproc] Got reference path from .ref file: %s", refPath.c_str());
          }
-         return refPath;
+      }
+      else
+      {
+         refPath = "";
       }
    }
    
-   return "";
+   return refPath;
 }
 
 std::string Dso::dataString(const char *targetShape) const
