@@ -941,6 +941,8 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
    {
       std::set<std::string> specialPointNames;
       std::set<std::string> specialVertexNames;
+      std::set<std::string> ignorePointNames;
+      std::set<std::string> ignoreVertexNames;
       
       const char *accName = mDso->accelerationName();
       if (!accName)
@@ -966,11 +968,20 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
          specialPointNames.insert(velName);
       }
       
-      if (mDso->outputReference())
+      if (mDso->outputReference() && (mDso->referenceSource() == RS_attributes ||
+                                      mDso->referenceSource() == RS_attributes_then_file))
       {
+         // force reading reference attributes
          specialPointNames.insert(mDso->referencePositionName());
          specialPointNames.insert(mDso->referenceNormalName());
          specialVertexNames.insert(mDso->referenceNormalName());
+      }
+      else
+      {
+         // force ignoring reference attributes
+         ignorePointNames.insert(mDso->referencePositionName());
+         ignorePointNames.insert(mDso->referenceNormalName());
+         ignoreVertexNames.insert(mDso->referenceNormalName());
       }
       
       // what about 'radius' and 'size'?
@@ -1029,7 +1040,8 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
                }
                else
                {
-                  if (vertexAttrs && (mDso->readVertexAttribs() || specialVertexNames.find(ua.first) != specialVertexNames.end()))
+                  if (vertexAttrs && ignoreVertexNames.find(ua.first) == ignoreVertexNames.end() &&
+                      (mDso->readVertexAttribs() || specialVertexNames.find(ua.first) != specialVertexNames.end()))
                   {
                      //ua.second.arnoldCategory = AI_USERDEF_INDEXED;
                      attrs = vertexAttrs;
@@ -1057,7 +1069,8 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
                }
                else
                {
-                  if (pointAttrs && (mDso->readPointAttribs() || specialPointNames.find(ua.first) != specialPointNames.end()))
+                  if (pointAttrs && ignorePointNames.find(ua.first) == ignorePointNames.end() &&
+                      (mDso->readPointAttribs() || specialPointNames.find(ua.first) != specialPointNames.end()))
                   {
                      //ua.second.arnoldCategory = AI_USERDEF_VARYING;
                      attrs = pointAttrs;
