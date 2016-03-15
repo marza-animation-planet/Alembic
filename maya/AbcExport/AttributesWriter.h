@@ -66,6 +66,8 @@ class AttributesWriter
     static bool hasAnyAttr(const MFnDependencyNode & iNode,
                            const JobArgs & iArgs);
 
+    static bool hasReferenceObject(const MFnDependencyNode & iNode);
+
   private:
 
     std::vector < PlugAndObjArray >     mPlugObjArrayVec;
