@@ -69,7 +69,7 @@ struct Prop
 };
 
 void addProps(Alembic::Abc::ICompoundProperty & iParent, MObject & iObject,
-              bool iUnmarkedFaceVaryingColors, bool iUnmarkedFaceVaryingUVs);
+              bool iUnmarkedFaceVaryingColors, bool iUnmarkedFaceVaryingUVs, bool iIgnoreReference=false);
 
 bool addArrayProp(Alembic::Abc::IArrayProperty & iProp, MObject & iParent);
 bool addScalarProp(Alembic::Abc::IScalarProperty & iProp, MObject & iParent);
@@ -295,5 +295,13 @@ bool getUVandColorAttrs( Alembic::Abc::ICompoundProperty & iParent,
     std::vector< Alembic::AbcGeom::IC3fGeomParam > & ioC3s,
     std::vector< Alembic::AbcGeom::IC4fGeomParam > & ioC4s,
     bool iUnmarkedFaceVaryingColors);
+
+bool getReferenceMeshAttrs( Alembic::Abc::ICompoundProperty & iParent,
+    Alembic::AbcGeom::IP3fGeomParam &Pref,
+    Alembic::AbcGeom::IN3fGeomParam &Nref);
+
+bool createReferenceMesh( MObject &iMesh,
+    const Alembic::AbcGeom::IP3fGeomParam &Pref,
+    const Alembic::AbcGeom::IN3fGeomParam &Nref);
 
 #endif  // ABCIMPORT_NODE_ITERATOR_HELPER_H_

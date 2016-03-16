@@ -69,6 +69,9 @@
 #include <maya/MFnCamera.h>
 #include <maya/MFnParticleSystem.h>
 #include <maya/MTime.h>
+#include <maya/MFloatPointArray.h>
+#include <maya/MVectorArray.h>
+#include <maya/MDGModifier.h>
 
 template <class T>
 void unsupportedWarning(T & iProp)
@@ -1330,7 +1333,7 @@ bool addScalarProp(Alembic::Abc::IScalarProperty & iProp, MObject & iParent)
 
 
 void addProps(Alembic::Abc::ICompoundProperty & iParent, MObject & iObject,
-    bool iUnmarkedFaceVaryingColors, bool iUnmarkedFaceVaryingUVs)
+    bool iUnmarkedFaceVaryingColors, bool iUnmarkedFaceVaryingUVs, bool iIgnoreReference)
 {
     // if the params CompoundProperty (.arbGeomParam or .userProperties)
     // aren't valid, then skip
@@ -1366,6 +1369,24 @@ void addProps(Alembic::Abc::ICompoundProperty & iParent, MObject & iObject,
         }
         else
         {
+            if (iObject.hasFn(MFn::kMesh) && iIgnoreReference)
+            {
+                if (propHeader.isArray())
+                {
+                    if (propName == "Nref" || propName == "Pref")
+                    {
+                        continue;
+                    }
+                }
+                else
+                {
+                    if (propName == "hasReferenceObject")
+                    {
+                        continue;
+                    }
+                }
+            }
+            
             if (propHeader.isArray())
             {
                 Alembic::Abc::IArrayProperty prop(iParent, propName);
@@ -3377,4 +3398,147 @@ bool getUVandColorAttrs(Alembic::Abc::ICompoundProperty & iParent,
     }
 
     return anyAnimated;
+}
+
+bool getReferenceMeshAttrs( Alembic::Abc::ICompoundProperty & iParent,
+    Alembic::AbcGeom::IP3fGeomParam &Pref,
+    Alembic::AbcGeom::IN3fGeomParam &Nref)
+{
+    if (!iParent)
+        return false;
+
+    Alembic::AbcGeom::IP3fGeomParam _Pref;
+    Alembic::AbcGeom::IN3fGeomParam _Nref;
+
+    const Alembic::Abc::PropertyHeader *propHeader = 0;
+
+    propHeader = iParent.getPropertyHeader("Pref");
+    if (propHeader &&
+        Alembic::AbcGeom::IP3fGeomParam::matches(*propHeader) &&
+        Alembic::AbcGeom::GetGeometryScope(propHeader->getMetaData()) == Alembic::AbcGeom::kVaryingScope)
+    {
+        _Pref = Alembic::AbcGeom::IP3fGeomParam(iParent, propHeader->getName());
+    }
+    else
+    {
+        return false;
+    }
+
+    propHeader = iParent.getPropertyHeader("Nref");
+    if (propHeader &&
+        Alembic::AbcGeom::IN3fGeomParam::matches(*propHeader) &&
+        (Alembic::AbcGeom::GetGeometryScope(propHeader->getMetaData()) == Alembic::AbcGeom::kVaryingScope ||
+         Alembic::AbcGeom::GetGeometryScope(propHeader->getMetaData()) == Alembic::AbcGeom::kFacevaryingScope))
+    {
+        _Nref = Alembic::AbcGeom::IN3fGeomParam(iParent, propHeader->getName());
+    }
+    else
+    {
+        return false;
+    }
+
+    Pref = _Pref;
+    Nref = _Nref;
+
+    return true;
+}
+
+bool createReferenceMesh( MObject &iMesh,
+    const Alembic::AbcGeom::IP3fGeomParam &Pref,
+    const Alembic::AbcGeom::IN3fGeomParam &Nref)
+{
+    MFnMesh fn(iMesh);
+
+    int numVertices = fn.numVertices();
+    int numPolygons = fn.numPolygons();
+    int numFaceVertices = fn.numFaceVertices();
+
+    Alembic::AbcGeom::IP3fGeomParam::Sample Psamp = Pref.getExpandedValue();
+    Alembic::AbcGeom::IN3fGeomParam::Sample Nsamp = Nref.getExpandedValue();
+    
+    Alembic::Abc::P3fArraySamplePtr Pvals = Psamp.getVals();
+    Alembic::Abc::N3fArraySamplePtr Nvals = Nsamp.getVals();
+    
+    size_t Pcount = Pvals->size();
+    size_t Ncount = Nvals->size();
+    
+    if (Pcount != size_t(numVertices) || Ncount != size_t(numFaceVertices))
+    {
+        return false;
+    }
+    
+    MIntArray polygonCounts;
+    MIntArray polygonConnects;
+    MFloatPointArray vertexArray;
+    
+    fn.getVertices(polygonCounts, polygonConnects);
+    
+    vertexArray.setLength(Pcount);
+    for (size_t i=0; i<Pcount; ++i)
+    {
+        MFloatPoint &dst = vertexArray[i];
+        const Alembic::Abc::V3f &src = (*Pvals)[i];
+        
+        dst.x = src.x;
+        dst.y = src.y;
+        dst.z = src.z;
+    }
+    
+    MFnMesh refFn;
+    
+    MObject refObj = refFn.create(numVertices, numPolygons, vertexArray, polygonCounts, polygonConnects);
+    
+    if (refObj != MObject::kNullObj)
+    {
+        MIntArray faceList(Ncount);
+        MIntArray vertexList(Ncount);
+        MVectorArray normalArray(Ncount);
+
+        int i = 0;
+        
+        for (int p=0, n=0; p<numPolygons; ++p)
+        {
+            MIntArray polyVerts;
+            
+            refFn.getPolygonVertices(p, polyVerts);
+            
+            int nv = polyVerts.length();
+            
+            // reverse winding
+            for (int v=nv-1; v>=0; --v, ++i)
+            {
+                MVector &dst = normalArray[i];
+                const Alembic::Abc::V3f &src = (*Nvals)[i];
+                
+                dst.x = src.x;
+                dst.y = src.y;
+                dst.z = src.z;
+                
+                faceList[i] = p;
+                vertexList[i] = polyVerts[v];
+            }
+        }
+
+        refFn.setFaceVertexNormals(normalArray, faceList, vertexList);
+        
+        MDGModifier dgMod;
+        
+        MPlug pSrc = refFn.findPlug("message");
+        MPlug pDst = fn.findPlug("referenceObject");
+        
+        dgMod.connect(pSrc, pDst);
+        dgMod.doIt();
+        
+        MString refName = fn.name() + "_reference";
+        dgMod.renameNode(refObj, refName);
+        dgMod.doIt();
+
+        // rename parent too?
+
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
