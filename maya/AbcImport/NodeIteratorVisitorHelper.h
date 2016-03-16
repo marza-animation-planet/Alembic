@@ -300,7 +300,7 @@ bool getReferenceMeshAttrs( Alembic::Abc::ICompoundProperty & iParent,
     Alembic::AbcGeom::IP3fGeomParam &Pref,
     Alembic::AbcGeom::IN3fGeomParam &Nref);
 
-bool createReferenceMesh( MObject &iMesh,
+bool createReferenceMesh( MObject polyObj, Alembic::AbcGeom::IPolyMesh &iMesh,
     const Alembic::AbcGeom::IP3fGeomParam &Pref,
     const Alembic::AbcGeom::IN3fGeomParam &Nref);
 

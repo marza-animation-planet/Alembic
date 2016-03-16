@@ -71,7 +71,7 @@
 #include <maya/MTime.h>
 #include <maya/MFloatPointArray.h>
 #include <maya/MVectorArray.h>
-#include <maya/MDGModifier.h>
+#include <maya/MDagModifier.h>
 
 template <class T>
 void unsupportedWarning(T & iProp)
@@ -3443,37 +3443,82 @@ bool getReferenceMeshAttrs( Alembic::Abc::ICompoundProperty & iParent,
     return true;
 }
 
-bool createReferenceMesh( MObject &iMesh,
+bool createReferenceMesh( MObject polyObj, Alembic::AbcGeom::IPolyMesh &iMesh,
     const Alembic::AbcGeom::IP3fGeomParam &Pref,
     const Alembic::AbcGeom::IN3fGeomParam &Nref)
 {
-    MFnMesh fn(iMesh);
+    Alembic::AbcGeom::IPolyMeshSchema schema = iMesh.getSchema();
 
-    int numVertices = fn.numVertices();
-    int numPolygons = fn.numPolygons();
-    int numFaceVertices = fn.numFaceVertices();
-
-    Alembic::AbcGeom::IP3fGeomParam::Sample Psamp = Pref.getExpandedValue();
-    Alembic::AbcGeom::IN3fGeomParam::Sample Nsamp = Nref.getExpandedValue();
+    Alembic::Abc::Int32ArraySamplePtr faceCounts = schema.getFaceCountsProperty().getValue();
+    Alembic::Abc::Int32ArraySamplePtr faceIndices = schema.getFaceIndicesProperty().getValue();
     
-    Alembic::Abc::P3fArraySamplePtr Pvals = Psamp.getVals();
-    Alembic::Abc::N3fArraySamplePtr Nvals = Nsamp.getVals();
-    
-    size_t Pcount = Pvals->size();
-    size_t Ncount = Nvals->size();
-    
-    if (Pcount != size_t(numVertices) || Ncount != size_t(numFaceVertices))
+    if (!faceCounts || !faceIndices)
     {
+        MGlobal::displayInfo("Missing face counts and/or face indices properties.");
         return false;
     }
     
-    MIntArray polygonCounts;
-    MIntArray polygonConnects;
-    MFloatPointArray vertexArray;
+    size_t numPolygons = faceCounts->size();
+    size_t numFaceVertices = 0;
+    size_t numVertices = 0;
     
-    fn.getVertices(polygonCounts, polygonConnects);
+    for (size_t i=0, j=0; i<numPolygons; ++i)
+    {
+        size_t nv = size_t(faceCounts->get()[i]);
+        
+        for (size_t k=0; k<nv; ++k, ++j)
+        {
+            size_t vi = size_t(faceIndices->get()[j]);
+            if (vi >= numVertices)
+            {
+                numVertices = vi;
+            }
+        }
+        
+        numFaceVertices += nv;
+    }
     
-    vertexArray.setLength(Pcount);
+    // numVertices contains maximum point index
+    ++numVertices;
+
+    Alembic::AbcGeom::IP3fGeomParam::Sample Psamp = Pref.getExpandedValue();
+    Alembic::Abc::P3fArraySamplePtr Pvals = Psamp.getVals();
+    size_t Pcount = Pvals->size();
+    if (Pcount != numVertices)
+    {
+        MGlobal::displayInfo("Point count mismatch for reference object");
+        return false;
+    }
+    
+    Alembic::AbcGeom::IN3fGeomParam::Sample Nsamp = Nref.getExpandedValue();
+    Alembic::Abc::N3fArraySamplePtr Nvals = Nsamp.getVals();
+    size_t Ncount = Nvals->size();
+    if (Ncount != numFaceVertices)
+    {
+        MGlobal::displayInfo("Normal count mismatch for reference object");
+        return false;
+    }
+    
+    MIntArray polygonCounts(numPolygons);
+    MIntArray polygonConnects(numFaceVertices);
+    MFloatPointArray vertexArray(numVertices);
+    
+    int base = 0;
+    
+    for (size_t i=0, j=0; i<numPolygons; ++i)
+    {
+        int nv = faceCounts->get()[i];
+        
+        polygonCounts[i] = nv;
+        
+        for (int k=0; k<nv; ++k, ++j)
+        {
+            polygonConnects[j] = faceIndices->get()[base + nv - k - 1];
+        }
+        
+        base += nv;
+    }
+    
     for (size_t i=0; i<Pcount; ++i)
     {
         MFloatPoint &dst = vertexArray[i];
@@ -3484,9 +3529,15 @@ bool createReferenceMesh( MObject &iMesh,
         dst.z = src.z;
     }
     
+    MFnMesh fn(polyObj);
     MFnMesh refFn;
     
-    MObject refObj = refFn.create(numVertices, numPolygons, vertexArray, polygonCounts, polygonConnects);
+    MDagPath ppath;
+    fn.getPath(ppath);
+    ppath.pop(2);
+    
+    MStatus stat;
+    MObject refObj = refFn.create(numVertices, numPolygons, vertexArray, polygonCounts, polygonConnects, MObject::kNullObj, &stat);
     
     if (refObj != MObject::kNullObj)
     {
@@ -3521,24 +3572,65 @@ bool createReferenceMesh( MObject &iMesh,
 
         refFn.setFaceVertexNormals(normalArray, faceList, vertexList);
         
-        MDGModifier dgMod;
+        MDagModifier dagMod;
         
+        // connect mesh referenceObject
         MPlug pSrc = refFn.findPlug("message");
         MPlug pDst = fn.findPlug("referenceObject");
         
-        dgMod.connect(pSrc, pDst);
-        dgMod.doIt();
+        dagMod.connect(pSrc, pDst);
+        dagMod.doIt();
         
-        MString refName = fn.name() + "_reference";
-        dgMod.renameNode(refObj, refName);
-        dgMod.doIt();
+        // rename parent
+        MDagPath path;
+        fn.getPath(path);
+        path.pop();
+        
+        MDagPath refPath;
+        refFn.getPath(refPath);
+        refPath.pop();
+        
+        MFnTransform tr(path);
+        MFnTransform refTr(refPath);
+        
+        MString refName = tr.name() + "_reference";
+        MObject trObj = refPath.node();
+        
+        dagMod.renameNode(refObj, refName);
+        dagMod.doIt();
+        
+        // reparent if necessary
+        if (ppath.isValid())
+        {
+            MObject parentObj = ppath.node();
+            dagMod.reparentNode(trObj, parentObj);
+            dagMod.doIt();
+        }
 
-        // rename parent too?
+        MPlug plug;
+        
+        // set reference transform as template
+        plug = refTr.findPlug("template");
+        if (!plug.isNull())
+        {
+            plug.setBool(true);
+        }
+        
+        // cut transform inheritance
+        plug = refTr.findPlug("inheritsTransform");
+        if (!plug.isNull())
+        {
+            plug.setBool(false);
+        }
+        
+        // reset transform
+        refTr.set(MTransformationMatrix::identity);
 
         return true;
     }
     else
     {
+        stat.perror("Create reference mesh");
         return false;
     }
 }

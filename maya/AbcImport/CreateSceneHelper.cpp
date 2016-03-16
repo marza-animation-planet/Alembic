@@ -1339,7 +1339,11 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPolyMesh& iNode)
         addFaceSets(polyObj, iNode);
         if (hasReference)
         {
-            createReferenceMesh(polyObj, Pref, Nref);
+            // if mesh is animated, topology isn't filled yet
+            if (!createReferenceMesh(polyObj, iNode, Pref, Nref))
+            {
+                MGlobal::displayInfo("Failed to create mesh reference object.");
+            }
         }
         mImportedObjects[iNode.getHeader().getFullName()] = polyObj;
     }
