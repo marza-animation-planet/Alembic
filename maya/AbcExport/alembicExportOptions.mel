@@ -104,6 +104,7 @@ global proc int _alembicExportOptions(string $parent,
             checkBoxGrp -ncb 1 -l "" -l1 "Write All UVs" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteAllUVs;
             checkBoxGrp -ncb 1 -l "" -l1 "Write Color Sets" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteColors;
             checkBoxGrp -ncb 1 -l "" -l1 "Write Face Sets" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteFaceSets;
+            checkBoxGrp -ncb 1 -l "" -l1 "Write Reference Mesh" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteReferenceMesh;
          setParent ..;
       setParent ..;
       
@@ -240,6 +241,10 @@ global proc int _alembicExportOptions(string $parent,
             else if ($key == "wfs")
             {
                checkBoxGrp -e -v1 ($val == "1") optWriteFaceSets;
+            }
+            else if ($key == "wrm")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optWriteReferenceMesh;
             }
             else if ($key == "fc" || $key == "pc")
             {
@@ -396,6 +401,11 @@ global proc int _alembicExportOptions(string $parent,
       if (`checkBoxGrp -q -v1 optWriteFaceSets` == true)
       {
          $optionsString += ";wfs=1";
+      }
+      
+      if (`checkBoxGrp -q -v1 optWriteReferenceMesh` == true)
+      {
+         $optionsString += ";wrm=1";
       }
       
       $text = `textFieldGrp -q -tx optGAList`;

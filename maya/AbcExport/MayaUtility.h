@@ -160,6 +160,7 @@ struct JobArgs
         writeColorSets = false;
         writeFaceSets = false;
         writeInstances = false;
+        writeReferenceMesh = false;
     }
 
     bool excludeInvisible;
@@ -174,6 +175,7 @@ struct JobArgs
     bool writeColorSets;
     bool writeFaceSets;
     bool writeInstances;
+    bool writeReferenceMesh;
 
     std::string melPerFrameCallback;
     std::string melPostCallback;

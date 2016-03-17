@@ -307,6 +307,7 @@ MayaMeshWriter::MayaMeshWriter(MDagPath & iDag,
     mWriteUVs(iArgs.writeUVs),
     mWriteColorSets(iArgs.writeColorSets),
     mWriteUVSets(iArgs.writeUVSets),
+    mWriteReferenceMesh(iArgs.writeReferenceMesh),
     mIsGeometryAnimated(false),
     mDagPath(iDag)
 {

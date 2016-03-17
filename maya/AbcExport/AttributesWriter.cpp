@@ -2058,101 +2058,104 @@ AttributesWriter::AttributesWriter(
     std::set<std::string> ignoreNames;
 
     // Add reference object if any
-    MPlug pReferenceObject = iNode.findPlug("referenceObject");
-    if (!pReferenceObject.isNull())
+    if (iArgs.writeReferenceMesh)
     {
-        MPlugArray pSrcs;
-        if (pReferenceObject.connectedTo(pSrcs, true, false) && pSrcs.length() == 1)
+        MPlug pReferenceObject = iNode.findPlug("referenceObject");
+        if (!pReferenceObject.isNull())
         {
-            MPlug pSrc = pSrcs[0];
-            
-            MObject oSrc = pSrc.node();
-            
-            if (oSrc.hasFn(MFn::kMesh))
+            MPlugArray pSrcs;
+            if (pReferenceObject.connectedTo(pSrcs, true, false) && pSrcs.length() == 1)
             {
-                // back to a dag to extract world position
-                MDagPath path;
+                MPlug pSrc = pSrcs[0];
                 
-                if (MDagPath::getAPathTo(oSrc, path) == MS::kSuccess)
+                MObject oSrc = pSrc.node();
+                
+                if (oSrc.hasFn(MFn::kMesh))
                 {
-                    MFnMesh fnMesh(path);
+                    // back to a dag to extract world position
+                    MDagPath path;
                     
-                    Alembic::AbcCoreAbstract::MetaData md;
-                    md.set("isArray", "1");
-                    
-                    std::vector<Abc::V3f> values;
-                    std::vector<Abc::uint32_t> indices;
-                    bool bvalue = true;
-                    
-                    ignoreNames.insert("hasReferenceObject");
-                    ignoreNames.insert("Pref");
-                    ignoreNames.insert("Nref");
-                    
-                    // Output 'hasReferenceObject' user property
-                    MGlobal::displayInfo("Writing 'hasReferenceObject' user property.");
-                    Abc::OBoolProperty prop(iUserProps, "hasReferenceObject", iTimeIndex);
-                    prop.set(&bvalue);
-                    
-                    // Output 'Pref' geo param
+                    if (MDagPath::getAPathTo(oSrc, path) == MS::kSuccess)
                     {
-                        MGlobal::displayInfo("Writing 'Pref' geom param (varying).");
-                        MFloatPointArray Pref;
-                        fnMesh.getPoints(Pref, MSpace::kWorld);
+                        MFnMesh fnMesh(path);
                         
-                        unsigned int Pcount = Pref.length();
+                        Alembic::AbcCoreAbstract::MetaData md;
+                        md.set("isArray", "1");
                         
-                        values.resize(Pcount);
+                        std::vector<Abc::V3f> values;
+                        std::vector<Abc::uint32_t> indices;
+                        bool bvalue = true;
                         
-                        for (i=0; i<Pcount; ++i)
+                        ignoreNames.insert("hasReferenceObject");
+                        ignoreNames.insert("Pref");
+                        ignoreNames.insert("Nref");
+                        
+                        // Output 'hasReferenceObject' user property
+                        MGlobal::displayInfo("Writing 'hasReferenceObject' user property.");
+                        Abc::OBoolProperty prop(iUserProps, "hasReferenceObject", iTimeIndex);
+                        prop.set(&bvalue);
+                        
+                        // Output 'Pref' geo param
                         {
-                            values[i].x = Pref[i].x;
-                            values[i].y = Pref[i].y;
-                            values[i].z = Pref[i].z;
+                            MGlobal::displayInfo("Writing 'Pref' geom param (varying).");
+                            MFloatPointArray Pref;
+                            fnMesh.getPoints(Pref, MSpace::kWorld);
+                            
+                            unsigned int Pcount = Pref.length();
+                            
+                            values.resize(Pcount);
+                            
+                            for (i=0; i<Pcount; ++i)
+                            {
+                                values[i].x = Pref[i].x;
+                                values[i].y = Pref[i].y;
+                                values[i].z = Pref[i].z;
+                            }
+                            
+                            AbcGeom::OP3fGeomParam geoParam(iArbGeom, "Pref", false, AbcGeom::kVaryingScope, 1, iTimeIndex, md);
+                            AbcGeom::OP3fGeomParam::Sample sample(values, AbcGeom::kVaryingScope);
+                            geoParam.set(sample);
                         }
                         
-                        AbcGeom::OP3fGeomParam geoParam(iArbGeom, "Pref", false, AbcGeom::kVaryingScope, 1, iTimeIndex, md);
-                        AbcGeom::OP3fGeomParam::Sample sample(values, AbcGeom::kVaryingScope);
-                        geoParam.set(sample);
-                    }
-                    
-                    // Output 'Nref' geo param
-                    {
-                        MGlobal::displayInfo("Writing 'Nref' geom param (facevarying).");
-                        MFloatVectorArray Nref;
-                        MIntArray fvcount;
-                        MIntArray Nindices;
-                        
-                        fnMesh.getNormals(Nref, MSpace::kWorld);
-                        fnMesh.getNormalIds(fvcount, Nindices);
-                        
-                        unsigned int Ncount = Nref.length();
-                        
-                        values.resize(Ncount);
-                        
-                        for (i=0; i<Ncount; ++i)
+                        // Output 'Nref' geo param
                         {
-                            values[i].x = Nref[i].x;
-                            values[i].y = Nref[i].y;
-                            values[i].z = Nref[i].z;
+                            MGlobal::displayInfo("Writing 'Nref' geom param (facevarying).");
+                            MFloatVectorArray Nref;
+                            MIntArray fvcount;
+                            MIntArray Nindices;
+                            
+                            fnMesh.getNormals(Nref, MSpace::kWorld);
+                            fnMesh.getNormalIds(fvcount, Nindices);
+                            
+                            unsigned int Ncount = Nref.length();
+                            
+                            values.resize(Ncount);
+                            
+                            for (i=0; i<Ncount; ++i)
+                            {
+                                values[i].x = Nref[i].x;
+                                values[i].y = Nref[i].y;
+                                values[i].z = Nref[i].z;
+                            }
+                            
+                            unsigned int Icount = 0;
+                            
+                            for (i=0; i<fvcount.length(); ++i)
+                            {
+                                Icount += fvcount[i];
+                            }
+                            
+                            indices.resize(Icount);
+                            
+                            for (i=0; i<Icount; ++i)
+                            {
+                                indices[i] = Nindices[i];
+                            }
+                            
+                            AbcGeom::ON3fGeomParam geoParam(iArbGeom, "Nref", true, AbcGeom::kFacevaryingScope, 1, iTimeIndex, md);
+                            AbcGeom::ON3fGeomParam::Sample sample(values, indices, AbcGeom::kFacevaryingScope);
+                            geoParam.set(sample);
                         }
-                        
-                        unsigned int Icount = 0;
-                        
-                        for (i=0; i<fvcount.length(); ++i)
-                        {
-                            Icount += fvcount[i];
-                        }
-                        
-                        indices.resize(Icount);
-                        
-                        for (i=0; i<Icount; ++i)
-                        {
-                            indices[i] = Nindices[i];
-                        }
-                        
-                        AbcGeom::ON3fGeomParam geoParam(iArbGeom, "Nref", true, AbcGeom::kFacevaryingScope, 1, iTimeIndex, md);
-                        AbcGeom::ON3fGeomParam::Sample sample(values, indices, AbcGeom::kFacevaryingScope);
-                        geoParam.set(sample);
                     }
                 }
             }
@@ -2560,30 +2563,34 @@ bool AttributesWriter::hasAnyAttr(const MFnDependencyNode & iNode,
         }
     }
 
-    return hasReferenceObject(iNode);
+    return hasReferenceObject(iNode, iArgs);
 }
 
-bool AttributesWriter::hasReferenceObject(const MFnDependencyNode & iNode)
+bool AttributesWriter::hasReferenceObject(const MFnDependencyNode & iNode,
+                                          const JobArgs & iArgs)
 {
-    MPlug pReferenceObject = iNode.findPlug("referenceObject");
-    
-    if (!pReferenceObject.isNull())
+    if (iArgs.writeReferenceMesh)
     {
-        MPlugArray pSrcs;
+        MPlug pReferenceObject = iNode.findPlug("referenceObject");
         
-        if (pReferenceObject.connectedTo(pSrcs, true, false) && pSrcs.length() == 1)
+        if (!pReferenceObject.isNull())
         {
-            MPlug pSrc = pSrcs[0];
+            MPlugArray pSrcs;
             
-            MObject oSrc = pSrc.node();
-            
-            if (oSrc.hasFn(MFn::kMesh))
+            if (pReferenceObject.connectedTo(pSrcs, true, false) && pSrcs.length() == 1)
             {
-                MDagPath path;
+                MPlug pSrc = pSrcs[0];
                 
-                if (MDagPath::getAPathTo(oSrc, path) == MS::kSuccess)
+                MObject oSrc = pSrc.node();
+                
+                if (oSrc.hasFn(MFn::kMesh))
                 {
-                    return true;
+                    MDagPath path;
+                    
+                    if (MDagPath::getAPathTo(oSrc, path) == MS::kSuccess)
+                    {
+                        return true;
+                    }
                 }
             }
         }

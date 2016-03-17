@@ -200,6 +200,13 @@ MStatus AlembicExportFileTranslator::writer(
                 jobopts += " -wi";
             }
         }
+        else if (key == "wrm")
+        {
+            if (val == "1")
+            {
+                jobopts += " -wrm";
+            }
+        }
         else if (key == "ef")
         {
             if (val == "1")
