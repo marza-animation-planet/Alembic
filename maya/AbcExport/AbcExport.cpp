@@ -407,6 +407,11 @@ try
             {
                 jobArgs.writeInstances = true;
             }
+            
+            else if (arg == "-wrm" || arg == "-writereferencemesh")
+            {
+                jobArgs.writeReferenceMesh = true;
+            }
 
             else if (arg == "-mfc" || arg == "-melperframecallback")
             {

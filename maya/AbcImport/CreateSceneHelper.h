@@ -108,7 +108,8 @@ public:
         MString iFilterString = MString(),
         MString iExcludeFilterString = MString(),
         bool iCreateInstances = false,
-        bool iReadMeshNormals = false);
+        bool iReadMeshNormals = false,
+        bool iCreateReferenceMesh = false);
 
     ~CreateSceneVisitor();
 
@@ -184,6 +185,7 @@ private:
 
     bool mCreateInstances;
     bool mReadMeshNormals;
+    bool mCreateReferenceMesh;
 
     // special map of shaders to selection lists that have selections
     // of parts of meshes.  They are to get around a problem where a shape

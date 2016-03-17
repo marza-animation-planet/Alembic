@@ -91,6 +91,7 @@ class MayaMeshWriter
     bool mWriteUVs;
     bool mWriteColorSets;
     bool mWriteUVSets;
+    bool mWriteReferenceMesh;
 
     bool mIsGeometryAnimated;
     MDagPath mDagPath;

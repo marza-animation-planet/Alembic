@@ -318,12 +318,13 @@ CreateSceneVisitor::CreateSceneVisitor(double iFrame,
     bool iUnmarkedFaceVaryingColors, bool iUnmarkedFaceVaryingUVs, const MObject & iParent,
     Action iAction, MString iRootNodes,
     MString iIncludeFilterString, MString iExcludeFilterString,
-    bool createInstances, bool readMeshNormals) :
+    bool createInstances, bool readMeshNormals, bool createReferenceMesh) :
     mFrame(iFrame), mParent(iParent),
     mUnmarkedFaceVaryingColors(iUnmarkedFaceVaryingColors),
     mUnmarkedFaceVaryingUVs(iUnmarkedFaceVaryingUVs),
     mAction(iAction), mOnlyPattern(0), mExceptPattern(0),
-    mCreateInstances(createInstances), mReadMeshNormals(readMeshNormals)
+    mCreateInstances(createInstances), mReadMeshNormals(readMeshNormals),
+    mCreateReferenceMesh(createReferenceMesh)
 {
     mAnyRoots = false;
 
@@ -1179,6 +1180,20 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ISubD& iNode)
         subdAndFriends.mC3s, subdAndFriends.mC4s,
         mUnmarkedFaceVaryingColors);
 
+    bool hasReference = false;
+    Alembic::AbcGeom::IP3fGeomParam Pref;
+    Alembic::AbcGeom::IN3fGeomParam Nref;
+    
+    const Alembic::Abc::PropertyHeader *propHeader = (userProp ? userProp.getPropertyHeader("hasReferenceObject") : 0);
+    if (propHeader && Alembic::Abc::IBoolProperty::matches(*propHeader))
+    {
+        Alembic::Abc::IBoolProperty prop(userProp, "hasReferenceObject");
+        if (prop.getValue())
+        {
+            hasReference = getReferenceMeshAttrs(arbProp, Pref, Nref);
+        }
+    }
+
     bool isConstant = iNode.getSchema().isConstant();
 
     // add animated SubDs to the list
@@ -1220,9 +1235,17 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ISubD& iNode)
     if (subDObj != MObject::kNullObj)
     {
         setConstantVisibility(visProp, subDObj);
-        addProps(arbProp, subDObj, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs);
-        addProps(userProp, subDObj, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs);
+        addProps(arbProp, subDObj, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs, hasReference);
+        addProps(userProp, subDObj, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs, hasReference);
         addFaceSets(subDObj, iNode);
+        if (hasReference && mCreateReferenceMesh)
+        {
+            // if mesh is animated, topology isn't filled yet
+            if (!createReferenceMesh(subDObj, iNode, Pref, Nref))
+            {
+                MGlobal::displayInfo("Failed to create mesh reference object.");
+            }
+        }
         mImportedObjects[iNode.getHeader().getFullName()] = subDObj;
     }
 
@@ -1284,6 +1307,20 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPolyMesh& iNode)
         meshAndFriends.mC3s, meshAndFriends.mC4s,
         mUnmarkedFaceVaryingColors);
 
+    bool hasReference = false;
+    Alembic::AbcGeom::IP3fGeomParam Pref;
+    Alembic::AbcGeom::IN3fGeomParam Nref;
+    
+    const Alembic::Abc::PropertyHeader *propHeader = (userProp ? userProp.getPropertyHeader("hasReferenceObject") : 0);
+    if (propHeader && Alembic::Abc::IBoolProperty::matches(*propHeader))
+    {
+        Alembic::Abc::IBoolProperty prop(userProp, "hasReferenceObject");
+        if (prop.getValue())
+        {
+            hasReference = getReferenceMeshAttrs(arbProp, Pref, Nref);
+        }
+    }
+
     // add animated poly mesh to the list
     if (!isConstant || colorAnim)
         mData.mPolyMeshList.push_back(meshAndFriends);
@@ -1320,9 +1357,17 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPolyMesh& iNode)
     if (polyObj != MObject::kNullObj)
     {
         setConstantVisibility(visProp, polyObj);
-        addProps(arbProp, polyObj, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs);
-        addProps(userProp, polyObj, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs);
+        addProps(arbProp, polyObj, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs, hasReference);
+        addProps(userProp, polyObj, mUnmarkedFaceVaryingColors, mUnmarkedFaceVaryingUVs, hasReference);
         addFaceSets(polyObj, iNode);
+        if (hasReference && mCreateReferenceMesh)
+        {
+            // if mesh is animated, topology isn't filled yet
+            if (!createReferenceMesh(polyObj, iNode, Pref, Nref))
+            {
+                MGlobal::displayInfo("Failed to create mesh reference object.");
+            }
+        }
         mImportedObjects[iNode.getHeader().getFullName()] = polyObj;
     }
 

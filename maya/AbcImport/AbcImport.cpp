@@ -72,6 +72,8 @@ NAME_PREFIX "AbcImport  [options] File                                    \n\n"
                     the notUV metadata is set.                              \n\
 -ci / createInstances                                                       \n\
                     Create maya node instances.                             \n\
+-crm / createReferenceMesh                                                  \n\
+                    Create maya mesh reference object.                      \n\
 -rmn / readMeshNormals                                                      \n\
                     Set mesh normals if data available.                     \n\
                     Note that this will lock the normals and, as such, is \
@@ -138,6 +140,7 @@ MSyntax AbcImport::createSyntax()
     syntax.addFlag("-rcs",  "-recreateAllColorSets", MSyntax::kNoArg);
     syntax.addFlag("-rus",  "-recreateAllUVSets", MSyntax::kNoArg);
     syntax.addFlag("-ci",   "-createInstances", MSyntax::kNoArg);
+    syntax.addFlag("-crm",  "-createReferenceMesh", MSyntax::kNoArg);
     syntax.addFlag("-rmn",  "-readMeshNormals", MSyntax::kNoArg);
 
     syntax.addFlag("-ct",   "-connect",          MSyntax::kString);
@@ -273,6 +276,12 @@ MStatus AbcImport::doIt(const MArgList & args)
         readMeshNormals = true;
     }
 
+    bool createReferenceMesh = false;
+    if (argData.isFlagSet("createReferenceMesh"))
+    {
+        createReferenceMesh = true;
+    }
+
     status = argData.getCommandArgument(0, filename);
     MString abcNodeName;
     if (status == MS::kSuccess)
@@ -338,7 +347,7 @@ MStatus AbcImport::doIt(const MArgList & args)
             ArgData inputData(filename, debugOn, reparentObj,
                 swap, connectRootNodes, createIfNotFound, removeIfNoUpdate,
                 recreateColorSets, recreateUVSets, filterString, excludeFilterString,
-                createInstances, readMeshNormals);
+                createInstances, readMeshNormals, createReferenceMesh);
             abcNodeName = createScene(inputData);
 
             if (inputData.mSequenceStartTime != inputData.mSequenceEndTime &&
