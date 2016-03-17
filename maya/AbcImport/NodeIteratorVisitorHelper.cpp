@@ -2854,7 +2854,8 @@ ArgData::ArgData(MString iFileName,
     bool iDebugOn, MObject iReparentObj, bool iConnect,
     MString iConnectRootNodes, bool iCreateIfNotFound, bool iRemoveIfNoUpdate,
     bool iRecreateColorSets, bool iRecreateUVSets, MString iFilterString,
-    MString iExcludeFilterString, bool createInstances, bool readMeshNormals) :
+    MString iExcludeFilterString, bool createInstances, bool readMeshNormals,
+    bool createReferenceMesh) :
         mFileName(iFileName),
         mDebugOn(iDebugOn), mReparentObj(iReparentObj),
         mRecreateColorSets(iRecreateColorSets),
@@ -2866,7 +2867,8 @@ ArgData::ArgData(MString iFileName,
         mIncludeFilterString(iFilterString),
         mExcludeFilterString(iExcludeFilterString),
         mCreateInstances(createInstances),
-        mReadMeshNormals(readMeshNormals)
+        mReadMeshNormals(readMeshNormals),
+        mCreateReferenceMesh(createReferenceMesh)
 {
     mSequenceStartTime = -DBL_MAX;
     mSequenceEndTime = DBL_MAX;
@@ -2892,6 +2894,7 @@ ArgData & ArgData::operator=(const ArgData & rhs)
     mExcludeFilterString = rhs.mExcludeFilterString;
     mCreateInstances = rhs.mCreateInstances;
     mReadMeshNormals = rhs.mReadMeshNormals;
+    mCreateReferenceMesh = rhs.mCreateReferenceMesh;
 
     // optional information for the "connect" flag
     mConnect = rhs.mConnect;
@@ -2934,7 +2937,8 @@ MString createScene(ArgData & iArgData)
     CreateSceneVisitor visitor(iArgData.mSequenceStartTime,
         iArgData.mRecreateColorSets, iArgData.mRecreateUVSets, iArgData.mReparentObj, action,
         iArgData.mConnectRootNodes, iArgData.mIncludeFilterString,
-        iArgData.mExcludeFilterString, iArgData.mCreateInstances, iArgData.mReadMeshNormals);
+        iArgData.mExcludeFilterString, iArgData.mCreateInstances, iArgData.mReadMeshNormals,
+        iArgData.mCreateReferenceMesh);
 
     visitor.walk(archive);
 
@@ -3443,15 +3447,12 @@ bool getReferenceMeshAttrs( Alembic::Abc::ICompoundProperty & iParent,
     return true;
 }
 
-bool createReferenceMesh( MObject polyObj, Alembic::AbcGeom::IPolyMesh &iMesh,
+static bool createReferenceMesh( MObject polyObj,
+    Alembic::Abc::Int32ArraySamplePtr faceCounts,
+    Alembic::Abc::Int32ArraySamplePtr faceIndices,
     const Alembic::AbcGeom::IP3fGeomParam &Pref,
     const Alembic::AbcGeom::IN3fGeomParam &Nref)
 {
-    Alembic::AbcGeom::IPolyMeshSchema schema = iMesh.getSchema();
-
-    Alembic::Abc::Int32ArraySamplePtr faceCounts = schema.getFaceCountsProperty().getValue();
-    Alembic::Abc::Int32ArraySamplePtr faceIndices = schema.getFaceIndicesProperty().getValue();
-    
     if (!faceCounts || !faceIndices)
     {
         MGlobal::displayInfo("Missing face counts and/or face indices properties.");
@@ -3633,4 +3634,28 @@ bool createReferenceMesh( MObject polyObj, Alembic::AbcGeom::IPolyMesh &iMesh,
         stat.perror("Create reference mesh");
         return false;
     }
+}
+
+bool createReferenceMesh( MObject polyObj, Alembic::AbcGeom::IPolyMesh &iMesh,
+    const Alembic::AbcGeom::IP3fGeomParam &Pref,
+    const Alembic::AbcGeom::IN3fGeomParam &Nref)
+{
+    Alembic::AbcGeom::IPolyMeshSchema schema = iMesh.getSchema();
+
+    Alembic::Abc::Int32ArraySamplePtr faceCounts = schema.getFaceCountsProperty().getValue();
+    Alembic::Abc::Int32ArraySamplePtr faceIndices = schema.getFaceIndicesProperty().getValue();
+    
+    return createReferenceMesh(polyObj, faceCounts, faceIndices, Pref, Nref);
+}
+
+bool createReferenceMesh( MObject polyObj, Alembic::AbcGeom::ISubD &iSubD,
+    const Alembic::AbcGeom::IP3fGeomParam &Pref,
+    const Alembic::AbcGeom::IN3fGeomParam &Nref)
+{
+    Alembic::AbcGeom::ISubDSchema schema = iSubD.getSchema();
+
+    Alembic::Abc::Int32ArraySamplePtr faceCounts = schema.getFaceCountsProperty().getValue();
+    Alembic::Abc::Int32ArraySamplePtr faceIndices = schema.getFaceIndicesProperty().getValue();
+    
+    return createReferenceMesh(polyObj, faceCounts, faceIndices, Pref, Nref);
 }

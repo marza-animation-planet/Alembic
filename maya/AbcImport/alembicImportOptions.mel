@@ -41,6 +41,7 @@ global proc int alembicImportOptions(string $parent,
          columnLayout;
             checkBoxGrp -ncb 1 -l "" -l1 "Recreate All Color Sets" -adj 2 -cal 1 right -cal 2 left -v1 false optColSets;
             checkBoxGrp -ncb 1 -l "" -l1 "Recreate All UV Sets" -adj 2 -cal 1 right -cal 2 left -v1 false optUVSets;
+            checkBoxGrp -ncb 1 -l "" -l1 "Create Reference Object" -adj 2 -cal 1 right -cal 2 left -v1 false optRefObj;
          setParent ..;
       setParent ..;
       
@@ -99,6 +100,10 @@ global proc int alembicImportOptions(string $parent,
             else if ($key == "rus")
             {
                checkBoxGrp -e -v1 ($val == "1") optUVSets;
+            }
+            else if ($key == "crm")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optRefObj;
             }
             else if ($key == "d")
             {
@@ -190,6 +195,11 @@ global proc int alembicImportOptions(string $parent,
       if (`checkBoxGrp -q -v1 optUVSets` == true)
       {
          $optionsString += ";rus=1";
+      }
+      
+      if (`checkBoxGrp -q -v1 optRefObj` == true)
+      {
+         $optionsString += ";crm=1";
       }
       
       $flt = `textFieldGrp -q -tx optFlt`;

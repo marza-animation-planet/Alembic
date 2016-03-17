@@ -254,7 +254,8 @@ public:
         MString iIncludeFilterString = MString(""),
         MString iExcludeFilterString = MString(""),
         bool    createInstances = false,
-        bool    readMeshNormals = false);
+        bool    readMeshNormals = false,
+        bool    createReferenceMesh = false);
     ArgData(const ArgData & rhs);
     ArgData & operator=(const ArgData & rhs);
 
@@ -277,6 +278,7 @@ public:
     MString     mExcludeFilterString;
     bool        mCreateInstances;
     bool        mReadMeshNormals;
+    bool        mCreateReferenceMesh;
 
     WriterData  mData;
 };  // ArgData
@@ -301,6 +303,10 @@ bool getReferenceMeshAttrs( Alembic::Abc::ICompoundProperty & iParent,
     Alembic::AbcGeom::IN3fGeomParam &Nref);
 
 bool createReferenceMesh( MObject polyObj, Alembic::AbcGeom::IPolyMesh &iMesh,
+    const Alembic::AbcGeom::IP3fGeomParam &Pref,
+    const Alembic::AbcGeom::IN3fGeomParam &Nref);
+
+bool createReferenceMesh( MObject polyObj, Alembic::AbcGeom::ISubD &iSubD,
     const Alembic::AbcGeom::IP3fGeomParam &Pref,
     const Alembic::AbcGeom::IN3fGeomParam &Nref);
 
