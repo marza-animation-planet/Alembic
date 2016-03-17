@@ -94,6 +94,9 @@ def AutoSetup(shapes=None, verbose=False):
                if props is None:
                   continue
                
+               hasPref = False
+               hasNref = False
+               
                gprops = props.properties.get(".arbGeomParams", None)
                if gprops:
                   if names["overrideBoundsMin"] in gprops.properties and names["overrideBoundsMax"] in gprops.properties:
@@ -121,6 +124,9 @@ def AutoSetup(shapes=None, verbose=False):
                            cmds.setAttr(shape+".mtoa_constant_abc_padBoundsWithPeakWidth", True)
                         if gs == "uni":
                            promoteAttrs.append(names["peakWidth"])
+                  
+                  hasPref = ("Pref" in gprops.properties)
+                  hasNref = ("Nref" in gprops.properties)
                
                uprops = props.properties.get(".userProperties", None)
                if uprops:
@@ -135,6 +141,14 @@ def AutoSetup(shapes=None, verbose=False):
                   if names["peakWidth"] in uprops.properties:
                      if singleShape:
                         cmds.setAttr(shape+".mtoa_constant_abc_padBoundsWithPeakWidth", True)
+                  
+                  if "hasReferenceObject" in uprops.properties and hasPref and hasNref:
+                     p = uprops.properties["hasReferenceObject"]
+                     if p.values[0]:
+                        cmds.setAttr(shape+".mtoa_constant_abc_outputReference", True)
+                        cmds.setAttr(shape+".mtoa_constant_abc_referenceSource", 1)
+                        cmds.setAttr(shape+".mtoa_constant_abc_referencePositionName", "Pref", type="string")
+                        cmds.setAttr(shape+".mtoa_constant_abc_referenceNormalName", "Nref", type="string")
       
       _recurseNodes(a.top)
       
