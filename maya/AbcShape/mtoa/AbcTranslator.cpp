@@ -1840,7 +1840,7 @@ float CAbcTranslator::GetSampleFrame(unsigned int step)
    
    int steps = opts.findPlug("motion_steps").asInt();
    
-   if (steps <= 1)
+   if (!IsMotionBlurEnabled() || !IsLocalMotionBlurEnabled() || steps <= 1)
    {
       return m_session->GetExportFrame();
    }
