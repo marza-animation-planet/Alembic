@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import glob
 import excons
@@ -382,6 +383,7 @@ if excons.GetArgument("with-maya", default=None) is not None:
       mtoa_base = excons.GetArgument("with-mtoa")
       mtoa_defs = defs[:]
       mtoa_ext = ""
+      mtoa_ver = "unknown"
       
       if mtoa_base or (mtoa_inc and mtoa_lib):
          if mtoa_inc is None:
@@ -402,6 +404,12 @@ if excons.GetArgument("with-maya", default=None) is not None:
             mtoa_defs.append("_LINUX")
             mtoa_ext = ".so"
          
+         m = re.search(r"\d+\.\d+\.\d+(\.\d+)?", mtoa_inc)
+         if m is None:
+            m = re.search(r"\d+\.\d+\.\d+(\.\d+)?", mtoa_lib)
+         if m is not None:
+            mtoa_ver = m.group(0)
+         
          AbcShapeMtoa = "maya/AbcShape/mtoa/%sMtoa.py" % AbcShapeName
          AbcShapeHelper = "maya/AbcShape/mtoa/%sHelper.py" % AbcShapeName
          
@@ -414,6 +422,7 @@ if excons.GetArgument("with-maya", default=None) is not None:
          prjs.append({"name": "%sAbcShapeMtoa" % nameprefix,
                       "type": "dynamicmodule",
                       "prefix": "maya/plug-ins/mtoa",
+                      "bldprefix": "maya-%s/mtoa-%s" % (maya.Version(), mtoa_ver),
                       "ext": mtoa_ext,
                       "defs": mtoa_defs,
                       "srcs": glob.glob("maya/AbcShape/mtoa/*.cpp"),
