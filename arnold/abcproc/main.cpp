@@ -170,7 +170,7 @@ int ProcCleanup(void *user_ptr)
 
 // ---
 
-#include <H5pubconf.h>
+#include <H5public.h>
 
 #ifdef H5_HAVE_THREADSAFE
 
@@ -178,10 +178,9 @@ int ProcCleanup(void *user_ptr)
 
 // ToDo
 
-#else
+#else // _WIN32
 
 #include <pthread.h>
-#include <H5public.h>
 
 static int __attribute__((constructor)) on_dlopen(void)
 {
@@ -205,9 +204,9 @@ static int __attribute__((destructor)) on_dlclose(void)
    return 0;
 }
 
-#endif
+#endif // _WIN32
 
-#endif
+#endif // H5_HAVE_THREADSAFE
 
 proc_loader
 {
