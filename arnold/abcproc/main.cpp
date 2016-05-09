@@ -182,12 +182,12 @@ int ProcCleanup(void *user_ptr)
 
 #include <pthread.h>
 
-static int __attribute__((constructor)) on_dlopen(void)
+static void __attribute__((constructor)) on_dlopen(void)
 {
    H5dont_atexit();
 }
 
-static int __attribute__((destructor)) on_dlclose(void)
+static void __attribute__((destructor)) on_dlclose(void)
 {
    // Hack around thread termination segfault
    // -> alembic procedural is unloaded before thread finishes
@@ -200,8 +200,6 @@ static int __attribute__((destructor)) on_dlclose(void)
    pthread_key_delete(H5TS_cancel_key_g);
    pthread_key_delete(H5TS_funcstk_key_g);
    pthread_key_delete(H5TS_errstk_key_g);
-   
-   return 0;
 }
 
 #endif // _WIN32
