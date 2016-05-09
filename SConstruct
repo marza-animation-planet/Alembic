@@ -191,12 +191,14 @@ for libname in ["Util",
    
    prjs.append({"name": "Alembic%s" % libname,
                 "type": "staticlib",
+                "alias": "alembiclib",
                 "srcs": glob.glob("lib/Alembic/%s/*.cpp" % libname),
                 "custom": [RequireAlembic()],
                 "install": {"include/Alembic/%s" % libname: glob.glob("lib/Alembic/%s/*.h" % libname)}})
 
 prjs.append({"name": "AlembicAbcOpenGL",
              "type": "staticlib",
+             "alias": "alembicgl",
              "srcs": glob.glob("lib/AbcOpenGL/*.cpp"),
              "custom": [RequireAlembic(withGL=True)],
              "install": {"include/AbcOpenGL": glob.glob("lib/AbcOpenGL/*.h")}})
@@ -208,6 +210,7 @@ prjs.extend([{"name": ("alembicmodule" if sys.platform != "win32" else "alembic"
               "ext": python.ModuleExtension(),
               "alias": "pyalembic",
               "prefix": "%s/%s" % (python.ModulePrefix(), python.Version()),
+              "rpaths": ["../.."],
               "bldprefix": "python-%s" % python.Version(),
               "defs": ["alembicmodule_EXPORTS"],
               "incdirs": ["python/PyAlembic"],
@@ -220,6 +223,7 @@ prjs.extend([{"name": ("alembicmodule" if sys.platform != "win32" else "alembic"
               "ext": python.ModuleExtension(),
               "alias": "pyalembicgl",
               "prefix": "%s/%s" % (python.ModulePrefix(), python.Version()),
+              "rpaths": ["../.."],
               "bldprefix": "python-%s" % python.Version(),
               "defs": ["alembicglmodule_EXPORTS"],
               "incdirs": ["python/PyAbcOpenGL"],
@@ -241,11 +245,13 @@ for progname in ["AbcConvert",
    
    prjs.append({"name": progname.lower(),
                 "type": "program",
+                "alias": "alembictools",
                 "srcs": prog_srcs.get(progname, glob.glob("examples/bin/%s/*.cpp" % progname)),
                 "custom": [RequireAlembic()]})
 
 prjs.append({"name": "SimpleAbcViewer",
              "type": "program",
+             "alias": "alembictools",
              "srcs": glob.glob("examples/bin/SimpleAbcViewer/*.cpp"),
              "custom": [RequireAlembic(withGL=True)]})
 
@@ -268,7 +274,9 @@ defs = []
 if nameprefix:
    defs.append("NAME_PREFIX=\"\\\"%s\\\"\"" % nameprefix)
 
-withArnold = (excons.GetArgument("with-arnold", default=None) is not None)
+arnoldInc, arnoldLib = excons.GetDirs("arnold", libdirname=("lib" if sys.platform == "win32" else "bin"), silent=True)
+withArnold = (arnoldInc and arnoldLib)
+withMaya = (excons.GetArgument("with-maya", default=None) is not None)
 withVray = (excons.GetArgument("with-vray", default=None) is not None)
 
 if withArnold:
@@ -276,6 +284,7 @@ if withArnold:
                 "type": "dynamicmodule",
                 "ext": arnold.PluginExt(),
                 "prefix": "arnold",
+                "rpaths": ["../lib"],
                 "bldprefix": "arnold-%s" % arnold.Version(),
                 "defs": defs,
                 "incdirs": ["arnold/Procedural"],
@@ -286,6 +295,7 @@ if withArnold:
                 "type": "dynamicmodule",
                 "ext": arnold.PluginExt(),
                 "prefix": "arnold",
+                "rpaths": ["../lib"],
                 "bldprefix": "arnold-%s" % arnold.Version(),
                 "incdirs": ["arnold/abcproc"],
                 "srcs": glob.glob("arnold/abcproc/*.cpp"),
@@ -297,12 +307,13 @@ if withVray:
                 "alias": "AlembicLoader",
                 "ext": vray.PluginExt(),
                 "prefix": "vray",
+                "rpaths": ["../lib"],
                 "bldprefix": "vray-%s" % vray.Version(),
                 "incdirs": ["vray"],
                 "srcs": glob.glob("vray/*.cpp"),
                 "custom": [vray.Require, RequireAlembicHelper()]})
 
-if excons.GetArgument("with-maya", default=None) is not None:
+if withMaya:
    def replace_in_file(src, dst, srcStr, dstStr):
       fdst = open(dst, "w")
       fsrc = open(src, "r")
@@ -346,6 +357,7 @@ if excons.GetArgument("with-maya", default=None) is not None:
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins",
+                 "rpaths": ["../../lib"],
                  "bldprefix": "maya-%s" % maya.Version(),
                  "defs": defs + (["ABCIMPORT_VERSION=\"\\\"%s\\\"\"" % impver] if impver else []),
                  "incdirs": ["maya/AbcImport"],
@@ -357,6 +369,7 @@ if excons.GetArgument("with-maya", default=None) is not None:
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins",
+                 "rpaths": ["../../lib"],
                  "bldprefix": "maya-%s" % maya.Version(),
                  "defs": defs + (["ABCEXPORT_VERSION=\"\\\"%s\\\"\"" % expver] if expver else []),
                  "incdirs": ["maya/AbcExport"],
@@ -368,6 +381,7 @@ if excons.GetArgument("with-maya", default=None) is not None:
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins" + ("/vray" if withVray else ""),
+                 "rpaths": ["../../lib" if not withVray else "../../../lib"],
                  "bldprefix": "maya-%s" % maya.Version() + ("/vray-%s" % vray.Version() if withVray else ""),
                  "defs": defs + (["ABCSHAPE_VERSION=\"\\\"%s\\\"\"" % shpver] if shpver else []) +
                                 (["ABCSHAPE_VRAY_SUPPORT"] if withVray else []),
@@ -378,20 +392,12 @@ if excons.GetArgument("with-maya", default=None) is not None:
                              "maya/python": [AbcShapeMtoa, AbcMatEditPy] + ([AbcShapePy] if withVray else [])}}])
    
    if withArnold:
-      mtoa_inc = excons.GetArgument("with-mtoa-inc")
-      mtoa_lib = excons.GetArgument("with-mtoa-lib")
-      mtoa_base = excons.GetArgument("with-mtoa")
+      mtoa_inc, mtoa_lib = excons.GetDirs("mtoa", libdirname=("lib" if sys.platform == "win32" else "bin"))
       mtoa_defs = defs[:]
       mtoa_ext = ""
       mtoa_ver = "unknown"
       
-      if mtoa_base or (mtoa_inc and mtoa_lib):
-         if mtoa_inc is None:
-            mtoa_inc = mtoa_base + "/include"
-         
-         if mtoa_lib is None:
-            mtoa_lib = mtoa_base + ("/lib" if sys.platform == "win32" else "/bin")
-
+      if mtoa_inc and mtoa_lib:
          if sys.platform == "darwin":
             mtoa_defs.append("_DARWIN")
             mtoa_ext = ".dylib"
@@ -422,6 +428,7 @@ if excons.GetArgument("with-maya", default=None) is not None:
          prjs.append({"name": "%sAbcShapeMtoa" % nameprefix,
                       "type": "dynamicmodule",
                       "prefix": "maya/plug-ins/mtoa",
+                      "rpaths": ["../../../lib"],
                       "bldprefix": "maya-%s/mtoa-%s" % (maya.Version(), mtoa_ver),
                       "ext": mtoa_ext,
                       "defs": mtoa_defs,
