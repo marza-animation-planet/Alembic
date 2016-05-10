@@ -69,6 +69,11 @@ def RequireAlembic(withPython=False, withGL=False):
             msc12warn = False
       
       else:
+         env.Append(CPPFLAGS=" ".join([" -Wno-unused-local-typedefs",
+                                       "-Wno-unused-parameter",
+                                       "-Wno-unused-but-set-variable",
+                                       "-Wno-unused-variable",
+                                       "-Wno-ignored-qualifiers"]))
          if cpp11:
             env.Append(CPPFLAGS=" -std=c++11")
       
