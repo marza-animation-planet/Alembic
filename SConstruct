@@ -359,6 +359,7 @@ if withMaya:
    # it doesn't hurt to link SceneHelper
    
    prjs.extend([{"name": "%sAbcImport" % nameprefix,
+                 "alias": "maya",
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins",
@@ -367,10 +368,11 @@ if withMaya:
                  "defs": defs + (["ABCIMPORT_VERSION=\"\\\"%s\\\"\"" % impver] if impver else []),
                  "incdirs": ["maya/AbcImport"],
                  "srcs": glob.glob("maya/AbcImport/*.cpp") + regex_src,
-                 "custom": [maya.Require, maya.Plugin, RequireRegex, RequireAlembic()],
+                 "custom": [RequireRegex, RequireAlembic(), maya.Require, maya.Plugin],
                  "install": {"maya/scripts": glob.glob("maya/AbcImport/*.mel")}
                 },
                 {"name": "%sAbcExport" % nameprefix,
+                 "alias": "maya",
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins",
@@ -379,10 +381,11 @@ if withMaya:
                  "defs": defs + (["ABCEXPORT_VERSION=\"\\\"%s\\\"\"" % expver] if expver else []),
                  "incdirs": ["maya/AbcExport"],
                  "srcs": glob.glob("maya/AbcExport/*.cpp"),
-                 "custom": [maya.Require, maya.Plugin, RequireAlembic()],
+                 "custom": [RequireAlembic(), maya.Require, maya.Plugin],
                  "install": {"maya/scripts": glob.glob("maya/AbcExport/*.mel")}
                 },
                 {"name": "%sAbcShape" % nameprefix,
+                 "alias": "maya",
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins" + ("/vray" if withVray else ""),
@@ -392,7 +395,7 @@ if withMaya:
                                 (["ABCSHAPE_VRAY_SUPPORT"] if withVray else []),
                  "incdirs": ["maya/AbcShape"],
                  "srcs": glob.glob("maya/AbcShape/*.cpp"),
-                 "custom": [maya.Require, maya.Plugin] + ([vray.Require] if withVray else []) + [RequireAlembicHelper()],
+                 "custom": ([vray.Require] if withVray else []) + [RequireAlembicHelper(), maya.Require, maya.Plugin],
                  "install": {"maya/scripts": glob.glob("maya/AbcShape/*.mel"),
                              "maya/python": [AbcShapeMtoa, AbcMatEditPy] + ([AbcShapePy] if withVray else [])}}])
    
@@ -443,7 +446,7 @@ if withMaya:
                       "libs": ["mtoa_api"],
                       "install": {"maya/plug-ins/mtoa": [AbcShapeMtoa],
                                   "maya/python": [AbcShapeHelper]},
-                      "custom": [arnold.Require, maya.Require, RequireAlembicHelper()]})
+                      "custom": [RequireAlembicHelper(), arnold.Require, maya.Require]})
 
 
 excons.DeclareTargets(env, prjs)
