@@ -34,7 +34,7 @@ PrintVisitor::PrintVisitor()
 AlembicNode::VisitReturn PrintVisitor::enter(AlembicNode &node, AlembicNode *)
 {
    Indent(mCurDepth);
-   std::cout << node.formatPartialPath("cubes:", AlembicNode::LocalPrefix, '|'); // << std::endl;
+   std::cout << node.formatPartialPath("", AlembicNode::LocalPrefix, '|'); // << std::endl;
    if (node.isInstance())
    {
       std::cout << " [" << node.instanceNumber() << "] [instance: " << node.masterPath() << "]";

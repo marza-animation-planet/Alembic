@@ -239,7 +239,6 @@ AlembicNode::AlembicNode(Alembic::Abc::IObject iObj, const AlembicSceneFilter &f
       
       for (size_t i=0; i<numChildren; ++i)
       {
-         //if (filter.isExcluded(mIObj.getFullName().c_str()))
          if (filter.isExcluded(mIObj.getChild(i).getFullName().c_str()))
          {
             continue;
@@ -301,10 +300,22 @@ AlembicNode* AlembicNode::filteredClone(const AlembicSceneFilter &filter, Alembi
    {
       rv = new AlembicNode(*this, filter, parent);
       
-      if (rv && rv->childCount() == 0 && !filter.isIncluded(rv))
+      if (rv && !filter.isIncluded(rv))
       {
-         delete rv;
-         rv = 0;
+         bool keptChild = false;
+         for (size_t i=0; i<rv->childCount(); ++i)
+         {
+            if (filter.keep(rv->child(i)->object()))
+            {
+               keptChild = true;
+               break;
+            }
+         }
+         if (!keptChild)
+         {
+            delete rv;
+            rv = 0;
+         }
       }
    }
    
@@ -1033,10 +1044,22 @@ AlembicNode* AlembicNode::FilteredWrap(Alembic::Abc::IObject iObj, const Alembic
       rv = new AlembicCurves(iObj, filter, iParent);
    }
    
-   if (rv && rv->childCount() == 0 && !filter.isIncluded(rv))
+   if (rv && !filter.isIncluded(rv))
    {
-      delete rv;
-      rv = 0;
+      bool keptChild = false;
+      for (size_t i=0; i<rv->childCount(); ++i)
+      {
+         if (filter.keep(rv->child(i)->object()))
+         {
+            keptChild = true;
+            break;
+         }
+      }
+      if (!keptChild)
+      {
+         delete rv;
+         rv = 0;
+      }
    }
    
    return rv;
