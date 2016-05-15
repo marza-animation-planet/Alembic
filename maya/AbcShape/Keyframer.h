@@ -44,10 +44,16 @@ public:
                             bool reverse,
                             bool preserveStart);
    void createCurves(MFnAnimCurve::InfinityType preInf = MFnAnimCurve::kConstant,
-                     MFnAnimCurve::InfinityType postInf = MFnAnimCurve::kConstant);
+                     MFnAnimCurve::InfinityType postInf = MFnAnimCurve::kConstant,
+                     bool deleteExistingCurves=false);
    void setRotationCurvesInterpolation(const MString &interpType, const MStringDict &nodeInterpType);
    void fixCurvesTangents(MFnAnimCurve::AnimCurveType type);
    void fixCurvesTangents();
+   
+   void clearInheritsTransformKey(const MObject &node, bool v);
+   void clearTransformKeys(const MObject &node, const MMatrix &m);
+   void clearVisibilityKey(const MObject &node, bool v);
+   void clearAnyKey(const MObject &node, const MString &attr, int index, double val);
    
    void beginRetime();
    void retimeCurve(MFnAnimCurve &curve,

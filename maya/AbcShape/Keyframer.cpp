@@ -111,6 +111,46 @@ Keyframer::CurveEntry& Keyframer::getOrCreateEntry(const MFnDependencyNode &dnod
    return it->second;
 }
 
+void Keyframer::clearAnyKey(const MObject &node,
+                            const MString &attrName,
+                            int index, double v)
+{
+   MStatus stat;
+
+   MFnDependencyNode dnode(node, &stat);
+
+   if (stat != MS::kSuccess)
+   {
+      return;
+   }
+
+   MString realName = attrName;
+
+   // if plug a compound, get indexth child
+   MPlug plug = dnode.findPlug(attrName);
+
+   if (plug.isCompound())
+   {
+      if (index < 0 || (unsigned int)index >= plug.numChildren())
+      {
+         return;
+      }  
+
+      realName = plug.child(index).partialName();
+   }
+   else if (index != 0)
+   {
+      return;
+   }
+
+   CurveEntry &entry = getOrCreateEntry(dnode, realName, MFnAnimCurve::kAnimCurveTU);
+
+   entry.step = false;
+   entry.times.clear();
+   entry.values.clear();
+   entry.values.append(v);
+}
+
 void Keyframer::addAnyKey(const MObject &node,
                           const MString &attrName,
                           int index, double v)
@@ -146,7 +186,31 @@ void Keyframer::addAnyKey(const MObject &node,
    CurveEntry &entry = getOrCreateEntry(dnode, realName, MFnAnimCurve::kAnimCurveTU);
 
    entry.step = false;
+   if (entry.times.length() != entry.values.length())
+   {
+      entry.times.clear();
+      entry.values.clear();
+   }
    entry.times.append(mTime);
+   entry.values.append(v);
+}
+
+void Keyframer::clearVisibilityKey(const MObject &node, bool v)
+{
+   MStatus stat;
+
+   MFnDependencyNode dnode(node, &stat);
+
+   if (stat != MS::kSuccess)
+   {
+      return;
+   }
+
+   CurveEntry &entry = getOrCreateEntry(dnode, "visibility", MFnAnimCurve::kAnimCurveTU);
+
+   entry.step = true;
+   entry.times.clear();
+   entry.values.clear();
    entry.values.append(v);
 }
 
@@ -164,11 +228,16 @@ void Keyframer::addVisibilityKey(const MObject &node, bool v)
    CurveEntry &entry = getOrCreateEntry(dnode, "visibility", MFnAnimCurve::kAnimCurveTU);
 
    entry.step = true;
+   if (entry.times.length() != entry.values.length())
+   {
+      entry.times.clear();
+      entry.values.clear();
+   }
    entry.times.append(mTime);
    entry.values.append(v);
 }
 
-void  Keyframer::addInheritsTransformKey(const MObject &node, bool v)
+void Keyframer::clearInheritsTransformKey(const MObject &node, bool v)
 {
    MStatus stat;
 
@@ -182,8 +251,77 @@ void  Keyframer::addInheritsTransformKey(const MObject &node, bool v)
    CurveEntry &entry = getOrCreateEntry(dnode, "inheritsTransform", MFnAnimCurve::kAnimCurveTU);
 
    entry.step = true;
+   entry.times.clear();
+   entry.values.clear();
+   entry.values.append(v);
+}
+
+void Keyframer::addInheritsTransformKey(const MObject &node, bool v)
+{
+   MStatus stat;
+
+   MFnDependencyNode dnode(node, &stat);
+
+   if (stat != MS::kSuccess)
+   {
+      return;
+   }
+
+   CurveEntry &entry = getOrCreateEntry(dnode, "inheritsTransform", MFnAnimCurve::kAnimCurveTU);
+
+   entry.step = true;
+   if (entry.times.length() != entry.values.length())
+   {
+      entry.times.clear();
+      entry.values.clear();
+   }
    entry.times.append(mTime);
    entry.values.append(v);
+}
+
+void Keyframer::clearTransformKeys(const MObject &node, const MMatrix &m)
+{
+   MStatus stat;
+
+   MFnTransform dnode(node, &stat);
+
+   if (stat != MS::kSuccess)
+   {
+      return;
+   }
+
+   MTransformationMatrix tm(m);
+   double v[12];
+   MTransformationMatrix::RotationOrder ro;
+
+   MVector t = tm.getTranslation(MSpace::kTransform);
+   v[0] = t.x;
+   v[1] = t.y;
+   v[2] = t.z;
+
+   tm.getRotation(v+3, ro);
+   v[3] = MAngle(v[3]).asRadians();
+   v[4] = MAngle(v[4]).asRadians();
+   v[5] = MAngle(v[5]).asRadians();
+
+   tm.getScale(v+6, MSpace::kTransform);
+
+   tm.getShear(v+9, MSpace::kTransform);
+
+   // add curve keys
+   
+   size_t i = 0;
+
+   while (msTransformAttrNames[i] != 0)
+   {
+      CurveEntry &entry = getOrCreateEntry(dnode, msTransformAttrNames[i], msTransformCurveTypes[i]);
+
+      entry.times.clear();
+      entry.values.clear();
+      entry.values.append(v[i]);
+
+      ++i;
+   }
 }
 
 void Keyframer::addTransformKey(const MObject &node, const MMatrix &m)
@@ -216,13 +354,18 @@ void Keyframer::addTransformKey(const MObject &node, const MMatrix &m)
    tm.getShear(v+9, MSpace::kTransform);
 
    // add curve keys
-
+   
    size_t i = 0;
 
    while (msTransformAttrNames[i] != 0)
    {
       CurveEntry &entry = getOrCreateEntry(dnode, msTransformAttrNames[i], msTransformCurveTypes[i]);
 
+      if (entry.times.length() != entry.values.length())
+      {
+         entry.times.clear();
+         entry.values.clear();
+      }
       entry.times.append(mTime);
       entry.values.append(v[i]);
 
@@ -233,6 +376,11 @@ void Keyframer::addTransformKey(const MObject &node, const MMatrix &m)
 void Keyframer::cleanupCurve(CurveEntry &e, std::vector<unsigned int> &removeKeys, double threshold)
 {
    unsigned int nk = e.values.length();
+
+   if (e.times.length() != nk)
+   {
+      return;
+   }
 
    // clear indices
    removeKeys.clear();
@@ -471,7 +619,8 @@ void Keyframer::addCurvesImportInfo(const MObject &node,
 }
 
 void Keyframer::createCurves(MFnAnimCurve::InfinityType preInf,
-                             MFnAnimCurve::InfinityType postInf)
+                             MFnAnimCurve::InfinityType postInf,
+                             bool deleteExistingCurves)
 {
    MStatus stat;
    std::vector<unsigned int> tempIndices;
@@ -485,13 +634,43 @@ void Keyframer::createCurves(MFnAnimCurve::InfinityType preInf,
       
       cleanupCurve(entry, tempIndices, threshold);
     
-      if (entry.type != MFnAnimCurve::kAnimCurveTA &&
-          entry.type != MFnAnimCurve::kAnimCurveUA &&
-          (entry.times.length() == 1 ||
-           (entry.times.length() == 2 && fabs(entry.values[0] - entry.values[1]) <= threshold)))
+      // Also check for curves to delete
+      // In any other case, times.length() == values.length()
+      if ((entry.times.length() == 0 && entry.values.length() == 1) ||
+          // Why checking for angle curves here?
+          (entry.type != MFnAnimCurve::kAnimCurveTA &&
+           entry.type != MFnAnimCurve::kAnimCurveUA &&
+           (entry.times.length() == 1 ||
+            (entry.times.length() == 2 && fabs(entry.values[0] - entry.values[1]) <= threshold))))
       {
          // set constant value
+         // (if there's a curve connected -> disconnect or delete)
+         
          MPlug plug(entry.obj, entry.attr);
+         
+         MDGModifier dgmod;
+         MPlugArray srcs;
+         plug.connectedTo(srcs, true, false);
+         
+         for (unsigned int i=0; i<srcs.length(); ++i)
+         {
+            MObject srcNode = srcs[i].node();
+            if (srcNode.hasFn(MFn::kAnimCurve))
+            {
+               #ifdef _DEBUG
+               std::cout << "Disconnect existing curve" << std::endl;
+               #endif
+               dgmod.disconnect(srcs[i], plug);
+               
+               if (deleteExistingCurves)
+               {
+                  dgmod.deleteNode(srcNode);
+               }
+               
+               dgmod.doIt();
+            }
+         }
+         
          plug.setValue(entry.values[0]);
       }
       else
@@ -513,12 +692,19 @@ void Keyframer::createCurves(MFnAnimCurve::InfinityType preInf,
             
             for (unsigned int i=0; i<srcs.length(); ++i)
             {
-               if (srcs[i].node().hasFn(MFn::kAnimCurve))
+               MObject srcNode = srcs[i].node();
+               if (srcNode.hasFn(MFn::kAnimCurve))
                {
                   #ifdef _DEBUG
                   std::cout << "Disconnect existing curve" << std::endl;
                   #endif
                   dgmod.disconnect(srcs[i], plug);
+                  
+                  if (deleteExistingCurves)
+                  {
+                     dgmod.deleteNode(srcNode);
+                  }
+                  
                   retry = true;
                }
             }
