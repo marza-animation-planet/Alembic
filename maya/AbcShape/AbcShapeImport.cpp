@@ -33,6 +33,7 @@
 #include <maya/MFnCompoundAttribute.h>
 #include <maya/MFnMatrixData.h>
 #include <maya/MFnStringData.h>
+#include <maya/MPlugArray.h>
 
 MSyntax AbcShapeImport::createSyntax()
 {
@@ -53,6 +54,7 @@ MSyntax AbcShapeImport::createSyntax()
    syntax.addFlag("-nri", "-nodeRotationInterpolation", MSyntax::kString, MSyntax::kString);
    syntax.addFlag("-ft", "-filterObjects", MSyntax::kString);
    syntax.addFlag("-eft", "-excludeFilterObjects", MSyntax::kString);
+   syntax.addFlag("-u", "-update", MSyntax::kNoArg);
    syntax.addFlag("-h", "-help", MSyntax::kNoArg);
    
    syntax.makeFlagMultiUse("-nri");
@@ -184,11 +186,11 @@ public:
 
 typedef std::set<RetimeSample, RetimeSampleCompare> RetimeSampleSet;
 
-class CreateTree
+class UpdateTree
 {
 public:
    
-   CreateTree(const std::string &abcPath,
+   UpdateTree(const std::string &abcPath,
               AbcShape::DisplayMode mode,
               bool ignoreTransforms,
               bool createInstances,
@@ -209,7 +211,7 @@ public:
 
    const MDagPath& getDag(const std::string &path) const;
    
-   void keyTransforms(const MString &defaultRotationInterpolation, const MStringDict &nodeRotationInterpolation);
+   void keyTransforms(const MString &defaultRotationInterpolation, const MStringDict &nodeRotationInterpolation, bool deleteExistingCurves=false);
    void keyVisibility(Alembic::AbcGeom::IObject iobj, MFnDependencyNode &fn);
    
 private:
@@ -217,9 +219,11 @@ private:
    template <class T>
    AlembicNode::VisitReturn enterShape(AlembicNodeT<T> &node, AlembicNode *instance=0);
    
+   bool isAlreadyProcessed(const std::string &path) const;
+   
    bool hasDag(const std::string &path) const;
    bool addDag(const std::string &path, const MDagPath &dag);
-   bool checkExistingDag(const char *dagType, AlembicNode *node);
+   bool checkExistingDag(AlembicNode *node, const char *dagType=0);
    bool createDag(const char *dagType, AlembicNode *node, bool force=false);
    
    void getTransformSamples(AlembicXform *node, RetimeSampleSet &samples);
@@ -294,6 +298,12 @@ private:
    
 private:
    
+   struct DagPathEntry
+   {
+      MDagPath dagPath;
+      std::string typeName;
+   };
+   
    std::string mAbcPath;
    AbcShape::DisplayMode mMode;
    bool mIgnoreTransforms;
@@ -302,12 +312,13 @@ private:
    double mOffset;
    bool mPreserveStartFrame;
    AbcShape::CycleType mCycleType;
-   std::map<std::string, MDagPath> mDags;
+   std::map<std::string, DagPathEntry> mDags;
    Keyframer mKeyframer;
    MPlug mTimeSource;
+   std::set<std::string> mProcessed;
 };
 
-CreateTree::CreateTree(const std::string &abcPath,
+UpdateTree::UpdateTree(const std::string &abcPath,
                        AbcShape::DisplayMode mode,
                        bool ignoreTransforms,
                        bool createInstances,
@@ -334,43 +345,51 @@ CreateTree::CreateTree(const std::string &abcPath,
    mTimeSource = timeNode.findPlug("outTime");
 }
 
-bool CreateTree::hasDag(const std::string &path) const
+bool UpdateTree::hasDag(const std::string &path) const
 {
    return (mDags.find(path) != mDags.end());
 }
 
-const MDagPath& CreateTree::getDag(const std::string &path) const
+const MDagPath& UpdateTree::getDag(const std::string &path) const
 {
    static MDagPath sInvalidDag;
-   std::map<std::string, MDagPath>::const_iterator it = mDags.find(path);
-   return (it != mDags.end() ? it->second : sInvalidDag);
+   std::map<std::string, DagPathEntry>::const_iterator it = mDags.find(path);
+   return (it != mDags.end() ? it->second.dagPath : sInvalidDag);
 }
 
-bool CreateTree::addDag(const std::string &path, const MDagPath &dag)
+bool UpdateTree::addDag(const std::string &path, const MDagPath &dag)
 {
    if (hasDag(path))
    {
       return false;
    }
    
-   mDags[path] = dag;
+   DagPathEntry &entry = mDags[path];
+   
+   entry.dagPath = dag;
+   entry.typeName = MFnDagNode(dag).typeName().asChar();
    
    return true;
 }
 
-bool CreateTree::checkExistingDag(const char *dagType, AlembicNode *node)
+bool UpdateTree::checkExistingDag(AlembicNode *node, const char *dagType)
 {
-   if (!dagType || !node)
+   if (!node)
    {
       return false;
    }
-   else if (!hasDag(node->path()))
+   
+   const std::string &nodePath = node->path();
+   
+   std::map<std::string, DagPathEntry>::const_iterator it = mDags.find(nodePath);
+   
+   if (it == mDags.end())
    {
       MString curNs = MNamespace::currentNamespace();
       MSelectionList sl;
       MDagPath dagPath;
       
-      std::string tmp = node->path();
+      std::string tmp = nodePath;
       
       size_t p0 = 0;
       size_t p1 = tmp.find('/');
@@ -402,33 +421,54 @@ bool CreateTree::checkExistingDag(const char *dagType, AlembicNode *node)
       
       if (sl.add(tmp.c_str()) == MS::kSuccess && sl.getDagPath(0, dagPath) == MS::kSuccess)
       {
+         MGlobal::displayInfo("[" + MString(PREFIX_NAME("AbcShapeImport")) + "] Re-use existing DAG \"" + dagPath.fullPathName() + "\"");
+         
          MFnDagNode dagNode(dagPath);
          
-         // Check type
-         if (dagNode.typeName () == dagType)
+         DagPathEntry &entry = mDags[nodePath];
+         
+         entry.dagPath = dagPath;
+         entry.typeName = dagNode.typeName().asChar();
+         
+         if (dagType)
          {
-            MGlobal::displayInfo("[" + MString(PREFIX_NAME("AbcShapeImport")) + "] Re-use existing DAG \"" + dagPath.fullPathName() + "\"");
-            
-            mDags[node->path()] = dagPath;
+            return (entry.typeName == dagType);
+         }
+         else
+         {
             return true;
          }
       }
-      
-      return false;
+      else
+      {
+         return false;
+      }
    }
    else
    {
-      return true;
+      if (dagType)
+      {
+         return (it->second.typeName == dagType);
+      }
+      else
+      {
+         return true;
+      }
    }
 }
 
-bool CreateTree::createDag(const char *dagType, AlembicNode *node, bool force)
+bool UpdateTree::createDag(const char *dagType, AlembicNode *node, bool force)
 {
    if (!dagType || !node)
    {
       return false;
    }
-   else if (force || !hasDag(node->path()))
+   
+   const std::string &nodePath = node->path();
+   
+   std::map<std::string, DagPathEntry>::iterator it = mDags.find(nodePath);
+   
+   if (force || it == mDags.end())
    {
       MDagModifier dagmod;
       MStatus status;
@@ -455,7 +495,10 @@ bool CreateTree::createDag(const char *dagType, AlembicNode *node, bool force)
          dagNode.setName(node->name().c_str());
          dagNode.getPath(dagPath);
          
-         mDags[node->path()] = dagPath;
+         DagPathEntry &entry = mDags[nodePath];
+         
+         entry.dagPath = dagPath;
+         entry.typeName = dagType;
          
          if (dagType == PREFIX_NAME("AbcShape"))
          {
@@ -471,84 +514,132 @@ bool CreateTree::createDag(const char *dagType, AlembicNode *node, bool force)
    }
    else
    {
-      return true;
+      return (it->second.typeName == dagType);
    }
 }
 
+bool UpdateTree::isAlreadyProcessed(const std::string &path) const
+{
+   return (mProcessed.find(path) != mProcessed.end());
+}
+
 template <class T>
-AlembicNode::VisitReturn CreateTree::enterShape(AlembicNodeT<T> &node, AlembicNode *instance)
+AlembicNode::VisitReturn UpdateTree::enterShape(AlembicNodeT<T> &node, AlembicNode *instance)
 {
    AlembicNode *target = (instance ? instance : &node);
    
-   if (checkExistingDag(PREFIX_NAME("AbcShape"), target))
+   std::string targetPath = target->path();
+   
+   if (isAlreadyProcessed(targetPath))
    {
-      return AlembicNode::ContinueVisit;
+      return AlembicNode::DontVisitChildren;
    }
    
-   if (!createDag(PREFIX_NAME("AbcShape"), target, true))
+   mProcessed.insert(targetPath);
+   
+   // When updating a tree, allow the already existing dag to have a different type
+   // In such case, just update the visibiilty and user prop keys
+   bool exists = checkExistingDag(target);
+   bool typeMatch = false;
+   
+   if (!exists)
    {
-      return AlembicNode::StopVisit;
+      if (!createDag(PREFIX_NAME("AbcShape"), target, true))
+      {
+         return AlembicNode::StopVisit;
+      }
+      
+      typeMatch = true;
+   }
+   else
+   {
+      typeMatch = checkExistingDag(target, PREFIX_NAME("AbcShape"));
    }
    
-   // Set AbcShape (the order in which attributes are set is though as to have the lowest possible update cost)
-   MPlug plug;
-   MFnDagNode dagNode(getDag(target->path()));
+   MFnDagNode dagNode(getDag(targetPath));
    
-   plug = dagNode.findPlug("visibleInReflections");
-   plug.setBool(true);
-   
-   plug = dagNode.findPlug("visibleInRefractions");
-   plug.setBool(true);
-   
-   plug = dagNode.findPlug("ignoreXforms");
-   // plug.setBool(true);
-   plug.setBool(!mIgnoreTransforms);
-   // Should I disable 'inheritsTransform' on parent too?
-   
-   plug = dagNode.findPlug("ignoreInstances");
-   // plug.setBool(true);
-   plug.setBool(mCreateInstances);
-   
-   plug = dagNode.findPlug("ignoreVisibility");
-   plug.setBool(true);
-   
-   plug = dagNode.findPlug("cycleType");
-   plug.setShort(short(mCycleType));
-   
-   plug = dagNode.findPlug("speed");
-   plug.setDouble(mSpeed);
-   
-   plug = dagNode.findPlug("offset");
-   plug.setDouble(mOffset);
-   
-   plug = dagNode.findPlug("preserveStartFrame");
-   plug.setBool(mPreserveStartFrame);
-   
-   plug = dagNode.findPlug("objectExpression");
-   plug.setString(target->path().c_str());
-   
-   plug = dagNode.findPlug("displayMode");
-   plug.setShort(short(mMode));
-   
-   plug = dagNode.findPlug("filePath");
-   plug.setString(mAbcPath.c_str());
-   
-   // Only connect time if animated
-   // Note: On first evaluation, plug.asXXX doesn't seem to return valid values
-   //       though everything is correct within the compute method
-   //       Trigger a dummy evaluation before querying the value we're interested in
-   //       Internally, AbcShape will handle that nicely so that no un-necessary computations happen
-   plug = dagNode.findPlug("numShapes");
-   plug.asInt();
-   
-   plug = dagNode.findPlug("animated");
-   if (plug.asBool())
+   if (typeMatch)
    {
-      MDGModifier dgmod;
+      // Set AbcShape (the order in which attributes are set is though as to have the lowest possible update cost)
+      MPlug plug;
+      
+      plug = dagNode.findPlug("ignoreXforms");
+      plug.setBool(!mIgnoreTransforms);
+      // Should I disable 'inheritsTransform' on parent too?
+      
+      plug = dagNode.findPlug("ignoreInstances");
+      plug.setBool(mCreateInstances);
+      
+      plug = dagNode.findPlug("cycleType");
+      plug.setShort(short(mCycleType));
+      
+      plug = dagNode.findPlug("speed");
+      plug.setDouble(mSpeed);
+      
+      plug = dagNode.findPlug("offset");
+      plug.setDouble(mOffset);
+      
+      plug = dagNode.findPlug("preserveStartFrame");
+      plug.setBool(mPreserveStartFrame);
+      
+      plug = dagNode.findPlug("objectExpression");
+      plug.setString(targetPath.c_str());
+      
+      plug = dagNode.findPlug("displayMode");
+      plug.setShort(short(mMode));
+      
+      plug = dagNode.findPlug("filePath");
+      plug.setString(mAbcPath.c_str());
+      
+      if (!exists)
+      {
+         // Only set those on newly created nodes
+         plug = dagNode.findPlug("visibleInReflections");
+         plug.setBool(true);
+         
+         plug = dagNode.findPlug("visibleInRefractions");
+         plug.setBool(true);
+         
+         plug = dagNode.findPlug("ignoreVisibility");
+         plug.setBool(true);
+      }
+      
+      // Only connect time if animated
+      // Note: On first evaluation, plug.asXXX doesn't seem to return valid values
+      //       though everything is correct within the compute method
+      //       Trigger a dummy evaluation before querying the value we're interested in
+      //       Internally, AbcShape will handle that nicely so that no un-necessary computations happen
+      plug = dagNode.findPlug("numShapes");
+      plug.asInt();
+      
+      plug = dagNode.findPlug("animated");
+      bool animated = plug.asBool();
       
       plug = dagNode.findPlug("time");
-      dgmod.connect(mTimeSource, plug);
-      dgmod.doIt();
+         
+      MPlugArray srcs;
+      plug.connectedTo(srcs, true, false);
+      
+      if (animated)
+      {
+         if (srcs.length() == 0)
+         {
+            MDGModifier dgmod;
+            dgmod.connect(mTimeSource, plug);
+            dgmod.doIt();
+         }
+      }
+      else
+      {
+         MDGModifier dgmod;
+         
+         for (unsigned int i=0; i<srcs.length(); ++i)
+         {
+            dgmod.disconnect(srcs[i], plug);
+         }
+         
+         dgmod.doIt();
+      }
    }
    
    // also key shape level visibilty
@@ -559,32 +650,32 @@ AlembicNode::VisitReturn CreateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
    return AlembicNode::ContinueVisit;
 }
 
-AlembicNode::VisitReturn CreateTree::enter(AlembicMesh &node, AlembicNode *instance)
+AlembicNode::VisitReturn UpdateTree::enter(AlembicMesh &node, AlembicNode *instance)
 {
    return enterShape(node, instance);
 }
 
-AlembicNode::VisitReturn CreateTree::enter(AlembicSubD &node, AlembicNode *instance)
+AlembicNode::VisitReturn UpdateTree::enter(AlembicSubD &node, AlembicNode *instance)
 {
    return enterShape(node, instance);
 }
 
-AlembicNode::VisitReturn CreateTree::enter(AlembicPoints &node, AlembicNode *instance)
+AlembicNode::VisitReturn UpdateTree::enter(AlembicPoints &node, AlembicNode *instance)
 {
    return enterShape(node, instance);
 }
 
-AlembicNode::VisitReturn CreateTree::enter(AlembicCurves &node, AlembicNode *instance)
+AlembicNode::VisitReturn UpdateTree::enter(AlembicCurves &node, AlembicNode *instance)
 {
    return enterShape(node, instance);
 }
 
-AlembicNode::VisitReturn CreateTree::enter(AlembicNuPatch &node, AlembicNode *instance)
+AlembicNode::VisitReturn UpdateTree::enter(AlembicNuPatch &node, AlembicNode *instance)
 {
    return enterShape(node, instance);
 }
 
-void CreateTree::getTransformSamples(AlembicXform *node, RetimeSampleSet &samples)
+void UpdateTree::getTransformSamples(AlembicXform *node, RetimeSampleSet &samples)
 {
    Alembic::AbcGeom::IXformSchema schema = node->typedObject().getSchema();
    
@@ -627,7 +718,7 @@ void CreateTree::getTransformSamples(AlembicXform *node, RetimeSampleSet &sample
    }
 }
 
-void CreateTree::getDefaultTransform(AlembicXform *node, bool worldSpace, MMatrix &outM)
+void UpdateTree::getDefaultTransform(AlembicXform *node, bool worldSpace, MMatrix &outM)
 {
    Alembic::AbcGeom::IXformSchema schema = node->typedObject().getSchema();
    
@@ -658,7 +749,7 @@ void CreateTree::getDefaultTransform(AlembicXform *node, bool worldSpace, MMatri
    }
 }
 
-void CreateTree::getTransformAtTime(AlembicXform *node, double t, bool worldSpace, MMatrix &outM)
+void UpdateTree::getTransformAtTime(AlembicXform *node, double t, bool worldSpace, MMatrix &outM)
 {
    Alembic::AbcGeom::IXformSchema schema = node->typedObject().getSchema();
    
@@ -702,7 +793,7 @@ void CreateTree::getTransformAtTime(AlembicXform *node, double t, bool worldSpac
    }
 }
 
-void CreateTree::keyVisibility(Alembic::AbcGeom::IObject iobj, MFnDependencyNode &fn)
+void UpdateTree::keyVisibility(Alembic::AbcGeom::IObject iobj, MFnDependencyNode &fn)
 {
    Alembic::Abc::ICompoundProperty props = iobj.getProperties();
 
@@ -724,7 +815,11 @@ void CreateTree::keyVisibility(Alembic::AbcGeom::IObject iobj, MFnDependencyNode
             prop.get(v);
             pVis.setBool(v != 0);
                
-            if (!prop.isConstant() && fabs(mSpeed) > 0.0001)
+            if (prop.isConstant())
+            {
+               mKeyframer.clearVisibilityKey(mobj, v != 0);
+            }
+            else if (fabs(mSpeed) > 0.0001)
             {
                Alembic::AbcCoreAbstract::TimeSamplingPtr ts = prop.getTimeSampling();
                
@@ -771,8 +866,12 @@ void CreateTree::keyVisibility(Alembic::AbcGeom::IObject iobj, MFnDependencyNode
             
             prop.get(v);
             pVis.setBool(v);
-               
-            if (!prop.isConstant() && fabs(mSpeed) > 0.0001)
+            
+            if (prop.isConstant())
+            {
+               mKeyframer.clearVisibilityKey(mobj, v);
+            }
+            else if (fabs(mSpeed) > 0.0001)
             {
                Alembic::AbcCoreAbstract::TimeSamplingPtr ts = prop.getTimeSampling();
                
@@ -814,18 +913,25 @@ void CreateTree::keyVisibility(Alembic::AbcGeom::IObject iobj, MFnDependencyNode
    }
 }
 
-AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *instance)
+AlembicNode::VisitReturn UpdateTree::enter(AlembicXform &node, AlembicNode *instance)
 {
    AlembicNode *target = (instance ? instance : &node);
    
-   if (checkExistingDag(node.isLocator() ? "locator" : "transform", target))
+   std::string targetPath = target->path();
+   
+   if (isAlreadyProcessed(targetPath))
    {
-      return AlembicNode::ContinueVisit;
+      return AlembicNode::DontVisitChildren;
    }
+   
+   mProcessed.insert(targetPath);
+   
+   // want exact type all the time here
+   bool exists = checkExistingDag(target, node.isLocator() ? "locator" : "transform");
    
    if (node.isLocator())
    {
-      if (!createDag("locator", target, true))
+      if (!exists && !createDag("locator", target, true))
       {
          return AlembicNode::StopVisit;
       }
@@ -835,11 +941,12 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
       
       loc.get(posscl);
       
-      MFnDagNode locNode(getDag(target->path()));
+      MFnDagNode locNode(getDag(targetPath));
       MObject locObj = locNode.object();
       
       if (mIgnoreTransforms)
       {
+         // Beware!
          // Key direct parent transform with world transformation
          
          AlembicNode *parent = target->parent();
@@ -880,15 +987,19 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
             }
             else if (samples.size() == 1)
             {
+               // what about existing keys?
                getTransformAtTime(pnode, samples.begin()->otime, true, mmat);
-               MTransformationMatrix tm(mmat);
-               xform.set(tm);
+               // MTransformationMatrix tm(mmat);
+               // xform.set(tm);
+               mKeyframer.clearTransformKeys(xformObj, mmat);
             }
             else
             {
+               // what about existing keys?
                getDefaultTransform(pnode, true, mmat);
-               MTransformationMatrix tm(mmat);
-               xform.set(tm);
+               //MTransformationMatrix tm(mmat);
+               //xform.set(tm);
+               mKeyframer.clearTransformKeys(xformObj, mmat);
             }
          }
       }
@@ -907,7 +1018,16 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
       pSy.setDouble(posscl[4]);
       pSz.setDouble(posscl[5]);
       
-      if (!loc.isConstant() && fabs(mSpeed) > 0.0001)
+      if (loc.isConstant())
+      {
+         mKeyframer.clearAnyKey(locObj, "localPositionX", 0, posscl[0]);
+         mKeyframer.clearAnyKey(locObj, "localPositionY", 0, posscl[1]);
+         mKeyframer.clearAnyKey(locObj, "localPositionZ", 0, posscl[2]);
+         mKeyframer.clearAnyKey(locObj, "localScaleX", 0, posscl[3]);
+         mKeyframer.clearAnyKey(locObj, "localScaleY", 0, posscl[4]);
+         mKeyframer.clearAnyKey(locObj, "localScaleZ", 0, posscl[5]);
+      }
+      else if (fabs(mSpeed) > 0.0001)
       {
          size_t numSamples = loc.getNumSamples();
          
@@ -959,7 +1079,7 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
    }
    else
    {
-      if (!createDag("transform", target, true))
+      if (!exists && !createDag("transform", target, true))
       {
          return AlembicNode::StopVisit;
       }
@@ -968,7 +1088,7 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
       
       // key xform attributes, visibilty and inheritsTransform
       
-      MFnTransform xform(getDag(target->path()));
+      MFnTransform xform(getDag(targetPath));
       MObject xformObj = xform.object();
       
       if (!mIgnoreTransforms)
@@ -985,10 +1105,17 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
          pIT.setBool(inheritsXforms);
          
          // Transformation matrix
-         MTransformationMatrix mmat(MMatrix(sample.getMatrix().x));
-         xform.set(mmat);
+         MMatrix mmat(sample.getMatrix().x);
          
-         if (!schema.isConstant() && fabs(mSpeed) > 0.0001)
+         MTransformationMatrix tmat(mmat);
+         xform.set(tmat);
+         
+         if (schema.isConstant())
+         {
+            mKeyframer.clearTransformKeys(xformObj, mmat);
+            mKeyframer.clearInheritsTransformKey(xformObj, inheritsXforms);
+         }
+         else if (fabs(mSpeed) > 0.0001)
          {
             size_t numSamples = schema.getNumSamples();
             
@@ -1031,7 +1158,8 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
       }
       else
       {
-         // Leave transform to identity (AbcShape will handle it)
+         mKeyframer.clearTransformKeys(xformObj, MMatrix::identity);
+         mKeyframer.clearInheritsTransformKey(xformObj, true);
       }
       
       keyVisibility(node.object(), xform);
@@ -1042,18 +1170,26 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicXform &node, AlembicNode *inst
    return AlembicNode::ContinueVisit;
 }
 
-AlembicNode::VisitReturn CreateTree::enter(AlembicNode &node, AlembicNode *)
+AlembicNode::VisitReturn UpdateTree::enter(AlembicNode &node, AlembicNode *)
 {
    if (node.isInstance())
    {
       if (mCreateInstances)
       {
+         // When updating, we may have nodes that were instances
+         //   turned into duplicates and nodes that lived on their own turned
+         //   into instances...
+         // For now, I can only suggest re-building the tree from scratch
+         
          // get master
          // need to be sure master is created befoer
-         AlembicNode::VisitReturn rv = node.master()->enter(*this);
-         if (rv != AlembicNode::ContinueVisit)
+         if (!isAlreadyProcessed(node.masterPath()))
          {
-            return rv;
+            AlembicNode::VisitReturn rv = node.master()->enter(*this);
+            if (rv != AlembicNode::ContinueVisit)
+            {
+               return rv;
+            }
          }
          
          MDagPath masterDag = getDag(node.masterPath());
@@ -1063,24 +1199,34 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicNode &node, AlembicNode *)
             return AlembicNode::StopVisit;
          }
          
-         if (!node.parent())
+         
+         
+         if (!checkExistingDag(&node, MFnDagNode(masterDag).typeName().asChar()))
          {
-            return AlembicNode::StopVisit;
+            if (!node.parent())
+            {
+               return AlembicNode::StopVisit;
+            }
+            
+            MDagPath parentDag = getDag(node.parent()->path());
+            
+            if (!parentDag.isValid())
+            {
+               return AlembicNode::StopVisit;
+            }
+            
+            MFnDagNode parentNode(parentDag);
+            
+            MObject masterObj = masterDag.node();
+            
+            if (parentNode.addChild(masterObj, MFnDagNode::kNextPos, true) != MS::kSuccess)
+            {
+               return AlembicNode::StopVisit;
+            }
          }
-         
-         MDagPath parentDag = getDag(node.parent()->path());
-         
-         if (!parentDag.isValid())
+         else
          {
-            return AlembicNode::StopVisit;
-         }
-         
-         MFnDagNode parentNode(parentDag);
-         MObject masterObj = masterDag.node();
-         
-         if (parentNode.addChild(masterObj, MFnDagNode::kNextPos, true) != MS::kSuccess)
-         {
-            return AlembicNode::StopVisit;
+            // node already exists... but is it an instance of master?
          }
          
          return AlembicNode::DontVisitChildren;
@@ -1094,7 +1240,7 @@ AlembicNode::VisitReturn CreateTree::enter(AlembicNode &node, AlembicNode *)
    return AlembicNode::ContinueVisit;
 }
 
-bool CreateTree::createPointAttribute(MFnDagNode &node, const std::string &name, bool array, MPlug &plug)
+bool UpdateTree::createPointAttribute(MFnDagNode &node, const std::string &name, bool array, MPlug &plug)
 {
    MFnNumericAttribute nAttr;
    MString aname(name.c_str());
@@ -1117,7 +1263,7 @@ bool CreateTree::createPointAttribute(MFnDagNode &node, const std::string &name,
    }
 }
 
-bool CreateTree::createColorAttribute(MFnDagNode &node, const std::string &name, bool alpha, bool array, MPlug &plug)
+bool UpdateTree::createColorAttribute(MFnDagNode &node, const std::string &name, bool alpha, bool array, MPlug &plug)
 {
    MFnNumericAttribute nAttr;
    MString aname(name.c_str());
@@ -1184,7 +1330,7 @@ bool CreateTree::createColorAttribute(MFnDagNode &node, const std::string &name,
    }
 }
 
-bool CreateTree::createNumericAttribute(MFnDagNode &node, const std::string &name, MFnNumericData::Type type, bool array, MPlug &plug)
+bool UpdateTree::createNumericAttribute(MFnDagNode &node, const std::string &name, MFnNumericData::Type type, bool array, MPlug &plug)
 {
    MFnNumericAttribute nAttr;
    MString aname(name.c_str());
@@ -1207,7 +1353,7 @@ bool CreateTree::createNumericAttribute(MFnDagNode &node, const std::string &nam
    }
 }
 
-bool CreateTree::createMatrixAttribute(MFnDagNode &node, const std::string &name, MFnMatrixAttribute::Type type, bool array, MPlug &plug)
+bool UpdateTree::createMatrixAttribute(MFnDagNode &node, const std::string &name, MFnMatrixAttribute::Type type, bool array, MPlug &plug)
 {
    MFnMatrixAttribute mAttr;
    MString aname(name.c_str());
@@ -1230,7 +1376,7 @@ bool CreateTree::createMatrixAttribute(MFnDagNode &node, const std::string &name
    }
 }
 
-bool CreateTree::createStringAttribute(MFnDagNode &node, const std::string &name, bool array, MPlug &plug)
+bool UpdateTree::createStringAttribute(MFnDagNode &node, const std::string &name, bool array, MPlug &plug)
 {
    MFnTypedAttribute tAttr;
    MString aname(name.c_str());
@@ -1256,7 +1402,7 @@ bool CreateTree::createStringAttribute(MFnDagNode &node, const std::string &name
    }
 }
 
-bool CreateTree::checkPointAttribute(const MPlug &plug, bool array)
+bool UpdateTree::checkPointAttribute(const MPlug &plug, bool array)
 {
    if (plug.isArray() != array)
    {
@@ -1276,7 +1422,7 @@ bool CreateTree::checkPointAttribute(const MPlug &plug, bool array)
    return (nAttr.unitType() == MFnNumericData::k3Float);
 }
 
-bool CreateTree::checkColorAttribute(const MPlug &plug, bool alpha, bool array)
+bool UpdateTree::checkColorAttribute(const MPlug &plug, bool alpha, bool array)
 {
    if (plug.isArray() != array)
    {
@@ -1319,7 +1465,7 @@ bool CreateTree::checkColorAttribute(const MPlug &plug, bool alpha, bool array)
    }
 }
 
-bool CreateTree::checkNumericAttribute(const MPlug &plug, MFnNumericData::Type type, bool array)
+bool UpdateTree::checkNumericAttribute(const MPlug &plug, MFnNumericData::Type type, bool array)
 {
    if (plug.isArray() != array)
    {
@@ -1338,7 +1484,7 @@ bool CreateTree::checkNumericAttribute(const MPlug &plug, MFnNumericData::Type t
    return (nAttr.unitType() == type);
 }
 
-bool CreateTree::checkMatrixAttribute(const MPlug &plug, bool array)
+bool UpdateTree::checkMatrixAttribute(const MPlug &plug, bool array)
 {
    if (plug.isArray() != array)
    {
@@ -1359,7 +1505,7 @@ bool CreateTree::checkMatrixAttribute(const MPlug &plug, bool array)
    return true;
 }
 
-bool CreateTree::checkStringAttribute(const MPlug &plug, bool array)
+bool UpdateTree::checkStringAttribute(const MPlug &plug, bool array)
 {
    if (plug.isArray() != array)
    {
@@ -1379,13 +1525,13 @@ bool CreateTree::checkStringAttribute(const MPlug &plug, bool array)
 }
 
 template <typename T, int D>
-void CreateTree::attributeSample(Alembic::Abc::IScalarProperty prop, Alembic::AbcCoreAbstract::index_t sampIdx, T *outVal)
+void UpdateTree::attributeSample(Alembic::Abc::IScalarProperty prop, Alembic::AbcCoreAbstract::index_t sampIdx, T *outVal)
 {
    prop.get(outVal, Alembic::Abc::ISampleSelector(sampIdx));
 }
 
 template <typename T, int D>
-void CreateTree::attributeSample(Alembic::Abc::IArrayProperty prop, Alembic::AbcCoreAbstract::index_t sampIdx, T *outVal)
+void UpdateTree::attributeSample(Alembic::Abc::IArrayProperty prop, Alembic::AbcCoreAbstract::index_t sampIdx, T *outVal)
 {
    Alembic::AbcCoreAbstract::ArraySamplePtr samp;
    prop.get(samp, Alembic::Abc::ISampleSelector(sampIdx));
@@ -1393,14 +1539,23 @@ void CreateTree::attributeSample(Alembic::Abc::IArrayProperty prop, Alembic::Abc
 }
 
 template <typename T, int D, class Property>
-void CreateTree::keyAttribute(Property prop, MPlug &plug)
+void UpdateTree::keyAttribute(Property prop, MPlug &plug)
 {
-   if (!prop.isConstant() && fabs(mSpeed) > 0.0001)
+   MObject nodeObj = plug.node();
+   MString plugName = plug.partialName();
+   T val[D];
+   
+   if (prop.isConstant())
    {
-      MObject nodeObj = plug.node();
-      MString plugName = plug.partialName();
-      T val[D];
+      attributeSample<T, D>(prop, 0, val);
       
+      for (int d=0; d<D; ++d)
+      {
+         mKeyframer.clearAnyKey(nodeObj, plugName, d, val[d]);
+      }
+   }
+   else if (fabs(mSpeed) > 0.0001)
+   {
       size_t numSamples = prop.getNumSamples();
          
       Alembic::AbcCoreAbstract::TimeSamplingPtr ts = prop.getTimeSampling();
@@ -1453,7 +1608,7 @@ void CreateTree::keyAttribute(Property prop, MPlug &plug)
 }
 
 template <typename T, int D, typename TT>
-void CreateTree::setNumericAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
+void UpdateTree::setNumericAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
 {
    T val[D];
    
@@ -1465,7 +1620,7 @@ void CreateTree::setNumericAttribute(Alembic::Abc::IScalarProperty prop, MPlug &
 }
 
 template <typename T, int D, typename TT>
-void CreateTree::setNumericAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
+void UpdateTree::setNumericAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
 {
    Alembic::AbcCoreAbstract::ArraySamplePtr samp;
    prop.get(samp);
@@ -1478,7 +1633,7 @@ void CreateTree::setNumericAttribute(Alembic::Abc::IArrayProperty prop, MPlug &p
 }
 
 template <typename T, int D, typename TT>
-void CreateTree::setNumericArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
+void UpdateTree::setNumericArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
 {
    Alembic::AbcCoreAbstract::ArraySamplePtr samp;
    prop.get(samp);
@@ -1493,7 +1648,7 @@ void CreateTree::setNumericArrayAttribute(Alembic::Abc::IArrayProperty prop, MPl
 }
 
 template <typename T, int D, typename TT>
-void CreateTree::setCompoundAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
+void UpdateTree::setCompoundAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
 {
    T val[D];
    
@@ -1508,7 +1663,7 @@ void CreateTree::setCompoundAttribute(Alembic::Abc::IScalarProperty prop, MPlug 
 }
 
 template <typename T, int D, typename TT>
-void CreateTree::setCompoundAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
+void UpdateTree::setCompoundAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
 {
    Alembic::AbcCoreAbstract::ArraySamplePtr samp;
    prop.get(samp);
@@ -1524,7 +1679,7 @@ void CreateTree::setCompoundAttribute(Alembic::Abc::IArrayProperty prop, MPlug &
 }
 
 template <typename T, int D, typename TT>
-void CreateTree::setCompoundArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
+void UpdateTree::setCompoundArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
 {
    Alembic::AbcCoreAbstract::ArraySamplePtr samp;
    prop.get(samp);
@@ -1542,7 +1697,7 @@ void CreateTree::setCompoundArrayAttribute(Alembic::Abc::IArrayProperty prop, MP
 }
 
 template <typename T>
-void CreateTree::setMatrixAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
+void UpdateTree::setMatrixAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
 {
    T val[16];
    prop.get(val);
@@ -1564,7 +1719,7 @@ void CreateTree::setMatrixAttribute(Alembic::Abc::IScalarProperty prop, MPlug &p
 }
 
 template <typename T>
-void CreateTree::setMatrixAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
+void UpdateTree::setMatrixAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
 {
    Alembic::AbcCoreAbstract::ArraySamplePtr samp;
    prop.get(samp);
@@ -1588,7 +1743,7 @@ void CreateTree::setMatrixAttribute(Alembic::Abc::IArrayProperty prop, MPlug &pl
 }
 
 template <typename T>
-void CreateTree::setMatrixArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
+void UpdateTree::setMatrixArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
 {
    Alembic::AbcCoreAbstract::ArraySamplePtr samp;
    prop.get(samp);
@@ -1613,7 +1768,7 @@ void CreateTree::setMatrixArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlu
    }
 }
 
-void CreateTree::setStringAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
+void UpdateTree::setStringAttribute(Alembic::Abc::IScalarProperty prop, MPlug &plug)
 {
    std::string val;
    
@@ -1624,7 +1779,7 @@ void CreateTree::setStringAttribute(Alembic::Abc::IScalarProperty prop, MPlug &p
    // key frames not supported
 }
 
-void CreateTree::setStringAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
+void UpdateTree::setStringAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
 {
    Alembic::AbcCoreAbstract::ArraySamplePtr samp;
    prop.get(samp);
@@ -1636,7 +1791,7 @@ void CreateTree::setStringAttribute(Alembic::Abc::IArrayProperty prop, MPlug &pl
    // key frames not supported
 }
 
-void CreateTree::setStringArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
+void UpdateTree::setStringArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlug &plug)
 {
    Alembic::AbcCoreAbstract::ArraySamplePtr samp;
    prop.get(samp);
@@ -1650,7 +1805,7 @@ void CreateTree::setStringArrayAttribute(Alembic::Abc::IArrayProperty prop, MPlu
 }
 
 template <typename T, int D, typename TT>
-void CreateTree::setNumericUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
+void UpdateTree::setNumericUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
 {
    MFnNumericData::Type type = (MFnNumericData::Type) NumericType<TT, D>::Value;
    
@@ -1670,7 +1825,7 @@ void CreateTree::setNumericUserProp(MFnDagNode &node, const std::string &name, A
 }
 
 template <typename T, int D, typename TT>
-void CreateTree::setNumericArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
+void UpdateTree::setNumericArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
 {
    MFnNumericData::Type type = (MFnNumericData::Type) NumericType<TT, D>::Value;
    
@@ -1699,7 +1854,7 @@ void CreateTree::setNumericArrayUserProp(MFnDagNode &node, const std::string &na
 }
 
 template <typename T, int D>
-void CreateTree::setPointUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
+void UpdateTree::setPointUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
 {
    MPlug plug = node.findPlug(name.c_str());
    
@@ -1717,7 +1872,7 @@ void CreateTree::setPointUserProp(MFnDagNode &node, const std::string &name, Ale
 }
 
 template <typename T, int D>
-void CreateTree::setPointArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
+void UpdateTree::setPointArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
 {
    MPlug plug = node.findPlug(name.c_str());
    
@@ -1744,7 +1899,7 @@ void CreateTree::setPointArrayUserProp(MFnDagNode &node, const std::string &name
 }
 
 template <typename T, int D>
-void CreateTree::setColorUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
+void UpdateTree::setColorUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
 {
    MPlug plug = node.findPlug(name.c_str());
    
@@ -1771,7 +1926,7 @@ void CreateTree::setColorUserProp(MFnDagNode &node, const std::string &name, Ale
 }
 
 template <typename T, int D>
-void CreateTree::setColorArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
+void UpdateTree::setColorArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
 {
    MPlug plug = node.findPlug(name.c_str());
    
@@ -1814,7 +1969,7 @@ void CreateTree::setColorArrayUserProp(MFnDagNode &node, const std::string &name
 }
 
 template <typename T>
-void CreateTree::setMatrixUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
+void UpdateTree::setMatrixUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
 {
    MFnMatrixAttribute::Type type = (MFnMatrixAttribute::Type) MatrixType<T>::Value;
    
@@ -1834,7 +1989,7 @@ void CreateTree::setMatrixUserProp(MFnDagNode &node, const std::string &name, Al
 }
 
 template <typename T>
-void CreateTree::setMatrixArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
+void UpdateTree::setMatrixArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
 {
    MFnMatrixAttribute::Type type = (MFnMatrixAttribute::Type) MatrixType<T>::Value;
    
@@ -1862,7 +2017,7 @@ void CreateTree::setMatrixArrayUserProp(MFnDagNode &node, const std::string &nam
    }
 }
 
-void CreateTree::setStringUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
+void UpdateTree::setStringUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
 {
    MPlug plug = node.findPlug(name.c_str());
    
@@ -1879,7 +2034,7 @@ void CreateTree::setStringUserProp(MFnDagNode &node, const std::string &name, Al
    }
 }
 
-void CreateTree::setStringArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
+void UpdateTree::setStringArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
 {
    MPlug plug = node.findPlug(name.c_str());
    
@@ -1906,7 +2061,7 @@ void CreateTree::setStringArrayUserProp(MFnDagNode &node, const std::string &nam
 }
 
 template <class T>
-void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
+void UpdateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
 {
    Alembic::Abc::ICompoundProperty props = node.typedObject().getSchema().getUserProperties();
    
@@ -2607,11 +2762,13 @@ void CreateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
    }
 }
 
-void CreateTree::leave(AlembicNode &, AlembicNode *)
+void UpdateTree::leave(AlembicNode &, AlembicNode *)
 {
 }
 
-void CreateTree::keyTransforms(const MString &defaultRotationInterpolation, const MStringDict &nodeRotationInterpolation)
+void UpdateTree::keyTransforms(const MString &defaultRotationInterpolation,
+                               const MStringDict &nodeRotationInterpolation,
+                               bool deleteExistingCurves)
 {
    MFnAnimCurve::InfinityType inf = MFnAnimCurve::kConstant;
    
@@ -2628,7 +2785,7 @@ void CreateTree::keyTransforms(const MString &defaultRotationInterpolation, cons
       break;
    }
    
-   mKeyframer.createCurves(inf, inf);
+   mKeyframer.createCurves(inf, inf, deleteExistingCurves);
    mKeyframer.setRotationCurvesInterpolation(defaultRotationInterpolation, nodeRotationInterpolation);
 }
 
@@ -2651,6 +2808,33 @@ bool AbcShapeImport::hasSyntax() const
 bool AbcShapeImport::isUndoable() const
 {
    return false;
+}
+
+static std::string DagToAbcPath(const MDagPath &path)
+{
+   std::string abcPath = "";
+   std::string tmp = path.fullPathName().asChar();
+                     
+   size_t p0 = 0;
+   size_t p1 = tmp.find('|', p0);
+   
+   while (p0 != std::string::npos)
+   {
+      std::string part = (p1 == std::string::npos ? tmp.substr(p0) : tmp.substr(p0, p1 - p0));
+      size_t p2 = part.rfind(':');
+      
+      part = (p2 != std::string::npos ? part.substr(p2 + 1) : part);
+      
+      if (part.length() > 0)
+      {
+         abcPath += "/" + part;
+      }
+      
+      p0 = (p1 != std::string::npos ? p1 + 1 : std::string::npos);
+      p1 = tmp.find('|', p0);
+   }
+   
+   return abcPath;
 }
 
 MStatus AbcShapeImport::doIt(const MArgList& args)
@@ -2681,42 +2865,47 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
    {
       MGlobal::displayInfo(MString(PREFIX_NAME("AbcShapeImport")) + " [options] abc_file_path");
       MGlobal::displayInfo("Options:");
-      MGlobal::displayInfo("-r / -reparent                   : dagpath");
-      MGlobal::displayInfo("                                   Reparent the whole hierarchy under a node in the current Maya scene.");
-      MGlobal::displayInfo("-n / -namespace                  : string");
-      MGlobal::displayInfo("                                   Namespace to add nodes to (default to current namespace).");
-      MGlobal::displayInfo("-m / -mode                       : string (box|boxes|points|geometry)");
-      MGlobal::displayInfo("                                   " + MString(PREFIX_NAME("AbcShape")) + " nodes display mode (default to box).");
-      MGlobal::displayInfo("-s / -speed                      : double");
-      MGlobal::displayInfo("                                   " + MString(PREFIX_NAME("AbcShape")) + " nodes speed (default to 1.0).");
-      MGlobal::displayInfo("-o / -offset                     : double");
-      MGlobal::displayInfo("                                   " + MString(PREFIX_NAME("AbcShape")) + " nodes offset in frames (default to 0.0).");
-      MGlobal::displayInfo("-psf / -preserveStartFrame       : bool");
-      MGlobal::displayInfo("                                   Preserve range start frame when using speed.");
-      MGlobal::displayInfo("-ct / -cycleType                 : string (hold|loop|reverse|bounce)");
-      MGlobal::displayInfo("                                   " + MString(PREFIX_NAME("AbcShape")) + " nodes cycle type (default to hold).");
-      MGlobal::displayInfo("-ci / -createInstances           :");
-      MGlobal::displayInfo("                                   Create maya instances.");
-      MGlobal::displayInfo("-it / -ignoreTransforms          :");
-      MGlobal::displayInfo("                                   Do not key transform nodes (but for locators direct parent).");
-      MGlobal::displayInfo("-ri / -rotationInterpolation     : string (none|euler|quaternion|quaternionSlerp|quaternionSquad)");
-      MGlobal::displayInfo("                                   Set created rotation curves interpolation type (default to quaternion).");
-      MGlobal::displayInfo("-ri / -nodeRotationInterpolation : string string (none|euler|quaternion|quaternionSlerp|quaternionSquad)");
-      MGlobal::displayInfo("                                   Override rotation curves interpolation type (second value) for a specific node (first value).");
-      MGlobal::displayInfo("                                   Node name is the alembic node name.");
-      MGlobal::displayInfo("-ftr / -fitTimeRange             :");
-      MGlobal::displayInfo("                                   Change Maya time slider to fit the range of input file.");
-      MGlobal::displayInfo("-sts / -setToStartFrame          :");
-      MGlobal::displayInfo("                                   Set the current time to the start of the frame range.");
-      MGlobal::displayInfo("-ft / -filterObjects             : string");
-      MGlobal::displayInfo("                                   Selective import cache objects whose name matches expression.");
-      MGlobal::displayInfo("-eft / -excludeFilterObjects     : string");
-      MGlobal::displayInfo("                                   Selective exclude cache objects whose name matches expression.");
-      MGlobal::displayInfo("-h / -help                       :");
-      MGlobal::displayInfo("                                   Display this help.");
+      MGlobal::displayInfo("-r / -reparent                    : dagpath");
+      MGlobal::displayInfo("                                    Reparent the whole hierarchy under a node in the current Maya scene.");
+      MGlobal::displayInfo("-n / -namespace                   : string");
+      MGlobal::displayInfo("                                    Namespace to add nodes to (default to current namespace).");
+      MGlobal::displayInfo("-m / -mode                        : string (box|boxes|points|geometry)");
+      MGlobal::displayInfo("                                    " + MString(PREFIX_NAME("AbcShape")) + " nodes display mode (default to box).");
+      MGlobal::displayInfo("-s / -speed                       : double");
+      MGlobal::displayInfo("                                    " + MString(PREFIX_NAME("AbcShape")) + " nodes speed (default to 1.0).");
+      MGlobal::displayInfo("-o / -offset                      : double");
+      MGlobal::displayInfo("                                    " + MString(PREFIX_NAME("AbcShape")) + " nodes offset in frames (default to 0.0).");
+      MGlobal::displayInfo("-psf / -preserveStartFrame        : bool");
+      MGlobal::displayInfo("                                    Preserve range start frame when using speed.");
+      MGlobal::displayInfo("-ct / -cycleType                  : string (hold|loop|reverse|bounce)");
+      MGlobal::displayInfo("                                    " + MString(PREFIX_NAME("AbcShape")) + " nodes cycle type (default to hold).");
+      MGlobal::displayInfo("-ci / -createInstances            :");
+      MGlobal::displayInfo("                                    Create maya instances.");
+      MGlobal::displayInfo("-it / -ignoreTransforms           :");
+      MGlobal::displayInfo("                                    Do not key transform nodes (but for locators direct parent).");
+      MGlobal::displayInfo("-ri / -rotationInterpolation      : string (none|euler|quaternion|quaternionSlerp|quaternionSquad)");
+      MGlobal::displayInfo("                                    Set created rotation curves interpolation type (default to quaternion).");
+      MGlobal::displayInfo("-nri / -nodeRotationInterpolation : string string (none|euler|quaternion|quaternionSlerp|quaternionSquad)");
+      MGlobal::displayInfo("                                    Override rotation curves interpolation type (second value) for a specific node (first value).");
+      MGlobal::displayInfo("                                    Node name is the alembic node name.");
+      MGlobal::displayInfo("-ftr / -fitTimeRange              :");
+      MGlobal::displayInfo("                                    Change Maya time slider to fit the range of input file.");
+      MGlobal::displayInfo("-sts / -setToStartFrame           :");
+      MGlobal::displayInfo("                                    Set the current time to the start of the frame range.");
+      MGlobal::displayInfo("-ft / -filterObjects              : string");
+      MGlobal::displayInfo("                                    Selective import cache objects whose name matches expression.");
+      MGlobal::displayInfo("-eft / -excludeFilterObjects      : string");
+      MGlobal::displayInfo("                                    Selective exclude cache objects whose name matches expression.");
+      MGlobal::displayInfo("-u / -update                      :");
+      MGlobal::displayInfo("                                    Update mode.");
+      MGlobal::displayInfo("                                    Add missing nodes, remove nodes not present in alembic file and update animation keys.");
+      MGlobal::displayInfo("                                    Alembic root nodes maya counterparts must be selected.");
+      MGlobal::displayInfo("                                    -namespace, -reparent, -filterObjects and -excludeFilterObjects flags will be ignored.");
+      MGlobal::displayInfo("-h / -help                        :");
+      MGlobal::displayInfo("                                    Display this help.");
       MGlobal::displayInfo("");
       MGlobal::displayInfo("Command also work in edit mode:");
-      MGlobal::displayInfo("  -mode, -speed, -offset, -preserveStartFrame, -cycleType, -rotationInterpolation flags are supported.");
+      MGlobal::displayInfo("  -mode, -speed, -offset, -preserveStartFrame, -cycleType, -rotationInterpolation, -nodeRotationInterpolation flags are supported.");
       MGlobal::displayInfo("  Acts on all " + MString(PREFIX_NAME("AbcShape")) + " in selected node trees.");
    }
    
@@ -3069,13 +3258,14 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       bool setToStartFrame = argData.isFlagSet("setToStartFrame");
       bool createInstances = argData.isFlagSet("createInstances");
       bool ignoreTransforms = argData.isFlagSet("ignoreTransforms");
+      bool update = argData.isFlagSet("update");
       
       if (ignoreTransforms && createInstances)
       {
          MGlobal::displayWarning("'createInstances' and 'ignoreTransforms' options are incompatible");
       }
       
-      if (argData.isFlagSet("reparent"))
+      if (!update && argData.isFlagSet("reparent"))
       {
          MSelectionList sl;
          
@@ -3100,7 +3290,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
          }
       }
       
-      if (argData.isFlagSet("namespace"))
+      if (!update && argData.isFlagSet("namespace"))
       {
          MString val;
          status = argData.getFlagArgument("namespace", 0, val);
@@ -3124,7 +3314,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
          }   
       }
       
-      if (argData.isFlagSet("filterObjects"))
+      if (!update && argData.isFlagSet("filterObjects"))
       {
          MString val;
          status = argData.getFlagArgument("filterObjects", 0, val);
@@ -3139,7 +3329,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
          }
       }
       
-      if (argData.isFlagSet("excludeFilterObjects"))
+      if (!update && argData.isFlagSet("excludeFilterObjects"))
       {
          MString val;
          status = argData.getFlagArgument("excludeFilterObjects", 0, val);
@@ -3176,9 +3366,136 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
             AlembicScene *scene = AlembicSceneCache::Ref(abcPath, filter);
             if (scene)
             {
-               // scene->setFilters(includeFilter.asChar(), excludeFilter.asChar());
+               if (update)
+               {
+                  MSelectionList oldSel;
+                  MSelectionList newSel;
+                  MDagPath path;
+                  MFnDagNode node;
+                  
+                  MGlobal::getActiveSelectionList(oldSel);
+                  
+                  // Check if the selected nodes are valid nodes in the alembic file
+                  
+                  if (oldSel.length() == 0)
+                  {
+                     MGlobal::displayError("No selection to update.");
+                     if (!AlembicSceneCache::Unref(scene))
+                     {
+                        delete scene;
+                     }
+                     return MS::kFailure;
+                  }
+                  
+                  for (unsigned int i=0; i<oldSel.length(); ++i)
+                  {
+                     if (oldSel.getDagPath(i, path) != MS::kSuccess)
+                     {
+                        continue;
+                     }
+                     
+                     if (node.setObject(path) != MS::kSuccess)
+                     {
+                        continue;
+                     }
+                     
+                     // Check namespace consistency
+                     std::string tmp = node.name().asChar();
+                     size_t p0 = tmp.rfind(':');
+                     
+                     if (i == 0)
+                     {
+                        if (p0 != std::string::npos)
+                        {
+                           ns = tmp.substr(0, p0).c_str();
+                        }
+                     }
+                     else
+                     {
+                        if ((p0 != std::string::npos && ns != tmp.substr(0, p0).c_str()) ||
+                            (p0 == std::string::npos && ns != ""))
+                        {
+                           MGlobal::displayError("All roots must exists in the same namespace.");
+                           if (!AlembicSceneCache::Unref(scene))
+                           {
+                              delete scene;
+                           }
+                           return MS::kFailure;
+                        }
+                     }
+                     
+                     // Get alembic node path
+                     std::string nodePath = DagToAbcPath(path);
+                     
+                     if (!scene->find(nodePath))
+                     {
+                        MGlobal::displayError("'" + MString(nodePath.c_str()) + "' node cannot be found in the provided alembic.");
+                        if (!AlembicSceneCache::Unref(scene))
+                        {
+                           delete scene;
+                        }
+                        return MS::kFailure;
+                     }
+                     else
+                     {
+                        // Update filter expression
+                        if (includeFilter.length() > 0)
+                        {
+                           includeFilter += "|";
+                        }
+                        includeFilter += nodePath.c_str();
+                     }
+                  }
+                  
+                  // Delete nodes under selected roots that cannot be found in the alembic file
+                  
+                  MGlobal::executeCommand("select -hi");
+                  MGlobal::getActiveSelectionList(newSel);
+                  
+                  MDagModifier dgmod;
+                  
+                  for (unsigned int i=0; i<newSel.length(); ++i)
+                  {
+                     if (newSel.getDagPath(i, path) != MS::kSuccess)
+                     {
+                        continue;
+                     }
+                     
+                     if (node.setObject(path) != MS::kSuccess)
+                     {
+                        continue;
+                     }
+                     
+                     std::string nodePath = DagToAbcPath(path);
+                     
+                     if (!scene->find(nodePath))
+                     {
+                        MObject nodeObj = node.object();
+                        dgmod.deleteNode(nodeObj);
+                     }
+                  }
+                  
+                  dgmod.doIt();
+                  
+                  MGlobal::setActiveSelectionList(oldSel);
+                  
+                  MNamespace::setCurrentNamespace(ns);
+                  
+                  // Create a new filter scene to include visit selected roots
+                  AlembicSceneFilter rootFilter(includeFilter.asChar(), "");
+                  AlembicScene *filteredScene = AlembicSceneCache::Ref(abcPath, rootFilter);
+                  if (!AlembicSceneCache::Unref(scene))
+                  {
+                     delete scene;
+                  }
+                  if (!filteredScene)
+                  {
+                     return MS::kFailure;
+                  }
+                  scene = filteredScene;
+               }
                
-               CreateTree visitor(abcPath, dm, ignoreTransforms, createInstances, speed, offset, preserveStartFrame, ct);
+               UpdateTree visitor(abcPath, dm, ignoreTransforms, createInstances, speed, offset, preserveStartFrame, ct);
                scene->visit(AlembicNode::VisitDepthFirst, visitor);
                
                visitor.keyTransforms(rotInterp, nodeRotInterp);
