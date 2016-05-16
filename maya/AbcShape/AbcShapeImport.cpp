@@ -55,6 +55,8 @@ MSyntax AbcShapeImport::createSyntax()
    syntax.addFlag("-ft", "-filterObjects", MSyntax::kString);
    syntax.addFlag("-eft", "-excludeFilterObjects", MSyntax::kString);
    syntax.addFlag("-u", "-update", MSyntax::kNoArg);
+   syntax.addFlag("-crt", "-createIfNotFound", MSyntax::kNoArg);
+   syntax.addFlag("-rm", "-removeIfNoUpdate", MSyntax::kNoArg);
    syntax.addFlag("-h", "-help", MSyntax::kNoArg);
    
    syntax.makeFlagMultiUse("-nri");
@@ -197,7 +199,8 @@ public:
               double speed,
               double offset,
               bool preserveStartFrame,
-              AbcShape::CycleType cycleType);
+              AbcShape::CycleType cycleType,
+              bool createNodes);
    
    AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicSubD &node, AlembicNode *instance=0);
@@ -316,6 +319,7 @@ private:
    Keyframer mKeyframer;
    MPlug mTimeSource;
    std::set<std::string> mProcessed;
+   bool mCreateNodes;
 };
 
 UpdateTree::UpdateTree(const std::string &abcPath,
@@ -325,7 +329,8 @@ UpdateTree::UpdateTree(const std::string &abcPath,
                        double speed,
                        double offset,
                        bool preserveStartFrame,
-                       AbcShape::CycleType cycleType)
+                       AbcShape::CycleType cycleType,
+                       bool createNodes)
    : mAbcPath(abcPath)
    , mMode(mode)
    , mIgnoreTransforms(ignoreTransforms)
@@ -334,6 +339,7 @@ UpdateTree::UpdateTree(const std::string &abcPath,
    , mOffset(offset)
    , mPreserveStartFrame(preserveStartFrame)
    , mCycleType(cycleType)
+   , mCreateNodes(createNodes)
 {
    MSelectionList sl;
    MObject timeObj;
@@ -544,6 +550,12 @@ AlembicNode::VisitReturn UpdateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
    
    if (!exists)
    {
+      if (!mCreateNodes)
+      {
+         return AlembicNode::DontVisitChildren;
+      }
+      
+      // Note: The force here is not needed as we don't check for exact type any more
       if (!createDag(PREFIX_NAME("AbcShape"), target, true))
       {
          return AlembicNode::StopVisit;
@@ -926,14 +938,24 @@ AlembicNode::VisitReturn UpdateTree::enter(AlembicXform &node, AlembicNode *inst
    
    mProcessed.insert(targetPath);
    
-   // want exact type all the time here
+   // Want exact type all the time here
    bool exists = checkExistingDag(target, node.isLocator() ? "locator" : "transform");
    
    if (node.isLocator())
    {
-      if (!exists && !createDag("locator", target, true))
+      if (!exists)
       {
-         return AlembicNode::StopVisit;
+         if (!mCreateNodes)
+         {
+            return AlembicNode::DontVisitChildren;
+         }
+         
+         // Note: The force here will ignore that the node may exists with a different type
+         //       Is that really desired?
+         if (!createDag("locator", target, true))
+         {
+            return AlembicNode::StopVisit;
+         }
       }
       
       Alembic::Abc::IScalarProperty loc = node.locatorProperty();
@@ -1079,9 +1101,19 @@ AlembicNode::VisitReturn UpdateTree::enter(AlembicXform &node, AlembicNode *inst
    }
    else
    {
-      if (!exists && !createDag("transform", target, true))
+      if (!exists)
       {
-         return AlembicNode::StopVisit;
+         if (!mCreateNodes)
+         {
+            return AlembicNode::DontVisitChildren;
+         }
+         
+         // Note: The force here will ignore that the node may exists with a different type
+         //       Is that really desired?
+         if (!createDag("transform", target, true))
+         {
+            return AlembicNode::StopVisit;
+         }
       }
       
       Alembic::AbcGeom::IXformSchema schema = node.typedObject().getSchema();
@@ -1199,9 +1231,9 @@ AlembicNode::VisitReturn UpdateTree::enter(AlembicNode &node, AlembicNode *)
             return AlembicNode::StopVisit;
          }
          
-         
-         
-         if (!checkExistingDag(&node, MFnDagNode(masterDag).typeName().asChar()))
+         // should we be strict about the type here?
+         //if (!checkExistingDag(&node, MFnDagNode(masterDag).typeName().asChar()))
+         if (mCreateNodes && !checkExistingDag(&node))
          {
             if (!node.parent())
             {
@@ -1223,10 +1255,6 @@ AlembicNode::VisitReturn UpdateTree::enter(AlembicNode &node, AlembicNode *)
             {
                return AlembicNode::StopVisit;
             }
-         }
-         else
-         {
-            // node already exists... but is it an instance of master?
          }
          
          return AlembicNode::DontVisitChildren;
@@ -2901,6 +2929,12 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       MGlobal::displayInfo("                                    Add missing nodes, remove nodes not present in alembic file and update animation keys.");
       MGlobal::displayInfo("                                    Alembic root nodes maya counterparts must be selected.");
       MGlobal::displayInfo("                                    -namespace, -reparent, -filterObjects and -excludeFilterObjects flags will be ignored.");
+      MGlobal::displayInfo("-crt / -createIfNotFound          :");
+      MGlobal::displayInfo("                                    Create nodes present in alembic file that are missing in maya tree.");
+      MGlobal::displayInfo("                                    Used only when -update flag is set.");
+      MGlobal::displayInfo("-rm / -removeIfNoUpdate           :");
+      MGlobal::displayInfo("                                    Remove nodes in maya tree that are not present in alembic file.");
+      MGlobal::displayInfo("                                    Used only when -update flag is set.");
       MGlobal::displayInfo("-h / -help                        :");
       MGlobal::displayInfo("                                    Display this help.");
       MGlobal::displayInfo("");
@@ -3253,6 +3287,8 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       MString excludeFilter("");
       MString curNs = MNamespace::currentNamespace();
       MDagPath parentDag;
+      bool createMissing = false;
+      bool deleteMissing = false;
       
       bool fitTimeRange = argData.isFlagSet("fitTimeRange");
       bool setToStartFrame = argData.isFlagSet("setToStartFrame");
@@ -3342,6 +3378,16 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
          {
             MGlobal::displayWarning("Invalid excludeFilterObjects flag argument");
          }
+      }
+      
+      if (update)
+      {
+         createMissing = argData.isFlagSet("createIfNotFound");
+         deleteMissing = argData.isFlagSet("removeIfNoUpdate");
+      }
+      else
+      {
+         createMissing = true;
       }
       
       status = argData.getCommandArgument(0, filename);
@@ -3447,41 +3493,41 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
                      }
                   }
                   
-                  // Delete nodes under selected roots that cannot be found in the alembic file
-                  
-                  MGlobal::executeCommand("select -hi");
-                  MGlobal::getActiveSelectionList(newSel);
-                  
-                  MDagModifier dgmod;
-                  
-                  for (unsigned int i=0; i<newSel.length(); ++i)
+                  // Delete nodes in selection that cannot be found in the alembic file
+                  if (deleteMissing)
                   {
-                     if (newSel.getDagPath(i, path) != MS::kSuccess)
+                     MGlobal::executeCommand("select -hi");
+                     MGlobal::getActiveSelectionList(newSel);
+                     
+                     MDagModifier dgmod;
+                     
+                     for (unsigned int i=0; i<newSel.length(); ++i)
                      {
-                        continue;
+                        if (newSel.getDagPath(i, path) != MS::kSuccess)
+                        {
+                           continue;
+                        }
+                        
+                        if (node.setObject(path) != MS::kSuccess)
+                        {
+                           continue;
+                        }
+                        
+                        std::string nodePath = DagToAbcPath(path);
+                        
+                        if (!scene->find(nodePath))
+                        {
+                           MObject nodeObj = node.object();
+                           dgmod.deleteNode(nodeObj);
+                        }
                      }
                      
-                     if (node.setObject(path) != MS::kSuccess)
-                     {
-                        continue;
-                     }
+                     dgmod.doIt();
                      
-                     std::string nodePath = DagToAbcPath(path);
-                     
-                     if (!scene->find(nodePath))
-                     {
-                        MObject nodeObj = node.object();
-                        dgmod.deleteNode(nodeObj);
-                     }
+                     MGlobal::setActiveSelectionList(oldSel);
                   }
                   
-                  dgmod.doIt();
-                  
-                  MGlobal::setActiveSelectionList(oldSel);
-                  
-                  MNamespace::setCurrentNamespace(ns);
-                  
-                  // Create a new filter scene to include visit selected roots
+                  // Create a new filtered scene to only visit selected nodes
                   AlembicSceneFilter rootFilter(includeFilter.asChar(), "");
                   AlembicScene *filteredScene = AlembicSceneCache::Ref(abcPath, rootFilter);
                   if (!AlembicSceneCache::Unref(scene))
@@ -3493,9 +3539,12 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
                      return MS::kFailure;
                   }
                   scene = filteredScene;
+                  
+                  // Set namespace for nodes to be created
+                  MNamespace::setCurrentNamespace(ns);
                }
                
-               UpdateTree visitor(abcPath, dm, ignoreTransforms, createInstances, speed, offset, preserveStartFrame, ct);
+               UpdateTree visitor(abcPath, dm, ignoreTransforms, createInstances, speed, offset, preserveStartFrame, ct, createMissing);
                scene->visit(AlembicNode::VisitDepthFirst, visitor);
                
                visitor.keyTransforms(rotInterp, nodeRotInterp);
