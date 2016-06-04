@@ -449,7 +449,63 @@ if withMaya:
                       "custom": [RequireAlembicHelper(), arnold.Require, maya.Require]})
 
 
-excons.DeclareTargets(env, prjs)
+targets = excons.DeclareTargets(env, prjs)
 
 Export("RequireAlembic")
 Export("RequireAlembicHelper")
+
+# Add a 'dist' target (Ecosytem distribution)
+#   arnold/abcproc/<version>/abcproc.so|dll|dylib
+
+def make_eco_envs():
+  envs = {}
+
+  srcenvs = ["arnold/abcproc/abcproc.env"]
+
+  for srcenv in srcenvs:
+    version = None
+
+    with open(srcenv, "r") as f:
+      for line in f.readlines():
+        m = re.search(r"\"version\"\s*:\s*\"([^\"]*)\"", line)
+        if m is not None:
+          version = m.group(1)
+          break
+
+    if version is not None:
+      import shutil
+
+      name = os.path.splitext(os.path.basename(srcenv))[0]
+      outenv = "%s_%s.env" % (name, version.replace(".", "_"))
+      envs[name] = (version, outenv)
+      shutil.copy(srcenv, outenv)
+
+  return envs
+
+dist_dir = excons.GetArgument("dist-dir", "dist")
+eco_envs = make_eco_envs()
+ntargets = len(COMMAND_LINE_TARGETS)
+alltargets = (ntargets == 0 or (ntargets == 1 and COMMAND_LINE_TARGETS[0] == "dist"))
+
+dist_env = env.Clone()
+
+if withArnold and (alltargets or "abcproc" in COMMAND_LINE_TARGETS):
+  if "abcproc" in eco_envs:
+    ver, eco = eco_envs["abcproc"]
+    dist_arnold = dist_dir + "/arnold"
+    dist_abcproc = dist_arnold + "/abcproc/" + ver
+    Alias("dist", dist_env.Install(dist_arnold, eco))
+    Alias("dist", dist_env.Install(dist_abcproc, targets["abcproc"][0]))
+    dist_env.Clean("dist", dist_abcproc)
+
+if GetOption("clean"):
+  if "dist" in COMMAND_LINE_TARGETS:
+    targetnames = filter(lambda x: x != "dist", COMMAND_LINE_TARGETS)
+    if len(targetnames) == 0:
+      targetnames = targets.keys()
+    # if not other -> all of them
+    for tgt in targetnames:
+      if tgt == "dist" or not tgt in targets:
+        continue
+      for item in excons.GetTargetOutputFiles(env, targets[tgt][0]):
+        env.NoClean(item)
