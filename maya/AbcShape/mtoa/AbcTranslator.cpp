@@ -571,6 +571,22 @@ bool CAbcTranslator::IsSingleShape() const
 
 void CAbcTranslator::ExportSubdivAttribs(AtNode *proc)
 {
+   static bool sInit = true;
+   static const char *sAdaptiveErrorName = "subdiv_pixel_error";
+   
+   if (sInit)
+   {
+      const AtNodeEntry *polymesh = AiNodeEntryLookUp("polymesh");
+      if (polymesh)
+      {
+         if (AiNodeEntryLookUpParameter(polymesh, "subdiv_adaptive_error") != NULL)
+         {
+            sAdaptiveErrorName = "subdiv_adaptive_error";
+         }
+      }
+      sInit = true;
+   }
+   
    const AtNodeEntry *nodeEntry = AiNodeGetNodeEntry(proc);
    MPlug plug;
 
@@ -592,24 +608,25 @@ void CAbcTranslator::ExportSubdivAttribs(AtNode *proc)
       AiNodeSetInt(proc, "subdiv_adaptive_metric", plug.asInt());
    }
 
-   plug = FindMayaPlug("aiSubdivPixelError");
-   if (!plug.isNull() && HasParameter(nodeEntry, "subdiv_pixel_error", proc, "constant FLOAT"))
-   {
-      AiNodeSetFlt(proc, "subdiv_pixel_error", plug.asFloat());
-   }
-   
    // starting arnold 4.2.8.0
    plug = FindMayaPlug("aiSubdivAdaptiveSpace");
    if (!plug.isNull() && HasParameter(nodeEntry, "subdiv_adaptive_space", proc, "constant INT"))
    {
       AiNodeSetInt(proc, "subdiv_adaptive_space", plug.asInt());
    }
-   
-   // starting arnold 4.2.8.0
+
+   // The long name hasn't changed as is still "aiSubdivPixelError"
+   // Only shot name was changed from "ai_subdiv_pixel_error" to "ai_subdiv_adaptive_error"
+   // It may be though in a future MtoA version where compatibility can be broken
+   //   so lookup first for what the name should really be
    plug = FindMayaPlug("aiSubdivAdaptiveError");
-   if (!plug.isNull() && HasParameter(nodeEntry, "subdiv_adaptive_error", proc, "constant FLOAT"))
+   if (plug.isNull())
    {
-      AiNodeSetFlt(proc, "subdiv_adaptive_error", plug.asFloat());
+      plug = FindMayaPlug("aiSubdivPixelError");
+   }
+   if (!plug.isNull() && HasParameter(nodeEntry, sAdaptiveErrorName, proc, "constant FLOAT"))
+   {
+      AiNodeSetFlt(proc, sAdaptiveErrorName, plug.asFloat());
    }
 
    plug = FindMayaPlug("aiSubdivDicingCamera");
