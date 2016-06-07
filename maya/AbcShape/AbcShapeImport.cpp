@@ -34,6 +34,7 @@
 #include <maya/MFnMatrixData.h>
 #include <maya/MFnStringData.h>
 #include <maya/MPlugArray.h>
+#include <maya/MDagPathArray.h>
 
 MSyntax AbcShapeImport::createSyntax()
 {
@@ -3500,6 +3501,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
                      MGlobal::getActiveSelectionList(newSel);
                      
                      MDagModifier dgmod;
+                     MDagPathArray paths;
                      
                      for (unsigned int i=0; i<newSel.length(); ++i)
                      {
@@ -3508,6 +3510,15 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
                            continue;
                         }
                         
+                        paths.append(path);
+                     }
+
+                     MGlobal::setActiveSelectionList(oldSel);
+
+                     for (unsigned int i=0; i<paths.length(); ++i)
+                     {
+                        path = paths[i];
+                        
                         if (node.setObject(path) != MS::kSuccess)
                         {
                            continue;
@@ -3515,16 +3526,16 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
                         
                         std::string nodePath = DagToAbcPath(path);
                         
-                        if (!scene->find(nodePath))
+                        if (nodePath.length() > 0 && !scene->find(nodePath))
                         {
+                           MGlobal::displayInfo("[mzAbcShapeImport] Deleting DAG \"" + path.fullPathName() + "\"");
+                           
                            MObject nodeObj = node.object();
+                           
                            dgmod.deleteNode(nodeObj);
+                           dgmod.doIt();
                         }
                      }
-                     
-                     dgmod.doIt();
-                     
-                     MGlobal::setActiveSelectionList(oldSel);
                   }
                   
                   // Create a new filtered scene to only visit selected nodes
