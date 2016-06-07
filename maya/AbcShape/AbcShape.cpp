@@ -2685,10 +2685,6 @@ bool AbcShape::getInternalValueInContext(const MPlug &plug, MDataHandle &handle,
    }
    else if (plug == aInCustomFrame)
    {
-      char msg[1024];
-      sprintf(msg, "Get inCustomFrame = %f", mInCustomFrame);
-      MGlobal::displayInfo(msg);
-      
       handle.setDouble(mInCustomFrame);
       return true;
    }
@@ -2954,11 +2950,6 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
    else if (plug == aInCustomFrame)
    {
       mInCustomFrame = handle.asDouble();
-      
-      char msg[1024];
-      sprintf(msg, "Set inCustomFrame = %f", mInCustomFrame);
-      MGlobal::displayInfo(msg);
-      
       return true;
    }
    else
