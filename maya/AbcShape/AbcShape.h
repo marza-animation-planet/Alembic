@@ -100,6 +100,8 @@ public:
     static MObject aAnimated;
     static MObject aUvSetCount;
     static MObject aOutSampleTime;
+    static MObject aInCustomFrame;
+    static MObject aOutCustomTime;
     
 #ifdef ABCSHAPE_VRAY_SUPPORT
     // V-Ray specific attributes
@@ -201,7 +203,7 @@ private:
     double getFPS() const;
     double computeAdjustedTime(double inputTime, double speed, double timeOffset) const;
     double computeRetime(double inputTime, double firstTime, double lastTime, CycleType cycleType, bool *clipped=0) const;
-    double getSampleTime(bool *clipped=0) const;
+    double getSampleTime(bool useCustomTime, bool *clipped=0) const;
     
     void printInfo(bool detailed=false) const;
     void printSceneBounds() const;
@@ -253,6 +255,7 @@ private:
     MObject aUvSetName;
     std::vector<std::string> mUvSetNames;
     bool mClipped;
+    double mInCustomFrame;
     
 #ifdef ABCSHAPE_VRAY_SUPPORT
     VR::DefStringParam mVRFilename;

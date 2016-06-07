@@ -761,6 +761,8 @@ MObject AbcShape::aOutBoxMax;
 MObject AbcShape::aAnimated;
 MObject AbcShape::aUvSetCount;
 MObject AbcShape::aOutSampleTime;
+MObject AbcShape::aInCustomFrame;
+MObject AbcShape::aOutCustomTime;
 #ifdef ABCSHAPE_VRAY_SUPPORT
 MObject AbcShape::aOutApiType;
 MObject AbcShape::aOutApiClassification;
@@ -996,6 +998,23 @@ MStatus AbcShape::initialize()
    nAttr.setStorable(false);
    stat = addAttribute(aOutSampleTime);
    MCHECKERROR(stat, "Could not add 'outSampleTime' attribute");
+   
+   aInCustomFrame = nAttr.create("inCustomFrame", "incf", MFnNumericData::kDouble, 0.0, &stat);
+   MCHECKERROR(stat, "Could not create 'inCustomFrame' attribute");
+   nAttr.setWritable(true);
+   nAttr.setStorable(true);
+   nAttr.setHidden(true);
+   nAttr.setInternal(true);
+   stat = addAttribute(aInCustomFrame);
+   MCHECKERROR(stat, "Could not add 'inCustomFrame' attribute");
+   
+   aOutCustomTime = nAttr.create("outCustomTime", "ouct", MFnNumericData::kDouble, 0.0, &stat);
+   MCHECKERROR(stat, "Could not create 'outCustomTime' attribute");
+   nAttr.setWritable(false);
+   nAttr.setStorable(false);
+   nAttr.setHidden(true);
+   stat = addAttribute(aOutCustomTime);
+   MCHECKERROR(stat, "Could not add 'outCustomTime' attribute");
    
 #ifdef ABCSHAPE_VRAY_SUPPORT
    MFnStringData outApiTypeDefault;
@@ -1289,6 +1308,14 @@ MStatus AbcShape::initialize()
    attributeAffects(aStartFrame, aOutSampleTime);
    attributeAffects(aEndFrame, aOutSampleTime);
    
+   attributeAffects(aInCustomFrame, aOutCustomTime);
+   attributeAffects(aCycleType, aOutCustomTime);
+   attributeAffects(aSpeed, aOutCustomTime);
+   attributeAffects(aOffset, aOutCustomTime);
+   attributeAffects(aPreserveStartFrame, aOutCustomTime);
+   attributeAffects(aStartFrame, aOutCustomTime);
+   attributeAffects(aEndFrame, aOutCustomTime);
+   
    return MS::kSuccess;
 }
 
@@ -1349,6 +1376,7 @@ AbcShape::AbcShape()
    , mUpdateLevel(AbcShape::UL_none)
    , mAnimated(false)
    , mClipped(false)
+   , mInCustomFrame(0.0)
 #ifdef ABCSHAPE_VRAY_SUPPORT
    , mVRFilename("filename", "")
    , mVRUseReferenceObject("useReferenceObject", false)
@@ -1506,6 +1534,24 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
       MDataHandle hOut = block.outputValue(plug.attribute());
       
       hOut.setDouble(mSampleTime);
+      
+      block.setClean(plug);
+      
+      return MS::kSuccess;
+   }
+   else if (plug.attribute() == aOutCustomTime)
+   {
+      block.inputValue(aInCustomFrame).asDouble();
+      block.inputValue(aSpeed).asDouble();
+      block.inputValue(aOffset).asDouble();
+      block.inputValue(aStartFrame).asDouble();
+      block.inputValue(aEndFrame).asDouble();
+      block.inputValue(aCycleType).asShort();
+      block.inputValue(aPreserveStartFrame).asBool();
+      
+      MDataHandle hOut = block.outputValue(plug.attribute());
+      
+      hOut.setDouble(getSampleTime(true));
       
       block.setClean(plug);
       
@@ -2416,7 +2462,7 @@ double AbcShape::computeRetime(const double inputTime,
    return retime;
 }
 
-double AbcShape::getSampleTime(bool *clipped) const
+double AbcShape::getSampleTime(bool useCustomTime, bool *clipped) const
 {
    double invFPS = 1.0 / getFPS();
    double startOffset = 0.0f;
@@ -2424,7 +2470,8 @@ double AbcShape::getSampleTime(bool *clipped) const
    {
       startOffset = (mStartFrame * (mSpeed - 1.0) / mSpeed);
    }
-   double sampleTime = computeAdjustedTime(mTime.as(MTime::kSeconds), mSpeed, (startOffset + mOffset) * invFPS);
+   double inTime = (useCustomTime ? (mInCustomFrame * invFPS) : mTime.as(MTime::kSeconds));
+   double sampleTime = computeAdjustedTime(inTime, mSpeed, (startOffset + mOffset) * invFPS);
    return computeRetime(sampleTime, mStartFrame * invFPS, mEndFrame * invFPS, mCycleType, clipped);
 }
 
@@ -2488,7 +2535,7 @@ void AbcShape::updateRange()
          
          mStartFrame = start;
          mEndFrame = end;
-         mSampleTime = getSampleTime();
+         mSampleTime = getSampleTime(false);
          
          // This will force instant refresh of AE values
          // but won't trigger any update as mStartFrame and mEndFrame are unchanged
@@ -2634,6 +2681,15 @@ bool AbcShape::getInternalValueInContext(const MPlug &plug, MDataHandle &handle,
    else if (plug == aTime)
    {
       handle.setMTime(mTime);
+      return true;
+   }
+   else if (plug == aInCustomFrame)
+   {
+      char msg[1024];
+      sprintf(msg, "Get inCustomFrame = %f", mInCustomFrame);
+      MGlobal::displayInfo(msg);
+      
+      handle.setDouble(mInCustomFrame);
       return true;
    }
    else if (plug == aOffset)
@@ -2895,6 +2951,16 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       mDrawLocators = handle.asBool();
       return true;
    }
+   else if (plug == aInCustomFrame)
+   {
+      mInCustomFrame = handle.asDouble();
+      
+      char msg[1024];
+      sprintf(msg, "Set inCustomFrame = %f", mInCustomFrame);
+      MGlobal::displayInfo(msg);
+      
+      return true;
+   }
    else
    {
       return MPxSurfaceShape::setInternalValueInContext(plug, handle, ctx);
@@ -2904,7 +2970,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
    {
       bool clipped = false;
       
-      double sampleTime = getSampleTime(&clipped);
+      double sampleTime = getSampleTime(false, &clipped);
       
       if (clipped != mClipped)
       {
@@ -2956,6 +3022,7 @@ void AbcShape::copyInternalData(MPxNode *source)
       mAnimated = node->mAnimated;
       mUvSetNames = node->mUvSetNames;
       mClipped = node->mClipped;
+      mInCustomFrame = node->mInCustomFrame;
     
       if (mScene && !AlembicSceneCache::Unref(mScene))
       {
