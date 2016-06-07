@@ -91,6 +91,7 @@ private:
    float m_widthSclMinMax[3];
    float m_peakPadding;
    std::string m_promoteToObjAttr;
+   double m_renderFrame;
 };
 
 #endif

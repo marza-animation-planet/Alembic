@@ -1334,13 +1334,38 @@ void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
       
       if (IsSingleShape())
       {
-         MPlug plug = FindMayaObjectPlug("outSampleTime");
+         bool supportBoundsOverrides = false;
+         
+         MPlug plug = FindMayaObjectPlug("inCustomFrame");
          if (!plug.isNull())
          {
+            plug.setDouble(m_renderFrame);
+            plug = FindMayaObjectPlug("outCustomTime");
             m_renderTime = plug.asDouble();
+            supportBoundsOverrides = true;
+         }
+         else
+         {
+            plug = FindMayaObjectPlug("outSampleTime");
+            if (!plug.isNull())
+            {
+               m_renderTime = plug.asDouble();
+               supportBoundsOverrides = true;
+            }
+         }
+         
+         if (supportBoundsOverrides)
+         {
             m_overrideBounds = FindMayaPlug("mtoa_constant_abc_useOverrideBounds").asBool();
             m_padBoundsWithPeakRadius = FindMayaPlug("mtoa_constant_abc_padBoundsWithPeakRadius").asBool();
             m_padBoundsWithPeakWidth = FindMayaPlug("mtoa_constant_abc_padBoundsWithPeakWidth").asBool();
+            
+            if (m_overrideBounds || m_padBoundsWithPeakWidth || m_padBoundsWithPeakRadius)
+            {
+               char msg[1024];
+               sprintf(msg, "[AbcShapeMtoa] Sample bounds override attributes at frame %f (time = %f)", m_renderFrame, m_renderTime);
+               MGlobal::displayInfo(msg);
+            }
          }
          
          
@@ -1432,6 +1457,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
    
    m_abcPath = abcfile.asChar();
    m_objPath = objpath.asChar();
+   m_renderFrame = renderFrame;
    
    // ---
 
