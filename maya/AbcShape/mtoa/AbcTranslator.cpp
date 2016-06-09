@@ -435,25 +435,14 @@ void CAbcTranslator::GetFrames(double inRenderFrame, double inSampleFrame,
    MDGContext ctx0(MTime(inRenderFrame, MTime::uiUnit()));
    MDGContext ctx1(MTime(inSampleFrame, MTime::uiUnit()));
    
+   MStatus st;
    MTime t;
    
-   if (pTime.getValue(t, ctx0) != MS::kSuccess)
-   {
-      outRenderFrame = t.asUnits(MTime::uiUnit());
-   }
-   else
-   {
-      outRenderFrame = inRenderFrame;
-   }
+   t = pTime.asMTime(ctx0, &st);
+   outRenderFrame = (st == MS::kSuccess ? t.asUnits(MTime::uiUnit()) : inRenderFrame);
    
-   if (pTime.getValue(t, ctx1) != MS::kSuccess)
-   {
-      outSampleFrame = t.asUnits(MTime::uiUnit());
-   }
-   else
-   {
-      outSampleFrame = inSampleFrame;
-   }
+   t = pTime.asMTime(ctx1, &st);
+   outSampleFrame = (st == MS::kSuccess ? t.asUnits(MTime::uiUnit()) : inSampleFrame);
 }
 
 double CAbcTranslator::GetFPS()
