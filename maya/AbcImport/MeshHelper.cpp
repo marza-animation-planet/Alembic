@@ -1439,16 +1439,16 @@ MObject createPoly(double iFrame, bool iReadNormals, PolyMeshAndFriends & iNode,
         true);
 
 
-    if ( !schema.getNormalsParam().valid() )
-    {
-        MFnNumericAttribute attr;
-        MString attrName("noNormals");
-        MObject attrObj = attr.create(attrName, attrName,
-        MFnNumericData::kBoolean, true);
-        attr.setKeyable(true);
-        attr.setHidden(false);
-        fnMesh.addAttribute(attrObj, MFnDependencyNode::kLocalDynamicAttr);
-    }
+    // if ( !schema.getNormalsParam().valid() )
+    // {
+    //     MFnNumericAttribute attr;
+    //     MString attrName("noNormals");
+    //     MObject attrObj = attr.create(attrName, attrName,
+    //     MFnNumericData::kBoolean, true);
+    //     attr.setKeyable(true);
+    //     attr.setHidden(false);
+    //     fnMesh.addAttribute(attrObj, MFnDependencyNode::kLocalDynamicAttr);
+    // }
 
     return obj;
 }
