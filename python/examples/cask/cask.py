@@ -453,7 +453,7 @@ class Archive(object):
 
         # time sampling attributes
         self.time_sampling_id = 0
-        self.fps = fps
+        self.fps = float(fps)
         self.__start_time = None
         self.__end_time = None
 
@@ -935,6 +935,9 @@ class Property(object):
         else:
             return 0
 
+    def get_sample_index(self, time=None, frame=None):
+        return self.__get_sample_index(time=time, frame=frame)
+
     @property
     def values(self):
         """
@@ -1150,6 +1153,23 @@ class Object(object):
     schema = property(__get_schema, __set_schema,
                       doc="Returns the Alembic schema object.")
 
+    def get_sample_index(self, time=None, frame=None):
+        """
+        Converts time in secs or frame number to sample index.
+
+        :param time: time in seconds.
+        :param frame: frame number.
+        :return: sample index.
+        """
+        ts = self.schema.getTimeSampling()
+        numSamples = self.schema.getNumSamples()
+        if time is not None:
+            return ts.getNearIndex(float(time), numSamples)
+        elif frame is not None:
+            return ts.getNearIndex((frame / self.archive().fps), numSamples)
+        else:
+            return 0
+
     @classmethod
     def matches(cls, iobject):
         """
@@ -1363,7 +1383,7 @@ class Object(object):
         except AttributeError:
             return self.parent.start_frame()
 
-    def end_frame(self, fps=24):
+    def end_frame(self, fps=None):
         """
         :param fps: Frames per second used to calculate the end frame
         (default 24.0)
@@ -1373,19 +1393,20 @@ class Object(object):
         try:
             time_sample = self.iobject.getTimeSampling()
             num_samples = self.iobject.getNumSamples()
-            fps = self.archive().fps
+            if fps is None:
+                fps = self.archive().fps
             if num_samples:
                 return round(time_sample.getSampleTime(num_samples - 1) * fps)
             return round(time_sample.getSampleTime(0) * fps)
         except AttributeError:
             return self.parent.end_frame()
 
-    def global_matrix(self):
+    def global_matrix(self, time=None, frame=None):
         """Returns world space matrix for this object."""
         def accum_xform(xform, obj):
             """recursive xform accum"""
             if Xform.matches(obj._iobject):
-                xform *= obj.matrix()
+                xform *= obj.matrix(time=time, frame=frame)
         xform = imath.M44d()
         xform.makeIdentity()
         parent = self
@@ -1477,12 +1498,14 @@ class Xform(Object):
     def __init__(self, *args, **kwargs):
         super(Xform, self).__init__(*args, **kwargs)
 
-    def matrix(self, index=0):
+    def matrix(self, index=None, time=None, frame=None):
         """
         Returns the xform matrix value for a given index.
 
         :param index: Sample index.
         """
+        if index is None:
+            index = self.get_sample_index(time, frame)
         return self.schema.getValue(index).getMatrix()
 
     def set_scale(self, *args):
