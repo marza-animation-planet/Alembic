@@ -2818,12 +2818,6 @@ void Dso::transferInstanceParams(AtNode *dst)
      
    AtArray *ary;
   
-   ary = AiNodeGetArray(mProcNode, "matrix");
-   if (ary)
-   {
-      AiNodeSetArray(dst, "matrix", AiArrayCopy(ary));
-   }
-
    ary = AiNodeGetArray(mProcNode, "shader");
    if (ary)
    {
