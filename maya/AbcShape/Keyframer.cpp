@@ -488,7 +488,23 @@ void Keyframer::setRotationCurvesInterpolation(const MString &type, const MStrin
          if (rotCurves.length() > 0)
          {
             MGlobal::setActiveSelectionList(rotCurves);
-            MGlobal::executeCommand("rotationInterpolation -c " + slit->first);
+            
+            MString other = ((slit->first == "none" || slit->first == "euler") ? "quaternion" : "euler");
+            MString cmd = "";
+            
+            cmd += "{ string $crv, $it = \"\";\n";
+            cmd += "  for ($crv in `ls -sl`)\n";
+            cmd += "  {\n";
+            cmd += "    $it = `rotationInterpolation -q $crv`;\n";
+            cmd += "    if ($it == \"" + slit->first + "\")\n";
+            cmd += "    {\n";
+            cmd += "       rotationInterpolation -c " + other + " $crv;\n";
+            cmd += "    }\n";
+            cmd += "    rotationInterpolation -c " + slit->first + " $crv;\n";
+            cmd += "  } }";
+            
+            MGlobal::executeCommand(cmd);
+            //MGlobal::executeCommand("rotationInterpolation -c " + slit->first);
          }
       }
       
