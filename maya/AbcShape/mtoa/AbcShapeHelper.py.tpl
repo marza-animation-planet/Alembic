@@ -103,8 +103,7 @@ def AutoSetup(shapes=None, verbose=False):
                      gsm = gprops.properties[names["overrideBoundsMin"]].iobject.getHeader().getMetaData().get("geoScope")
                      gsM = gprops.properties[names["overrideBoundsMax"]].iobject.getHeader().getMetaData().get("geoScope")
                      if gsm == gsM and gsm in ("con", "uni"):
-                        if singleShape:
-                           cmds.setAttr(shape+".mtoa_constant_abc_useOverrideBounds", True)
+                        cmds.setAttr(shape+".mtoa_constant_abc_useOverrideBounds", True)
                         if gsm == "uni":
                            promoteAttrs.append(names["overrideBoundsMin"])
                            promoteAttrs.append(names["overrideBoundsMax"])
@@ -112,16 +111,14 @@ def AutoSetup(shapes=None, verbose=False):
                   if names["peakRadius"] in gprops.properties:
                      gs = gprops.properties[names["peakRadius"]].iobject.getHeader().getMetaData().get("geoScope")
                      if gs in ("con", "uni"):
-                        if singleShape:
-                           cmds.setAttr(shape+".mtoa_constant_abc_padBoundsWithPeakRadius", True)
+                        cmds.setAttr(shape+".mtoa_constant_abc_padBoundsWithPeakRadius", True)
                         if gs == "uni":
                            promoteAttrs.append(names["peakRadius"])
                   
                   if names["peakWidth"] in gprops.properties:
                      gs = gprops.properties[names["peakWidth"]].iobject.getHeader().getMetaData().get("geoScope")
                      if gs in ("con", "uni"):
-                        if singleShape:
-                           cmds.setAttr(shape+".mtoa_constant_abc_padBoundsWithPeakWidth", True)
+                        cmds.setAttr(shape+".mtoa_constant_abc_padBoundsWithPeakWidth", True)
                         if gs == "uni":
                            promoteAttrs.append(names["peakWidth"])
                   
@@ -131,16 +128,13 @@ def AutoSetup(shapes=None, verbose=False):
                uprops = props.properties.get(".userProperties", None)
                if uprops:
                   if names["overrideBoundsMin"] in uprops.properties and names["overrideBoundsMax"] in uprops.properties:
-                     if singleShape:
-                        cmds.setAttr(shape+".mtoa_constant_abc_useOverrideBounds", True)
+                     cmds.setAttr(shape+".mtoa_constant_abc_useOverrideBounds", True)
                   
                   if names["peakRadius"] in uprops.properties:
-                     if singleShape:
-                        cmds.setAttr(shape+".mtoa_constant_abc_padBoundsWithPeakRadius", True)
+                     cmds.setAttr(shape+".mtoa_constant_abc_padBoundsWithPeakRadius", True)
                   
                   if names["peakWidth"] in uprops.properties:
-                     if singleShape:
-                        cmds.setAttr(shape+".mtoa_constant_abc_padBoundsWithPeakWidth", True)
+                     cmds.setAttr(shape+".mtoa_constant_abc_padBoundsWithPeakWidth", True)
                   
                   if "hasReferenceObject" in uprops.properties and hasPref and hasNref:
                      p = uprops.properties["hasReferenceObject"]

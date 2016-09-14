@@ -199,19 +199,21 @@ bool MakeProcedurals::overrideBounds(AlembicNodeT<Alembic::Abc::ISchemaObject<Sc
 {
    bool rv = false;
    
-   if (!mDso->ignoreDeformBlur())
+   if (!mDso->ignoreDeformBlur() && mDso->useOverrideBounds())
    {
-      const char *minAttrName = mDso->overrideBoundsMinName();
-      if (!minAttrName)
-      {
-         minAttrName = "overrideBoundsMin";
-      }
+      //const char *minAttrName = mDso->overrideBoundsMinName();
+      //if (!minAttrName)
+      //{
+      //   minAttrName = "overrideBoundsMin";
+      //}
+      const char *minAttrName = mDso->overrideBoundsMinName().c_str();
       
-      const char *maxAttrName = mDso->overrideBoundsMaxName();
-      if (!maxAttrName)
-      {
-         maxAttrName = "overrideBoundsMax";
-      }
+      //const char *maxAttrName = mDso->overrideBoundsMaxName();
+      //if (!maxAttrName)
+      //{
+      //   maxAttrName = "overrideBoundsMax";
+      //}
+      const char *maxAttrName = mDso->overrideBoundsMaxName().c_str();
       
       Schema schema = node.typedObject().getSchema();
       
@@ -350,7 +352,9 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
             sampleTimes = &(mDso->motionSampleTimes()[0]);
             sampleTimesCount = mDso->numMotionSamples();
          }
-            
+         
+         // For mesh of Heterogeneous topology and particles
+         // -> samples need to be computed based on current frame + velocity/acceleration extrapolation
          for (size_t i=0; i<sampleTimesCount; ++i)
          {
             double t = sampleTimes[i];
@@ -409,27 +413,36 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
                }
             }
          }
-         
-         const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mDso->procNode(), "disp_padding");
-         if (pe && mDso->overrideAttrib("disp_padding"))
-         {
-            float padding = AiNodeGetFlt(mDso->procNode(), "disp_padding");
-            
-            if (padding > 0.0f && mDso->verbose())
-            {
-               AiMsgInfo("[abcproc] \"disp_padding\" attribute found on procedural, pad bounds by %f", padding);
-            }
-            
-            extraPadding += padding;
-         }
       }
-      else
+      
+      // Add constant bounds padding
+      if (mDso->verbose() && mDso->boundsPadding())
       {
-         extraPadding = 0.0f;
+         AiMsgInfo("[abcproc] Add constant bounds padding: %f", mDso->boundsPadding());
+      }
+      extraPadding += mDso->boundsPadding();
+      
+      // Also add 'disp_padding' to extraPadding
+      const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mDso->procNode(), "disp_padding");
+      if (pe) // && mDso->overrideAttrib("disp_padding"))
+      {
+         float padding = AiNodeGetFlt(mDso->procNode(), "disp_padding");
+         
+         if (padding > 0.0f && mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] \"disp_padding\" attribute found on procedural, pad bounds by %f", padding);
+         }
+         
+         extraPadding += padding;
       }
       
       if (extraPadding > 0)
       {
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Total bounds padding: %f", extraPadding);
+         }
+      
          box.min.x -= extraPadding;
          box.min.y -= extraPadding;
          box.min.z -= extraPadding;

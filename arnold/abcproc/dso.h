@@ -251,14 +251,28 @@ public:
    
    bool cleanAttribName(std::string &name) const;
    
-   inline const char* overrideBoundsMinName() const
+   inline float boundsPadding() const
    {
-      return (mMultiParams.overrideBoundsMinName.length() > 0 ? mMultiParams.overrideBoundsMinName.c_str() : 0);
+      return mMultiParams.boundsPadding;
    }
    
-   inline const char* overrideBoundsMaxName() const
+   inline bool useOverrideBounds() const
    {
-      return (mMultiParams.overrideBoundsMaxName.length() > 0 ? mMultiParams.overrideBoundsMaxName.c_str() : 0);
+      return mMultiParams.useOverrideBounds;
+   }
+   
+   //inline const char* overrideBoundsMinName() const
+   inline const std::string& overrideBoundsMinName() const
+   {
+      //return (mMultiParams.overrideBoundsMinName.length() > 0 ? mMultiParams.overrideBoundsMinName.c_str() : 0);
+      return mMultiParams.overrideBoundsMinName;
+   }
+   
+   //inline const char* overrideBoundsMaxName() const
+   inline const std::string& overrideBoundsMaxName() const
+   {
+      //return (mMultiParams.overrideBoundsMaxName.length() > 0 ? mMultiParams.overrideBoundsMaxName.c_str() : 0);
+      return mMultiParams.overrideBoundsMaxName;
    }
    
    // Shapes
@@ -304,6 +318,11 @@ public:
       return mSingleParams.radiusScale;
    }
    
+   inline bool padBoundsWithPeakRadius() const
+   {
+      return mMultiParams.padBoundsWithPeakRadius;
+   }
+   
    inline const std::string& peakRadiusName() const
    {
       return mMultiParams.peakRadiusName;
@@ -334,6 +353,11 @@ public:
    inline double widthScale() const
    {
       return mSingleParams.widthScale;
+   }
+   
+   inline bool padBoundsWithPeakWidth() const
+   {
+      return mMultiParams.padBoundsWithPeakWidth;
    }
    
    inline const std::string& peakWidthName() const
@@ -480,11 +504,17 @@ private:
    struct MultiParameters
    {
       std::set<std::string> overrideAttribs;
+      
+      float boundsPadding;
+      
+      bool useOverrideBounds;
       std::string overrideBoundsMinName;
       std::string overrideBoundsMaxName;
       
+      bool padBoundsWithPeakRadius;
       std::string peakRadiusName;
       
+      bool padBoundsWithPeakWidth;
       std::string peakWidthName;
       
       void reset();

@@ -325,11 +325,17 @@ std::string Dso::CommonParameters::shapeKey() const
 void Dso::MultiParameters::reset()
 {
    overrideAttribs.clear();
-   overrideBoundsMinName = "";
-   overrideBoundsMaxName = "";
    
+   boundsPadding = 0.0f;
+   
+   useOverrideBounds = false;
+   overrideBoundsMinName = "overrideBoundsMin";
+   overrideBoundsMaxName = "overrideBoundsMax";
+   
+   padBoundsWithPeakRadius = false;
    peakRadiusName = "peakRadius";
    
+   padBoundsWithPeakWidth = false;
    peakWidthName = "peakWidth";
 }
 
@@ -348,24 +354,41 @@ std::string Dso::MultiParameters::dataString() const
       }
    }
    
-   if (overrideBoundsMinName.length() > 0)
+   if (boundsPadding > 0)
    {
-      oss << " -overrideBoundsMinName " << overrideBoundsMinName;
+      oss << " -boundspadding " << boundsPadding;
    }
    
-   if (overrideBoundsMaxName.length() > 0)
+   if (useOverrideBounds)
    {
-      oss << " -overrideBoundsMaxName " << overrideBoundsMaxName;
+      oss << " -useoverridebounds";
+      if (overrideBoundsMinName.length() > 0 && overrideBoundsMinName != "overrideBoundsMin")
+      {
+         oss << " -overrideboundsminname " << overrideBoundsMinName;
+      }
+      
+      if (overrideBoundsMaxName.length() > 0 && overrideBoundsMaxName != "overrideBoundsMax")
+      {
+         oss << " -overrideboundsmaxname " << overrideBoundsMaxName;
+      }
    }
    
-   if (peakRadiusName.length() > 0)
+   if (padBoundsWithPeakRadius)
    {
-      oss << " -peakradiusname " << peakRadiusName;
+      oss << " -padboundswithpeakradius";
+      if (peakRadiusName.length() > 0 && peakRadiusName != "peakRadius")
+      {
+         oss << " -peakradiusname " << peakRadiusName;
+      }
    }
    
-   if (peakWidthName.length() > 0)
+   if (padBoundsWithPeakWidth)
    {
-      oss << " -peakwidthname " << peakWidthName;
+      oss << " -padboundswithpeakwidth";
+      if (peakWidthName.length() > 0 && peakWidthName != "peakWidth")
+      {
+         oss << " -peakwidthname " << peakWidthName;
+      }
    }
    
    return oss.str();
@@ -1671,12 +1694,28 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       }
       --i;
    }
+   else if (args[i] == "-boundspadding")
+   {
+      ++i;
+      if (i >= args.size() ||
+          sscanf(args[i].c_str(), "%f", &(mMultiParams.boundsPadding)) != 1)
+      {
+         return false;
+      }
+   }
+   else if (args[i] == "-useoverridebounds")
+   {
+      mMultiParams.useOverrideBounds = true;
+   }
    else if (args[i] == "-overrideboundsminname")
    {
       ++i;
       if (i < args.size() && !isFlag(args[i]))
       {
-         mMultiParams.overrideBoundsMinName = args[i];
+         if (args[i].length() > 0)
+         {
+            mMultiParams.overrideBoundsMinName = args[i];
+         }
       }
    }
    else if (args[i] == "-overrideboundsmaxname")
@@ -1684,23 +1723,40 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
       ++i;
       if (i < args.size() && !isFlag(args[i]))
       {
-         mMultiParams.overrideBoundsMaxName = args[i];
+         if (args[i].length() > 0)
+         {
+            mMultiParams.overrideBoundsMaxName = args[i];
+         }
       }
+   }
+   else if (args[i] == "-padboundswithpeakradius")
+   {
+      mMultiParams.padBoundsWithPeakRadius = true;
    }
    else if (args[i] == "-peakradiusname")
    {
       ++i;
       if (i < args.size() && !isFlag(args[i]))
       {
-         mMultiParams.peakRadiusName = args[i];
+         if (args[i].length() > 0)
+         {
+            mMultiParams.peakRadiusName = args[i];
+         }
       }
+   }
+   else if (args[i] == "-padboundswithpeakwidth")
+   {
+      mMultiParams.padBoundsWithPeakWidth = true;
    }
    else if (args[i] == "-peakwidthname")
    {
       ++i;
       if (i < args.size() && !isFlag(args[i]))
       {
-         mMultiParams.peakWidthName = args[i];
+         if (args[i].length() > 0)
+         {
+            mMultiParams.peakWidthName = args[i];
+         }
       }
    }
    // Process single params
@@ -2455,11 +2511,37 @@ void Dso::readFromUserParams()
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
          }
       }
+      else if (param == "boundspadding")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
+         {
+            mMultiParams.boundsPadding = AiNodeGetFlt(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
+         }
+      }
+      else if (param == "useoverridebounds")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
+         {
+            mMultiParams.useOverrideBounds = AiNodeGetBool(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
+         }
+      }
       else if (param == "overrideboundsminname")
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            mMultiParams.overrideBoundsMinName = AiNodeGetStr(mProcNode, pname);
+            const char *n = AiNodeGetStr(mProcNode, pname);
+            if (n && strlen(n) > 0)
+            {
+               mMultiParams.overrideBoundsMinName = n;
+            }
          }
          else
          {
@@ -2470,29 +2552,63 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            mMultiParams.overrideBoundsMaxName = AiNodeGetStr(mProcNode, pname);
+            const char *n = AiNodeGetStr(mProcNode, pname);
+            if (n && strlen(n) > 0)
+            {
+               mMultiParams.overrideBoundsMaxName = n;
+            }
          }
          else
          {
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
+         }
+      }
+      else if (param == "padboundswithpeakradius")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
+         {
+            mMultiParams.padBoundsWithPeakRadius = AiNodeGetBool(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
          }
       }
       else if (param == "peakradiusname")
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            mMultiParams.peakRadiusName = AiNodeGetStr(mProcNode, pname);
+            const char *n = AiNodeGetStr(mProcNode, pname);
+            if (n && strlen(n) > 0)
+            {
+               mMultiParams.peakRadiusName = n;
+            }
          }
          else
          {
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
          }
       }
+      else if (param == "padboundswithpeakwidth")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
+         {
+            mMultiParams.padBoundsWithPeakWidth = AiNodeGetBool(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
+         }
+      }
       else if (param == "peakwidthname")
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            mMultiParams.peakWidthName = AiNodeGetStr(mProcNode, pname);
+            const char *n = AiNodeGetStr(mProcNode, pname);
+            if (n && strlen(n) > 0)
+            {
+               mMultiParams.peakWidthName = n;
+            }
          }
          else
          {

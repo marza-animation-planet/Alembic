@@ -394,7 +394,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
    
    double extraPadding = 0.0;
    
-   if (visible)
+   if (visible && mDso->padBoundsWithPeakRadius())
    {
       Alembic::AbcGeom::IPointsSchema &schema = node.typedObject().getSchema();
       Alembic::AbcGeom::IFloatGeomParam widths = schema.getWidthsParam();
@@ -404,23 +404,23 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
       
       const std::string &peakRadiusName = mDso->peakRadiusName();
       UserAttribute peakRadiusAttr;
-      
+   
       InitUserAttribute(peakRadiusAttr);
-      
+   
       bool hasPeakRadius = ReadSingleUserAttribute(peakRadiusName.c_str(), ObjectAttribute, renderTime, userProps, geomParams, peakRadiusAttr);
-      
+   
       if (!hasPeakRadius && mDso->isPromotedToObjectAttrib(peakRadiusName))
       {
          hasPeakRadius = ReadSingleUserAttribute(peakRadiusName.c_str(), PointAttribute, renderTime, userProps, geomParams, peakRadiusAttr);
-         
+      
          if (hasPeakRadius)
          {
             UserAttribute tmp;
-            
+         
             bool promoted = PromoteToObjectAttrib(peakRadiusAttr, tmp);
-            
+         
             DestroyUserAttribute(peakRadiusAttr);
-            
+         
             if (promoted)
             {
                hasPeakRadius = true;
@@ -598,13 +598,13 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode
    
    double extraPadding = 0.0;
    
-   if (visible)
+   if (visible && mDso->padBoundsWithPeakWidth())
    {
       Alembic::AbcGeom::ICurvesSchema schema = node.typedObject().getSchema();
       Alembic::Abc::ICompoundProperty userProps = schema.getUserProperties();
       Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
-      
       double t = mDso->renderTime();
+      
       const std::string &peakWidthName = mDso->peakWidthName();
       UserAttribute peakWidthAttr;
       

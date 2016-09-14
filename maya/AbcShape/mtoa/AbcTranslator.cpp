@@ -1225,25 +1225,27 @@ void CAbcTranslator::ReadAlembicAttributes()
          {
             AtPoint min, max;
             
-            bool hasMin = ReadFloat3Attribute(userProps, geomParams, m_overrideBoundsMin, Alembic::AbcGeom::kConstantScope, m_min);
+            bool hasMin = ReadFloat3Attribute(userProps, geomParams, m_overrideBoundsMin, Alembic::AbcGeom::kConstantScope, min);
             if (!hasMin && promoteMin)
             {
                MGlobal::displayInfo(MString("[mzAbcShapeMtoa] Check for promoted attribute \"") + m_overrideBoundsMin.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
-               hasMin = ReadFloat3Attribute(emptyProp, geomParams, m_overrideBoundsMin, Alembic::AbcGeom::kUniformScope, m_min);
+               hasMin = ReadFloat3Attribute(emptyProp, geomParams, m_overrideBoundsMin, Alembic::AbcGeom::kUniformScope, min);
             }
             if (hasMin)
             {
                AtPoint max;
                
-               bool hasMax = ReadFloat3Attribute(userProps, geomParams, m_overrideBoundsMax, Alembic::AbcGeom::kConstantScope, m_max);
+               bool hasMax = ReadFloat3Attribute(userProps, geomParams, m_overrideBoundsMax, Alembic::AbcGeom::kConstantScope, max);
                if (!hasMax && promoteMax)
                {
                   MGlobal::displayInfo(MString("[mzAbcShapeMtoa] Check for promoted attribute \"") + m_overrideBoundsMax.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
-                  hasMax = ReadFloat3Attribute(emptyProp, geomParams, m_overrideBoundsMax, Alembic::AbcGeom::kUniformScope, m_max);
+                  hasMax = ReadFloat3Attribute(emptyProp, geomParams, m_overrideBoundsMax, Alembic::AbcGeom::kUniformScope, max);
                }
                if (hasMax)
                {
                   MGlobal::displayInfo("[mzAbcShapeMtoa] Use bounds overrides contained in alembic file. [" + m_dagPath.partialPathName() + "]");
+                  m_min = min;
+                  m_max = max;
                   m_boundsOverridden = true;
                }
                else
@@ -1257,45 +1259,41 @@ void CAbcTranslator::ReadAlembicAttributes()
             }
          }
          
-         if (!m_boundsOverridden)
+         float peakRadius = 0.0f;
+         if (m_padBoundsWithPeakRadius)
          {
-            float peakRadius = 0.0f;
-            float peakWidth = 0.0f;
-            
-            if (m_padBoundsWithPeakRadius)
+            bool hasPeakRadius = ReadFloatAttribute(userProps, geomParams, m_peakRadius, Alembic::AbcGeom::kConstantScope, peakRadius);
+            if (!hasPeakRadius && promotePeakRadius)
             {
-               bool hasPeakRadius = ReadFloatAttribute(userProps, geomParams, m_peakRadius, Alembic::AbcGeom::kConstantScope, peakRadius);
-               if (!hasPeakRadius && promotePeakRadius)
-               {
-                  MGlobal::displayInfo(MString("[mzAbcShapeMtoa] Check for promoted attribute \"") + m_peakRadius.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
-                  hasPeakRadius = ReadFloatAttribute(emptyProp, geomParams, m_peakRadius, Alembic::AbcGeom::kUniformScope, peakRadius);
-               }
-               if (hasPeakRadius)
-               {
-                  MGlobal::displayInfo("[mzAbcShapeMtoa] Pad bounds with '" + MString(m_peakRadius.c_str()) + "' alembic attribute value. [" + m_dagPath.partialPathName() + "]");
-                  peakRadius *= m_radiusSclMinMax[0];
-                  if (peakRadius < m_radiusSclMinMax[1]) peakRadius = m_radiusSclMinMax[1];
-                  if (peakRadius > m_radiusSclMinMax[2]) peakRadius = m_radiusSclMinMax[2];
-                  m_peakPadding += peakRadius;
-               }
+               MGlobal::displayInfo(MString("[mzAbcShapeMtoa] Check for promoted attribute \"") + m_peakRadius.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
+               hasPeakRadius = ReadFloatAttribute(emptyProp, geomParams, m_peakRadius, Alembic::AbcGeom::kUniformScope, peakRadius);
             }
-            
-            if (m_padBoundsWithPeakWidth)
+            if (hasPeakRadius)
             {
-               bool hasPeakWidth = ReadFloatAttribute(userProps, geomParams, m_peakWidth, Alembic::AbcGeom::kConstantScope, peakWidth);
-               if (!hasPeakWidth && promotePeakWidth)
-               {
-                  MGlobal::displayInfo(MString("[mzAbcShapeMtoa] Check for promoted attribute \"") + m_peakWidth.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
-                  hasPeakWidth = ReadFloatAttribute(emptyProp, geomParams, m_peakWidth, Alembic::AbcGeom::kUniformScope, peakWidth);
-               }
-               if (hasPeakWidth)
-               {
-                  MGlobal::displayInfo("[mzAbcShapeMtoa] Pad bounds with '" + MString(m_peakWidth.c_str()) + "' alembic attribute value. [" + m_dagPath.partialPathName() + "]");
-                  peakWidth *= m_widthSclMinMax[0];
-                  if (peakWidth < m_widthSclMinMax[1]) peakWidth = m_widthSclMinMax[1];
-                  if (peakWidth > m_widthSclMinMax[2]) peakWidth = m_widthSclMinMax[2];
-                  m_peakPadding += 0.5f * peakWidth;
-               }
+               MGlobal::displayInfo("[mzAbcShapeMtoa] Pad bounds with '" + MString(m_peakRadius.c_str()) + "' alembic attribute value. [" + m_dagPath.partialPathName() + "]");
+               peakRadius *= m_radiusSclMinMax[0];
+               if (peakRadius < m_radiusSclMinMax[1]) peakRadius = m_radiusSclMinMax[1];
+               if (peakRadius > m_radiusSclMinMax[2]) peakRadius = m_radiusSclMinMax[2];
+               m_peakPadding += peakRadius;
+            }
+         }
+         
+         float peakWidth = 0.0f;
+         if (m_padBoundsWithPeakWidth)
+         {
+            bool hasPeakWidth = ReadFloatAttribute(userProps, geomParams, m_peakWidth, Alembic::AbcGeom::kConstantScope, peakWidth);
+            if (!hasPeakWidth && promotePeakWidth)
+            {
+               MGlobal::displayInfo(MString("[mzAbcShapeMtoa] Check for promoted attribute \"") + m_peakWidth.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
+               hasPeakWidth = ReadFloatAttribute(emptyProp, geomParams, m_peakWidth, Alembic::AbcGeom::kUniformScope, peakWidth);
+            }
+            if (hasPeakWidth)
+            {
+               MGlobal::displayInfo("[mzAbcShapeMtoa] Pad bounds with '" + MString(m_peakWidth.c_str()) + "' alembic attribute value. [" + m_dagPath.partialPathName() + "]");
+               peakWidth *= m_widthSclMinMax[0];
+               if (peakWidth < m_widthSclMinMax[1]) peakWidth = m_widthSclMinMax[1];
+               if (peakWidth > m_widthSclMinMax[2]) peakWidth = m_widthSclMinMax[2];
+               m_peakPadding += 0.5f * peakWidth;
             }
          }
       }
@@ -1371,13 +1369,9 @@ void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
                char msg[1024];
                sprintf(msg, "[AbcShapeMtoa] Sample bounds override attributes at frame %f (time = %f)", m_renderFrame, m_renderTime);
                MGlobal::displayInfo(msg);
+               
+               ReadAlembicAttributes();
             }
-         }
-         
-         
-         if (m_padBoundsWithPeakRadius || m_padBoundsWithPeakWidth)
-         {
-            ReadAlembicAttributes();
          }
          
          AiNodeSetBool(proc, "load_at_init", false);
@@ -1393,12 +1387,6 @@ void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
    }
    else if (singleShape && (transformBlur || deformBlur))
    {
-      if (step == 1 && m_overrideBounds && !m_padBoundsWithPeakRadius && !m_padBoundsWithPeakWidth)
-      {
-         // Attributes not read yet (override bounds only was set)
-         ReadAlembicAttributes();
-      }
-      
       if (m_boundsOverridden)
       {
          AiNodeSetPnt(proc, "min", m_min.x, m_min.y, m_min.z);
