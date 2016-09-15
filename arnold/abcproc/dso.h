@@ -256,6 +256,11 @@ public:
       return mMultiParams.boundsPadding;
    }
    
+   inline bool computeVelocityExpandedBounds() const
+   {
+      return (!mMultiParams.useOverrideBounds && mMultiParams.computeVelocityExpandedBounds);
+   }
+   
    inline bool useOverrideBounds() const
    {
       return mMultiParams.useOverrideBounds;
@@ -506,6 +511,8 @@ private:
       std::set<std::string> overrideAttribs;
       
       float boundsPadding;
+      
+      bool computeVelocityExpandedBounds;
       
       bool useOverrideBounds;
       std::string overrideBoundsMinName;

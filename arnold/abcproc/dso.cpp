@@ -328,6 +328,8 @@ void Dso::MultiParameters::reset()
    
    boundsPadding = 0.0f;
    
+   computeVelocityExpandedBounds = false;
+   
    useOverrideBounds = false;
    overrideBoundsMinName = "overrideBoundsMin";
    overrideBoundsMaxName = "overrideBoundsMax";
@@ -354,11 +356,6 @@ std::string Dso::MultiParameters::dataString() const
       }
    }
    
-   if (boundsPadding > 0)
-   {
-      oss << " -boundspadding " << boundsPadding;
-   }
-   
    if (useOverrideBounds)
    {
       oss << " -useoverridebounds";
@@ -371,6 +368,15 @@ std::string Dso::MultiParameters::dataString() const
       {
          oss << " -overrideboundsmaxname " << overrideBoundsMaxName;
       }
+   }
+   else if (computeVelocityExpandedBounds)
+   {
+      oss << " -computevelocityexpandedbounds";
+   }
+   
+   if (boundsPadding > 0)
+   {
+      oss << " -boundspadding " << boundsPadding;
    }
    
    if (padBoundsWithPeakRadius)
@@ -1703,6 +1709,10 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
          return false;
       }
    }
+   else if (args[i] == "-computevelocityexpandedbounds")
+   {
+      mMultiParams.computeVelocityExpandedBounds = true;
+   }
    else if (args[i] == "-useoverridebounds")
    {
       mMultiParams.useOverrideBounds = true;
@@ -2520,6 +2530,17 @@ void Dso::readFromUserParams()
          else
          {
             AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
+         }
+      }
+      else if (param == "computevelocityexpandedbounds")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
+         {
+            mMultiParams.computeVelocityExpandedBounds = AiNodeGetBool(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
          }
       }
       else if (param == "useoverridebounds")

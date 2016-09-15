@@ -145,10 +145,16 @@ private:
    float adjustWidth(float width) const;
 
    template <class Schema>
+   bool getVelocityAndAcceleration(const TimeSample<Schema> &ts, Alembic::Abc::ICompoundProperty geomParams, UserAttribute &vattr, UserAttribute &aattr);
+
+   template <class Schema>
+   bool computeVelocityBasedBounds(const TimeSample<Schema> &ts, Alembic::Abc::ICompoundProperty geomParams, Alembic::Abc::Box3d &box);
+
+   template <class Schema>
    bool overrideBounds(AlembicNodeT<Alembic::Abc::ISchemaObject<Schema> > &node, Alembic::Abc::Box3d &box);
    
    template <class T>
-   AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance, bool interpolateBounds, double extraPadding);
+   AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance, bool interpolateBounds, double extraPadding, const Alembic::Abc::Box3d *vbbox=0);
 
 private:
 
@@ -191,6 +197,188 @@ inline float MakeProcedurals::adjustWidth(float width) const
    else
    {
       return width;
+   }
+}
+
+template <class Schema>
+bool MakeProcedurals::getVelocityAndAcceleration(const TimeSample<Schema> &ts, Alembic::Abc::ICompoundProperty geomParams, UserAttribute &vattr, UserAttribute &aattr)
+{
+   Alembic::Abc::P3fArraySamplePtr P = ts.data().getPositions();
+   Alembic::Abc::V3fArraySamplePtr V = ts.data().getVelocities();
+   // a dummy
+   Alembic::Abc::ICompoundProperty userProps;
+   
+   const char *velName = mDso->velocityName();
+   
+   if (velName)
+   {
+      if (strcmp(velName, "<builtin>") != 0)
+      {
+         if (ReadSingleUserAttribute(velName, PointAttribute, ts.time(), userProps, geomParams, vattr))
+         {
+            if (vattr.arnoldType != AI_TYPE_VECTOR || size_t(vattr.dataCount) != P->size())
+            {
+               DestroyUserAttribute(vattr);
+            }
+         }
+      }
+   }
+   else
+   {
+      // Look for "velocity", "vel" and "v" in that order
+      if (ReadSingleUserAttribute("velocity", PointAttribute, ts.time(), userProps, geomParams, vattr))
+      {
+         if (vattr.arnoldType != AI_TYPE_VECTOR || size_t(vattr.dataCount) != P->size())
+         {
+            DestroyUserAttribute(vattr);
+         }
+      }
+      
+      if (!vattr.data && ReadSingleUserAttribute("vel", PointAttribute, ts.time(), userProps, geomParams, vattr))
+      {
+         if (vattr.arnoldType != AI_TYPE_VECTOR || size_t(vattr.dataCount) != P->size())
+         {
+            DestroyUserAttribute(vattr);
+         }
+      }
+      
+      if (!vattr.data && ReadSingleUserAttribute("v", PointAttribute, ts.time(), userProps, geomParams, vattr))
+      {
+         if (vattr.arnoldType != AI_TYPE_VECTOR || size_t(vattr.dataCount) != P->size())
+         {
+            DestroyUserAttribute(vattr);
+         }
+      }
+   }
+   
+   if (vattr.data || (V && V->size() == P->size()))
+   {
+      const char *accName = mDso->accelerationName();
+      
+      if (accName)
+      {
+         if (ReadSingleUserAttribute(accName, PointAttribute, ts.time(), userProps, geomParams, aattr))
+         {
+            if (aattr.arnoldType != AI_TYPE_VECTOR || size_t(aattr.dataCount) != P->size())
+            {
+               DestroyUserAttribute(aattr);
+            }
+         }
+      }
+      else
+      {
+         // Look for "acceleration", "accel" and "a" in that order
+         if (ReadSingleUserAttribute("acceleration", PointAttribute, ts.time(), userProps, geomParams, aattr))
+         {
+            if (aattr.arnoldType != AI_TYPE_VECTOR || size_t(aattr.dataCount) != P->size())
+            {
+               DestroyUserAttribute(aattr);
+            }
+         }
+         
+         if (!aattr.data && ReadSingleUserAttribute("accel", PointAttribute, ts.time(), userProps, geomParams, aattr))
+         {
+            if (aattr.arnoldType != AI_TYPE_VECTOR || size_t(aattr.dataCount) != P->size())
+            {
+               DestroyUserAttribute(aattr);
+            }
+         }
+         
+         if (!aattr.data && ReadSingleUserAttribute("a", PointAttribute, ts.time(), userProps, geomParams, aattr))
+         {
+            if (aattr.arnoldType != AI_TYPE_VECTOR || size_t(aattr.dataCount) != P->size())
+            {
+               DestroyUserAttribute(aattr);
+            }
+         }
+      }
+      
+      return true;
+   }
+   else
+   {
+      return false;
+   }
+}
+
+template <class Schema>
+bool MakeProcedurals::computeVelocityBasedBounds(const TimeSample<Schema> &ts, Alembic::Abc::ICompoundProperty geomParams, Alembic::Abc::Box3d &box)
+{
+   Alembic::Abc::P3fArraySamplePtr P = ts.data().getPositions();
+   Alembic::Abc::V3fArraySamplePtr V = ts.data().getVelocities();
+   UserAttribute vattr;
+   UserAttribute aattr;
+   
+   InitUserAttribute(vattr);
+   InitUserAttribute(aattr);
+   
+   if (getVelocityAndAcceleration(ts, geomParams, vattr, aattr))
+   {
+      const float *vel = (const float*) vattr.data;
+      const float *acc = (const float*) aattr.data;
+      
+      if (!vel)
+      {
+         vel = (const float*) V->getData();
+      }
+      
+      Alembic::Abc::V3d pnt;
+      
+      box.makeEmpty();
+      
+      if (acc)
+      {
+         for (size_t i=0; i<mDso->numMotionSamples(); ++i)
+         {
+            double dt = mDso->motionSampleTime(i) - ts.time();
+            dt *= mDso->velocityScale();
+            
+            const float *vvel = vel;
+            const float *vacc = acc;
+         
+            for (size_t j=0; j<P->size(); ++j, vvel+=3, vacc+=3)
+            {
+               Alembic::Abc::V3f p = P->get()[j];
+            
+               pnt.x = p.x + dt * (vvel[0] + 0.5 * dt * vacc[0]);
+               pnt.y = p.y + dt * (vvel[1] + 0.5 * dt * vacc[1]);
+               pnt.z = p.z + dt * (vvel[2] + 0.5 * dt * vacc[2]);
+               
+               box.extendBy(pnt);
+            }
+         }
+         
+         DestroyUserAttribute(aattr);
+      }
+      else
+      {
+         for (size_t i=0; i<mDso->numMotionSamples(); ++i)
+         {
+            double dt = mDso->motionSampleTime(i) - ts.time();
+            dt *= mDso->velocityScale();
+            
+            const float *vvel = vel;
+         
+            for (size_t j=0; j<P->size(); ++j, vvel+=3)
+            {
+               Alembic::Abc::V3f p = P->get()[j];
+               
+               pnt.x = p.x + dt * vvel[0];
+               pnt.y = p.y + dt * vvel[1];
+               pnt.z = p.z + dt * vvel[2];
+               
+               box.extendBy(pnt);
+            }
+         }
+      }
+      
+      DestroyUserAttribute(vattr);
+      
+      return true;
+   }
+   else
+   {
+      return false;
    }
 }
 
@@ -323,7 +511,7 @@ bool MakeProcedurals::overrideBounds(AlembicNodeT<Alembic::Abc::ISchemaObject<Sc
 }
 
 template <class T>
-AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance, bool interpolateBounds, double extraPadding)
+AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance, bool interpolateBounds, double extraPadding, const Alembic::Abc::Box3d *vbbox)
 {
    Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
    
@@ -412,6 +600,16 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
                   }
                }
             }
+         }
+         
+         // Expand bounds with velocity based bounds
+         if (vbbox && !vbbox->isEmpty())
+         {
+            if (mDso->verbose())
+            {
+               AiMsgInfo("[abcproc] Expand bounds using velocity information.");
+            }
+            box.extendBy(*vbbox);
          }
       }
       
@@ -1260,6 +1458,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
          
          if (!vel)
          {
+            // Note: samp0->time() not necessarily == renderTime
             vlist = AiArrayAllocate(P->size(), 1, AI_TYPE_POINT);
             
             for (size_t i=0; i<P->size(); ++i)
@@ -1292,7 +1491,9 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
             
             for (size_t i=0, j=0; i<mDso->numMotionSamples(); ++i)
             {
-               double dt = mDso->motionSampleTime(i) - mDso->renderTime();
+               // Note: samp0->time() not necessarily == renderTime
+               //double dt = mDso->motionSampleTime(i) - mDso->renderTime();
+               double dt = mDso->motionSampleTime(i) - samp0->time();
                dt *= mDso->velocityScale();
                
                if (acc)

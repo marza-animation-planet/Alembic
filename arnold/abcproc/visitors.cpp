@@ -376,14 +376,86 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicXform &node, AlembicNode 
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicMesh &node, AlembicNode *instance)
 {
-   bool interpolate = (node.typedObject().getSchema().getTopologyVariance() != Alembic::AbcGeom::kHeterogenousTopology);
-   return shapeEnter(node, instance, interpolate, 0.0);
+   Alembic::AbcGeom::IPolyMeshSchema schema = node.typedObject().getSchema();
+   Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
+   bool varyingTopo = (schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
+   Alembic::Abc::Box3d vbbox;
+   
+   vbbox.makeEmpty();
+   
+   if (visible && !mDso->ignoreDeformBlur() && mDso->computeVelocityExpandedBounds() && varyingTopo)
+   {
+      Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
+      double t = mDso->renderTime();
+      
+      TimeSampleList<Alembic::AbcGeom::IPolyMeshSchema> &samples = node.samples().schemaSamples;
+      TimeSampleList<Alembic::AbcGeom::IPolyMeshSchema>::ConstIterator samp0, samp1;
+      double b = 0.0;
+      
+      node.sampleSchema(t, t, false);
+      
+      if (samples.getSamples(t, samp0, samp1, b))
+      {
+         Alembic::Abc::Box3d box;
+         
+         if (computeVelocityBasedBounds(*samp0, geomParams, box))
+         {
+            vbbox.extendBy(box);
+         }
+         
+         if (b > 0.0)
+         {
+            if (computeVelocityBasedBounds(*samp1, geomParams, box))
+            {
+               vbbox.extendBy(box);
+            }
+         }
+      }
+   }
+   
+   return shapeEnter(node, instance, !varyingTopo, 0.0, &vbbox);
 }
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicSubD &node, AlembicNode *instance)
 {
-   bool interpolate = (node.typedObject().getSchema().getTopologyVariance() != Alembic::AbcGeom::kHeterogenousTopology);
-   return shapeEnter(node, instance, interpolate, 0.0);
+   Alembic::AbcGeom::ISubDSchema schema = node.typedObject().getSchema();
+   Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
+   bool varyingTopo = (schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
+   Alembic::Abc::Box3d vbbox;
+   
+   vbbox.makeEmpty();
+   
+   if (visible && !mDso->ignoreDeformBlur() && mDso->computeVelocityExpandedBounds() && varyingTopo)
+   {
+      Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
+      double t = mDso->renderTime();
+      
+      TimeSampleList<Alembic::AbcGeom::ISubDSchema> &samples = node.samples().schemaSamples;
+      TimeSampleList<Alembic::AbcGeom::ISubDSchema>::ConstIterator samp0, samp1;
+      double b = 0.0;
+      
+      node.sampleSchema(t, t, false);
+      
+      if (samples.getSamples(t, samp0, samp1, b))
+      {
+         Alembic::Abc::Box3d box;
+         
+         if (computeVelocityBasedBounds(*samp0, geomParams, box))
+         {
+            vbbox.extendBy(box);
+         }
+         
+         if (b > 0.0)
+         {
+            if (computeVelocityBasedBounds(*samp1, geomParams, box))
+            {
+               vbbox.extendBy(box);
+            }
+         }
+      }
+   }
+   
+   return shapeEnter(node, instance, !varyingTopo, 0.0, &vbbox);
 }
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode *instance)
@@ -393,8 +465,11 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
    Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
    
    double extraPadding = 0.0;
+   Alembic::Abc::Box3d vbbox;
    
-   if (visible && mDso->padBoundsWithPeakRadius())
+   vbbox.makeEmpty();
+   
+   if (visible)
    {
       Alembic::AbcGeom::IPointsSchema &schema = node.typedObject().getSchema();
       Alembic::AbcGeom::IFloatGeomParam widths = schema.getWidthsParam();
@@ -402,157 +477,175 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
       Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
       double renderTime = mDso->renderTime();
       
-      const std::string &peakRadiusName = mDso->peakRadiusName();
-      UserAttribute peakRadiusAttr;
-   
-      InitUserAttribute(peakRadiusAttr);
-   
-      bool hasPeakRadius = ReadSingleUserAttribute(peakRadiusName.c_str(), ObjectAttribute, renderTime, userProps, geomParams, peakRadiusAttr);
-   
-      if (!hasPeakRadius && mDso->isPromotedToObjectAttrib(peakRadiusName))
+      if (!mDso->ignoreDeformBlur() && mDso->computeVelocityExpandedBounds())
       {
-         hasPeakRadius = ReadSingleUserAttribute(peakRadiusName.c_str(), PointAttribute, renderTime, userProps, geomParams, peakRadiusAttr);
-      
-         if (hasPeakRadius)
+         TimeSampleList<Alembic::AbcGeom::IPointsSchema> &samples = node.samples().schemaSamples;
+         TimeSampleList<Alembic::AbcGeom::IPointsSchema>::ConstIterator samp0, samp1;
+         double b = 0.0;
+         
+         node.sampleSchema(renderTime, renderTime, false);
+         
+         if (samples.getSamples(renderTime, samp0, samp1, b))
          {
-            UserAttribute tmp;
-         
-            bool promoted = PromoteToObjectAttrib(peakRadiusAttr, tmp);
-         
-            DestroyUserAttribute(peakRadiusAttr);
-         
-            if (promoted)
-            {
-               hasPeakRadius = true;
-               std::swap(tmp, peakRadiusAttr);
-            }
-            else
-            {
-               hasPeakRadius = false;
-            }
-         }
-      }
-      
-      if (hasPeakRadius && peakRadiusAttr.arnoldType == AI_TYPE_FLOAT)
-      {
-         extraPadding = adjustRadius(*((float*)peakRadiusAttr.data));
-      }
-      else
-      {
-         UserAttribute attr;
-         
-         InitUserAttribute(attr);
-         
-         const char *radiusName = mDso->radiusName();
-         bool checkAltName = false;
-         float constantRadius = -1.0f;
-         
-         if (radiusName == 0)
-         {
-            radiusName = "radius";
-            checkAltName = true; // also check for 'size'
-         }
-         
-         if (ReadSingleUserAttribute(radiusName, PointAttribute, renderTime, userProps, geomParams, attr))
-         {
-            if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
-            {
-               DestroyUserAttribute(attr);
-            }
-            else if (mDso->isPromotedToObjectAttrib(radiusName) && attr.dataCount >= 1)
-            {
-               constantRadius = *((const float*) attr.data);
-               DestroyUserAttribute(attr);
-            }
-         }
-         
-         if (attr.data == 0 && checkAltName && ReadSingleUserAttribute("size", PointAttribute, renderTime, userProps, geomParams, attr))
-         {
-            if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
-            {
-               DestroyUserAttribute(attr);
-            }
-            else if (mDso->isPromotedToObjectAttrib("size") && attr.dataCount >= 1 && constantRadius < 0.0f)
-            {
-               constantRadius = *((const float*) attr.data);
-               DestroyUserAttribute(attr);
-            }
-         }
-         
-         if (attr.data != 0)
-         {
-            const float *ptr = (const float*) attr.data;
+            Alembic::Abc::Box3d box;
             
-            for (unsigned int i=0; i<attr.dataCount; ++i)
+            if (computeVelocityBasedBounds(*samp0, geomParams, box))
             {
-               float r = adjustRadius(ptr[i]);
-               
-               if (r > extraPadding)
+               vbbox.extendBy(box);
+            }
+            
+            if (b > 0.0)
+            {
+               if (computeVelocityBasedBounds(*samp1, geomParams, box))
                {
-                  extraPadding = r;
+                  vbbox.extendBy(box);
+               }
+            }
+         }
+      }
+      
+      if (mDso->padBoundsWithPeakRadius())
+      {
+         const std::string &peakRadiusName = mDso->peakRadiusName();
+         UserAttribute peakRadiusAttr;
+      
+         InitUserAttribute(peakRadiusAttr);
+      
+         bool hasPeakRadius = ReadSingleUserAttribute(peakRadiusName.c_str(), ObjectAttribute, renderTime, userProps, geomParams, peakRadiusAttr);
+      
+         if (!hasPeakRadius && mDso->isPromotedToObjectAttrib(peakRadiusName))
+         {
+            hasPeakRadius = ReadSingleUserAttribute(peakRadiusName.c_str(), PointAttribute, renderTime, userProps, geomParams, peakRadiusAttr);
+         
+            if (hasPeakRadius)
+            {
+               UserAttribute tmp;
+            
+               bool promoted = PromoteToObjectAttrib(peakRadiusAttr, tmp);
+            
+               DestroyUserAttribute(peakRadiusAttr);
+            
+               if (promoted)
+               {
+                  hasPeakRadius = true;
+                  std::swap(tmp, peakRadiusAttr);
+               }
+               else
+               {
+                  hasPeakRadius = false;
+               }
+            }
+         }
+         
+         if (hasPeakRadius && peakRadiusAttr.arnoldType == AI_TYPE_FLOAT)
+         {
+            extraPadding = adjustRadius(*((float*)peakRadiusAttr.data));
+         }
+         else
+         {
+            UserAttribute attr;
+            
+            InitUserAttribute(attr);
+            
+            const char *radiusName = mDso->radiusName();
+            bool checkAltName = false;
+            float constantRadius = -1.0f;
+            
+            if (radiusName == 0)
+            {
+               radiusName = "radius";
+               checkAltName = true; // also check for 'size'
+            }
+            
+            if (ReadSingleUserAttribute(radiusName, PointAttribute, renderTime, userProps, geomParams, attr))
+            {
+               if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
+               {
+                  DestroyUserAttribute(attr);
+               }
+               else if (mDso->isPromotedToObjectAttrib(radiusName) && attr.dataCount >= 1)
+               {
+                  constantRadius = *((const float*) attr.data);
+                  DestroyUserAttribute(attr);
                }
             }
             
-            DestroyUserAttribute(attr);
-         }
-         else if (widths.valid())
-         {
-            TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> wsamples;
-            TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator wsample;
-               
-            const double *sampleTimes = 0;
-            size_t sampleTimesCount = 0;
-            
-            if (mDso->ignoreDeformBlur())
+            if (attr.data == 0 && checkAltName && ReadSingleUserAttribute("size", PointAttribute, renderTime, userProps, geomParams, attr))
             {
-               sampleTimes = &renderTime;
-               sampleTimesCount = 1;
-            }
-            else
-            {
-               sampleTimes = &(mDso->motionSampleTimes()[0]);
-               sampleTimesCount = mDso->numMotionSamples();
-            }
-               
-            for (size_t i=0; i<sampleTimesCount; ++i)
-            {
-               double t = sampleTimes[i];
-               
-               wsamples.update(widths, t, t, (i > 0 || instance != 0));
-            }
-            
-            for (wsample=wsamples.begin(); wsample!=wsamples.end(); ++wsample)
-            {
-               Alembic::Abc::FloatArraySamplePtr vals = wsample->data().getVals();
-               
-               for (size_t i=0; i<vals->size(); ++i)
+               if (attr.arnoldType != AI_TYPE_FLOAT || attr.dataDim != 1)
                {
-                  float r = adjustRadius(vals->get()[i]);
+                  DestroyUserAttribute(attr);
+               }
+               else if (mDso->isPromotedToObjectAttrib("size") && attr.dataCount >= 1 && constantRadius < 0.0f)
+               {
+                  constantRadius = *((const float*) attr.data);
+                  DestroyUserAttribute(attr);
+               }
+            }
+            
+            if (attr.data != 0)
+            {
+               const float *ptr = (const float*) attr.data;
+               
+               for (unsigned int i=0; i<attr.dataCount; ++i)
+               {
+                  float r = adjustRadius(ptr[i]);
                   
                   if (r > extraPadding)
                   {
                      extraPadding = r;
                   }
                }
+               
+               DestroyUserAttribute(attr);
             }
-         }
-         else
-         {
-            // constant radius may have been set earlier if attribute was promoted to object level
-            if (constantRadius < 0.0f)
+            else if (widths.valid())
             {
-               if (ReadSingleUserAttribute(radiusName, ObjectAttribute, renderTime, userProps, geomParams, attr))
+               TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> wsamples;
+               TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator wsample;
+                  
+               const double *sampleTimes = 0;
+               size_t sampleTimesCount = 0;
+               
+               if (mDso->ignoreDeformBlur())
                {
-                  if (attr.arnoldType == AI_TYPE_FLOAT && attr.dataDim == 1)
-                  {
-                     constantRadius = *((const float*) attr.data);
-                  }
-                  DestroyUserAttribute(attr);
+                  sampleTimes = &renderTime;
+                  sampleTimesCount = 1;
+               }
+               else
+               {
+                  sampleTimes = &(mDso->motionSampleTimes()[0]);
+                  sampleTimesCount = mDso->numMotionSamples();
+               }
+                  
+               for (size_t i=0; i<sampleTimesCount; ++i)
+               {
+                  double t = sampleTimes[i];
+                  
+                  wsamples.update(widths, t, t, (i > 0 || instance != 0));
                }
                
-               if (constantRadius < 0.0f && checkAltName)
+               for (wsample=wsamples.begin(); wsample!=wsamples.end(); ++wsample)
                {
-                  if (ReadSingleUserAttribute("size", ObjectAttribute, renderTime, userProps, geomParams, attr))
+                  Alembic::Abc::FloatArraySamplePtr vals = wsample->data().getVals();
+                  
+                  for (size_t i=0; i<vals->size(); ++i)
+                  {
+                     float r = adjustRadius(vals->get()[i]);
+                     
+                     if (r > extraPadding)
+                     {
+                        extraPadding = r;
+                     }
+                  }
+               }
+            }
+            else
+            {
+               // constant radius may have been set earlier if attribute was promoted to object level
+               if (constantRadius < 0.0f)
+               {
+                  if (ReadSingleUserAttribute(radiusName, ObjectAttribute, renderTime, userProps, geomParams, attr))
                   {
                      if (attr.arnoldType == AI_TYPE_FLOAT && attr.dataDim == 1)
                      {
@@ -560,29 +653,41 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
                      }
                      DestroyUserAttribute(attr);
                   }
+                  
+                  if (constantRadius < 0.0f && checkAltName)
+                  {
+                     if (ReadSingleUserAttribute("size", ObjectAttribute, renderTime, userProps, geomParams, attr))
+                     {
+                        if (attr.arnoldType == AI_TYPE_FLOAT && attr.dataDim == 1)
+                        {
+                           constantRadius = *((const float*) attr.data);
+                        }
+                        DestroyUserAttribute(attr);
+                     }
+                  }
+               }
+               
+               if (constantRadius < 0.0f)
+               {
+                  extraPadding = mDso->radiusMin();
+               }
+               else
+               {
+                  extraPadding = adjustRadius(constantRadius);
                }
             }
-            
-            if (constantRadius < 0.0f)
-            {
-               extraPadding = mDso->radiusMin();
-            }
-            else
-            {
-               extraPadding = adjustRadius(constantRadius);
-            }
          }
-      }
-      
-      DestroyUserAttribute(peakRadiusAttr);
-      
-      if (mDso->verbose())
-      {
-         AiMsgInfo("[abcproc] Points extra bounds padding: %lf", extraPadding);
+         
+         DestroyUserAttribute(peakRadiusAttr);
+         
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Points extra bounds padding: %lf", extraPadding);
+         }
       }
    }
    
-   return shapeEnter(node, instance, false, extraPadding);
+   return shapeEnter(node, instance, false, extraPadding, &vbbox);
 }
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode *instance)
@@ -597,116 +702,150 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode
    Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
    
    double extraPadding = 0.0;
+   Alembic::Abc::Box3d vbbox;
    
-   if (visible && mDso->padBoundsWithPeakWidth())
+   vbbox.makeEmpty();
+   
+   if (visible)
    {
       Alembic::AbcGeom::ICurvesSchema schema = node.typedObject().getSchema();
       Alembic::Abc::ICompoundProperty userProps = schema.getUserProperties();
       Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
       double t = mDso->renderTime();
       
-      const std::string &peakWidthName = mDso->peakWidthName();
-      UserAttribute peakWidthAttr;
-      
-      InitUserAttribute(peakWidthAttr);
-      
-      bool hasPeakWidth = ReadSingleUserAttribute(peakWidthName.c_str(), ObjectAttribute, t, userProps, geomParams, peakWidthAttr);
-      
-      if (!hasPeakWidth && mDso->isPromotedToObjectAttrib(peakWidthName))
+      if (!mDso->ignoreDeformBlur() && mDso->computeVelocityExpandedBounds() &&
+          schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology)
       {
-         hasPeakWidth = ReadSingleUserAttribute(peakWidthName.c_str(), PrimitiveAttribute, t, userProps, geomParams, peakWidthAttr);
+         TimeSampleList<Alembic::AbcGeom::ICurvesSchema> &samples = node.samples().schemaSamples;
+         TimeSampleList<Alembic::AbcGeom::ICurvesSchema>::ConstIterator samp0, samp1;
+         double b = 0.0;
          
-         if (!hasPeakWidth)
-         {
-            hasPeakWidth = ReadSingleUserAttribute(peakWidthName.c_str(), PointAttribute, t, userProps, geomParams, peakWidthAttr);
-         }
+         node.sampleSchema(t, t, false);
          
-         if (hasPeakWidth)
+         if (samples.getSamples(t, samp0, samp1, b))
          {
-            UserAttribute tmp;
+            Alembic::Abc::Box3d box;
             
-            bool promoted = PromoteToObjectAttrib(peakWidthAttr, tmp);
-            
-            DestroyUserAttribute(peakWidthAttr);
-            
-            if (promoted)
+            if (computeVelocityBasedBounds(*samp0, geomParams, box))
             {
-               hasPeakWidth = true;
-               std::swap(tmp, peakWidthAttr);
-            }
-            else
-            {
-               hasPeakWidth = false;
-            }
-         }
-      }
-      
-      if (hasPeakWidth && peakWidthAttr.arnoldType == AI_TYPE_FLOAT)
-      {
-         extraPadding = 0.5 * adjustWidth(*((float*)peakWidthAttr.data));
-      }
-      else
-      {
-         Alembic::AbcGeom::IFloatGeomParam widths = node.typedObject().getSchema().getWidthsParam();
-         
-         if (widths.valid())
-         {
-            TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> wsamples;
-            TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator wsample;
-               
-            double renderTime = mDso->renderTime();
-            
-            const double *sampleTimes = 0;
-            size_t sampleTimesCount = 0;
-            
-            if (mDso->ignoreDeformBlur())
-            {
-               sampleTimes = &renderTime;
-               sampleTimesCount = 1;
-            }
-            else
-            {
-               sampleTimes = &(mDso->motionSampleTimes()[0]);
-               sampleTimesCount = mDso->numMotionSamples();
-            }
-               
-            for (size_t i=0; i<sampleTimesCount; ++i)
-            {
-               double t = sampleTimes[i];
-               
-               wsamples.update(widths, t, t, (i > 0 || instance != 0));
+               vbbox.extendBy(box);
             }
             
-            for (wsample=wsamples.begin(); wsample!=wsamples.end(); ++wsample)
+            if (b > 0.0)
             {
-               Alembic::Abc::FloatArraySamplePtr vals = wsample->data().getVals();
-               
-               for (size_t i=0; i<vals->size(); ++i)
+               if (computeVelocityBasedBounds(*samp1, geomParams, box))
                {
-                  float r = 0.5f * adjustWidth(vals->get()[i]);
-                  
-                  if (r > extraPadding)
-                  {
-                     extraPadding = r;
-                  }
+                  vbbox.extendBy(box);
                }
             }
          }
-         else
-         {
-            extraPadding = 0.5f * mDso->widthMin();
-         }
       }
       
-      DestroyUserAttribute(peakWidthAttr);
-      
-      if (mDso->verbose())
+      if (mDso->padBoundsWithPeakWidth())
       {
-         AiMsgInfo("[abcproc] Curves extra bounds padding: %lf", extraPadding);
+         const std::string &peakWidthName = mDso->peakWidthName();
+         UserAttribute peakWidthAttr;
+         
+         InitUserAttribute(peakWidthAttr);
+         
+         bool hasPeakWidth = ReadSingleUserAttribute(peakWidthName.c_str(), ObjectAttribute, t, userProps, geomParams, peakWidthAttr);
+         
+         if (!hasPeakWidth && mDso->isPromotedToObjectAttrib(peakWidthName))
+         {
+            hasPeakWidth = ReadSingleUserAttribute(peakWidthName.c_str(), PrimitiveAttribute, t, userProps, geomParams, peakWidthAttr);
+            
+            if (!hasPeakWidth)
+            {
+               hasPeakWidth = ReadSingleUserAttribute(peakWidthName.c_str(), PointAttribute, t, userProps, geomParams, peakWidthAttr);
+            }
+            
+            if (hasPeakWidth)
+            {
+               UserAttribute tmp;
+               
+               bool promoted = PromoteToObjectAttrib(peakWidthAttr, tmp);
+               
+               DestroyUserAttribute(peakWidthAttr);
+               
+               if (promoted)
+               {
+                  hasPeakWidth = true;
+                  std::swap(tmp, peakWidthAttr);
+               }
+               else
+               {
+                  hasPeakWidth = false;
+               }
+            }
+         }
+         
+         if (hasPeakWidth && peakWidthAttr.arnoldType == AI_TYPE_FLOAT)
+         {
+            extraPadding = 0.5 * adjustWidth(*((float*)peakWidthAttr.data));
+         }
+         else
+         {
+            Alembic::AbcGeom::IFloatGeomParam widths = node.typedObject().getSchema().getWidthsParam();
+            
+            if (widths.valid())
+            {
+               TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> wsamples;
+               TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator wsample;
+                  
+               double renderTime = mDso->renderTime();
+               
+               const double *sampleTimes = 0;
+               size_t sampleTimesCount = 0;
+               
+               if (mDso->ignoreDeformBlur())
+               {
+                  sampleTimes = &renderTime;
+                  sampleTimesCount = 1;
+               }
+               else
+               {
+                  sampleTimes = &(mDso->motionSampleTimes()[0]);
+                  sampleTimesCount = mDso->numMotionSamples();
+               }
+                  
+               for (size_t i=0; i<sampleTimesCount; ++i)
+               {
+                  double t = sampleTimes[i];
+                  
+                  wsamples.update(widths, t, t, (i > 0 || instance != 0));
+               }
+               
+               for (wsample=wsamples.begin(); wsample!=wsamples.end(); ++wsample)
+               {
+                  Alembic::Abc::FloatArraySamplePtr vals = wsample->data().getVals();
+                  
+                  for (size_t i=0; i<vals->size(); ++i)
+                  {
+                     float r = 0.5f * adjustWidth(vals->get()[i]);
+                     
+                     if (r > extraPadding)
+                     {
+                        extraPadding = r;
+                     }
+                  }
+               }
+            }
+            else
+            {
+               extraPadding = 0.5f * mDso->widthMin();
+            }
+         }
+         
+         DestroyUserAttribute(peakWidthAttr);
+         
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Curves extra bounds padding: %lf", extraPadding);
+         }
       }
    }
    
-   return shapeEnter(node, instance, false, extraPadding);
+   return shapeEnter(node, instance, false, extraPadding, &vbbox);
 }
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicNuPatch &node, AlembicNode *instance)
@@ -4451,7 +4590,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
                
                for (size_t i=0, j=0; i<mDso->numMotionSamples(); ++i)
                {
-                  t = mDso->motionSampleTime(i) - mDso->renderTime();
+                  //t = mDso->motionSampleTime(i) - mDso->renderTime();
+                  t = mDso->motionSampleTime(i) - samp0->time();
                   t *= mDso->velocityScale();
                   
                   if (!fillCurvesPositions(info, i, mDso->numMotionSamples(), Nv, P0, W0, P1, W1, vel, acc, t, K, num_points, points))
