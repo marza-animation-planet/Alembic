@@ -117,6 +117,11 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    helper.MakeInputString(data);
    
    data.defaultValue.BOOL = false;
+   data.name = "mtoa_constant_abc_computeVelocityExpandedBounds";
+   data.shortName = "cvebnd";
+   helper.MakeInputBoolean(data);
+   
+   data.defaultValue.BOOL = false;
    data.name = "mtoa_constant_abc_padBoundsWithPeakRadius";
    data.shortName = "pkrpad";
    helper.MakeInputBoolean(data);
@@ -317,6 +322,7 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
 CAbcTranslator::CAbcTranslator()
    : CShapeTranslator()
    , m_motionBlur(false)
+   , m_computeVelocityExpandedBounds(false)
    , m_overrideBounds(false)
    , m_boundsOverridden(false)
    , m_renderTime(0.0)
@@ -324,6 +330,10 @@ CAbcTranslator::CAbcTranslator()
    , m_padBoundsWithPeakRadius(false)
    , m_padBoundsWithPeakWidth(false)
    , m_peakPadding(0.0f)
+   , m_renderFrame(0.0)
+   , m_velocityScale(1.0f)
+   , m_sampleFrame(0.0)
+   , m_sampleTime(0.0)
 {
    m_radiusSclMinMax[0] = 1.0f;
    m_radiusSclMinMax[1] = 0.0f;
@@ -336,6 +346,19 @@ CAbcTranslator::CAbcTranslator()
 
 CAbcTranslator::~CAbcTranslator()
 {
+   m_p0.clear();
+   m_v0.clear();
+   m_a0.clear();
+   
+   m_p1.clear();
+   m_v1.clear();
+   m_a1.clear();
+   
+   if (m_widths.valid())
+   {
+      m_widths.reset();
+   }
+   
    if (m_scene)
    {
       AlembicSceneCache::Unref(m_scene);
@@ -881,11 +904,17 @@ void CAbcTranslator::ExportShader(AtNode *proc, bool update)
    }
 }
 
-bool CAbcTranslator::ReadFloat3Attribute(Alembic::Abc::ICompoundProperty userProps,
-                                         Alembic::Abc::ICompoundProperty geomParams,
-                                         const std::string &name,
-                                         Alembic::AbcGeom::GeometryScope geoScope,
-                                         AtPoint &out)
+// ---
+
+typedef bool (*ReadFloatCB)(const float*, const double*, size_t dim, size_t count, void*);
+
+static bool ReadFloat3Attribute(double time,
+                                Alembic::Abc::ICompoundProperty userProps,
+                                Alembic::Abc::ICompoundProperty geomParams,
+                                const std::string &name,
+                                Alembic::AbcGeom::GeometryScope geoScope,
+                                ReadFloatCB callback,
+                                void *userData)
 {
    bool rv = false;
    
@@ -900,19 +929,13 @@ bool CAbcTranslator::ReadFloat3Attribute(Alembic::Abc::ICompoundProperty userPro
             TimeSample<Alembic::AbcGeom::IV3dGeomParam> sampler;
             Alembic::AbcGeom::IV3dGeomParam prop(geomParams, name);
             
-            sampler.get(prop, m_renderTime);
+            sampler.get(prop, time);
             
             Alembic::AbcGeom::IV3dGeomParam::Sample::samp_ptr_type vl = sampler.data().getVals();
             
-            if (vl && vl->size() >= 1)
+            if (vl)
             {
-               Alembic::Abc::V3d v = (*vl)[0];
-               
-               out.x = float(v.x);
-               out.y = float(v.y);
-               out.z = float(v.z);
-               
-               rv = true;
+               rv = callback(NULL, (const double*) vl->getData(), 3, vl->size(), userData);
             }
          }
          else if (Alembic::AbcGeom::IV3fGeomParam::matches(*header))
@@ -920,19 +943,13 @@ bool CAbcTranslator::ReadFloat3Attribute(Alembic::Abc::ICompoundProperty userPro
             TimeSample<Alembic::AbcGeom::IV3fGeomParam> sampler;
             Alembic::AbcGeom::IV3fGeomParam prop(geomParams, name);
             
-            sampler.get(prop, m_renderTime);
+            sampler.get(prop, time);
             
             Alembic::AbcGeom::IV3fGeomParam::Sample::samp_ptr_type vl = sampler.data().getVals();
             
-            if (vl && vl->size() >= 1)
+            if (vl)
             {
-               Alembic::Abc::V3f v = (*vl)[0];
-               
-               out.x = v.x;
-               out.y = v.y;
-               out.z = v.z;
-               
-               rv = true;
+               rv = callback((const float*) vl->getData(), NULL, 3, vl->size(), userData);
             }
          }
          else if (Alembic::AbcGeom::IP3dGeomParam::matches(*header))
@@ -940,19 +957,13 @@ bool CAbcTranslator::ReadFloat3Attribute(Alembic::Abc::ICompoundProperty userPro
             TimeSample<Alembic::AbcGeom::IP3dGeomParam> sampler;
             Alembic::AbcGeom::IP3dGeomParam prop(geomParams, name);
             
-            sampler.get(prop, m_renderTime);
+            sampler.get(prop, time);
             
             Alembic::AbcGeom::IP3dGeomParam::Sample::samp_ptr_type vl = sampler.data().getVals();
             
-            if (vl && vl->size() >= 1)
+            if (vl)
             {
-               Alembic::Abc::V3d v = (*vl)[0];
-               
-               out.x = float(v.x);
-               out.y = float(v.y);
-               out.z = float(v.z);
-               
-               rv = true;
+               rv = callback(NULL, (const double*) vl->getData(), 3, vl->size(), userData);
             }
          }
          else if (Alembic::AbcGeom::IP3fGeomParam::matches(*header))
@@ -960,19 +971,13 @@ bool CAbcTranslator::ReadFloat3Attribute(Alembic::Abc::ICompoundProperty userPro
             TimeSample<Alembic::AbcGeom::IP3fGeomParam> sampler;
             Alembic::AbcGeom::IP3fGeomParam prop(geomParams, name);
             
-            sampler.get(prop, m_renderTime);
+            sampler.get(prop, time);
             
             Alembic::AbcGeom::IP3fGeomParam::Sample::samp_ptr_type vl = sampler.data().getVals();
             
-            if (vl && vl->size() >= 1)
+            if (vl)
             {
-               Alembic::Abc::V3f v = (*vl)[0];
-               
-               out.x = v.x;
-               out.y = v.y;
-               out.z = v.z;
-               
-               rv = true;
+               rv = callback((const float*) vl->getData(), NULL, 3, vl->size(), userData);
             }
          }
       }
@@ -989,60 +994,44 @@ bool CAbcTranslator::ReadFloat3Attribute(Alembic::Abc::ICompoundProperty userPro
             TimeSample<Alembic::Abc::IV3dProperty> sampler;
             Alembic::Abc::IV3dProperty prop(userProps, name);
             
-            sampler.get(prop, m_renderTime);
+            sampler.get(prop, time);
             
             Alembic::Abc::V3d v = sampler.data();
             
-            out.x = float(v.x);
-            out.y = float(v.y);
-            out.z = float(v.z);
-            
-            rv = true;
+            rv = callback(NULL, (const double*) &(v.x), 3, 1, userData);
          }
          else if (Alembic::Abc::IV3fProperty::matches(*header))
          {
             TimeSample<Alembic::Abc::IV3fProperty> sampler;
             Alembic::Abc::IV3fProperty prop(userProps, name);
             
-            sampler.get(prop, m_renderTime);
+            sampler.get(prop, time);
             
             Alembic::Abc::V3f v = sampler.data();
             
-            out.x = v.x;
-            out.y = v.y;
-            out.z = v.z;
-            
-            rv = true;
+            rv = callback((const float*) &(v.x), NULL, 3, 1, userData);
          }
          else if (Alembic::Abc::IP3dProperty::matches(*header))
          {
             TimeSample<Alembic::Abc::IP3dProperty> sampler;
             Alembic::Abc::IP3dProperty prop(userProps, name);
             
-            sampler.get(prop, m_renderTime);
+            sampler.get(prop, time);
             
             Alembic::Abc::V3d v = sampler.data();
             
-            out.x = float(v.x);
-            out.y = float(v.y);
-            out.z = float(v.z);
-            
-            rv = true;
+            rv = callback(NULL, (const double*) &(v.x), 3, 1, userData);
          }
          else if (Alembic::Abc::IP3fProperty::matches(*header))
          {
             TimeSample<Alembic::Abc::IP3fProperty> sampler;
             Alembic::Abc::IP3fProperty prop(userProps, name);
             
-            sampler.get(prop, m_renderTime);
+            sampler.get(prop, time);
             
             Alembic::Abc::V3f v = sampler.data();
             
-            out.x = v.x;
-            out.y = v.y;
-            out.z = v.z;
-            
-            rv = true;
+            rv = callback((const float*) &(v.x), NULL, 3, 1, userData);
          }
       }
    }
@@ -1050,11 +1039,13 @@ bool CAbcTranslator::ReadFloat3Attribute(Alembic::Abc::ICompoundProperty userPro
    return rv;
 }
 
-bool CAbcTranslator::ReadFloatAttribute(Alembic::Abc::ICompoundProperty userProps,
-                                        Alembic::Abc::ICompoundProperty geomParams,
-                                        const std::string &name,
-                                        Alembic::AbcGeom::GeometryScope geoScope,
-                                        float &out)
+static bool ReadFloatAttribute(double time,
+                               Alembic::Abc::ICompoundProperty userProps,
+                               Alembic::Abc::ICompoundProperty geomParams,
+                               const std::string &name,
+                               Alembic::AbcGeom::GeometryScope geoScope,
+                               ReadFloatCB callback,
+                               void *userData)
 {
    bool rv = false;
    
@@ -1069,15 +1060,13 @@ bool CAbcTranslator::ReadFloatAttribute(Alembic::Abc::ICompoundProperty userProp
             TimeSample<Alembic::AbcGeom::IFloatGeomParam> sampler;
             Alembic::AbcGeom::IFloatGeomParam prop(geomParams, name);
             
-            sampler.get(prop, m_renderTime);
+            sampler.get(prop, time);
             
             Alembic::AbcGeom::IFloatGeomParam::Sample::samp_ptr_type vl = sampler.data().getVals();
             
-            if (vl && vl->size() >= 1)
+            if (vl)
             {
-               out = (*vl)[0];
-               
-               rv = true;
+               rv = callback((const float*) vl->getData(), NULL, 1, vl->size(), userData);
             }
          }
          else if (Alembic::AbcGeom::IDoubleGeomParam::matches(*header))
@@ -1085,15 +1074,13 @@ bool CAbcTranslator::ReadFloatAttribute(Alembic::Abc::ICompoundProperty userProp
             TimeSample<Alembic::AbcGeom::IDoubleGeomParam> sampler;
             Alembic::AbcGeom::IDoubleGeomParam prop(geomParams, name);
             
-            sampler.get(prop, m_renderTime);
+            sampler.get(prop, time);
             
             Alembic::AbcGeom::IDoubleGeomParam::Sample::samp_ptr_type vl = sampler.data().getVals();
             
-            if (vl && vl->size() >= 1)
+            if (vl)
             {
-               out = (float) (*vl)[0];
-               
-               rv = true;
+               rv = callback(NULL, (const double*) vl->getData(), 1, vl->size(), userData);
             }
          }
       }
@@ -1110,22 +1097,22 @@ bool CAbcTranslator::ReadFloatAttribute(Alembic::Abc::ICompoundProperty userProp
             TimeSample<Alembic::Abc::IFloatProperty> sampler;
             Alembic::Abc::IFloatProperty prop(userProps, name);
             
-            sampler.get(prop, m_renderTime);
+            sampler.get(prop, time);
             
-            out = sampler.data();
+            float tmp = sampler.data();
             
-            rv = true;
+            rv = callback((const float*) &tmp, NULL, 1, 1, userData);
          }
          else if (Alembic::Abc::IDoubleProperty::matches(*header))
          {
             TimeSample<Alembic::Abc::IDoubleProperty> sampler;
             Alembic::Abc::IDoubleProperty prop(userProps, name);
             
-            sampler.get(prop, m_renderTime);
+            sampler.get(prop, time);
             
-            out = (float) sampler.data();
+            double tmp = sampler.data();
             
-            rv = true;
+            rv = callback(NULL, (const double*) &tmp, 1, 1, userData);
          }
       }
    }
@@ -1133,12 +1120,391 @@ bool CAbcTranslator::ReadFloatAttribute(Alembic::Abc::ICompoundProperty userProp
    return rv;
 }
 
-void CAbcTranslator::ReadAlembicAttributes()
+static bool ReadSinglePnt(const float *fdata, const double *ddata, size_t dim, size_t count, void *userData)
+{
+   if (dim == 3 && count >= 1)
+   {
+      AtPoint *pnt = (AtPoint*) userData;
+      
+      if (fdata)
+      {
+         pnt->x = fdata[0];
+         pnt->y = fdata[1];
+         pnt->z = fdata[2];
+         return true;
+      }
+      else if (ddata)
+      {
+         pnt->x = float(ddata[0]);
+         pnt->y = float(ddata[1]);
+         pnt->z = float(ddata[2]);
+         return true;
+      }
+   }
+   
+   return false;
+}
+
+static bool ReadSingleFlt(const float *fdata, const double *ddata, size_t dim, size_t count, void *userData)
+{
+   if (dim == 1 && count >= 1)
+   {
+      float *flt = (float*) userData;
+      
+      if (fdata)
+      {
+         *flt = fdata[0];
+         return true;
+      }
+      else if (ddata)
+      {
+         *flt = float(ddata[0]);
+         return true;
+      }
+   }
+   
+   return false;
+}
+
+static bool ReadVectors(const float *fdata, const double *ddata, size_t dim, size_t count, void *userData)
+{
+   if (dim == 3)
+   {
+      std::vector<float> &data = *((std::vector<float>*) userData);
+      
+      if (fdata)
+      {
+         data.resize(3 * count);
+         for (size_t i=0, j=0; i<count; ++i, j+=3)
+         {
+            data[j+0] = fdata[j+0];
+            data[j+1] = fdata[j+1];
+            data[j+2] = fdata[j+2];
+         }
+         return true;
+      }
+      else if (ddata)
+      {
+         data.resize(3 * count);
+         for (size_t i=0, j=0; i<count; ++i, j+=3)
+         {
+            data[j+0] = float(ddata[j+0]);
+            data[j+1] = float(ddata[j+1]);
+            data[j+2] = float(ddata[j+2]);
+         }
+         return true;
+      }
+   }
+   
+   return false;
+}
+
+static bool MaxFloat(const float *fdata, const double *ddata, size_t dim, size_t count, void *userData)
+{
+   if (dim == 1)
+   {
+      float &max = *((float*) userData);
+      
+      if (fdata)
+      {
+         for (size_t i=0; i<count; ++i)
+         {
+            if (fdata[i] > max)
+            {
+               max = fdata[i];
+            }
+         }
+         return true;
+      }
+      else if (ddata)
+      {
+         for (size_t i=0; i<count; ++i)
+         {
+            if (ddata[i] > max)
+            {
+               max = float(ddata[i]);
+            }
+         }
+         return true;
+      }
+   }
+   
+   return false;
+}
+
+template <class Schema>
+static bool GetVelocityAndAcceleration(const TimeSample<Schema> &ts,
+                                       Alembic::Abc::ICompoundProperty geomParams,
+                                       const char *velName,
+                                       const char *accName,
+                                       std::vector<float> &pos,
+                                       std::vector<float> &vel,
+                                       std::vector<float> &acc,
+                                       bool verbose=true)
+{
+   Alembic::Abc::P3fArraySamplePtr P = ts.data().getPositions();
+   Alembic::Abc::V3fArraySamplePtr V = ts.data().getVelocities();
+   Alembic::Abc::ICompoundProperty emptyProps;
+   
+   if (velName)
+   {
+      if (strcmp(velName, "<builtin>") != 0)
+      {
+         if (ReadFloat3Attribute(ts.time(), emptyProps, geomParams, velName, Alembic::AbcGeom::kVaryingScope, ReadVectors, &vel))
+         {
+            if (vel.size() != 3 * P->size())
+            {
+               vel.clear();
+            }
+            else if (verbose)
+            {
+               MGlobal::displayInfo("[AbcShapeMtoa] Read velocities from attribute \"" + MString(velName) + "\"");
+            }
+         }
+      }
+   }
+   else
+   {
+      // Look for "velocity", "vel" and "v" in that order
+      if (ReadFloat3Attribute(ts.time(), emptyProps, geomParams, "velocity", Alembic::AbcGeom::kVaryingScope, ReadVectors, &vel))
+      {
+         if (vel.size() != 3 * P->size())
+         {
+            vel.clear();
+         }
+         else if (verbose)
+         {
+            MGlobal::displayInfo("[AbcShapeMtoa] Read velocities from attribute \"velocity\"");
+         }
+      }
+      
+      if (vel.size() == 0 && ReadFloat3Attribute(ts.time(), emptyProps, geomParams, "vel", Alembic::AbcGeom::kVaryingScope, ReadVectors, &vel))
+      {
+         if (vel.size() != 3 * P->size())
+         {
+            vel.clear();
+         }
+         else if (verbose)
+         {
+            MGlobal::displayInfo("[AbcShapeMtoa] Read velocities from attribute \"vel\"");
+         }
+      }
+      
+      if (vel.size() == 0 && ReadFloat3Attribute(ts.time(), emptyProps, geomParams, "v", Alembic::AbcGeom::kVaryingScope, ReadVectors, &vel))
+      {
+         if (vel.size() != 3 * P->size())
+         {
+            vel.clear();
+         }
+         else if (verbose)
+         {
+            MGlobal::displayInfo("[AbcShapeMtoa] Read velocities from attribute \"v\"");
+         }
+      }
+   }
+   
+   if (vel.size() == 0)
+   {
+      if (V && V->size() == P->size())
+      {
+         if (verbose)
+         {
+            MGlobal::displayInfo("[AbcShapeMtoa] Read built-in velocities.");
+         }
+         
+         pos.resize(3 * P->size());
+         vel.resize(3 * V->size());
+         for (size_t i=0, j=0; i<P->size(); ++i, j+=3)
+         {
+            const Alembic::Abc::V3f &p = (*P)[i];
+            const Alembic::Abc::V3f &v = (*V)[i];
+            pos[j+0] = p.x;
+            pos[j+1] = p.y;
+            pos[j+2] = p.z;
+            vel[j+0] = v.x;
+            vel[j+1] = v.y;
+            vel[j+2] = v.z;
+         }
+      }
+      else
+      {
+         // Don't bother reading points as we haven't velocities to extrapolate them
+      }
+   }
+   else
+   {
+      pos.resize(3 * P->size());
+      for (size_t i=0, j=0; i<P->size(); ++i, j+=3)
+      {
+         const Alembic::Abc::V3f &p = (*P)[i];
+         pos[j+0] = p.x;
+         pos[j+1] = p.y;
+         pos[j+2] = p.z;
+      }
+   }
+   
+   if (vel.size() > 0)
+   {
+      if (accName)
+      {
+         if (ReadFloat3Attribute(ts.time(), emptyProps, geomParams, accName, Alembic::AbcGeom::kVaryingScope, ReadVectors, &acc))
+         {
+            if (acc.size() != 3 * P->size())
+            {
+               acc.clear();
+            }
+            else if (verbose)
+            {
+               MGlobal::displayInfo("[AbcShapeMtoa] Read accelerations from attribute \"" + MString(accName) + "\"");
+            }
+         }
+      }
+      else
+      {
+         // Look for "acceleration", "accel" and "a" in that order
+         if (ReadFloat3Attribute(ts.time(), emptyProps, geomParams, "acceleration", Alembic::AbcGeom::kVaryingScope, ReadVectors, &acc))
+         {
+            if (acc.size() != 3 * P->size())
+            {
+               acc.clear();
+            }
+            else if (verbose)
+            {
+               MGlobal::displayInfo("[AbcShapeMtoa] Read accelerations from attribute \"acceleration\"");
+            }
+         }
+         
+         if (acc.size() == 0 && ReadFloat3Attribute(ts.time(), emptyProps, geomParams, "accel", Alembic::AbcGeom::kVaryingScope, ReadVectors, &acc))
+         {
+            if (acc.size() != 3 * P->size())
+            {
+               acc.clear();
+            }
+            else if (verbose)
+            {
+               MGlobal::displayInfo("[AbcShapeMtoa] Read accelerations from attribute \"accel\"");
+            }
+         }
+         
+         if (acc.size() == 0 && ReadFloat3Attribute(ts.time(), emptyProps, geomParams, "a", Alembic::AbcGeom::kVaryingScope, ReadVectors, &acc))
+         {
+            if (acc.size() != 3 * P->size())
+            {
+               acc.clear();
+            }
+            else if (verbose)
+            {
+               MGlobal::displayInfo("[AbcShapeMtoa] Read accelerations from attribute \"a\"");
+            }
+         }
+      }
+      
+      return true;
+   }
+   else
+   {
+      if (verbose)
+      {
+         MGlobal::displayInfo("[AbcShapeMtoa] No data to expand bounds based on velocities.");
+      }
+      return false;
+   }
+}
+
+static void ExpandBounds(double time,     // motion sample time
+                         double dataTime, // sampled data time
+                         const std::vector<float> &pos,
+                         const std::vector<float> &vel,
+                         const std::vector<float> &acc,
+                         float velScale,
+                         Alembic::Abc::Box3d &box,
+                         bool verbose=false)
+{
+   if (pos.size() == 0 || vel.size() == 0 || pos.size() != vel.size())
+   {
+      return;
+   }
+   
+   Alembic::Abc::V3d pnt;
+   
+   double dt = (time - dataTime) * velScale;
+   const float *vpos = &(pos[0]);
+   const float *vvel = &(vel[0]);
+   const float *vacc = (acc.size() > 0 ? &(acc[0]) : NULL);
+   size_t numPoints = (pos.size() / 3);
+   
+   if (verbose)
+   {
+      std::ostringstream oss;
+      oss << "[AbcShapeMtoa] Velocity Expand Bounds: sampleTime=" << time << ", baseTime=" << dataTime << ", velocityScale=" << velScale;
+      
+      MGlobal::displayInfo(oss.str().c_str());
+   }
+   
+   if (acc.size() == pos.size())
+   {
+      for (size_t i=0; i<numPoints; ++i, vpos+=3, vvel+=3, vacc+=3)
+      {
+         pnt.x = vpos[0] + dt * (vvel[0] + 0.5 * dt * vacc[0]);
+         pnt.y = vpos[1] + dt * (vvel[1] + 0.5 * dt * vacc[1]);
+         pnt.z = vpos[2] + dt * (vvel[2] + 0.5 * dt * vacc[2]);
+         
+         box.extendBy(pnt);
+      }
+   }
+   else
+   {
+      for (size_t i=0; i<numPoints; ++i, vpos+=3, vvel+=3)
+      {
+         pnt.x = vpos[0] + dt * vvel[0];
+         pnt.y = vpos[1] + dt * vvel[1];
+         pnt.z = vpos[2] + dt * vvel[2];
+         
+         box.extendBy(pnt);
+      }
+   }
+}
+
+static void SampleWidths(Alembic::AbcGeom::IFloatGeomParam widths, double time, float &curMax, bool verbose=false)
+{
+   TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> samples;
+   TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator sample;
+   
+   samples.update(widths, time, time, false);
+   
+   for (sample=samples.begin(); sample!=samples.end(); ++sample)
+   {
+      if (verbose)
+      {
+         std::ostringstream oss;
+         oss << "[AbcShapeMtoa] Compute maximum points/curves width a t=" << sample->time();
+         MGlobal::displayInfo(oss.str().c_str());
+      }
+      
+      Alembic::Abc::FloatArraySamplePtr vals = sample->data().getVals();
+      
+      for (size_t i=0; i<vals->size(); ++i)
+      {
+         float r = vals->get()[i];
+         if (r > curMax)
+         {
+            curMax = r;
+         }
+      }
+   }
+}
+
+// ---
+
+void CAbcTranslator::ReadAlembicAttributes(double time)
 {
    bool promoteMin = false;
    bool promoteMax = false;
    bool promotePeakRadius = false;
    bool promotePeakWidth = false;
+   bool promoteCustomRadius = false;
+   bool promoteRadius = false;
+   bool promoteSize = false;
    
    if (m_overrideBounds)
    {
@@ -1180,9 +1546,24 @@ void CAbcTranslator::ReadAlembicAttributes()
       {
          promoteMax = true;
       }
-      else if (m_padBoundsWithPeakRadius && name == m_peakRadius)
+      else if (m_padBoundsWithPeakRadius)
       {
-         promotePeakRadius = true;
+         if (name == m_peakRadius)
+         {
+            promotePeakRadius = true;
+         }
+         else if (name == m_radius)
+         {
+            promoteCustomRadius = true;
+         }
+         else if (name == "radius")
+         {
+            promoteRadius = true;
+         }
+         else if (name == "size")
+         {
+            promoteSize = true;
+         }
       }
       else if (m_padBoundsWithPeakWidth && name == m_peakWidth)
       {
@@ -1225,25 +1606,25 @@ void CAbcTranslator::ReadAlembicAttributes()
          {
             AtPoint min, max;
             
-            bool hasMin = ReadFloat3Attribute(userProps, geomParams, m_overrideBoundsMin, Alembic::AbcGeom::kConstantScope, min);
+            bool hasMin = ReadFloat3Attribute(time, userProps, geomParams, m_overrideBoundsMin, Alembic::AbcGeom::kConstantScope, ReadSinglePnt, &min);
             if (!hasMin && promoteMin)
             {
-               MGlobal::displayInfo(MString("[mzAbcShapeMtoa] Check for promoted attribute \"") + m_overrideBoundsMin.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
-               hasMin = ReadFloat3Attribute(emptyProp, geomParams, m_overrideBoundsMin, Alembic::AbcGeom::kUniformScope, min);
+               MGlobal::displayInfo(MString("[AbcShapeMtoa] Check for promoted attribute \"") + m_overrideBoundsMin.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
+               hasMin = ReadFloat3Attribute(time, emptyProp, geomParams, m_overrideBoundsMin, Alembic::AbcGeom::kUniformScope, ReadSinglePnt, &min);
             }
             if (hasMin)
             {
                AtPoint max;
                
-               bool hasMax = ReadFloat3Attribute(userProps, geomParams, m_overrideBoundsMax, Alembic::AbcGeom::kConstantScope, max);
+               bool hasMax = ReadFloat3Attribute(time, userProps, geomParams, m_overrideBoundsMax, Alembic::AbcGeom::kConstantScope, ReadSinglePnt, &max);
                if (!hasMax && promoteMax)
                {
-                  MGlobal::displayInfo(MString("[mzAbcShapeMtoa] Check for promoted attribute \"") + m_overrideBoundsMax.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
-                  hasMax = ReadFloat3Attribute(emptyProp, geomParams, m_overrideBoundsMax, Alembic::AbcGeom::kUniformScope, max);
+                  MGlobal::displayInfo(MString("[AbcShapeMtoa] Check for promoted attribute \"") + m_overrideBoundsMax.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
+                  hasMax = ReadFloat3Attribute(time, emptyProp, geomParams, m_overrideBoundsMax, Alembic::AbcGeom::kUniformScope, ReadSinglePnt, &max);
                }
                if (hasMax)
                {
-                  MGlobal::displayInfo("[mzAbcShapeMtoa] Use bounds overrides contained in alembic file. [" + m_dagPath.partialPathName() + "]");
+                  MGlobal::displayInfo("[AbcShapeMtoa] Use bounds overrides contained in alembic file. [" + m_dagPath.partialPathName() + "]");
                   m_min = min;
                   m_max = max;
                   m_boundsOverridden = true;
@@ -1258,19 +1639,197 @@ void CAbcTranslator::ReadAlembicAttributes()
                MGlobal::displayWarning(MString("Ignore bounds override: No object (or promoted) property named \"") + m_overrideBoundsMin.c_str() + MString("\" found in alembic file. [" + m_dagPath.partialPathName() + "]"));
             }
          }
-         
-         float peakRadius = 0.0f;
-         if (m_padBoundsWithPeakRadius)
+         else if (m_computeVelocityExpandedBounds)
          {
-            bool hasPeakRadius = ReadFloatAttribute(userProps, geomParams, m_peakRadius, Alembic::AbcGeom::kConstantScope, peakRadius);
+            MGlobal::displayInfo("[AbcShapeMtoa] Try to expand bounds base on velocity data. [" + m_dagPath.partialPathName() + "]");
+            
+            const char *velName = (m_velocity.length() > 0 ? m_velocity.c_str() : NULL);
+            const char *accName = (m_acceleration.length() > 0 ? m_acceleration.c_str() : NULL);
+            
+            m_t0 = 0.0;
+            m_p0.clear();
+            m_v0.clear();
+            m_a0.clear();
+            m_t1 = 0.0;
+            m_p1.clear();
+            m_v1.clear();
+            m_a1.clear();
+            m_vb.makeEmpty();
+            
+            if (node->type() == AlembicNode::TypeMesh)
+            {
+               AlembicMesh *mesh = (AlembicMesh*) node;
+               
+               if (mesh->typedObject().getSchema().getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology)
+               {
+                  TimeSampleList<Alembic::AbcGeom::IPolyMeshSchema> &samples = mesh->samples().schemaSamples;
+                  TimeSampleList<Alembic::AbcGeom::IPolyMeshSchema>::ConstIterator samp0, samp1;
+                  double b = 0.0;
+                  
+                  mesh->sampleSchema(time, time, false);
+                  
+                  if (samples.getSamples(time, samp0, samp1, b))
+                  {
+                     m_t0 = samp0->time();
+                     GetVelocityAndAcceleration(*samp0, geomParams, velName, accName, m_p0, m_v0, m_a0);
+                  }
+               }
+            }
+            else if (node->type() == AlembicNode::TypeSubD)
+            {
+               AlembicSubD *subd = (AlembicSubD*) node;
+               
+               if (subd->typedObject().getSchema().getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology)
+               {
+                  TimeSampleList<Alembic::AbcGeom::ISubDSchema> &samples = subd->samples().schemaSamples;
+                  TimeSampleList<Alembic::AbcGeom::ISubDSchema>::ConstIterator samp0, samp1;
+                  double b = 0.0;
+                  
+                  subd->sampleSchema(time, time, false);
+                  
+                  if (samples.getSamples(time, samp0, samp1, b))
+                  {
+                     m_t0 = samp0->time();
+                     GetVelocityAndAcceleration(*samp0, geomParams, velName, accName, m_p0, m_v0, m_a0);
+                  }
+               }
+            }
+            else if (node->type() == AlembicNode::TypeCurves)
+            {
+               AlembicCurves *curves = (AlembicCurves*) node;
+               
+               if (curves->typedObject().getSchema().getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology)
+               {
+                  TimeSampleList<Alembic::AbcGeom::ICurvesSchema> &samples = curves->samples().schemaSamples;
+                  TimeSampleList<Alembic::AbcGeom::ICurvesSchema>::ConstIterator samp0, samp1;
+                  double b = 0.0;
+                  
+                  curves->sampleSchema(time, time, false);
+                  
+                  if (samples.getSamples(time, samp0, samp1, b))
+                  {
+                     m_t0 = samp0->time();
+                     GetVelocityAndAcceleration(*samp0, geomParams, velName, accName, m_p0, m_v0, m_a0);
+                  }
+               }
+            }
+            else if (node->type() == AlembicNode::TypePoints)
+            {
+               AlembicPoints *points = (AlembicPoints*) node;
+               
+               TimeSampleList<Alembic::AbcGeom::IPointsSchema> &samples = points->samples().schemaSamples;
+               TimeSampleList<Alembic::AbcGeom::IPointsSchema>::ConstIterator samp0, samp1;
+               double b = 0.0;
+               
+               points->sampleSchema(time, time, false);
+               
+               if (samples.getSamples(time, samp0, samp1, b))
+               {
+                  m_t0 = samp0->time();
+                  GetVelocityAndAcceleration(*samp0, geomParams, velName, accName, m_p0, m_v0, m_a0);
+                  
+                  if (b > 0)
+                  {
+                     m_t1 = samp1->time();
+                     GetVelocityAndAcceleration(*samp1, geomParams, velName, accName, m_p1, m_v1, m_a1);
+                  }
+               }
+            }
+         }
+         
+         if (m_padBoundsWithPeakRadius && node->type() == AlembicNode::TypePoints)
+         {
+            AlembicPoints *points = (AlembicPoints*) node;
+            float peakRadius = -1.0f;
+            
+            bool hasPeakRadius = ReadFloatAttribute(time, userProps, geomParams, m_peakRadius, Alembic::AbcGeom::kConstantScope, ReadSingleFlt, &peakRadius);
             if (!hasPeakRadius && promotePeakRadius)
             {
-               MGlobal::displayInfo(MString("[mzAbcShapeMtoa] Check for promoted attribute \"") + m_peakRadius.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
-               hasPeakRadius = ReadFloatAttribute(emptyProp, geomParams, m_peakRadius, Alembic::AbcGeom::kUniformScope, peakRadius);
+               MGlobal::displayInfo(MString("[AbcShapeMtoa] Check for promoted attribute \"") + m_peakRadius.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
+               hasPeakRadius = ReadFloatAttribute(time, emptyProp, geomParams, m_peakRadius, Alembic::AbcGeom::kUniformScope, ReadSingleFlt, &peakRadius);
             }
+            
             if (hasPeakRadius)
             {
-               MGlobal::displayInfo("[mzAbcShapeMtoa] Pad bounds with '" + MString(m_peakRadius.c_str()) + "' alembic attribute value. [" + m_dagPath.partialPathName() + "]");
+               MGlobal::displayInfo("[AbcShapeMtoa] Pad bounds with '" + MString(m_peakRadius.c_str()) + "' alembic attribute value. [" + m_dagPath.partialPathName() + "]");
+            }
+            else
+            {
+               bool ppRadius = false;
+               
+               if (m_radius.length() > 0)
+               {
+                  ppRadius = ReadFloatAttribute(time, userProps, geomParams, m_radius.c_str(), Alembic::AbcGeom::kVaryingScope, (promoteCustomRadius ? ReadSingleFlt : MaxFloat), &peakRadius);
+                  ppRadius = ppRadius && !promoteCustomRadius;
+               }
+               else
+               {
+                  ppRadius = ReadFloatAttribute(time, userProps, geomParams, "radius", Alembic::AbcGeom::kVaryingScope, (promoteRadius ? ReadSingleFlt : MaxFloat), &peakRadius);
+                  if (!ppRadius)
+                  {
+                     ppRadius = ReadFloatAttribute(time, userProps, geomParams, "size", Alembic::AbcGeom::kVaryingScope, (promoteSize ? ReadSingleFlt : MaxFloat), &peakRadius);
+                     ppRadius = ppRadius && !promoteSize;
+                  }
+                  else
+                  {
+                     ppRadius = !promoteRadius;
+                  }
+               }
+               
+               if (!ppRadius)
+               {
+                  // No per-point radius custom attribute (or promoted to constant)
+                  // Check for built-in widths
+                  
+                  Alembic::AbcGeom::IFloatGeomParam widths = points->typedObject().getSchema().getWidthsParam();
+                  
+                  if (!widths.valid())
+                  {
+                     if (peakRadius < 0.0f)
+                     {
+                        // try to read from object scope attributes
+                        if (m_radius.length() > 0)
+                        {
+                           ReadFloatAttribute(time, userProps, geomParams, m_radius.c_str(), Alembic::AbcGeom::kConstantScope, ReadSingleFlt, &peakRadius);
+                        }
+                        else 
+                        {
+                           if (!ReadFloatAttribute(time, userProps, geomParams, "radius", Alembic::AbcGeom::kConstantScope, ReadSingleFlt, &peakRadius))
+                           {
+                              ReadFloatAttribute(time, userProps, geomParams, "size", Alembic::AbcGeom::kConstantScope, ReadSingleFlt, &peakRadius);
+                           }
+                        }
+                     }
+                     
+                     if (peakRadius < 0.0f)
+                     {
+                        MGlobal::displayInfo("[AbcShapeMtoa] Pad bounds with min radius. [" + m_dagPath.partialPathName() + "]");
+                        // Use min radius
+                        m_peakPadding += m_radiusSclMinMax[1];
+                     }
+                     else
+                     {
+                        MGlobal::displayInfo("[AbcShapeMtoa] Pad bounds with user specified radius constant value. [" + m_dagPath.partialPathName() + "]");
+                     }
+                  }
+                  else
+                  {
+                     MGlobal::displayInfo("[AbcShapeMtoa] Pad bounds with built-in width parameter samples. [" + m_dagPath.partialPathName() + "]");
+                     
+                     m_widths = widths;
+                     m_widthAdjust = m_radiusSclMinMax;
+                     // reset peakRadius (may have been read as constant of radius attribute was promoted to object scope)
+                     peakRadius = -1.0f;
+                  }
+               }
+               else
+               {
+                  MGlobal::displayInfo("[AbcShapeMtoa] Pad bounds with user specified radius maximum value. [" + m_dagPath.partialPathName() + "]");
+               }
+            }
+            
+            if (peakRadius >= 0.0f)
+            {
                peakRadius *= m_radiusSclMinMax[0];
                if (peakRadius < m_radiusSclMinMax[1]) peakRadius = m_radiusSclMinMax[1];
                if (peakRadius > m_radiusSclMinMax[2]) peakRadius = m_radiusSclMinMax[2];
@@ -1278,22 +1837,42 @@ void CAbcTranslator::ReadAlembicAttributes()
             }
          }
          
-         float peakWidth = 0.0f;
-         if (m_padBoundsWithPeakWidth)
+         if (m_padBoundsWithPeakWidth && node->type() == AlembicNode::TypeCurves)
          {
-            bool hasPeakWidth = ReadFloatAttribute(userProps, geomParams, m_peakWidth, Alembic::AbcGeom::kConstantScope, peakWidth);
+            AlembicCurves *curves = (AlembicCurves*) node;
+            float peakWidth = 0.0f;
+            
+            bool hasPeakWidth = ReadFloatAttribute(time, userProps, geomParams, m_peakWidth, Alembic::AbcGeom::kConstantScope, ReadSingleFlt, &peakWidth);
             if (!hasPeakWidth && promotePeakWidth)
             {
-               MGlobal::displayInfo(MString("[mzAbcShapeMtoa] Check for promoted attribute \"") + m_peakWidth.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
-               hasPeakWidth = ReadFloatAttribute(emptyProp, geomParams, m_peakWidth, Alembic::AbcGeom::kUniformScope, peakWidth);
+               MGlobal::displayInfo(MString("[AbcShapeMtoa] Check for promoted attribute \"") + m_peakWidth.c_str() + MString("\". [") + m_dagPath.partialPathName() + "]");
+               hasPeakWidth = ReadFloatAttribute(time, emptyProp, geomParams, m_peakWidth, Alembic::AbcGeom::kUniformScope, ReadSingleFlt, &peakWidth);
             }
             if (hasPeakWidth)
             {
-               MGlobal::displayInfo("[mzAbcShapeMtoa] Pad bounds with '" + MString(m_peakWidth.c_str()) + "' alembic attribute value. [" + m_dagPath.partialPathName() + "]");
+               MGlobal::displayInfo("[AbcShapeMtoa] Pad bounds with '" + MString(m_peakWidth.c_str()) + "' alembic attribute value. [" + m_dagPath.partialPathName() + "]");
                peakWidth *= m_widthSclMinMax[0];
                if (peakWidth < m_widthSclMinMax[1]) peakWidth = m_widthSclMinMax[1];
                if (peakWidth > m_widthSclMinMax[2]) peakWidth = m_widthSclMinMax[2];
                m_peakPadding += 0.5f * peakWidth;
+            }
+            else
+            {
+               // if no mb -> only sample render frame
+               Alembic::AbcGeom::IFloatGeomParam widths = curves->typedObject().getSchema().getWidthsParam();
+               if (!widths.valid())
+               {
+                  MGlobal::displayInfo("[AbcShapeMtoa] Pad bounds with min width. [" + m_dagPath.partialPathName() + "]");
+                  peakWidth = m_widthSclMinMax[1];
+                  m_peakPadding += 0.5f * peakWidth;
+               }
+               else
+               {
+                  MGlobal::displayInfo("[AbcShapeMtoa] Pad bounds with built-in width parameter samples. [" + m_dagPath.partialPathName() + "]");
+                  // If deform blur is disabled, should sample a render time
+                  m_widths = widths;
+                  m_widthAdjust = m_widthSclMinMax;
+               }
             }
          }
       }
@@ -1328,55 +1907,105 @@ void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
    dbmin.getData(bmin.x, bmin.y, bmin.z);
    dbmax.getData(bmax.x, bmax.y, bmax.z);
    
+   bool supportBoundsOverrides = false;
+   MPlug pInFrame, pOutTime;
+         
+   pInFrame = FindMayaObjectPlug("inCustomFrame");
+   if (!pInFrame.isNull())
+   {
+      pInFrame.setDouble(m_sampleFrame);
+      pOutTime = FindMayaObjectPlug("outCustomTime");
+      if (!pOutTime.isNull())
+      {
+         m_sampleTime = pOutTime.asDouble();
+         supportBoundsOverrides = true;
+      }
+   }
+   else
+   {
+      pOutTime = FindMayaObjectPlug("outSampleTime");
+      if (!pOutTime.isNull())
+      {
+         m_sampleTime = pOutTime.asDouble();
+         supportBoundsOverrides = true;
+      }
+   }
+   
    if (step == 0)
    {
       m_peakPadding = 0.0f;
       m_overrideBounds = false;
+      m_computeVelocityExpandedBounds = false;
       m_padBoundsWithPeakWidth = false;
       m_padBoundsWithPeakRadius = false;
       m_boundsOverridden = false;
+      m_widths.reset();
+      m_widthAdjust = 0;
+      m_maxWidth = 0.0f;
       
-      if (IsSingleShape())
+      if (singleShape)
       {
-         bool supportBoundsOverrides = false;
-         
-         MPlug plug = FindMayaObjectPlug("inCustomFrame");
-         if (!plug.isNull())
-         {
-            plug.setDouble(m_renderFrame);
-            plug = FindMayaObjectPlug("outCustomTime");
-            m_renderTime = plug.asDouble();
-            supportBoundsOverrides = true;
-         }
-         else
-         {
-            plug = FindMayaObjectPlug("outSampleTime");
-            if (!plug.isNull())
-            {
-               m_renderTime = plug.asDouble();
-               supportBoundsOverrides = true;
-            }
-         }
-         
          if (supportBoundsOverrides)
          {
+            if (!pInFrame.isNull())
+            {
+               pInFrame.setDouble(m_renderFrame);
+               m_renderTime = pOutTime.asDouble();
+            }
+            else
+            {
+               // In this case, we should only get pOutTime if m_sampleFrame == m_renderFrame
+               // This only only match first sample time if motion blur is set to "Start On Frame"
+               m_renderTime = m_sampleTime;
+            }
+         
             m_overrideBounds = FindMayaPlug("mtoa_constant_abc_useOverrideBounds").asBool();
+            m_computeVelocityExpandedBounds = (!m_overrideBounds && FindMayaPlug("mtoa_constant_abc_computeVelocityExpandedBounds").asBool());
             m_padBoundsWithPeakRadius = FindMayaPlug("mtoa_constant_abc_padBoundsWithPeakRadius").asBool();
             m_padBoundsWithPeakWidth = FindMayaPlug("mtoa_constant_abc_padBoundsWithPeakWidth").asBool();
             
-            if (m_overrideBounds || m_padBoundsWithPeakWidth || m_padBoundsWithPeakRadius)
+            if (m_computeVelocityExpandedBounds && (!deformBlur || int(step) == (GetNumMotionSteps() - 1)))
+            {
+               // don't need to compute velocity bounds expansion
+               MGlobal::displayInfo("[AbcShapeMota] No deformation blur, ignore 'computeVelocityExpandedBounds'. [" + m_dagPath.partialPathName() + "]");
+               m_computeVelocityExpandedBounds = false;
+            }
+            
+            if (m_overrideBounds || m_computeVelocityExpandedBounds || m_padBoundsWithPeakWidth || m_padBoundsWithPeakRadius)
             {
                char msg[1024];
                sprintf(msg, "[AbcShapeMtoa] Sample bounds override attributes at frame %f (time = %f)", m_renderFrame, m_renderTime);
-               MGlobal::displayInfo(msg);
+               MGlobal::displayInfo(msg + MString(". [") + m_dagPath.partialPathName() + "]");
                
-               ReadAlembicAttributes();
+               ReadAlembicAttributes(m_renderTime);
+               
+               if (m_computeVelocityExpandedBounds)
+               {
+                  // deform blur is either on or a single step is exported for that shape
+                  ExpandBounds(m_sampleTime, m_t0, m_p0, m_v0, m_a0, m_velocityScale, m_vb);
+                  ExpandBounds(m_sampleTime, m_t1, m_p1, m_v1, m_a1, m_velocityScale, m_vb);
+               }
+               
+               if (m_widths.valid())
+               {
+                  // sample time is not necessary the render time, if deformation blur is disabled, use points/curves with at render time
+                  SampleWidths(m_widths, (deformBlur ? m_sampleTime : m_renderTime), m_maxWidth);
+               }
             }
          }
          
          AiNodeSetBool(proc, "load_at_init", false);
-         AiNodeSetPnt(proc, "min", static_cast<float>(bmin.x), static_cast<float>(bmin.y), static_cast<float>(bmin.z));
-         AiNodeSetPnt(proc, "max", static_cast<float>(bmax.x), static_cast<float>(bmax.y), static_cast<float>(bmax.z));
+         
+         if (m_boundsOverridden)
+         {
+            AiNodeSetPnt(proc, "min", m_min.x, m_min.y, m_min.z);
+            AiNodeSetPnt(proc, "max", m_max.x, m_max.y, m_max.z);
+         }
+         else
+         {
+            AiNodeSetPnt(proc, "min", static_cast<float>(bmin.x), static_cast<float>(bmin.y), static_cast<float>(bmin.z));
+            AiNodeSetPnt(proc, "max", static_cast<float>(bmax.x), static_cast<float>(bmax.y), static_cast<float>(bmax.z));
+         }
       }
       else
       {
@@ -1385,34 +2014,54 @@ void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
          AiNodeSetPnt(proc, "max", 0.0f, 0.0f, 0.0f);
       }
    }
-   else if (singleShape && (transformBlur || deformBlur))
+   else if (singleShape)
    {
-      if (m_boundsOverridden)
+      if (!m_boundsOverridden)
       {
-         AiNodeSetPnt(proc, "min", m_min.x, m_min.y, m_min.z);
-         AiNodeSetPnt(proc, "max", m_max.x, m_max.y, m_max.z);
-         
-         return;
+         if (transformBlur || deformBlur)
+         {
+            if (m_computeVelocityExpandedBounds)
+            {
+               ExpandBounds(m_sampleTime, m_t0, m_p0, m_v0, m_a0, m_velocityScale, m_vb);
+               ExpandBounds(m_sampleTime, m_t1, m_p1, m_v1, m_a1, m_velocityScale, m_vb);
+            }
+            
+            if (m_widths.valid())
+            {
+               SampleWidths(m_widths, m_sampleTime, m_maxWidth);
+            }
+            
+            AtPoint cmin = AiNodeGetPnt(proc, "min");
+            AtPoint cmax = AiNodeGetPnt(proc, "max");
+            
+            // merge bmin, max in cmin, cmax
+            if (bmin.x < cmin.x)
+               cmin.x = static_cast<float>(bmin.x);
+            if (bmin.y < cmin.y)
+               cmin.y = static_cast<float>(bmin.y);
+            if (bmin.z < cmin.z)
+               cmin.z = static_cast<float>(bmin.z);
+            if (bmax.x > cmax.x)
+               cmax.x = static_cast<float>(bmax.x);
+            if (bmax.y > cmax.y)
+               cmax.y = static_cast<float>(bmax.y);
+            if (bmax.z > cmax.z)
+               cmax.z = static_cast<float>(bmax.z);
+            
+            AiNodeSetPnt(proc, "min", cmin.x, cmin.y, cmin.z);
+            AiNodeSetPnt(proc, "max", cmax.x, cmax.y, cmax.z);
+         }
+         else
+         {
+            // if boundsOverriden
+            float dframe = m_renderFrame - m_sampleFrame;
+            if (-0.001f < dframe && dframe < 0.001f)
+            {
+               AiNodeSetPnt(proc, "min", static_cast<float>(bmin.x), static_cast<float>(bmin.y), static_cast<float>(bmin.z));
+               AiNodeSetPnt(proc, "max", static_cast<float>(bmax.x), static_cast<float>(bmax.y), static_cast<float>(bmax.z));
+            }
+         }
       }
-      
-      AtPoint cmin = AiNodeGetPnt(proc, "min");
-      AtPoint cmax = AiNodeGetPnt(proc, "max");
-      
-      if (bmin.x < cmin.x)
-         cmin.x = static_cast<float>(bmin.x);
-      if (bmin.y < cmin.y)
-         cmin.y = static_cast<float>(bmin.y);
-      if (bmin.z < cmin.z)
-         cmin.z = static_cast<float>(bmin.z);
-      if (bmax.x > cmax.x)
-         cmax.x = static_cast<float>(bmax.x);
-      if (bmax.y > cmax.y)
-         cmax.y = static_cast<float>(bmax.y);
-      if (bmax.z > cmax.z)
-         cmax.z = static_cast<float>(bmax.z);
-      
-      AiNodeSetPnt(proc, "min", cmin.x, cmin.y, cmin.z);
-      AiNodeSetPnt(proc, "max", cmax.x, cmax.y, cmax.z);
    }
 }
 
@@ -1452,6 +2101,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
    m_abcPath = abcfile.asChar();
    m_objPath = objpath.asChar();
    m_renderFrame = renderFrame;
+   m_sampleFrame = sampleFrame;
    
    // ---
 
@@ -1609,6 +2259,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          tmp = plug.asString();
          if (tmp.numChars() > 0)
          {
+            m_radius = tmp.asChar();
             data += " -radiusname " + tmp;
          }
       }
@@ -1803,7 +2454,8 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
       plug = FindMayaPlug("mtoa_constant_abc_velocityScale");
       if (!plug.isNull())
       {
-         data += " -velocityscale " + ToString(plug.asFloat());
+         m_velocityScale = plug.asFloat();
+         data += " -velocityscale " + ToString(m_velocityScale);
       }
       
       plug = FindMayaPlug("mtoa_constant_abc_velocityName");
@@ -1812,6 +2464,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          tmp = plug.asString();
          if (tmp.numChars() > 0)
          {
+            m_velocity = tmp.asChar();
             data += " -velocityname " + tmp;
          }
       }
@@ -1822,6 +2475,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          tmp = plug.asString();
          if (tmp.numChars() > 0)
          {
+            m_acceleration = tmp.asChar();
             data += " -accelerationname " + tmp;
          }
       }
@@ -1954,14 +2608,14 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
       plug = FindMayaPlug("aiRenderCurve");
       if (!plug.isNull() && HasParameter(entry, "abc_ignoreNurbs", proc, "constant BOOL"))
       {
-         MGlobal::displayWarning("[mzAbcShape] Override 'abc_ignoreNurbs' from MtoA specific parameter 'aiRenderCurve'");
+         MGlobal::displayWarning("[AbcShapeMtoa] Override 'abc_ignoreNurbs' from MtoA specific parameter 'aiRenderCurve'");
          AiNodeSetBool(proc, "abc_ignoreNurbs", !plug.asBool());
       }
       
       plug = FindMayaPlug("aiSampleRate");
       if (!plug.isNull() && HasParameter(entry, "abc_nurbsSampleRate", proc, "constant INT"))
       {
-         MGlobal::displayWarning("[mzAbcShape] Override 'abc_nurbsSampleRate' from MtoA specific parameter 'aiSampleRate'");
+         MGlobal::displayWarning("[AbcShapeMtoa] Override 'abc_nurbsSampleRate' from MtoA specific parameter 'aiSampleRate'");
          AiNodeSetInt(proc, "abc_nurbsSampleRate", plug.asInt());
       }
       
@@ -1969,7 +2623,7 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
       if (!plug.isNull() && HasParameter(entry, "abc_widthMin", proc, "constant FLOAT") &&
                             HasParameter(entry, "abc_widthMax", proc, "constant FLOAT"))
       {
-         MGlobal::displayWarning("[mzAbcShape] Override 'abc_widthMin' and 'abc_widthMax' from MtoA specific parameter 'aiCurveWidth'");
+         MGlobal::displayWarning("[AbcShapeMtoa] Override 'abc_widthMin' and 'abc_widthMax' from MtoA specific parameter 'aiCurveWidth'");
          float width = plug.asFloat();
          AiNodeSetFlt(proc, "abc_widthMin", width);
          AiNodeSetFlt(proc, "abc_widthMax", width);
@@ -1979,21 +2633,21 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
       plug = FindMayaPlug("aiRadiusMultiplier");
       if (!plug.isNull() && HasParameter(entry, "abc_radiusScale", proc, "constant FLOAT"))
       {
-         MGlobal::displayWarning("[mzAbcShape] Override 'abc_radiusScale' from MtoA specific parameter 'aiRadiusMultiplier'");
+         MGlobal::displayWarning("[AbcShapeMtoa] Override 'abc_radiusScale' from MtoA specific parameter 'aiRadiusMultiplier'");
          AiNodeSetFlt(proc, "abc_radiusScale", plug.asFloat());
       }
       
       plug = FindMayaPlug("aiMinParticleRadius");
       if (!plug.isNull() && HasParameter(entry, "abc_radiusMin", proc, "constant FLOAT"))
       {
-         MGlobal::displayWarning("[mzAbcShape] Override 'abc_radiusMin' from MtoA specific parameter 'aiMinParticleRadius'");
+         MGlobal::displayWarning("[AbcShapeMtoa] Override 'abc_radiusMin' from MtoA specific parameter 'aiMinParticleRadius'");
          AiNodeSetFlt(proc, "abc_radiusMin", plug.asFloat());
       }
       
       plug = FindMayaPlug("aiMaxParticleRadius");
       if (!plug.isNull() && HasParameter(entry, "abc_radiusMax", proc, "constant FLOAT"))
       {
-         MGlobal::displayWarning("[mzAbcShape] Override 'abc_radiusMax' from MtoA specific parameter 'aiMaxParticleRadius'");
+         MGlobal::displayWarning("[AbcShapeMtoa] Override 'abc_radiusMax' from MtoA specific parameter 'aiMaxParticleRadius'");
          AiNodeSetFlt(proc, "abc_radiusMax", plug.asFloat());
       }
       
@@ -2014,35 +2668,64 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
       // Last motion sample exported      
       const AtNodeEntry *nodeEntry = AiNodeGetNodeEntry(proc);
 
+      AtPoint cmin = AiNodeGetPnt(proc, "min");
+      AtPoint cmax = AiNodeGetPnt(proc, "max");
+
+      if (m_computeVelocityExpandedBounds)
+      {
+         // merge m_vb in cmin, cmax
+         if (m_vb.min.x < cmin.x)
+            cmin.x = static_cast<float>(m_vb.min.x);
+         if (m_vb.min.y < cmin.y)
+            cmin.y = static_cast<float>(m_vb.min.y);
+         if (m_vb.min.z < cmin.z)
+            cmin.z = static_cast<float>(m_vb.min.z);
+         if (m_vb.max.x > cmax.x)
+            cmax.x = static_cast<float>(m_vb.max.x);
+         if (m_vb.max.y > cmax.y)
+            cmax.y = static_cast<float>(m_vb.max.y);
+         if (m_vb.max.z > cmax.z)
+            cmax.z = static_cast<float>(m_vb.max.z);
+      }
+
       // Add padding to bounding box
       float padding = m_peakPadding;
-      
+
+      if (m_widths.valid())
+      {
+         if (m_widthAdjust)
+         {
+            float aw = m_maxWidth * m_widthAdjust[0];
+            if (aw < m_widthAdjust[1]) aw = m_widthAdjust[1];
+            if (aw > m_widthAdjust[2]) aw = m_widthAdjust[2];
+            padding += aw;
+         }
+         else
+         {
+            padding += m_maxWidth;
+         }
+      }
+
       if (HasParameter(nodeEntry, "disp_padding", proc))
       {
          padding += AiNodeGetFlt(proc, "disp_padding");
       }
-      
+
       MPlug plug = FindMayaPlug("mtoa_constant_abc_boundsPadding");
       if (!plug.isNull())
       {
          padding += plug.asFloat();
       }
-      
-      if (padding != 0.0f)
-      {
-         AtPoint cmin = AiNodeGetPnt(proc, "min");
-         AtPoint cmax = AiNodeGetPnt(proc, "max");
 
-         cmin.x -= padding;
-         cmin.y -= padding;
-         cmin.z -= padding;
-         cmax.x += padding;
-         cmax.y += padding;
-         cmax.z += padding;
+      cmin.x -= padding;
+      cmin.y -= padding;
+      cmin.z -= padding;
+      cmax.x += padding;
+      cmax.y += padding;
+      cmax.z += padding;
 
-         AiNodeSetPnt(proc, "min", cmin.x, cmin.y, cmin.z);
-         AiNodeSetPnt(proc, "max", cmax.x, cmax.y, cmax.z);
-      }
+      AiNodeSetPnt(proc, "min", cmin.x, cmin.y, cmin.z);
+      AiNodeSetPnt(proc, "max", cmax.x, cmax.y, cmax.z);
    }
 }
 

@@ -9,14 +9,15 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       self.renderStatsAttributes()
       
       self.beginLayout("Bounds", collapse=True)
-      self.addControl("mtoa_constant_abc_boundsPadding", label="Bounds Padding")
       self.addControl("mtoa_constant_abc_useOverrideBounds", label="Use Override Bounds", annotation="Use user defined bounds embedded in ABC file")
       self.addControl("mtoa_constant_abc_overrideBoundsMinName", label="Override Bounds Min Name")
       self.addControl("mtoa_constant_abc_overrideBoundsMaxName", label="Override Bounds Max Name")
+      self.addControl("mtoa_constant_abc_computeVelocityExpandedBounds", label="Compute Velocity Expanded Bounds")
       self.addControl("mtoa_constant_abc_padBoundsWithPeakRadius", label="Pad With Peak Radius")
       self.addControl("mtoa_constant_abc_peakRadiusName", label="Peak Radius Name")
       self.addControl("mtoa_constant_abc_padBoundsWithPeakWidth", label="Pad With Peak Width")
       self.addControl("mtoa_constant_abc_peakWidthName", label="Peak Width Name")
+      self.addControl("mtoa_constant_abc_boundsPadding", label="Bounds Padding")
       self.endLayout()
       
       self.beginLayout("Attributes", collapse=True)
