@@ -402,14 +402,6 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicMesh &node, AlembicNode *
          {
             vbbox.extendBy(box);
          }
-         
-         if (b > 0.0)
-         {
-            if (computeVelocityBasedBounds(*samp1, geomParams, box))
-            {
-               vbbox.extendBy(box);
-            }
-         }
       }
    }
    
@@ -443,14 +435,6 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicSubD &node, AlembicNode *
          if (computeVelocityBasedBounds(*samp0, geomParams, box))
          {
             vbbox.extendBy(box);
-         }
-         
-         if (b > 0.0)
-         {
-            if (computeVelocityBasedBounds(*samp1, geomParams, box))
-            {
-               vbbox.extendBy(box);
-            }
          }
       }
    }
@@ -729,14 +713,6 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode
             if (computeVelocityBasedBounds(*samp0, geomParams, box))
             {
                vbbox.extendBy(box);
-            }
-            
-            if (b > 0.0)
-            {
-               if (computeVelocityBasedBounds(*samp1, geomParams, box))
-               {
-                  vbbox.extendBy(box);
-               }
             }
          }
       }
