@@ -20,5 +20,7 @@ maya/AbcShape/*AbcMaterialEditor.mel
 maya/AbcShape/*AbcMaterialEditor.py
 maya/AbcShape/mtoa/*.py
 arnold/abcproc/*.py
+arnold/abcproc/abcproc.env.tmp
 /dist/
+/eco/
 /*.env
