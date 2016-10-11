@@ -102,6 +102,7 @@ private:
    Alembic::AbcGeom::IFloatGeomParam m_widths; // points/curves built-in width parameter
    float m_maxWidth; 
    float *m_widthAdjust;
+   bool m_forceVelocityBlur;
 };
 
 #endif

@@ -45,6 +45,7 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       self.addControl("mtoa_constant_abc_velocityScale", label="Velocity Scale")
       self.addControl("mtoa_constant_abc_velocityName", label="Velocity Name")
       self.addControl("mtoa_constant_abc_accelerationName", label="Acceleration Name")
+      self.addControl("mtoa_constant_abc_forceVelocityBlur", label="Force Velocity Blur")
       self.endLayout()
       
       self.beginLayout("Mesh", collapse=True)

@@ -541,7 +541,7 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
             sampleTimesCount = mDso->numMotionSamples();
          }
          
-         // For mesh of Heterogeneous topology and particles
+         // For mesh/curves of Heterogeneous topology or forced velocity blur and particles
          // -> samples need to be computed based on current frame + velocity/acceleration extrapolation
          for (size_t i=0; i<sampleTimesCount; ++i)
          {

@@ -88,6 +88,11 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.shortName = "accan";
    helper.MakeInputString(data);
    
+   data.defaultValue.BOOL = false;
+   data.name = "mtoa_constant_abc_forceVelocityBlur";
+   data.shortName = "fvmb";
+   helper.MakeInputBoolean(data);
+   
    // bounding box
    
    data.defaultValue.FLT = 0.0f;
@@ -334,6 +339,7 @@ CAbcTranslator::CAbcTranslator()
    , m_velocityScale(1.0f)
    , m_sampleFrame(0.0)
    , m_sampleTime(0.0)
+   , m_forceVelocityBlur(false)
 {
    m_radiusSclMinMax[0] = 1.0f;
    m_radiusSclMinMax[1] = 0.0f;
@@ -1660,7 +1666,7 @@ void CAbcTranslator::ReadAlembicAttributes(double time)
             {
                AlembicMesh *mesh = (AlembicMesh*) node;
                
-               if (mesh->typedObject().getSchema().getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology)
+               if (m_forceVelocityBlur || mesh->typedObject().getSchema().getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology)
                {
                   TimeSampleList<Alembic::AbcGeom::IPolyMeshSchema> &samples = mesh->samples().schemaSamples;
                   TimeSampleList<Alembic::AbcGeom::IPolyMeshSchema>::ConstIterator samp0, samp1;
@@ -1679,7 +1685,7 @@ void CAbcTranslator::ReadAlembicAttributes(double time)
             {
                AlembicSubD *subd = (AlembicSubD*) node;
                
-               if (subd->typedObject().getSchema().getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology)
+               if (m_forceVelocityBlur || subd->typedObject().getSchema().getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology)
                {
                   TimeSampleList<Alembic::AbcGeom::ISubDSchema> &samples = subd->samples().schemaSamples;
                   TimeSampleList<Alembic::AbcGeom::ISubDSchema>::ConstIterator samp0, samp1;
@@ -1698,7 +1704,7 @@ void CAbcTranslator::ReadAlembicAttributes(double time)
             {
                AlembicCurves *curves = (AlembicCurves*) node;
                
-               if (curves->typedObject().getSchema().getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology)
+               if (m_forceVelocityBlur || curves->typedObject().getSchema().getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology)
                {
                   TimeSampleList<Alembic::AbcGeom::ICurvesSchema> &samples = curves->samples().schemaSamples;
                   TimeSampleList<Alembic::AbcGeom::ICurvesSchema>::ConstIterator samp0, samp1;
@@ -2467,6 +2473,13 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
             m_velocity = tmp.asChar();
             data += " -velocityname " + tmp;
          }
+      }
+      
+      plug = FindMayaPlug("mtoa_constant_abc_forceVelocityBlur");
+      if (!plug.isNull())
+      {
+         m_forceVelocityBlur = plug.asBool();
+         data += " -forcevelocityblur";
       }
       
       plug = FindMayaPlug("mtoa_constant_abc_accelerationName");

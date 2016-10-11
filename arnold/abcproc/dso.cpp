@@ -73,6 +73,8 @@ void Dso::CommonParameters::reset()
    velocityScale = 1.0f;
    velocityName = "";
    accelerationName = "";
+   
+   forceVelocityBlur = false;
 
    promoteToObjectAttribs.clear();
    
@@ -210,6 +212,10 @@ std::string Dso::CommonParameters::dataString(const char *targetShape) const
          ++it;
       }
    }
+   if (forceVelocityBlur)
+   {
+      oss << " -forcevelocityblur";
+   }
    if (verbose)
    {
       oss << " -verbose";
@@ -317,6 +323,10 @@ std::string Dso::CommonParameters::shapeKey() const
    if (ignoreNurbs)
    {
       oss << " -ignorenurbs";
+   }
+   if (forceVelocityBlur)
+   {
+      oss << " -forcevelocityblur";
    }
    
    return oss.str();
@@ -1905,6 +1915,10 @@ bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
    {
       mCommonParams.ignoreNurbs = true;
    }
+   else if (args[i] == "-forcevelocityblur")
+   {
+      mCommonParams.forceVelocityBlur = true;
+   }
    else if (args[i] == "-nurbssamplerate")
    {
       ++i;
@@ -2904,6 +2918,17 @@ void Dso::readFromUserParams()
          if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
          {
             mCommonParams.ignoreNurbs = AiNodeGetBool(mProcNode, pname);
+         }
+         else
+         {
+            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
+         }
+      }
+      else if (param == "forcevelocityblur")
+      {
+         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
+         {
+            mCommonParams.forceVelocityBlur = AiNodeGetBool(mProcNode, pname);
          }
          else
          {

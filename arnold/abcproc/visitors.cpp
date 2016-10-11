@@ -378,12 +378,12 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicMesh &node, AlembicNode *
 {
    Alembic::AbcGeom::IPolyMeshSchema schema = node.typedObject().getSchema();
    Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
-   bool varyingTopo = (schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
+   bool varyingTopology = (mDso->forceVelocityBlur() || schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
    Alembic::Abc::Box3d vbbox;
    
    vbbox.makeEmpty();
    
-   if (visible && !mDso->ignoreDeformBlur() && mDso->computeVelocityExpandedBounds() && varyingTopo)
+   if (visible && !mDso->ignoreDeformBlur() && mDso->computeVelocityExpandedBounds() && varyingTopology)
    {
       Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
       double t = mDso->renderTime();
@@ -405,19 +405,19 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicMesh &node, AlembicNode *
       }
    }
    
-   return shapeEnter(node, instance, !varyingTopo, 0.0, &vbbox);
+   return shapeEnter(node, instance, !varyingTopology, 0.0, &vbbox);
 }
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicSubD &node, AlembicNode *instance)
 {
    Alembic::AbcGeom::ISubDSchema schema = node.typedObject().getSchema();
    Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
-   bool varyingTopo = (schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
+   bool varyingTopology = (mDso->forceVelocityBlur() || schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
    Alembic::Abc::Box3d vbbox;
    
    vbbox.makeEmpty();
    
-   if (visible && !mDso->ignoreDeformBlur() && mDso->computeVelocityExpandedBounds() && varyingTopo)
+   if (visible && !mDso->ignoreDeformBlur() && mDso->computeVelocityExpandedBounds() && varyingTopology)
    {
       Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
       double t = mDso->renderTime();
@@ -439,7 +439,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicSubD &node, AlembicNode *
       }
    }
    
-   return shapeEnter(node, instance, !varyingTopo, 0.0, &vbbox);
+   return shapeEnter(node, instance, !varyingTopology, 0.0, &vbbox);
 }
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode *instance)
@@ -681,7 +681,10 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode
       return AlembicNode::ContinueVisit;
    }
    
-   // Take into account the curve width in the computed bounds
+   // Note: Take into account the curve width in the computed bounds
+   
+   Alembic::AbcGeom::ICurvesSchema schema = node.typedObject().getSchema();
+   bool varyingTopology = (mDso->forceVelocityBlur() || schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
    
    Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
    
@@ -692,13 +695,11 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode
    
    if (visible)
    {
-      Alembic::AbcGeom::ICurvesSchema schema = node.typedObject().getSchema();
       Alembic::Abc::ICompoundProperty userProps = schema.getUserProperties();
       Alembic::Abc::ICompoundProperty geomParams = schema.getArbGeomParams();
       double t = mDso->renderTime();
       
-      if (!mDso->ignoreDeformBlur() && mDso->computeVelocityExpandedBounds() &&
-          schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology)
+      if (!mDso->ignoreDeformBlur() && mDso->computeVelocityExpandedBounds() && varyingTopology)
       {
          TimeSampleList<Alembic::AbcGeom::ICurvesSchema> &samples = node.samples().schemaSamples;
          TimeSampleList<Alembic::AbcGeom::ICurvesSchema>::ConstIterator samp0, samp1;
@@ -821,7 +822,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode
       }
    }
    
-   return shapeEnter(node, instance, false, extraPadding, &vbbox);
+   return shapeEnter(node, instance, !varyingTopology, extraPadding, &vbbox);
 }
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicNuPatch &node, AlembicNode *instance)
@@ -1750,7 +1751,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
    
    MeshInfo info;
    
-   info.varyingTopology = (schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
+   info.varyingTopology = (mDso->forceVelocityBlur() || schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
    
    if (schema.getUVsParam().valid())
    {
@@ -2525,7 +2526,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
    
    MeshInfo info;
    
-   info.varyingTopology = (schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
+   info.varyingTopology = (mDso->forceVelocityBlur() || schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
    
    if (schema.getUVsParam().valid())
    {
@@ -4322,7 +4323,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
    
    CurvesInfo info;
    
-   info.varyingTopology = (schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
+   info.varyingTopology = (mDso->forceVelocityBlur() || schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
    
    TimeSampleList<Alembic::AbcGeom::ICurvesSchema> &samples = node.samples().schemaSamples;
    TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> Wsamples;

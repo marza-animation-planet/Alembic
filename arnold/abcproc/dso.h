@@ -205,6 +205,11 @@ public:
       return (mCommonParams.accelerationName.length() > 0 ? mCommonParams.accelerationName.c_str() : 0);
    }
    
+   inline bool forceVelocityBlur() const
+   {
+      return mCommonParams.forceVelocityBlur;
+   }
+   
    double computeTime(double frame, bool *exclude=0) const;
    
    // Attributes
@@ -497,6 +502,8 @@ private:
       std::set<std::string> promoteToObjectAttribs;
       
       bool ignoreNurbs;
+      
+      bool forceVelocityBlur;
       
       // peakRadius attribute name (points)
       // peakWidth attribute name (curves)
