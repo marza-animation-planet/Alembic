@@ -154,7 +154,7 @@ private:
    bool overrideBounds(AlembicNodeT<Alembic::Abc::ISchemaObject<Schema> > &node, Alembic::Abc::Box3d &box);
    
    template <class T>
-   AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance, bool interpolateBounds, double extraPadding, const Alembic::Abc::Box3d *vbbox=0);
+   AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance, bool multiSampleBounds, bool interpolateBounds, double extraPadding, const Alembic::Abc::Box3d *vbbox=0);
 
 private:
 
@@ -511,7 +511,7 @@ bool MakeProcedurals::overrideBounds(AlembicNodeT<Alembic::Abc::ISchemaObject<Sc
 }
 
 template <class T>
-AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance, bool interpolateBounds, double extraPadding, const Alembic::Abc::Box3d *vbbox)
+AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance, bool multiSampleBounds, bool interpolateBounds, double extraPadding, const Alembic::Abc::Box3d *vbbox)
 {
    Alembic::Util::bool_t visible = (mDso->ignoreVisibility() ? true : GetVisibility(node.object().getProperties(), mDso->renderTime()));
    
@@ -530,7 +530,7 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
          const double *sampleTimes = 0;
          size_t sampleTimesCount = 0;
          
-         if (mDso->ignoreDeformBlur())
+         if (mDso->ignoreDeformBlur() || !multiSampleBounds)
          {
             sampleTimes = &renderTime;
             sampleTimesCount = 1;
@@ -541,8 +541,6 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
             sampleTimesCount = mDso->numMotionSamples();
          }
          
-         // For mesh/curves of Heterogeneous topology or forced velocity blur and particles
-         // -> samples need to be computed based on current frame + velocity/acceleration extrapolation
          for (size_t i=0; i<sampleTimesCount; ++i)
          {
             double t = sampleTimes[i];

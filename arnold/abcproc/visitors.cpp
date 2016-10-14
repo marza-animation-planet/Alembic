@@ -405,7 +405,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicMesh &node, AlembicNode *
       }
    }
    
-   return shapeEnter(node, instance, !varyingTopology, 0.0, &vbbox);
+   return shapeEnter(node, instance, !varyingTopology, true, 0.0, &vbbox);
 }
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicSubD &node, AlembicNode *instance)
@@ -439,7 +439,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicSubD &node, AlembicNode *
       }
    }
    
-   return shapeEnter(node, instance, !varyingTopology, 0.0, &vbbox);
+   return shapeEnter(node, instance, !varyingTopology, true, 0.0, &vbbox);
 }
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode *instance)
@@ -671,7 +671,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicPoints &node, AlembicNode
       }
    }
    
-   return shapeEnter(node, instance, false, extraPadding, &vbbox);
+   return shapeEnter(node, instance, true, false, extraPadding, &vbbox);
 }
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode *instance)
@@ -822,7 +822,7 @@ AlembicNode::VisitReturn MakeProcedurals::enter(AlembicCurves &node, AlembicNode
       }
    }
    
-   return shapeEnter(node, instance, !varyingTopology, extraPadding, &vbbox);
+   return shapeEnter(node, instance, !varyingTopology, true, extraPadding, &vbbox);
 }
 
 AlembicNode::VisitReturn MakeProcedurals::enter(AlembicNuPatch &node, AlembicNode *instance)
