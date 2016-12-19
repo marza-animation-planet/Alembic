@@ -8,14 +8,21 @@
 #   define NAME_PREFIX ""
 #endif
 
+#include "utils/Version.h"
 #include "translators/shape/ShapeTranslator.h"
 #include "extension/Extension.h"
 #include "AlembicSceneCache.h"
 #include <maya/MDagPath.h>
 #include <maya/MPlug.h>
-
 #include <string>
 #include <map>
+#include <vector>
+#include <algorithm>
+#include <set>
+
+#if MTOA_ARCH_VERSION_NUM == 1 && MTOA_MAJOR_VERSION_NUM <= 3
+#  define OLD_API
+#endif
 
 class CAbcTranslator : public CShapeTranslator
 {
@@ -25,14 +32,21 @@ public:
    virtual ~CAbcTranslator();
 
    virtual AtNode* CreateArnoldNodes();
+   virtual void Export(AtNode* atNode);
+   virtual bool RequiresMotionData();
+
+#ifdef OLD_API
    virtual AtNode* Init(CArnoldSession* session, MDagPath &dagPath, MString outputAttr="");
    virtual AtNode* Init(CArnoldSession* session, MObject &object, MString outputAttr="");
-   virtual void Export(AtNode* atNode);
    virtual void ExportMotion(AtNode* atNode, unsigned int step);
    virtual void Update(AtNode *atNode);
    virtual void UpdateMotion(AtNode* atNode, unsigned int step);
-   virtual bool RequiresMotionData();
    virtual void Delete();
+#else
+   virtual void Init();
+   virtual void ExportMotion(AtNode *atNode);
+   virtual void RequestUpdate();
+#endif
 
    static void* Create();
    static void NodeInitializer(CAbTranslator context);
@@ -49,7 +63,7 @@ private:
    
    bool IsSingleShape() const;
 
-   float GetSampleFrame(unsigned int step);
+   double GetSampleFrame(unsigned int step);
    void GetFrames(double inRenderFrame, double inSampleFrame,
                   double &outRenderFrame, double &outSampleFrame);
    double GetFPS();
@@ -59,6 +73,10 @@ private:
    bool HasParameter(const AtNodeEntry *anodeEntry, const char *param, AtNode *anode=NULL, const char *decl=NULL);
    
    void ReadAlembicAttributes(double time);
+
+#ifndef OLD_API
+   MPlug FindMayaObjectPlug(const MString &attrName, MStatus* ReturnStatus=NULL) const;
+#endif
 
 private:
 
@@ -103,6 +121,8 @@ private:
    float m_maxWidth; 
    float *m_widthAdjust;
    bool m_forceVelocityBlur;
+   std::set<unsigned int> m_exportedSteps;
+   std::vector<float> m_samples;
 };
 
 #endif

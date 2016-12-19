@@ -371,6 +371,8 @@ CAbcTranslator::~CAbcTranslator()
    }
 }
 
+#ifdef OLD_API
+
 AtNode* CAbcTranslator::Init(CArnoldSession *session, MDagPath& dagPath, MString outputAttr)
 {
    AtNode *rv = CShapeTranslator::Init(session, dagPath, outputAttr);
@@ -383,11 +385,6 @@ AtNode* CAbcTranslator::Init(CArnoldSession* session, MObject& object, MString o
    AtNode *rv = CDagTranslator::Init(session, object, outputAttr);
    m_motionBlur = (IsMotionBlurEnabled(MTOA_MBLUR_DEFORM|MTOA_MBLUR_OBJECT) && IsLocalMotionBlurEnabled());
    return rv;
-}
-
-AtNode* CAbcTranslator::CreateArnoldNodes()
-{
-   return AddArnoldNode("procedural");
 }
 
 void CAbcTranslator::Export(AtNode *atNode)
@@ -408,6 +405,41 @@ void CAbcTranslator::Update(AtNode *atNode)
 void CAbcTranslator::UpdateMotion(AtNode *atNode, unsigned int step)
 {
    ExportAbc(atNode, step, true);
+}
+
+void CAbcTranslator::Delete()
+{
+}
+
+#else
+
+void CAbcTranslator::Init()
+{
+   CShapeTranslator::Init();
+   m_motionBlur = (IsMotionBlurEnabled(MTOA_MBLUR_DEFORM|MTOA_MBLUR_OBJECT) && IsLocalMotionBlurEnabled());
+}
+
+void CAbcTranslator::Export(AtNode *atNode)
+{
+   ExportAbc(atNode, GetMotionStep(), IsExported());
+}
+
+void CAbcTranslator::ExportMotion(AtNode *atNode)
+{
+   ExportAbc(atNode, GetMotionStep(), IsExported());
+}
+
+void CAbcTranslator::RequestUpdate()
+{
+   SetUpdateMode(AI_RECREATE_NODE);
+   CShapeTranslator::RequestUpdate();
+}
+
+#endif
+
+AtNode* CAbcTranslator::CreateArnoldNodes()
+{
+   return AddArnoldNode("procedural");
 }
 
 bool CAbcTranslator::RequiresMotionData()
@@ -455,6 +487,15 @@ MString CAbcTranslator::ToString(int val)
    rv += val;
    return rv;
 }
+
+#ifndef OLD_API
+MPlug CAbcTranslator::FindMayaObjectPlug(const MString &attrName, MStatus* ReturnStatus) const
+{
+   MObject obj = GetMayaObject();
+   MFnDependencyNode node(obj);
+   return node.findPlug(attrName, ReturnStatus);
+}
+#endif
 
 void CAbcTranslator::GetFrames(double inRenderFrame, double inSampleFrame,
                                double &outRenderFrame, double &outSampleFrame)
@@ -795,7 +836,11 @@ void CAbcTranslator::ExportShader(AtNode *proc, bool update)
       shadingEngine.setObject(shadingGroupPlug.node());
       
       // Surface shader
+#ifdef OLD_API
       AtNode *shader = ExportNode(shadingGroupPlug);
+#else
+      AtNode *shader = ExportConnectedNode(shadingGroupPlug);
+#endif
       
       if (shader != NULL)
       {
@@ -810,10 +855,15 @@ void CAbcTranslator::ExportShader(AtNode *proc, bool update)
    }
 
    MDagPath masterDag;
+#ifdef OLD_API
    if (DoIsMasterInstance(m_dagPath, masterDag))
    {
+      // DoIsMasterInstance doesn't set masterDag when it returns true
       masterDag = m_dagPath;
    }
+#else
+   masterDag = (IsMasterInstance() ? m_dagPath : GetMasterInstance());
+#endif
    
    shadingGroupPlug = GetNodeShadingGroup(masterDag.node(), (masterDag.isInstanced() ? masterDag.instanceNumber() : 0));
    if (!shadingGroupPlug.isNull())
@@ -886,7 +936,11 @@ void CAbcTranslator::ExportShader(AtNode *proc, bool update)
 
          if (HasParameter(nodeEntry, "disp_map", proc, "constant ARRAY NODE"))
          {
+#ifdef OLD_API
             AtNode *dispImage = ExportNode(shaderConns[0]);
+#else
+            AtNode *dispImage = ExportConnectedNode(shaderConns[0]);
+#endif
             AiNodeSetArray(proc, "disp_map", AiArrayConvert(1, 1, AI_TYPE_NODE, &dispImage));
          }
       }
@@ -1637,12 +1691,12 @@ void CAbcTranslator::ReadAlembicAttributes(double time)
                }
                else
                {
-                  MGlobal::displayWarning(MString("Ignore bounds override: No object (or promoted) property named \"") + m_overrideBoundsMax.c_str() + MString("\" found in alembic file. [" + m_dagPath.partialPathName() + "]"));
+                  MGlobal::displayWarning(MString("[AbcShapeMtoa] Ignore bounds override: No object (or promoted) property named \"") + m_overrideBoundsMax.c_str() + MString("\" found in alembic file. [" + m_dagPath.partialPathName() + "]"));
                }
             }
             else
             {
-               MGlobal::displayWarning(MString("Ignore bounds override: No object (or promoted) property named \"") + m_overrideBoundsMin.c_str() + MString("\" found in alembic file. [" + m_dagPath.partialPathName() + "]"));
+               MGlobal::displayWarning(MString("[AbcShapeMtoa] Ignore bounds override: No object (or promoted) property named \"") + m_overrideBoundsMin.c_str() + MString("\" found in alembic file. [" + m_dagPath.partialPathName() + "]"));
             }
          }
          else if (m_computeVelocityExpandedBounds)
@@ -1884,12 +1938,12 @@ void CAbcTranslator::ReadAlembicAttributes(double time)
       }
       else
       {
-         MGlobal::displayWarning(MString("Ignore bounds override: Could not find object in alembic file. [" + m_dagPath.partialPathName() + "]"));
+         MGlobal::displayWarning(MString("[AbcShapeMtoa] Ignore bounds override: Could not find object in alembic file. [" + m_dagPath.partialPathName() + "]"));
       }
    }
    else
    {
-      MGlobal::displayWarning(MString("Ignore bounds override: Could not read alembic file. [" + m_dagPath.partialPathName() + "]"));
+      MGlobal::displayWarning(MString("[AbcShapeMtoa] Ignore bounds override: Could not read alembic file. [" + m_dagPath.partialPathName() + "]"));
    }
 }
 
@@ -1936,8 +1990,12 @@ void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
          supportBoundsOverrides = true;
       }
    }
-   
+
+#ifdef OLD_API
    if (step == 0)
+#else
+   if (!IsExportingMotion())
+#endif
    {
       m_peakPadding = 0.0f;
       m_overrideBounds = false;
@@ -1970,7 +2028,7 @@ void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
             m_padBoundsWithPeakRadius = FindMayaPlug("mtoa_constant_abc_padBoundsWithPeakRadius").asBool();
             m_padBoundsWithPeakWidth = FindMayaPlug("mtoa_constant_abc_padBoundsWithPeakWidth").asBool();
             
-            if (m_computeVelocityExpandedBounds && (!deformBlur || int(step) == (GetNumMotionSteps() - 1)))
+            if (m_computeVelocityExpandedBounds && (!deformBlur || GetNumMotionSteps() == 1))
             {
                // don't need to compute velocity bounds expansion
                MGlobal::displayInfo("[AbcShapeMota] No deformation blur, ignore 'computeVelocityExpandedBounds'. [" + m_dagPath.partialPathName() + "]");
@@ -2111,8 +2169,14 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
    
    // ---
 
+#ifdef OLD_API
    if (step == 0)
+#else
+   if (!IsExportingMotion())
+#endif
    {
+      m_samples.clear();
+      
       AiNodeSetStr(proc, "dso", "abcproc");
 
       MString data, tmp;
@@ -2505,7 +2569,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          {
             data += " -relativesamples";
          }
-         data += " -samples " + ToString(relativeSamples ? sampleFrame - renderFrame : sampleFrame);
+         m_samples.push_back(relativeSamples ? sampleFrame - renderFrame : sampleFrame);
       }
 
       AiNodeSetStr(proc, "data", data.asChar());
@@ -2514,15 +2578,14 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
    {
       if (deformBlur || transformBlur)
       {
-         MString data = AiNodeGetStr(proc, "data");
-         data += " " + ToString(relativeSamples ? sampleFrame - renderFrame : sampleFrame);
-         AiNodeSetStr(proc, "data", data.asChar());
+         m_samples.push_back(relativeSamples ? sampleFrame - renderFrame : sampleFrame);
       }
    }
 }
 
-float CAbcTranslator::GetSampleFrame(unsigned int step)
+double CAbcTranslator::GetSampleFrame(unsigned int step)
 {
+#ifdef OLD_API
    MFnDependencyNode opts(m_session->GetArnoldRenderOptions());
    
    int steps = opts.findPlug("motion_steps").asInt();
@@ -2566,6 +2629,18 @@ float CAbcTranslator::GetSampleFrame(unsigned int step)
       
       return start + step * incr;
    }
+#else
+   unsigned int count = 0;
+   const double *frames = GetMotionFrames(count);
+   if (step >= count)
+   {
+      return GetExportFrame();
+   }
+   else
+   {
+      return frames[step];
+   }
+#endif
 }
 
 void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
@@ -2576,32 +2651,57 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
    GetFrames(renderFrame, sampleFrame, renderFrame, sampleFrame);
 
    MDagPath masterDag;
-   bool isInstance = !DoIsMasterInstance(m_dagPath, masterDag);
-   if (!isInstance)
+#ifdef OLD_API
+   if (DoIsMasterInstance(m_dagPath, masterDag))
    {
-      // IsMasterInstance doesn't set masterDag when it returns true
+      // DoIsMasterInstance doesn't set masterDag when it returns true
       masterDag = m_dagPath;
    }
+#else
+   masterDag = (IsMasterInstance() ? m_dagPath : GetMasterInstance());
+#endif
 
    ExportProc(proc, step, renderFrame, sampleFrame);
    ExportBounds(proc, step);
+#ifdef OLD_API
    ExportMatrix(proc, step);
+#else
+   ExportMatrix(proc);
+#endif
 
+#ifdef OLD_API
    if (step == 0)
+#else
+   if (!IsExportingMotion())
+#endif
    {
       MPlug plug;
       const AtNodeEntry *entry = AiNodeGetNodeEntry(proc);
+      
+      m_exportedSteps.clear();
+      
+#ifdef OLD_API
+      ExportShader(proc, update);
+#else
+      if (RequiresShaderExport())
+      {
+         ExportShader(proc, update);
+      }
+#endif
+      ExportVisibility(proc);
+      
+      // For meshes
+      
+      ExportMeshAttribs(proc);
+      ExportSubdivAttribs(proc);
+      
+      // For volumes
       
       plug = FindMayaPlug("aiStepSize");
       if (!plug.isNull() && HasParameter(entry, "step_size", proc, "constant FLOAT"))
       {
          AiNodeSetFlt(proc, "step_size", plug.asFloat());
       }
-      
-      ExportShader(proc, update);
-      ExportVisibility(proc);
-      ExportMeshAttribs(proc);
-      ExportSubdivAttribs(proc);
       
       // For curves/particles
       
@@ -2643,6 +2743,7 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
       }
       
       // For particles (overrides)
+      
       plug = FindMayaPlug("aiRadiusMultiplier");
       if (!plug.isNull() && HasParameter(entry, "abc_radiusScale", proc, "constant FLOAT"))
       {
@@ -2676,9 +2777,36 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
       }
    }
 
-   if (!IsMotionBlurEnabled() || !IsLocalMotionBlurEnabled() || int(step) >= (int(GetNumMotionSteps()) - 1))
+   // Call cleanup command on last export step
+   if (m_exportedSteps.find(step) != m_exportedSteps.end())
    {
-      // Last motion sample exported      
+      char numstr[16];
+      sprintf(numstr, "%u", step);
+      MGlobal::displayWarning(MString("[AbcShapeMtoa] Motion step already processed: ") + numstr);
+   }
+   m_exportedSteps.insert(step);
+
+   if (!m_motionBlur || m_exportedSteps.size() == GetNumMotionSteps())
+   {
+      // Last sample exported
+      
+      // Write out samples list if necessary
+      if (m_samples.size() > 0)
+      {
+         MString data = AiNodeGetStr(proc, "data");
+
+         std::sort(m_samples.begin(), m_samples.end());
+
+         data += " -samples";
+         for (size_t i=0; i<m_samples.size(); ++i)
+         {
+            data += " " + ToString(m_samples[i]);
+         }
+
+         AiNodeSetStr(proc, "data", data.asChar());
+      }
+      
+      // Write out final bounding box including padding
       const AtNodeEntry *nodeEntry = AiNodeGetNodeEntry(proc);
 
       AtPoint cmin = AiNodeGetPnt(proc, "min");
@@ -2741,9 +2869,3 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
       AiNodeSetPnt(proc, "max", cmax.x, cmax.y, cmax.z);
    }
 }
-
-void CAbcTranslator::Delete()
-{
-}
-
-
