@@ -8,6 +8,12 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       
       self.renderStatsAttributes()
       
+      self.addSeparator()
+      
+      self.addControl("aiSssSetname", label="SSS Set Name")
+      self.addControl("aiStepSize", label="Volume Step Size")
+      self.addControl("aiUserOptions", label="User Options")
+      
       self.beginLayout("Bounds", collapse=True)
       self.addControl("mtoa_constant_abc_useOverrideBounds", label="Use Override Bounds", annotation="Use user defined bounds embedded in ABC file")
       self.addControl("mtoa_constant_abc_overrideBoundsMinName", label="Override Bounds Min Name")
@@ -73,8 +79,6 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       self.endLayout()
       
       self.beginLayout("Others", collapse=True)
-      self.addControl("aiUserOptions", label="User Options")
-      self.addControl("aiStepSize", label="Volume Step Size")
       self.addControl("mtoa_constant_abc_verbose", label="Verbose")
       self.endLayout()
 
