@@ -62,6 +62,8 @@ private:
    void ExportShader(AtNode *atNode, bool update);
    
    bool IsSingleShape() const;
+   bool IsRenderable(MDagPath dagPath) const;
+   bool IsRenderable(MFnDagNode &node) const;
 
    double GetSampleFrame(unsigned int step);
    void GetFrames(double inRenderFrame, double inSampleFrame,

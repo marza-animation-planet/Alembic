@@ -744,46 +744,116 @@ void CAbcTranslator::ExportMeshAttribs(AtNode *proc)
    }
 }
 
+bool CAbcTranslator::IsRenderable(MFnDagNode &node) const
+{
+   MStatus status;
+
+   if (node.isIntermediateObject())
+   {
+      return false;
+   }
+
+   // Check standard visibility
+   MPlug visPlug = node.findPlug("visibility", &status);
+   if (status == MStatus::kSuccess && !visPlug.asBool())
+   {
+      return false;
+   }
+
+   // Check standard template
+   MPlug tplPlug = node.findPlug("template", &status);
+   if (status == MStatus::kSuccess && tplPlug.asBool())
+   {
+      return false;
+   }
+
+   // Check overrides
+   MPlug overPlug = node.findPlug("overrideEnabled", &status);
+   if (status == MStatus::kSuccess && overPlug.asBool())
+   {
+      // Visibility
+      MPlug overVisPlug = node.findPlug("overrideVisibility", &status);
+      if (status == MStatus::kSuccess && !overVisPlug.asBool())
+      {
+         return false;
+      }
+
+      // Template
+      MPlug overDispPlug = node.findPlug("overrideDisplayType", &status);
+      if (status == MStatus::kSuccess && overDispPlug.asInt() == 1)
+      {
+         return false;
+      }
+   }
+
+   return true;
+}
+
+bool CAbcTranslator::IsRenderable(MDagPath dagPath) const
+{
+   MStatus stat = MStatus::kSuccess;
+
+   while (stat == MStatus::kSuccess)
+   {
+      MFnDagNode node;
+      node.setObject(dagPath.node());
+
+      if (!IsRenderable(node))
+      {
+         return false;
+      }
+
+      stat = dagPath.pop();
+   }
+
+   return true;
+}
+
 void CAbcTranslator::ExportVisibility(AtNode *proc)
 {
    MPlug plug;
 
-   int visibility = AI_RAY_ALL;
+   int visibility = AI_RAY_UNDEFINED;
 
-   plug = FindMayaPlug("castsShadows"); // maya shape built-in attribute
-   if (!plug.isNull() && !plug.asBool())
+   if (IsRenderable(m_dagPath))
    {
-      visibility &= ~AI_RAY_SHADOW;
-   }
+      visibility = AI_RAY_ALL;
 
-   plug = FindMayaPlug("primaryVisibility"); // maya shape built-in attribute
-   if (!plug.isNull() && !plug.asBool())
-   {
-      visibility &= ~AI_RAY_CAMERA;
-   }
+      plug = FindMayaPlug("castsShadows"); // maya shape built-in attribute
+      if (!plug.isNull() && !plug.asBool())
+      {
+         visibility &= ~AI_RAY_SHADOW;
+      }
 
-   plug = FindMayaPlug("visibleInReflections"); // maya shape built-in attribute
-   if (!plug.isNull() && !plug.asBool())
-   {
-      visibility &= ~AI_RAY_REFLECTED;
-   }
+      plug = FindMayaPlug("primaryVisibility"); // maya shape built-in attribute
+      if (!plug.isNull() && !plug.asBool())
+      {
+         visibility &= ~AI_RAY_CAMERA;
+      }
 
-   plug = FindMayaPlug("visibleInRefractions"); // maya shape built-in attribute
-   if (!plug.isNull() && !plug.asBool())
-   {
-      visibility &= ~AI_RAY_REFRACTED;
-   }
+      plug = FindMayaPlug("visibleInReflections"); // maya shape built-in attribute
+      if (!plug.isNull() && !plug.asBool())
+      {
+         visibility &= ~AI_RAY_REFLECTED;
+      }
 
-   plug = FindMayaPlug("aiVisibleInDiffuse");
-   if (!plug.isNull() && !plug.asBool())
-   {
-      visibility &= ~AI_RAY_DIFFUSE;
-   }
+      plug = FindMayaPlug("visibleInRefractions"); // maya shape built-in attribute
+      if (!plug.isNull() && !plug.asBool())
+      {
+         visibility &= ~AI_RAY_REFRACTED;
+      }
 
-   plug = FindMayaPlug("aiVisibleInGlossy");
-   if (!plug.isNull() && !plug.asBool())
-   {
-      visibility &= ~AI_RAY_GLOSSY;
+      plug = FindMayaPlug("aiVisibleInDiffuse");
+      if (!plug.isNull() && !plug.asBool())
+      {
+         visibility &= ~AI_RAY_DIFFUSE;
+      }
+
+      plug = FindMayaPlug("aiVisibleInGlossy");
+      if (!plug.isNull() && !plug.asBool())
+      {
+         visibility &= ~AI_RAY_GLOSSY;
+      }
    }
 
    AiNodeSetByte(proc, "visibility", visibility);
