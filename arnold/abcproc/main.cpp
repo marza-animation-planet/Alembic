@@ -134,9 +134,15 @@ AtNode* ProcGetNode(void *user_ptr, int i)
                   AiMsgInfo("[abcproc] Create a new instance of \"%s\"", AiNodeGetName(master));
                }
                
+               GlobalLock::Acquire();
                output = AiNode("ginstance");
-               
-               // node name?
+               // get procedural node name
+               std::string name = AiNodeGetName(dso->procNode());
+               // rename source procedural node
+               AiNodeSetStr(dso->procNode(), "name", dso->uniqueName("_" + name).c_str());
+               // use procedural name for newly generated instance
+               AiNodeSetStr(output, "name", name.c_str());
+               GlobalLock::Release();
                
                AiNodeSetBool(output, "inherit_xform", false);
                AiNodeSetPtr(output, "node", master);
