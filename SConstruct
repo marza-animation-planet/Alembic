@@ -285,6 +285,10 @@ withMaya = (excons.GetArgument("with-maya", default=None) is not None)
 withVray = (excons.GetArgument("with-vray", default=None) is not None)
 
 if withArnold:
+   A, M, m, p = arnold.Version(asString=False)
+   if A < 4 or (A == 4 and (M < 2 or (M == 2 and m < 3))):
+      print("Arnold procedural requires arnold 4.2.3.0 or above.")
+      sys.exit(1)
    prjs.append({"name": "%sAlembicArnoldProcedural" % nameprefix,
                 "type": "dynamicmodule",
                 "ext": arnold.PluginExt(),

@@ -82,6 +82,9 @@ AtNode* ProcGetNode(void *user_ptr, int i)
          bool isInstance = dso->isInstance(&masterNodeName);
          GlobalLock::Release();
          
+         // Keep track of procedural node name
+         const char *procName = AiNodeGetName(dso->procNode());
+         
          if (!isInstance)
          {
             MakeShape visitor(dso);
@@ -98,28 +101,27 @@ AtNode* ProcGetNode(void *user_ptr, int i)
                
                if (dso->isInstance(&masterNodeName))
                {
-                  GlobalLock::Release();
+                  std::string name = AiNodeGetName(output);
                   
                   AiMsgWarning("[abcproc] Master node '%s' created in another thread. Ignore %s node '%s'.",
                                masterNodeName.c_str(),
                                AiNodeEntryGetName(AiNodeGetNodeEntry(output)),
-                               AiNodeGetName(output));
+                               name.c_str());
                   
-                  // reset name to avoid clashes
-                  AiNodeSetStr(output, "name", "");
+                  // reset name to avoid clashes when creating instance
+                  name += "_disabled";
+                  AiNodeSetStr(output, "name", dso->uniqueName(name).c_str());
                   AiNodeSetByte(output, "visibility", 0);
-#if AI_VERSION_ARCH_NUM > 4 || (AI_VERSION_ARCH_NUM == 4 && AI_VERSION_MAJOR_NUM > 2 || (AI_VERSION_MAJOR_NUM == 2 && AI_VERSION_MINOR_NUM >= 3))
                   AiNodeSetDisabled(output, true);
-#endif
-
+                  
                   isInstance = true;
                }
                else
                {
                   dso->setMasterNodeName(AiNodeGetName(output));
-                  
-                  GlobalLock::Release();
                }
+               
+               GlobalLock::Release();
             }
          }
          
@@ -136,12 +138,16 @@ AtNode* ProcGetNode(void *user_ptr, int i)
                
                GlobalLock::Acquire();
                output = AiNode("ginstance");
-               // get procedural node name
-               std::string name = AiNodeGetName(dso->procNode());
-               // rename source procedural node
-               AiNodeSetStr(dso->procNode(), "name", dso->uniqueName("_" + name).c_str());
+               // rename source procedural node if needed
+               if (!strcmp(AiNodeGetName(dso->procNode()), procName))
+               {
+                  // procedural node hasn't been renamed yet
+                  std::string name = "_";
+                  name += procName;
+                  AiNodeSetStr(dso->procNode(), "name", dso->uniqueName(name).c_str());
+               }
                // use procedural name for newly generated instance
-               AiNodeSetStr(output, "name", name.c_str());
+               AiNodeSetStr(output, "name", procName);
                GlobalLock::Release();
                
                AiNodeSetBool(output, "inherit_xform", false);
