@@ -378,6 +378,13 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
         return;
     }
 
+    // skip all template nodes (and their children)
+    // ( used by texture reference object )
+    if (util::isTemplate(mCurDag))
+    {
+        return;
+    }
+
     // skip nodes that aren't renderable (and their children)
     if (mArgs.excludeInvisible && !util::isRenderable(ob))
     {

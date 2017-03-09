@@ -118,6 +118,9 @@ bool isAnimated(MObject & object, bool checkParent = false);
 // determine if a Maya Object is intermediate
 bool isIntermediate(const MObject & object);
 
+// determine if a Maya Object is a texture reference object
+bool isTemplate(const MDagPath & path);
+
 // returns true for visible and lod invisible and not templated objects
 bool isRenderable(const MObject & object);
 

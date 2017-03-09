@@ -347,6 +347,27 @@ bool util::isIntermediate(const MObject & object)
         return false;
 }
 
+bool util::isTemplate(const MDagPath & path)
+{
+    MDagPath cpath(path);
+    MFnDagNode node;
+    MPlug plug;
+    MStatus stat;
+
+    while (cpath.length() > 0)
+    {
+        node.setObject(cpath);
+        plug = node.findPlug("template", false, &stat);
+        if (stat == MS::kSuccess && plug.asBool())
+        {
+            return true;
+        }
+        cpath.pop();
+    }
+
+    return false;
+}
+
 bool util::isRenderable(const MObject & object)
 {
     MStatus stat;
