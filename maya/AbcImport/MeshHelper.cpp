@@ -676,9 +676,9 @@ namespace
             {
                 meshIO.setCurrentColorSetName(iSetName);
             }
-#if MAYA_API_VERSION > 201200
-            meshIO.setDisplayColors(true);
-#endif
+// #if MAYA_API_VERSION > 201200
+//             meshIO.setDisplayColors(true);
+// #endif
         }
 
     }
