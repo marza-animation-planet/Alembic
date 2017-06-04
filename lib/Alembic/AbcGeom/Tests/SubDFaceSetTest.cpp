@@ -1,6 +1,6 @@
 //-*****************************************************************************
 //
-// Copyright (c) 2009-2012,
+// Copyright (c) 2009-2015,
 //  Sony Pictures Imageworks, Inc. and
 //  Industrial Light & Magic, a division of Lucasfilm Entertainment Company Ltd.
 //
@@ -125,9 +125,10 @@ void Example1_MeshOut()
     my_face_set.set ( my_face_set_samp );
     my_face_set.setFaceExclusivity ( kFaceSetExclusive );
     TESTING_ASSERT (my_face_set.getFaceExclusivity () == kFaceSetExclusive );
-    // Test that we've computed selfBounds correctly.
+
+    // No bounds were ever provided
     Box3d  face_set_bounds = my_face_set_samp.getSelfBounds ();
-    // std::cout << " -                 has bounds : " << face_set_bounds << std::endl;
+    TESTING_ASSERT(!face_set_bounds.hasVolume());
 
     OObject parentOfFaceSet = my_face_set_obj.getParent ();
     OObject grandParent = parentOfFaceSet.getParent ();
@@ -175,7 +176,11 @@ void Example1_MeshIn()
     Int32ArraySample faces = *(faceSetSamp0.getFaces ());
     TESTING_ASSERT( faces [0] == 1 &&
                     faces [1] == 2 &&
-                    faces [2] == 3);
+                    faces [2] == 3 );
+
+    IInt32ArrayProperty facesProp = faceSet.getFacesProperty();
+    TESTING_ASSERT ( facesProp.getNumSamples() == 1 );
+
     // end of FaceSet testing
 
     // UVs

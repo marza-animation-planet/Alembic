@@ -41,6 +41,10 @@
 
 #include <ostream>
 
+#if defined _WIN32 || defined _WIN64
+    #define STREAM_BUF_SIZE 1024*1024*2
+#endif
+
 namespace Alembic {
 namespace Ogawa {
 namespace ALEMBIC_VERSION_NS {
@@ -64,7 +68,7 @@ private:
     const OStream & operator=(const OStream &);
 
     class PrivateData;
-    Alembic::Util::auto_ptr< PrivateData > mData;
+    Alembic::Util::unique_ptr< PrivateData > mData;
 
     void init();
 };

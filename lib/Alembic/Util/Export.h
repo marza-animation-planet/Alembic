@@ -39,13 +39,17 @@
 
 #if defined(ALEMBIC_DLL)
     #if defined(ALEMBIC_EXPORTS)
-    #define ALEMBIC_EXPORT __declspec(dllexport)
+        #define ALEMBIC_EXPORT __declspec(dllexport)
     #else
-    #define ALEMBIC_EXPORT __declspec(dllimport)
+        #define ALEMBIC_EXPORT __declspec(dllimport)
     #endif
     #define ALEMBIC_EXPORT_CONST
 #else
-    #define ALEMBIC_EXPORT __attribute__ ((visibility ("default")))
+    #if defined _WIN32 || defined _WIN64
+        #define ALEMBIC_EXPORT
+    #else
+        #define ALEMBIC_EXPORT __attribute__ ((visibility ("default")))
+    #endif
     #define ALEMBIC_EXPORT_CONST const
 #endif
 

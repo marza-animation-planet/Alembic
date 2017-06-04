@@ -1,6 +1,6 @@
 ##-*****************************************************************************
 ##
-## Copyright (c) 2009-2015,
+## Copyright (c) 2009-2016,
 ##  Sony Pictures Imageworks Inc. and
 ##  Industrial Light & Magic, a division of Lucasfilm Entertainment Company Ltd.
 ##
@@ -33,12 +33,5 @@
 ##
 ##-*****************************************************************************
 
-# Include the source dirs to make the library root dir an include
-INCLUDE_DIRECTORIES(${ALEMBIC_LIBS_SOURCE_DIR})
-
 ADD_SUBDIRECTORY(Alembic)
 
-# Include the AbcOpenGL lib
-IF (USE_OPENGL)
-	ADD_SUBDIRECTORY(AbcOpenGL)
-ENDIF()

@@ -42,45 +42,92 @@ IF (USE_HDF5)
 ENDIF()
 ADD_SUBDIRECTORY(Abc)
 ADD_SUBDIRECTORY(AbcCoreFactory)
+ADD_SUBDIRECTORY(AbcCoreLayer)
 ADD_SUBDIRECTORY(AbcGeom)
 ADD_SUBDIRECTORY(AbcCollection)
 ADD_SUBDIRECTORY(AbcMaterial)
 ADD_SUBDIRECTORY(Ogawa)
 
-# http://www.cmake.org/Wiki/CMake/Tutorials/Object_Library
-IF (USE_HDF5)
-    SET(TARGET_OBJECTS
-        $<TARGET_OBJECTS:AlembicAbcMaterial>
-        $<TARGET_OBJECTS:AlembicAbcGeom>
-        $<TARGET_OBJECTS:AlembicAbcCollection>
-        $<TARGET_OBJECTS:AlembicAbcCoreFactory>
-        $<TARGET_OBJECTS:AlembicAbc>
-        $<TARGET_OBJECTS:AlembicAbcCoreHDF5>
-        $<TARGET_OBJECTS:AlembicAbcCoreOgawa>
-        $<TARGET_OBJECTS:AlembicAbcCoreAbstract>
-        $<TARGET_OBJECTS:AlembicOgawa>
-        $<TARGET_OBJECTS:AlembicUtil>
-    )
-ELSE()
-    SET(TARGET_OBJECTS
-        $<TARGET_OBJECTS:AlembicAbcMaterial>
-        $<TARGET_OBJECTS:AlembicAbcGeom>
-        $<TARGET_OBJECTS:AlembicAbcCollection>
-        $<TARGET_OBJECTS:AlembicAbcCoreFactory>
-        $<TARGET_OBJECTS:AlembicAbc>
-        $<TARGET_OBJECTS:AlembicAbcCoreOgawa>
-        $<TARGET_OBJECTS:AlembicAbcCoreAbstract>
-        $<TARGET_OBJECTS:AlembicOgawa>
-        $<TARGET_OBJECTS:AlembicUtil>
-    )
-ENDIF()
-ADD_LIBRARY(Alembic ${LIB_TYPE} ${TARGET_OBJECTS})
+ADD_LIBRARY(Alembic ${LIB_TYPE} ${CXX_FILES})
 
-# fixes undefined symbols for x86_64
-IF (ALEMBIC_SHARED_LIBS AND DARWIN)
-    TARGET_LINK_LIBRARIES(${CORE_LIBS})
+TARGET_INCLUDE_DIRECTORIES(Alembic
+    PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/lib>
+    $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/lib>
+    $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/include>
+    ${ALEMBIC_ILMBASE_INCLUDE_DIRECTORY}
+    ${Boost_INCLUDE_DIRS}
+    PRIVATE
+    ${HDF5_INCLUDE_DIRS}
+    )
+
+IF (ALEMBIC_SHARED_LIBS)
+  SET_TARGET_PROPERTIES(Alembic PROPERTIES DEFINE_SYMBOL ALEMBIC_EXPORTS)
+ENDIF()
+
+
+TARGET_LINK_LIBRARIES(Alembic
+    LINK_PUBLIC
+    ${ALEMBIC_ILMBASE_LIBS}
+    ${CMAKE_THREAD_LIBS_INIT}
+    ${EXTERNAL_MATH_LIBS}
+    LINK_PRIVATE
+    ${HDF5_LIBRARIES}
+  )
+
+# link in atomic if we are using tr1 and the compiler is new enough
+# to want  __atomic_compare_exchange_n
+IF ( ${ALEMBIC_LIB_USES_TR1} AND CMAKE_COMPILER_IS_GNUCXX AND
+    CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 4.8 )
+    TARGET_LINK_LIBRARIES( Alembic atomic )
 ENDIF()
 
 INSTALL(TARGETS Alembic
+        EXPORT AlembicTargets
         LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib)
+        ARCHIVE DESTINATION lib
+        RUNTIME DESTINATION lib)
+
+#-******************************************************************************
+# PACKAGE EXPORTS
+#-******************************************************************************
+
+CONFIGURE_FILE(AlembicConfig.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/AlembicConfig.cmake"
+    @ONLY
+    )
+
+INCLUDE(CMakePackageConfigHelpers)
+WRITE_BASIC_PACKAGE_VERSION_FILE(
+    "${CMAKE_CURRENT_BINARY_DIR}/AlembicConfigVersion.cmake"
+    VERSION
+    ${PROJECT_VERSION}
+    COMPATIBILITY
+    AnyNewerVersion
+    )
+
+EXPORT(TARGETS
+    Alembic
+    FILE
+    "${CMAKE_CURRENT_BINARY_DIR}/AlembicTargets.cmake"
+    NAMESPACE
+    Alembic::
+    )
+
+SET(ConfigPackageLocation lib/cmake/Alembic)
+INSTALL(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/AlembicConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/AlembicConfigVersion.cmake"
+    DESTINATION
+    ${ConfigPackageLocation}
+    )
+
+INSTALL(EXPORT
+    AlembicTargets
+    FILE
+    AlembicTargets.cmake
+    NAMESPACE
+    Alembic::
+    DESTINATION
+    ${ConfigPackageLocation}
+    )
