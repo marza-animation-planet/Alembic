@@ -216,6 +216,12 @@ prjs.append({"name": "AlembicAbcOpenGL",
 
 
 # Python modules
+pydefs = []
+if excons.GetArgument("ilmbase-python-static", excons.GetArgument("ilmbase-static", 0, int), int) != 0:
+   pydefs.append("PYILMBASE_STATICLIBS")
+if excons.GetArgument("boost-python-static", excons.GetArgument("boost-static", 0, int), int) != 0:
+   pydefs.append("PYALEMBIC_USE_STATIC_BOOST_PYTHON")
+
 prjs.extend([{"name": ("alembicmodule" if sys.platform != "win32" else "alembic"),
               "type": "dynamicmodule",
               "ext": python.ModuleExtension(),
@@ -223,7 +229,7 @@ prjs.extend([{"name": ("alembicmodule" if sys.platform != "win32" else "alembic"
               "prefix": "%s/%s" % (python.ModulePrefix(), python.Version()),
               "rpaths": ["../.."],
               "bldprefix": "python-%s" % python.Version(),
-              "defs": ["alembicmodule_EXPORTS"],
+              "defs": pydefs + ["alembicmodule_EXPORTS"],
               "incdirs": ["python/PyAlembic"],
               "srcs": glob.glob("python/PyAlembic/*.cpp"),
               "custom": [RequireAlembic(withPython=True)],
@@ -236,7 +242,7 @@ prjs.extend([{"name": ("alembicmodule" if sys.platform != "win32" else "alembic"
               "prefix": "%s/%s" % (python.ModulePrefix(), python.Version()),
               "rpaths": ["../.."],
               "bldprefix": "python-%s" % python.Version(),
-              "defs": ["alembicglmodule_EXPORTS"],
+              "defs": pydefs + ["alembicglmodule_EXPORTS"],
               "incdirs": ["python/PyAbcOpenGL"],
               "srcs": glob.glob("python/PyAbcOpenGL/*.cpp"),
               "custom": [RequireAlembic(withPython=True, withGL=True)]}])

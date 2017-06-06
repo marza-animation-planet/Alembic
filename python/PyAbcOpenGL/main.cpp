@@ -34,6 +34,10 @@
 //-*****************************************************************************
 
 #include <boost/python.hpp>
+#if defined(PYALEMBIC_USE_STATIC_BOOST_PYTHON) && defined(PYILMBASE_STATICLIBS)
+#include <PyIexAll.h>
+#include <PyImathAll.h>
+#endif
 
 using namespace boost::python;
 
@@ -44,8 +48,23 @@ BOOST_PYTHON_MODULE( alembicgl )
 {
     docstring_options doc_options( true, true, false );
     
+#if defined(PYALEMBIC_USE_STATIC_BOOST_PYTHON) && defined(PYILMBASE_STATICLIBS)
+    object iexmodule(handle<>(borrowed(PyImport_AddModule("iex"))));
+    if (PyErr_Occurred()) boost::python::throw_error_already_set();
+    {
+      scope iexscope(iexmodule);
+      PyIex::register_all();
+    }
+    object imathmodule(handle<>(borrowed(PyImport_AddModule("imath"))));
+    if (PyErr_Occurred()) boost::python::throw_error_already_set();
+    {
+      scope imathscope(imathmodule);
+      PyImath::register_all();
+    }
+#else
     handle<> imath( PyImport_ImportModule( "imath" ) );
     if( PyErr_Occurred() ) throw_error_already_set();
+#endif
 
     object package = scope();
     package.attr( "__path__" ) = "AbcOpenGL";

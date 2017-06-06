@@ -46,9 +46,9 @@ __version__ = "0.9.3"
 
 import os
 import re
-import imath
 import weakref
 import alembic
+import imath
 from functools import wraps
 
 # maps cask objects to Alembic IObjects
