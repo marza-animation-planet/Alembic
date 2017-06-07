@@ -1,6 +1,6 @@
 //-*****************************************************************************
 //
-// Copyright (c) 2009-2011,
+// Copyright (c) 2009-2012,
 //  Sony Pictures Imageworks, Inc. and
 //  Industrial Light & Magic, a division of Lucasfilm Entertainment Company Ltd.
 //
@@ -34,82 +34,67 @@
 //
 //-*****************************************************************************
 
-#include "AlembicNode.h"
-#include "AbcImport.h"
-#include "util.h"
+#ifndef ABCIMPORT_ALEMBIC_FILE_TRANSLATOR_H_
+#define ABCIMPORT_ALEMBIC_FILE_TRANSLATOR_H_
 
-#include <maya/MGlobal.h>
-#include <maya/MFnPlugin.h>
-#include <maya/MObject.h>
-#include <maya/MGlobal.h>
-
-#ifndef ABCIMPORT_VERSION
-#  define ABCIMPORT_VERSION "1.0"
-#endif
+#include <maya/MPxFileTranslator.h>
 
 #ifdef NAME_PREFIX
-// Avoid node id conflict with maya built-in AbcImport
-const MTypeId AlembicNode::mMayaNodeId(0x00082699);
+#   define PREFIX_NAME(s) NAME_PREFIX s
 #else
-// Interesting trivia: 0x2697 is the unicode character for Alembic
-const MTypeId AlembicNode::mMayaNodeId(0x00082697);
+#   define PREFIX_NAME(s) s
+#   define NAME_PREFIX ""
 #endif
 
-PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
+class AlembicFileTranslator : public MPxFileTranslator
 {
-    MString name = PREFIX_NAME("Alembic");
-    MString commandName = PREFIX_NAME("AbcImport");
-    MString nodeName = PREFIX_NAME("AlembicNode");
-    
-    MFnPlugin plugin(obj, name.asChar(), ABCIMPORT_VERSION, "Any");
+public:
 
-    MStatus status;
+    AlembicFileTranslator() : MPxFileTranslator() {}
 
-    status = plugin.registerCommand(commandName,
-                                    AbcImport::creator,
-                                    AbcImport::createSyntax);
-    if (!status)
+    virtual ~AlembicFileTranslator() {}
+
+    MStatus reader (const MFileObject& file,
+                    const MString& optionsString,
+                    MPxFileTranslator::FileAccessMode mode);
+
+    MStatus writer (const MFileObject& file,
+                    const MString& optionsString,
+                    MPxFileTranslator::FileAccessMode mode);
+
+    MFileKind identifyFile(const MFileObject& filename,
+                           const char* buffer,
+                           short size) const;
+
+    bool haveReadMethod() const
     {
-        status.perror("registerCommand");
+        return true;
     }
 
-    status = plugin.registerNode(nodeName,
-                                AlembicNode::mMayaNodeId,
-                                &AlembicNode::creator,
-                                &AlembicNode::initialize);
-    if (!status)
+    bool haveWriteMethod() const
     {
-        status.perror("registerNode");
+        return true;
     }
 
-    MString info = commandName + " v";
-    info += ABCIMPORT_VERSION;
-    info += " using ";
-    info += Alembic::AbcCoreAbstract::GetLibraryVersion().c_str();
-    MGlobal::displayInfo(info);
-
-    return status;
-}
-
-PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
-{
-    MFnPlugin plugin(obj);
-
-    MString commandName = PREFIX_NAME("AbcImport");
-
-    MStatus status;
-
-    status = plugin.deregisterNode(AlembicNode::mMayaNodeId);
-    if (!status)
+    bool haveNamespaceSupport() const
     {
-        status.perror("deregisterNode");
+        return true;
     }
 
-    status = plugin.deregisterCommand(commandName);
-    if (!status)
+    MString defaultExtension() const
     {
-        status.perror("deregisterCommand");
+        return "abc";
     }
 
-    return status;
-}
+    MString filter() const
+    {
+        return "*.abc";
+    }
+
+    static void* creator()
+    {
+        return new AlembicFileTranslator;
+    }
+};
+
+#endif  // ABCIMPORT_ALEMBIC_FILE_TRANSLATOR_H_

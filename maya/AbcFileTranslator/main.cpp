@@ -1,6 +1,6 @@
 //-*****************************************************************************
 //
-// Copyright (c) 2009-2012,
+// Copyright (c) 2009-2011,
 //  Sony Pictures Imageworks, Inc. and
 //  Industrial Light & Magic, a division of Lucasfilm Entertainment Company Ltd.
 //
@@ -34,51 +34,60 @@
 //
 //-*****************************************************************************
 
-#ifndef ABCIMPORT_ALEMBIC_IMPORT_FILE_TRANSLATOR_H_
-#define ABCIMPORT_ALEMBIC_IMPORT_FILE_TRANSLATOR_H_
+#include "AlembicFileTranslator.h"
+#include <maya/MGlobal.h>
+#include <maya/MFnPlugin.h>
+#include <maya/MObject.h>
+#include <maya/MGlobal.h>
+#include <Alembic/AbcCoreAbstract/All.h>
 
-#include <maya/MPxFileTranslator.h>
+#ifndef ABCFILETRANSLATOR_VERSION
+#  define ABCFILETRANSLATOR_VERSION "1.0"
+#endif
 
-class AlembicImportFileTranslator : public MPxFileTranslator
+PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
-public:
+    MString name = PREFIX_NAME("Alembic");
+    
+    MFnPlugin plugin(obj, name.asChar(), ABCFILETRANSLATOR_VERSION, "Any");
 
-    AlembicImportFileTranslator() : MPxFileTranslator() {}
+    MStatus status;
 
-    virtual ~AlembicImportFileTranslator() {}
-
-    MStatus reader (const MFileObject& file,
-                    const MString& optionsString,
-                    MPxFileTranslator::FileAccessMode mode);
-
-    MFileKind identifyFile(const MFileObject& filename,
-                           const char* buffer,
-                           short size) const;
-
-    bool haveReadMethod() const
+    status = plugin.registerFileTranslator(name,
+                                           NULL,
+                                           AlembicFileTranslator::creator,
+                                           "alembicTranslatorOptions",
+                                           "",
+                                           true);
+    if (!status)
     {
-        return true;
+        status.perror("registerFileTranslator");
     }
 
-    bool haveNamespaceSupport() const
+    MString info = PREFIX_NAME("AbcFileTranslator");
+    info += " v";
+    info += ABCFILETRANSLATOR_VERSION;
+    info += " using ";
+    info += Alembic::AbcCoreAbstract::GetLibraryVersion().c_str();
+    MGlobal::displayInfo(info);
+
+    return status;
+}
+
+PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
+{
+    MFnPlugin plugin(obj);
+
+    MString name = PREFIX_NAME("Alembic");
+
+    MStatus status;
+
+    status = plugin.deregisterFileTranslator(name);
+    if (!status)
     {
-        return true;
+        status.perror("deregisterFileTranslator");
     }
 
-    MString defaultExtension() const
-    {
-        return "abc";
-    }
+    return status;
+}
 
-    MString filter() const
-    {
-        return "*.abc";
-    }
-
-    static void* creator()
-    {
-        return new AlembicImportFileTranslator;
-    }
-};
-
-#endif  // ABCIMPORT_ALEMBIC_IMPORT_FILE_TRANSLATOR_H_

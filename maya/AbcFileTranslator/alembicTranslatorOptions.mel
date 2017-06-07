@@ -1,0 +1,14 @@
+
+global proc int alembicTranslatorOptions(string $parent,
+                                         string $action,
+                                         string $initialSettings,
+                                         string $resultCallback)
+{
+   print("alembicTranslatorOptions\n");
+   print("  parent = '" + $parent + "'\n");
+   print("  action = '" + $action + "'\n");
+   print("  initialSettings = '" + $initialSettings + "'\n");
+   print("  resultCallback = '" + $resultCallback + "'\n");
+   return 0;
+}
+

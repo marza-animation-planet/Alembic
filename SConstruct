@@ -348,6 +348,7 @@ if withMaya:
    
    impver = excons.GetArgument("maya-abcimport-version", None)
    expver = excons.GetArgument("maya-abcexport-version", None)
+   trsver = excons.GetArgument("maya-abctranslator-version", None)
    shpver = excons.GetArgument("maya-abcshape-version", None)
    
    if not os.path.exists(AbcShapeMel) or os.stat(AbcShapeMel).st_mtime < os.stat("maya/AbcShape/AETemplate.mel.tpl").st_mtime:
@@ -379,8 +380,7 @@ if withMaya:
                  "defs": defs + (["ABCIMPORT_VERSION=\"\\\"%s\\\"\"" % impver] if impver else []),
                  "incdirs": ["maya/AbcImport"],
                  "srcs": glob.glob("maya/AbcImport/*.cpp") + regexSrc,
-                 "custom": [RequireRegex, RequireAlembic(), maya.Require, maya.Plugin],
-                 "install": {"maya/scripts": glob.glob("maya/AbcImport/*.mel")}
+                 "custom": [RequireRegex, RequireAlembic(), maya.Require, maya.Plugin]
                 },
                 {"name": "%sAbcExport" % nameprefix,
                  "alias": "maya",
@@ -392,8 +392,7 @@ if withMaya:
                  "defs": defs + (["ABCEXPORT_VERSION=\"\\\"%s\\\"\"" % expver] if expver else []),
                  "incdirs": ["maya/AbcExport"],
                  "srcs": glob.glob("maya/AbcExport/*.cpp"),
-                 "custom": [RequireAlembic(), maya.Require, maya.Plugin],
-                 "install": {"maya/scripts": glob.glob("maya/AbcExport/*.mel")}
+                 "custom": [RequireAlembic(), maya.Require, maya.Plugin]
                 },
                 {"name": "%sAbcShape" % nameprefix,
                  "alias": "maya",
@@ -408,7 +407,20 @@ if withMaya:
                  "srcs": glob.glob("maya/AbcShape/*.cpp"),
                  "custom": ([vray.Require] if withVray else []) + [RequireAlembicHelper(), maya.Require, gl.Require, maya.Plugin],
                  "install": {"maya/scripts": glob.glob("maya/AbcShape/*.mel"),
-                             "maya/python": [AbcShapeMtoa, AbcMatEditPy] + ([AbcShapePy] if withVray else [])}}])
+                             "maya/python": [AbcShapeMtoa, AbcMatEditPy] + ([AbcShapePy] if withVray else [])}
+                },
+                {"name": "%sAbcFileTranslator" % nameprefix,
+                 "alias": "maya",
+                 "type": "dynamicmodule",
+                 "ext": maya.PluginExt(),
+                 "prefix": "maya/plug-ins",
+                 "rpaths": ["../../lib"],
+                 "bldprefix": "maya-%s" % maya.Version(),
+                 "defs": defs + (["ABCFILETRANSLATOR_VERSION=\"\\\"%s\\\"\"" % trsver] if trsver else []),
+                 "incdirs": ["maya/AbcFileTranslator"],
+                 "srcs": glob.glob("maya/AbcFileTranslator/*.cpp"),
+                 "custom": [RequireAlembic(), maya.Require, maya.Plugin],
+                 "install": {"maya/scripts": ["maya/AbcFileTranslator/alembicTranslatorOptions.mel"]}}])
    
    if withArnold:
       mtoa_inc, mtoa_lib = excons.GetDirs("mtoa", libdirname=("lib" if sys.platform == "win32" else "bin"))

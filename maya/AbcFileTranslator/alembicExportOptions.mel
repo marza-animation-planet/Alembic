@@ -18,9 +18,9 @@ global proc alembicExportOptions_frameRangeChanged()
 }
 
 global proc int alembicExportOptions(string $parent,
-                                      string $action,
-                                      string $initialSettings,
-                                      string $resultCallback)
+                                     string $action,
+                                     string $initialSettings,
+                                     string $resultCallback)
 {
     int $rv = 0;
     
