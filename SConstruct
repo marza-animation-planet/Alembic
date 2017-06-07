@@ -406,7 +406,7 @@ if withMaya:
                                 (["ABCSHAPE_VRAY_SUPPORT"] if withVray else []),
                  "incdirs": ["maya/AbcShape"],
                  "srcs": glob.glob("maya/AbcShape/*.cpp"),
-                 "custom": ([vray.Require] if withVray else []) + [RequireAlembicHelper(), maya.Require, maya.Plugin],
+                 "custom": ([vray.Require] if withVray else []) + [RequireAlembicHelper(), maya.Require, gl.Require, maya.Plugin],
                  "install": {"maya/scripts": glob.glob("maya/AbcShape/*.mel"),
                              "maya/python": [AbcShapeMtoa, AbcMatEditPy] + ([AbcShapePy] if withVray else [])}}])
    
