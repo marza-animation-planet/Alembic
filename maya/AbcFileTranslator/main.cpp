@@ -45,13 +45,43 @@
 #  define ABCFILETRANSLATOR_VERSION "1.0"
 #endif
 
+static MStatus CheckLoadPlugin(const MString name)
+{
+    MString scr = "if (!`pluginInfo -query -loaded \"" + name + "\"`) loadPlugin \"" + name + "\";";
+    return MGlobal::executeCommand(scr);
+}
+
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
+    MString impname = PREFIX_NAME("AbcImport");
+    MString expname = PREFIX_NAME("AbcExport");
     MString name = PREFIX_NAME("Alembic");
-    
+    MStatus status;
+
+    MString info = PREFIX_NAME("AbcFileTranslator");
+    info += " v";
+    info += ABCFILETRANSLATOR_VERSION;
+    info += " using ";
+    info += Alembic::AbcCoreAbstract::GetLibraryVersion().c_str();
+    MGlobal::displayInfo(info);
+
     MFnPlugin plugin(obj, name.asChar(), ABCFILETRANSLATOR_VERSION, "Any");
 
-    MStatus status;
+    status = CheckLoadPlugin(impname);
+
+    if (!status)
+    {
+        status.perror(PREFIX_NAME("AbcFileTranslator"));
+        return status;
+    }
+
+    status = CheckLoadPlugin(expname);
+
+    if (!status)
+    {
+        status.perror(PREFIX_NAME("AbcFileTranslator"));
+        return status;
+    }
 
     status = plugin.registerFileTranslator(name,
                                            NULL,
@@ -63,13 +93,6 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     {
         status.perror("registerFileTranslator");
     }
-
-    MString info = PREFIX_NAME("AbcFileTranslator");
-    info += " v";
-    info += ABCFILETRANSLATOR_VERSION;
-    info += " using ";
-    info += Alembic::AbcCoreAbstract::GetLibraryVersion().c_str();
-    MGlobal::displayInfo(info);
 
     return status;
 }
