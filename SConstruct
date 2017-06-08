@@ -420,7 +420,7 @@ if withMaya:
                  "incdirs": ["maya/AbcFileTranslator"],
                  "srcs": glob.glob("maya/AbcFileTranslator/*.cpp"),
                  "custom": [RequireAlembic(), maya.Require, maya.Plugin],
-                 "install": {"maya/scripts": ["maya/AbcFileTranslator/alembicTranslatorOptions.mel"]}}])
+                 "install": {"maya/scripts": glob.glob("maya/AbcFileTranslator/*.mel")}}])
    
    if withArnold:
       mtoa_inc, mtoa_lib = excons.GetDirs("mtoa", libdirname=("lib" if sys.platform == "win32" else "bin"))

@@ -1,14 +1,65 @@
 
+global string $gAbcLastOptions = "";
+
 global proc int alembicTranslatorOptions(string $parent,
                                          string $action,
                                          string $initialSettings,
                                          string $resultCallback)
 {
-   print("alembicTranslatorOptions\n");
-   print("  parent = '" + $parent + "'\n");
-   print("  action = '" + $action + "'\n");
-   print("  initialSettings = '" + $initialSettings + "'\n");
-   print("  resultCallback = '" + $resultCallback + "'\n");
-   return 0;
+   global string $gAbcLastOptions;
+
+   if ($action == "fileselected")
+   {
+      return 0;
+   }
+   else if ($action == "query")
+   {
+      if (`optionVar -exists abcFileTranslatorOptions`)
+      {
+         $initialSettings = `optionVar -query abcFileTranslatorOptions`;
+      }
+      else
+      {
+         $initialSettings = $gAbcLastOptions;
+      }
+   }
+
+   string $widget = `layout -query -fullPathName $parent`;
+
+   int $rv = 0;
+
+   while ($widget != "" && $widget != "|")
+   {
+      if (`window -exists $widget`)
+      {
+         string $title = `window -query -title $widget`;
+         if (size(match("export", tolower($title))) > 0)
+         {
+            $rv = alembicExportOptions($parent, $action, $initialSettings, $resultCallback);
+         }
+         else
+         {
+            $rv = alembicImportOptions($parent, $action, $initialSettings, $resultCallback);
+         }
+         break;
+      }
+      else if (`layout -exists $widget`)
+      {
+         $widget = `layout -query -parent $widget`;
+      }
+      else if (`control -exists $widget`)
+      {
+         $widget = `control -query -parent $widget`;
+      }
+      else
+      {
+         $gAbcLastOptions = $initialSettings;
+         break;
+      }
+   }
+
+   optionVar -stringValue abcFileTranslatorOptions $gAbcLastOptions;
+
+   return $rv;
 }
 
