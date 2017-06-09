@@ -224,14 +224,14 @@ for libname in ["Util",
    
    prjs.append({"name": "Alembic%s" % libname,
                 "type": "staticlib",
-                "alias": "alembiclib",
+                "alias": "alembic-libs",
                 "srcs": glob.glob("lib/Alembic/%s/*.cpp" % libname),
                 "custom": [RequireAlembic()],
                 "install": {"include/Alembic/%s" % libname: glob.glob("lib/Alembic/%s/*.h" % libname)}})
 
 prjs.append({"name": "AlembicAbcOpenGL",
              "type": "staticlib",
-             "alias": "alembicgl",
+             "alias": "alembic-libs",
              "srcs": glob.glob("lib/AbcOpenGL/*.cpp"),
              "custom": [RequireAlembic(withGL=True)],
              "install": {"include/AbcOpenGL": glob.glob("lib/AbcOpenGL/*.h")}})
@@ -244,8 +244,9 @@ if excons.GetArgument("boost-python-static", excons.GetArgument("boost-static", 
 
 prjs.extend([{"name": ("alembicmodule" if sys.platform != "win32" else "alembic"),
               "type": "dynamicmodule",
+              "desc": "Alembic python module",
               "ext": python.ModuleExtension(),
-              "alias": "pyalembic",
+              "alias": "alembic-python",
               "prefix": "%s/%s" % (python.ModulePrefix(), python.Version()),
               "rpaths": ["../.."],
               "bldprefix": "python-%s" % python.Version(),
@@ -257,8 +258,9 @@ prjs.extend([{"name": ("alembicmodule" if sys.platform != "win32" else "alembic"
              },
              {"name": ("alembicglmodule" if sys.platform != "win32" else "alembicgl"),
               "type": "dynamicmodule",
+              "desc": "Alembic OpenGL python module",
               "ext": python.ModuleExtension(),
-              "alias": "pyalembicgl",
+              "alias": "alembic-python",
               "prefix": "%s/%s" % (python.ModulePrefix(), python.Version()),
               "rpaths": ["../.."],
               "bldprefix": "python-%s" % python.Version(),
@@ -282,13 +284,13 @@ for progname in ["AbcConvert",
    
    prjs.append({"name": progname.lower(),
                 "type": "program",
-                "alias": "alembictools",
+                "alias": "alembic-tools",
                 "srcs": prog_srcs.get(progname, glob.glob("examples/bin/%s/*.cpp" % progname)),
                 "custom": [RequireAlembic()]})
 
 prjs.append({"name": "SimpleAbcViewer",
              "type": "program",
-             "alias": "alembictools",
+             "alias": "alembic-tools",
              "srcs": glob.glob("examples/bin/SimpleAbcViewer/*.cpp"),
              "custom": [RequireAlembic(withGL=True)]})
 
@@ -305,6 +307,8 @@ prjs.extend([{"name": "SceneHelper",
               "srcs": glob.glob("examples/bin/SceneHelper/*.cpp"),
               "custom": [RequireAlembicHelper()]}])
 
+deftargets = ["alembic-python", "alembic-tools"]
+
 # DCC tools
 
 defs = []
@@ -318,6 +322,7 @@ if withArnold:
       sys.exit(1)
    prjs.append({"name": "%sAlembicArnoldProcedural" % nameprefix,
                 "type": "dynamicmodule",
+                "desc": "Original arnold alembic procedural",
                 "ext": arnold.PluginExt(),
                 "prefix": "arnold",
                 "rpaths": ["../lib"],
@@ -329,6 +334,7 @@ if withArnold:
    
    prjs.append({"name": "abcproc",
                 "type": "dynamicmodule",
+                "desc": "Arnold alembic procedural",
                 "ext": arnold.PluginExt(),
                 "prefix": "arnold",
                 "rpaths": ["../lib"],
@@ -337,10 +343,12 @@ if withArnold:
                 "srcs": glob.glob("arnold/abcproc/*.cpp"),
                 "custom": [arnold.Require, RequireAlembicHelper()]})
 
+   deftargets.append(prjs[-1]["name"])
+
 if withVray:
    prjs.append({"name": "%svray_AlembicLoader" % ("lib" if sys.platform != "win32" else ""),
                 "type": "dynamicmodule",
-                "alias": "AlembicLoader",
+                "desc": "V-Ray alembic procedural",
                 "ext": vray.PluginExt(),
                 "prefix": "vray",
                 "rpaths": ["../lib"],
@@ -348,6 +356,8 @@ if withVray:
                 "incdirs": ["vray"],
                 "srcs": glob.glob("vray/*.cpp"),
                 "custom": [vray.Require, RequireAlembicHelper()]})
+
+   deftargets.append(prjs[-1]["name"])
 
 if withMaya:
    def replace_in_file(src, dst, srcStr, dstStr):
@@ -391,8 +401,9 @@ if withMaya:
    # it doesn't hurt to link SceneHelper
    
    prjs.extend([{"name": "%sAbcImport" % nameprefix,
-                 "alias": "maya",
+                 "alias": "alembic-maya",
                  "type": "dynamicmodule",
+                 "desc": "Maya alembic import plugin",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins",
                  "rpaths": ["../../lib"],
@@ -403,7 +414,8 @@ if withMaya:
                  "custom": [RequireRegex, RequireAlembic(), maya.Require, maya.Plugin]
                 },
                 {"name": "%sAbcExport" % nameprefix,
-                 "alias": "maya",
+                 "alias": "alembic-maya",
+                 "desc": "Maya alembic export plugin",
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins",
@@ -415,7 +427,8 @@ if withMaya:
                  "custom": [RequireAlembic(), maya.Require, maya.Plugin]
                 },
                 {"name": "%sAbcShape" % nameprefix,
-                 "alias": "maya",
+                 "alias": "alembic-maya",
+                 "desc": "Maya alembic proxy shape plugin",
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins" + ("/vray" if withVray else ""),
@@ -430,7 +443,8 @@ if withMaya:
                              "maya/python": [AbcShapeMtoa, AbcMatEditPy] + ([AbcShapePy] if withVray else [])}
                 },
                 {"name": "%sAbcFileTranslator" % nameprefix,
-                 "alias": "maya",
+                 "alias": "alembic-maya",
+                 "desc": "Maya file translator for alembic import and export",
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins",
@@ -441,7 +455,9 @@ if withMaya:
                  "srcs": glob.glob("maya/AbcFileTranslator/*.cpp"),
                  "custom": [RequireAlembic(), maya.Require, maya.Plugin],
                  "install": {"maya/scripts": glob.glob("maya/AbcFileTranslator/*.mel")}}])
-   
+
+   deftargets.append("alembic-maya")
+
    if withArnold:
       mtoa_inc, mtoa_lib = excons.GetDirs("mtoa", libdirname=("lib" if sys.platform == "win32" else "bin"))
       mtoa_defs = defs[:]
@@ -478,6 +494,7 @@ if withMaya:
          
          prjs.append({"name": "%sAbcShapeMtoa" % nameprefix,
                       "type": "dynamicmodule",
+                      "desc": "AbcShape translator for MtoA",
                       "prefix": "maya/plug-ins/mtoa",
                       "rpaths": ["../../../lib"],
                       "bldprefix": "maya-%s/mtoa-%s" % (maya.Version(), mtoa_ver),
@@ -491,15 +508,22 @@ if withMaya:
                                   "maya/python": [AbcShapeHelper]},
                       "custom": [RequireAlembicHelper(), arnold.Require, maya.Require]})
 
+         deftargets.append(prjs[-1]["name"])
+
+excons.AddHelpTargets({"alembic-libs": "All alembic libraries",
+                       "alembic-python": "All alembic python modules",
+                       "alembic-tools": "All alembic command line tools",
+                       "alembic-maya": "All alembic vray plugins",
+                       "eco": "Arnold procedural ecosystem package"})
 
 targets = excons.DeclareTargets(env, prjs)
 
 Export("RequireAlembic")
 Export("RequireAlembicHelper")
 
-#   arnold/abcproc/<version>/abcproc.so|dll|dylib
+Default(deftargets)
 
-if withArnold:
+if withArnold and "eco" in COMMAND_LINE_TARGETS:
    excons.EcosystemDist(env, "arnold/abcproc/abcproc.env", {"abcproc": ""}, name="abcproc", version="1.5.15")
 
 
