@@ -34,6 +34,30 @@ if withMaya:
    maya.SetupMscver()
 
 
+rv = excons.ExternalLibRequire("ilmbase", noLink=True)
+if not rv["require"]:
+   excons.PrintOnce("Build IlmBase from sources.", tool="alembic")
+   opts = {"openexr-suffix": "-2_2",
+           "ilmbase-python-staticlibs": "1"}
+   excons.Call("openexr", overrides=opts, imp=["RequireImath", "RequireIlmThread", "RequirePyImath"])
+   def RequireIlmBase(env):
+      RequireImath(env, static=True)
+      RequireIlmThread(env, static=True)
+   def RequirePyIlmBase(env):
+      RequirePyImath(env, staticpy=True, staticbase=True)
+      RequireIlmThread(env, static=True)
+else:
+   pyimath_static = (excons.GetArgument("ilmbase-python-static", excons.GetArgument("ilmbase-static", 0, int), int) != 0)
+   def RequireIlmBase(env):
+      ilmbase.Require(ilmthread=True, iexmath=True)(env)
+   def RequirePyIlmBase(env):
+      if pyimath_static:
+         env.Append(CPPDEFINES=["PYILMBASE_STATICLIBS"])
+      ilmbase.Require(ilmthread=True, iexmath=True, python=True)(env)
+      boost.Require(libs=["python"])(env)
+      python.SoftRequire(env)
+
+
 env = excons.MakeBaseEnv()
 
 
@@ -141,13 +165,11 @@ def RequireAlembic(withPython=False, withGL=False):
          reqs.append(gl.Require)
       
       if withPython:
-         reqs.append(ilmbase.Require(ilmthread=True, iexmath=True, python=True))
-         reqs.append(boost.Require(libs=["python"]))
-         reqs.append(python.SoftRequire)
+         reqs.append(RequirePyIlmBase)
          reqs.append(hdf5.Require(hl=True, verbose=True))
          
       else:
-         reqs.append(ilmbase.Require(ilmthread=True, iexmath=True))
+         reqs.append(RequireIlmBase)
          reqs.append(boost.Require())
          reqs.append(hdf5.Require(hl=True, verbose=True))
       
@@ -217,8 +239,6 @@ prjs.append({"name": "AlembicAbcOpenGL",
 
 # Python modules
 pydefs = []
-if excons.GetArgument("ilmbase-python-static", excons.GetArgument("ilmbase-static", 0, int), int) != 0:
-   pydefs.append("PYILMBASE_STATICLIBS")
 if excons.GetArgument("boost-python-static", excons.GetArgument("boost-static", 0, int), int) != 0:
    pydefs.append("PYALEMBIC_USE_STATIC_BOOST_PYTHON")
 

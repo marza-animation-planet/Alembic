@@ -1,3 +1,6 @@
 [submodule "excons"]
 	path = excons
 	url = git://github.com/gatgui/excons.git
+[submodule "openexr"]
+	path = openexr
+	url = git://github.com/gatgui/openexr.git
