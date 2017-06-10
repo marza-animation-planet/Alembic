@@ -14,18 +14,19 @@ from excons.tools import arnold
 from excons.tools import maya
 from excons.tools import vray
 
-msc10warn = True
-msc12warn = True
 
 excons.InitGlobals()
 
 nameprefix = excons.GetArgument("name-prefix", default="")
-cpp11 = excons.GetArgument("c++11", 0, int)
+
 regexSrcDir = "lib/SceneHelper/regex-2.7/src"
 regexInc = [regexSrcDir + "/regex.h"] if sys.platform == "win32" else []
 regexSrc = [regexSrcDir + "/regex.c"] if sys.platform == "win32" else []
+
 depsInc, depsLib = excons.GetDirs("deps", noexc=True, silent=True)
+
 arnoldInc, arnoldLib = excons.GetDirs("arnold", libdirname=("lib" if sys.platform == "win32" else "bin"), silent=True)
+
 withArnold = (arnoldInc and arnoldLib)
 withMaya = (excons.GetArgument("with-maya", default=None) is not None)
 withVray = (excons.GetArgument("with-vray", default=None) is not None)
@@ -33,7 +34,10 @@ withVray = (excons.GetArgument("with-vray", default=None) is not None)
 if withMaya:
    maya.SetupMscver()
 
+env = excons.MakeBaseEnv()
 
+
+# IlmBase setup
 rv = excons.ExternalLibRequire("ilmbase", noLink=True)
 if not rv["require"]:
    excons.PrintOnce("Build IlmBase from sources.", tool="alembic")
@@ -58,29 +62,16 @@ else:
       python.SoftRequire(env)
 
 
-env = excons.MakeBaseEnv()
-
-
 def RequireAlembic(withPython=False, withGL=False):
    
    def _RequireFunc(env):
-      global depsInc, depsLib, msc10warn, msc12warn
+      global depsInc, depsLib
       
       if sys.platform == "darwin":
-         import platform
-         vers = map(int, platform.mac_ver()[0].split("."))
-         # Force c++11 for OSX >= 10.9
-         if cpp11 or (vers[0] > 10 or (vers[0] == 10 and vers[1] >= 9)):
-            # clang complains a lot, make it quieter
-            env.Append(CPPFLAGS=" ".join([" -std=c++11",
-                                          "-Wno-deprecated-register",
-                                          "-Wno-deprecated-declarations",
-                                          "-Wno-missing-field-initializers",
-                                          "-Wno-unused-parameter",
-                                          "-Wno-unused-value",
-                                          "-Wno-unused-function",
-                                          "-Wno-unused-variable",
-                                          "-Wno-unused-private-field"]))
+         env.Append(CPPFLAGS=" ".join([" -Wno-unused-parameter",
+                                       "-Wno-unused-value",
+                                       "-Wno-unused-function",
+                                       "-Wno-unused-variable"]))
       elif sys.platform == "win32":
          env.Append(CCFLAGS=" /bigobj")
          env.Append(CPPDEFINES=["NOMINMAX"])
@@ -93,13 +84,8 @@ def RequireAlembic(withPython=False, withGL=False):
          if mscmaj == 10:
             env.Prepend(CPPPATH=["lib/vc10fix"])
          
-         if mscmaj < 10 and msc10warn:
-            print("You should use at least Visual C 10.0 if you expect reading alembic file above 2GB without crash (use mscver= flag)")
-            msc10warn = False
-         
-         if cpp11 and mscmaj < 12 and msc12warn:
-            print("You should use at least Visual C 12.0 for C++11 support (use mscver= flag)")
-            msc12warn = False
+         if mscmaj < 10:
+            excons.WarnOnce("You should use at least Visual C 10.0 if you expect reading alembic file above 2GB without crash (use mscver= flag)", tool="alembic")
       
       else:
          env.Append(CPPFLAGS=" ".join([" -Wno-unused-local-typedefs",
@@ -107,8 +93,6 @@ def RequireAlembic(withPython=False, withGL=False):
                                        "-Wno-unused-but-set-variable",
                                        "-Wno-unused-variable",
                                        "-Wno-ignored-qualifiers"]))
-         if cpp11:
-            env.Append(CPPFLAGS=" -std=c++11")
       
       defs = []
       incdirs = ["lib"]
@@ -513,7 +497,7 @@ if withMaya:
 excons.AddHelpTargets({"alembic-libs": "All alembic libraries",
                        "alembic-python": "All alembic python modules",
                        "alembic-tools": "All alembic command line tools",
-                       "alembic-maya": "All alembic vray plugins",
+                       "alembic-maya": "All alembic maya plugins",
                        "eco": "Arnold procedural ecosystem package"})
 
 targets = excons.DeclareTargets(env, prjs)
