@@ -11,6 +11,7 @@ from excons.tools import gl
 from excons.tools import glut
 from excons.tools import glew
 from excons.tools import arnold
+from excons.tools import mtoa
 from excons.tools import maya
 from excons.tools import vray
 
@@ -308,8 +309,8 @@ if withArnold:
                 "type": "dynamicmodule",
                 "desc": "Original arnold alembic procedural",
                 "ext": arnold.PluginExt(),
-                "prefix": "arnold",
-                "rpaths": ["../lib"],
+                "prefix": "arnold/%s" % arnold.Version(compat=True),
+                "rpaths": ["../../lib"],
                 "bldprefix": "arnold-%s" % arnold.Version(),
                 "defs": defs,
                 "incdirs": ["arnold/Procedural"],
@@ -320,8 +321,8 @@ if withArnold:
                 "type": "dynamicmodule",
                 "desc": "Arnold alembic procedural",
                 "ext": arnold.PluginExt(),
-                "prefix": "arnold",
-                "rpaths": ["../lib"],
+                "prefix": "arnold/%s" % arnold.Version(compat=True),
+                "rpaths": ["../../lib"],
                 "bldprefix": "arnold-%s" % arnold.Version(),
                 "incdirs": ["arnold/abcproc"],
                 "srcs": glob.glob("arnold/abcproc/*.cpp"),
@@ -389,8 +390,8 @@ if withMaya:
                  "type": "dynamicmodule",
                  "desc": "Maya alembic import plugin",
                  "ext": maya.PluginExt(),
-                 "prefix": "maya/plug-ins",
-                 "rpaths": ["../../lib"],
+                 "prefix": "maya/plug-ins/%s" % maya.Version(nice=True),
+                 "rpaths": ["../../../lib"],
                  "bldprefix": "maya-%s" % maya.Version(),
                  "defs": defs + (["ABCIMPORT_VERSION=\"\\\"%s\\\"\"" % impver] if impver else []),
                  "incdirs": ["maya/AbcImport"],
@@ -402,8 +403,8 @@ if withMaya:
                  "desc": "Maya alembic export plugin",
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
-                 "prefix": "maya/plug-ins",
-                 "rpaths": ["../../lib"],
+                 "prefix": "maya/plug-ins/%s" % maya.Version(nice=True),
+                 "rpaths": ["../../../lib"],
                  "bldprefix": "maya-%s" % maya.Version(),
                  "defs": defs + (["ABCEXPORT_VERSION=\"\\\"%s\\\"\"" % expver] if expver else []),
                  "incdirs": ["maya/AbcExport"],
@@ -415,8 +416,8 @@ if withMaya:
                  "desc": "Maya alembic proxy shape plugin",
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
-                 "prefix": "maya/plug-ins" + ("/vray" if withVray else ""),
-                 "rpaths": ["../../lib" if not withVray else "../../../lib"],
+                 "prefix": "maya/plug-ins/%s" % maya.Version(nice=True) + ("/vray" if withVray else ""),
+                 "rpaths": ["../../../lib" if not withVray else "../../../../lib"],
                  "bldprefix": "maya-%s" % maya.Version() + ("/vray-%s" % vray.Version() if withVray else ""),
                  "defs": defs + (["ABCSHAPE_VERSION=\"\\\"%s\\\"\"" % shpver] if shpver else []) +
                                 (["ABCSHAPE_VRAY_SUPPORT"] if withVray else []),
@@ -431,8 +432,8 @@ if withMaya:
                  "desc": "Maya file translator for alembic import and export",
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
-                 "prefix": "maya/plug-ins",
-                 "rpaths": ["../../lib"],
+                 "prefix": "maya/plug-ins/%s" % maya.Version(nice=True),
+                 "rpaths": ["../../../lib"],
                  "bldprefix": "maya-%s" % maya.Version(),
                  "defs": defs + (["ABCFILETRANSLATOR_VERSION=\"\\\"%s\\\"\"" % trsver] if trsver else []),
                  "incdirs": ["maya/AbcFileTranslator"],
@@ -443,35 +444,14 @@ if withMaya:
    deftargets.append("alembic-maya")
 
    if withArnold:
-      mtoa_inc, mtoa_lib = excons.GetDirs("mtoa", libdirname=("lib" if sys.platform == "win32" else "bin"))
-      mtoa_defs = defs[:]
-      mtoa_ext = ""
-      mtoa_ver = "unknown"
-      
-      if mtoa_inc and mtoa_lib:
-         if sys.platform == "darwin":
-            mtoa_defs.append("_DARWIN")
-            mtoa_ext = ".dylib"
-         
-         elif sys.platform == "win32":
-            mtoa_defs.append("_WIN32")
-            mtoa_ext = ".dll"
-         
-         else:
-            mtoa_defs.append("_LINUX")
-            mtoa_ext = ".so"
-         
-         m = re.search(r"\d+\.\d+\.\d+(\.\d+)?", mtoa_inc)
-         if m is None:
-            m = re.search(r"\d+\.\d+\.\d+(\.\d+)?", mtoa_lib)
-         if m is not None:
-            mtoa_ver = m.group(0)
-         
-         AbcShapeMtoa = "maya/AbcShape/mtoa/%sMtoa.py" % AbcShapeName
+      A, M, m = mtoa.Version(asString=False)
+      # So far MtoA 1.>=2 supported only
+      if A == 1 and M >= 2:
+         AbcShapeMtoaAE = "maya/AbcShape/mtoa/%sMtoa.py" % AbcShapeName
          AbcShapeHelper = "maya/AbcShape/mtoa/%sHelper.py" % AbcShapeName
          
-         if not os.path.exists(AbcShapeMtoa) or os.stat(AbcShapeMtoa).st_mtime < os.stat("maya/AbcShape/mtoa/AbcShapeMtoa.py.tpl").st_mtime:
-            replace_in_file("maya/AbcShape/mtoa/AbcShapeMtoa.py.tpl", AbcShapeMtoa, "<<NodeName>>", AbcShapeName)
+         if not os.path.exists(AbcShapeMtoaAE) or os.stat(AbcShapeMtoaAE).st_mtime < os.stat("maya/AbcShape/mtoa/AbcShapeMtoa.py.tpl").st_mtime:
+            replace_in_file("maya/AbcShape/mtoa/AbcShapeMtoa.py.tpl", AbcShapeMtoaAE, "<<NodeName>>", AbcShapeName)
          
          if not os.path.exists(AbcShapeHelper) or os.stat(AbcShapeHelper).st_mtime < os.stat("maya/AbcShape/mtoa/AbcShapeHelper.py.tpl").st_mtime:
             replace_in_file("maya/AbcShape/mtoa/AbcShapeHelper.py.tpl", AbcShapeHelper, "<<NodeName>>", AbcShapeName)
@@ -479,18 +459,15 @@ if withMaya:
          prjs.append({"name": "%sAbcShapeMtoa" % nameprefix,
                       "type": "dynamicmodule",
                       "desc": "AbcShape translator for MtoA",
-                      "prefix": "maya/plug-ins/mtoa",
-                      "rpaths": ["../../../lib"],
-                      "bldprefix": "maya-%s/mtoa-%s" % (maya.Version(), mtoa_ver),
-                      "ext": mtoa_ext,
-                      "defs": mtoa_defs,
+                      "prefix": "maya/plug-ins/%s/mtoa-%s" % (maya.Version(nice=True), mtoa.Version(compat=True)),
+                      "rpaths": ["../../../../lib"],
+                      "bldprefix": "maya-%s/mtoa-%s" % (maya.Version(), mtoa.Version()),
+                      "ext": mtoa.ExtensionExt(),
+                      "defs": defs,
                       "srcs": glob.glob("maya/AbcShape/mtoa/*.cpp"),
-                      "incdirs": [mtoa_inc],
-                      "libdirs": [mtoa_lib],
-                      "libs": ["mtoa_api"],
-                      "install": {"maya/plug-ins/mtoa": [AbcShapeMtoa],
+                      "install": {"maya/plug-ins/%s/mtoa-%s" % (maya.Version(nice=True), mtoa.Version(compat=True)): [AbcShapeMtoaAE],
                                   "maya/python": [AbcShapeHelper]},
-                      "custom": [RequireAlembicHelper(), arnold.Require, maya.Require]})
+                      "custom": [RequireAlembicHelper(), mtoa.Require, arnold.Require, maya.Require]})
 
          deftargets.append(prjs[-1]["name"])
 
@@ -507,7 +484,33 @@ Export("RequireAlembicHelper")
 
 Default(deftargets)
 
-if withArnold and "eco" in COMMAND_LINE_TARGETS:
-   excons.EcosystemDist(env, "arnold/abcproc/abcproc.env", {"abcproc": ""}, name="abcproc", version="1.5.15")
+if "eco" in COMMAND_LINE_TARGETS:
+   outbd = excons.OutputBaseDirectory()
+   ecop = "/" + excons.EcosystemPlatform() 
+
+   ecotgts = {"tools": targets["alembic-tools"],
+              "python": targets["alembic-python"] + ["python/examples/cask/cask.py"]}
+
+   outdirs = {"tools": ecop + "/bin",
+              "python": ecop + "/lib/python/%s" % python.Version()}
+
+   if withArnold:
+      ecotgts["arnold"] = targets["abcproc"]
+      outdirs["arnold"] = ecop + "/arnold/%s" % arnold.Version(compat=True)
+
+   if withMaya:
+      ecotgts["maya-scripts"] = [outbd + "/maya/python", outbd + "/maya/scripts"],
+      outdirs["maya-scripts"] = ecop + "/maya"
+
+      ecotgts["maya-plugins"] = targets["alembic-maya"]
+      outdirs["maya-plugins"] = ecop + "/maya/plug-ins/%s" % maya.Version(nice=True)
+
+      if withArnold:
+         tgtname = nameprefix + "AbcShapeMtoa"
+         if tgtname in targets:
+            ecotgts["mtoa"] = targets[tgtname] + [AbcShapeMtoaAE]
+            outdirs["mtoa"] = ecop + "/maya/plug-ins/%s/mtoa-%s" % (maya.Version(nice=True), mtoa.Version(compat=True))
+
+   excons.EcosystemDist(env, "alembic.env", outdirs, targets=ecotgts, name="alembic", version="1.5.17")
 
 

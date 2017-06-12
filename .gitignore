@@ -23,7 +23,7 @@ arnold/abcproc/*.py
 arnold/abcproc/abcproc.env.tmp
 /dist/
 /eco/
-/*.env
+/*.env.tmp
 /*.cmake.*
 /config.log
 /.sconf_temp/
