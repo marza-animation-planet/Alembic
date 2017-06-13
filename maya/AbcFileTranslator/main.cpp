@@ -45,41 +45,42 @@
 #  define ABCFILETRANSLATOR_VERSION "1.0"
 #endif
 
-static MStatus CheckLoadPlugin(const MString name)
+static MStatus CheckLoadPlugin(const MString &name)
 {
-    MString scr = "if (!`pluginInfo -query -loaded \"" + name + "\"`) loadPlugin \"" + name + "\";";
+    MString scr = "";
+    scr += "if (!`pluginInfo -query -loaded \"" + name + "\"`) {\n";
+    scr += "  if (`optionVar -query \"" + name + "_loading\"` == 0) {\n";
+    scr += "    loadPlugin \"" + name + "\";\n";
+    scr += "  }\n";
+    scr += "}";
     return MGlobal::executeCommand(scr);
 }
 
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
+    MString trname = PREFIX_NAME("AbcFileTranslator");
     MString impname = PREFIX_NAME("AbcImport");
     MString expname = PREFIX_NAME("AbcExport");
     MString name = PREFIX_NAME("Alembic");
     MStatus status;
 
-    MString info = PREFIX_NAME("AbcFileTranslator");
-    info += " v";
-    info += ABCFILETRANSLATOR_VERSION;
-    info += " using ";
-    info += Alembic::AbcCoreAbstract::GetLibraryVersion().c_str();
-    MGlobal::displayInfo(info);
-
     MFnPlugin plugin(obj, name.asChar(), ABCFILETRANSLATOR_VERSION, "Any");
 
-    status = CheckLoadPlugin(impname);
+    MGlobal::executeCommand("optionVar -intValue \"" + trname + "_loading\" 1;");
 
+    status = CheckLoadPlugin(impname);
     if (!status)
     {
         status.perror(PREFIX_NAME("AbcFileTranslator"));
+        MGlobal::executeCommand("optionVar -intValue \"" + trname + "_loading\" 0;");
         return status;
     }
 
     status = CheckLoadPlugin(expname);
-
     if (!status)
     {
         status.perror(PREFIX_NAME("AbcFileTranslator"));
+        MGlobal::executeCommand("optionVar -intValue \"" + trname + "_loading\" 0;");
         return status;
     }
 
@@ -92,7 +93,18 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     if (!status)
     {
         status.perror("registerFileTranslator");
+        MGlobal::executeCommand("optionVar -intValue \"" + trname + "_loading\" 0;");
+        return status;
     }
+
+    MString info = trname;
+    info += " v";
+    info += ABCFILETRANSLATOR_VERSION;
+    info += " using ";
+    info += Alembic::AbcCoreAbstract::GetLibraryVersion().c_str();
+    MGlobal::displayInfo(info);
+
+    MGlobal::executeCommand("optionVar -intValue \"" + trname + "_loading\" 0;");
 
     return status;
 }

@@ -55,22 +55,43 @@ const MTypeId AlembicNode::mMayaNodeId(0x00082699);
 const MTypeId AlembicNode::mMayaNodeId(0x00082697);
 #endif
 
+static MStatus CheckLoadPlugin(const MString &name)
+{
+    MString scr = "";
+    scr += "if (!`pluginInfo -query -loaded \"" + name + "\"`) {\n";
+    scr += "  if (`optionVar -query \"" + name + "_loading\"` == 0) {\n";
+    scr += "    loadPlugin \"" + name + "\";\n";
+    scr += "  }\n";
+    scr += "}";
+    return MGlobal::executeCommand(scr);
+}
+
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
     MString name = PREFIX_NAME("Alembic");
     MString commandName = PREFIX_NAME("AbcImport");
+    MString trname = PREFIX_NAME("AbcFileTranslator");
     MString nodeName = PREFIX_NAME("AlembicNode");
-    
-    MFnPlugin plugin(obj, name.asChar(), ABCIMPORT_VERSION, "Any");
-
     MStatus status;
 
-    status = plugin.registerCommand(commandName,
-                                    AbcImport::creator,
-                                    AbcImport::createSyntax);
+    MFnPlugin plugin(obj, name.asChar(), ABCIMPORT_VERSION, "Any");
+
+    MGlobal::executeCommand("optionVar -intValue \"" + commandName + "_loading\" 1;");
+
+    status = CheckLoadPlugin(trname);
+    if (!status)
+    {
+        status.perror(commandName);
+        MGlobal::executeCommand("optionVar -intValue \"" + commandName + "_loading\" 0;");
+        return status;
+    }
+
+    status = plugin.registerCommand(commandName, AbcImport::creator, AbcImport::createSyntax);
     if (!status)
     {
         status.perror("registerCommand");
+        MGlobal::executeCommand("optionVar -intValue \"" + commandName + "_loading\" 0;");
+        return status;
     }
 
     status = plugin.registerNode(nodeName,
@@ -80,6 +101,8 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     if (!status)
     {
         status.perror("registerNode");
+        MGlobal::executeCommand("optionVar -intValue \"" + commandName + "_loading\" 0;");
+        return status;
     }
 
     MString info = commandName + " v";
@@ -87,6 +110,8 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     info += " using ";
     info += Alembic::AbcCoreAbstract::GetLibraryVersion().c_str();
     MGlobal::displayInfo(info);
+
+    MGlobal::executeCommand("optionVar -intValue \"" + commandName + "_loading\" 0;");
 
     return status;
 }
