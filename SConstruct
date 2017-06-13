@@ -35,6 +35,11 @@ withVray = (excons.GetArgument("with-vray", default=None) is not None)
 if withMaya:
    maya.SetupMscver()
 
+if withVray:
+  vrayVer = vray.Version(asString=False, nice=True)
+else:
+  vrayVer = (0, 0, 0)
+
 env = excons.MakeBaseEnv()
 
 
@@ -335,7 +340,7 @@ if withVray:
                 "type": "dynamicmodule",
                 "desc": "V-Ray alembic procedural",
                 "ext": vray.PluginExt(),
-                "prefix": "vray",
+                "prefix": "vray/%d.%d" % (vrayVer[0], vrayVer[1]),
                 "rpaths": ["../lib"],
                 "bldprefix": "vray-%s" % vray.Version(),
                 "incdirs": ["vray"],
@@ -416,7 +421,7 @@ if withMaya:
                  "desc": "Maya alembic proxy shape plugin",
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
-                 "prefix": "maya/plug-ins/%s" % maya.Version(nice=True) + ("/vray" if withVray else ""),
+                 "prefix": "maya/plug-ins/%s" % maya.Version(nice=True) + ("/vray-%d.%d" % (vrayVer[0], vrayVer[1]) if withVray else ""),
                  "rpaths": ["../../../lib" if not withVray else "../../../../lib"],
                  "bldprefix": "maya-%s" % maya.Version() + ("/vray-%s" % vray.Version() if withVray else ""),
                  "defs": defs + (["ABCSHAPE_VERSION=\"\\\"%s\\\"\"" % shpver] if shpver else []) +
