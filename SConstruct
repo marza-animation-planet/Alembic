@@ -324,6 +324,7 @@ if withArnold:
    
    prjs.append({"name": "abcproc",
                 "type": "dynamicmodule",
+                "alias": "alembic-arnold",
                 "desc": "Arnold alembic procedural",
                 "ext": arnold.PluginExt(),
                 "prefix": "arnold/%s" % arnold.Version(compat=True),
@@ -333,11 +334,12 @@ if withArnold:
                 "srcs": glob.glob("arnold/abcproc/*.cpp"),
                 "custom": [arnold.Require, RequireAlembicHelper()]})
 
-   deftargets.append(prjs[-1]["name"])
+   deftargets.append("alembic-arnold")
 
 if withVray:
    prjs.append({"name": "%svray_AlembicLoader" % ("lib" if sys.platform != "win32" else ""),
                 "type": "dynamicmodule",
+                "alias": "alembic-vray",
                 "desc": "V-Ray alembic procedural",
                 "ext": vray.PluginExt(),
                 "prefix": "vray/%d.%d" % (vrayVer[0], vrayVer[1]),
@@ -347,7 +349,7 @@ if withVray:
                 "srcs": glob.glob("vray/*.cpp"),
                 "custom": [vray.Require, RequireAlembicHelper()]})
 
-   deftargets.append(prjs[-1]["name"])
+   deftargets.append("alembic-vray")
 
 if withMaya:
    def replace_in_file(src, dst, srcStr, dstStr):
@@ -463,6 +465,7 @@ if withMaya:
          
          prjs.append({"name": "%sAbcShapeMtoa" % nameprefix,
                       "type": "dynamicmodule",
+                      "alias": "alembic-mtoa",
                       "desc": "AbcShape translator for MtoA",
                       "prefix": "maya/plug-ins/%s/mtoa-%s" % (maya.Version(nice=True), mtoa.Version(compat=True)),
                       "rpaths": ["../../../../lib"],
@@ -474,12 +477,15 @@ if withMaya:
                                   "maya/python": [AbcShapeHelper]},
                       "custom": [RequireAlembicHelper(), mtoa.Require, arnold.Require, maya.Require]})
 
-         deftargets.append(prjs[-1]["name"])
+         deftargets.append("alembic-mtoa")
 
 excons.AddHelpTargets({"alembic-libs": "All alembic libraries",
                        "alembic-python": "All alembic python modules",
                        "alembic-tools": "All alembic command line tools",
                        "alembic-maya": "All alembic maya plugins",
+                       "alembic-arnold": "Arnold procedural",
+                       "alembic-mtoa": "MtoA translator for alembic shape",
+                       "alembic-vray": "V-Ray procedural",
                        "eco": "Arnold procedural ecosystem package"})
 
 targets = excons.DeclareTargets(env, prjs)
