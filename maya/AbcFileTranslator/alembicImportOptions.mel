@@ -14,15 +14,19 @@ global proc int alembicImportOptions(string $parent,
                                      string $initialSettings,
                                      string $resultCallback)
 {
+   global string $gAbcLastOptions;
+
    int $result = 0;
    string $flt = "";
-   string $optionsString = "";
-   
+   string $impOpts = "";
+   string $expOpts = "";
+
+   string $curParent = `setParent -query`;
+   setParent $parent;
+
    if ($action == "post")
    {
-      // Build UI elements
-      setParent $parent;
-      
+      // Build UI elements     
       frameLayout -collapsable false -label "Contents" -bv false;
          columnLayout;
             optionMenuGrp -l "Mode:" -adj 2 -cal 1 right -cal 2 left -cc "alembicImportOptions_modeChanged" optMode;
@@ -63,13 +67,11 @@ global proc int alembicImportOptions(string $parent,
       
       checkBoxGrp -ncb 1 -l "" -l1 "Debug" -adj 2 -cal 1 right -cal 2 left -v1 false optDbg;
       
-      $optionsString = $initialSettings;
-      
-      if (size($optionsString) > 0)
+      if (size($initialSettings) > 0)
       {
          // parse option string and set UI
          string $optlist[];
-         int $n = tokenize($optionsString, ";", $optlist);
+         int $n = tokenize($initialSettings, ";", $optlist);
          
          for ($i=0; $i<$n; $i++)
          {
@@ -146,91 +148,173 @@ global proc int alembicImportOptions(string $parent,
       
       // Update editable state
       alembicImportOptions_modeChanged();
-      
+
+      $gAbcLastOptions = $initialSettings;
+
       $result = 1;
    }
    else if ($action == "query")
    {
       // Build option string
-      setParent $parent;
-      
       $mode = `optionMenuGrp -q -v optMode`;
       
-      $optionsString = "mode=" + $mode;
+      $impOpts = "mode=" + $mode;
       
       if ($mode == "Update")
       {
          if (`checkBoxGrp -q -v1 optAddNode` == true)
          {
-            $optionsString += ";crt=1";
+            $impOpts += ";crt=1";
          }
          if (`checkBoxGrp -q -v1 optRemNode` == true)
          {
-            $optionsString += ";rm=1";
+            $impOpts += ";rm=1";
          }
       }
       else if ($mode == "Add")
       {
          if (`checkBoxGrp -q -v1 optReparent` == true)
          {
-            $optionsString += ";rpr=1";
+            $impOpts += ";rpr=1";
          }
       }
       
       if (`checkBoxGrp -q -v1 optFitTime` == true)
       {
-         $optionsString += ";ftr=1";
+         $impOpts += ";ftr=1";
       }
       
       if (`checkBoxGrp -q -v1 optStartFrame` == true)
       {
-         $optionsString += ";sts=1";
+         $impOpts += ";sts=1";
       }
       
       if (`checkBoxGrp -q -v1 optColSets` == true)
       {
-         $optionsString += ";rcs=1";
+         $impOpts += ";rcs=1";
       }
       
       if (`checkBoxGrp -q -v1 optUVSets` == true)
       {
-         $optionsString += ";rus=1";
+         $impOpts += ";rus=1";
       }
       
       if (`checkBoxGrp -q -v1 optRefObj` == true)
       {
-         $optionsString += ";crm=1";
+         $impOpts += ";crm=1";
       }
       
       $flt = `textFieldGrp -q -tx optFlt`;
       if (size($flt) > 0)
       {
-         $optionsString += ";ft=" + $flt + "";
+         $impOpts += ";ft=" + $flt + "";
       }
       
       $flt = `textFieldGrp -q -tx optExcFlt`;
       if (size($flt) > 0)
       {
-         $optionsString += ";eft=" + $flt + "";
+         $impOpts += ";eft=" + $flt + "";
       }
       
       if (`checkBoxGrp -q -v1 optDbg` == true)
       {
-         $optionsString += ";d=1";
+         $impOpts += ";d=1";
       }
       
       if (`checkBoxGrp -q -v1 optCreateInst` == true)
       {
-         $optionsString += ";ci=1";
+         $impOpts += ";ci=1";
       }
-      
-      eval($resultCallback + " \"" + $optionsString + "\"");
+
+      // Preserve other options in $initialSettings
+      if (size($initialSettings) > 0)
+      {
+         // parse option string and set UI
+         string $optlist[];
+         int $n = tokenize($initialSettings, ";", $optlist);
+         
+         string $frt;
+         float $sf, $ef;
+         
+         for ($i=0; $i<$n; $i++)
+         {
+            string $keyval[];
+            
+            int $n2 = tokenize($optlist[$i], "=", $keyval);
+            
+            if ($n2 < 2)
+            {
+               if (size($expOpts) > 0)
+               {
+                  $expOpts += ";";
+               }
+               $expOpts += $optlist[$i];
+               continue;
+            }
+
+            string $key = $keyval[0];
+            string $val = $keyval[1];
+            for ($j=2; $j<$n2; $j++)
+            {
+               $val += "=";
+               $val += $keyval[$j];
+            }
+            
+            if ($key == "ftr" ||
+                $key == "rcs" ||
+                $key == "rus" ||
+                $key == "crm" ||
+                $key == "d" ||
+                $key == "ft" ||
+                $key == "eft" ||
+                $key == "sts" ||
+                $key == "mode" ||
+                $key == "rpr" ||
+                $key == "crt" ||
+                $key == "rm" ||
+                $key == "ci")
+            {
+               continue;
+            }
+            else
+            {
+               if (size($expOpts) > 0)
+               {
+                  $expOpts += ";";
+               }
+               $expOpts += $key + "=" + $val;
+            }
+         }
+      }
+
+      string $allOpts = "";
+      if (size($impOpts))
+      {
+         $allOpts += $impOpts;
+      }
+      if (size($expOpts))
+      {
+         if (size($allOpts) > 0)
+         {
+            $allOpts += ";";
+         }
+         $allOpts += $expOpts;
+      }
+
+      $gAbcLastOptions = $allOpts;
+
+      eval($resultCallback + " \"" + $gAbcLastOptions + "\""); 
+
       $result = 1;
    }
    else
    {
+      $gAbcLastOptions = $initialSettings;
+
       $result = 0;
    }
-   
+
+   setParent $curParent;
+
    return $result;
 }

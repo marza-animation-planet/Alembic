@@ -34,25 +34,15 @@
 //
 //-*****************************************************************************
 
-#include "AlembicNode.h"
-#include "AbcImport.h"
-#include "util.h"
-
+#include "AlembicFileTranslator.h"
 #include <maya/MGlobal.h>
 #include <maya/MFnPlugin.h>
 #include <maya/MObject.h>
 #include <maya/MGlobal.h>
+#include <Alembic/AbcCoreAbstract/All.h>
 
-#ifndef ABCIMPORT_VERSION
-#  define ABCIMPORT_VERSION "1.0"
-#endif
-
-#ifdef NAME_PREFIX
-// Avoid node id conflict with maya built-in AbcImport
-const MTypeId AlembicNode::mMayaNodeId(0x00082699);
-#else
-// Interesting trivia: 0x2697 is the unicode character for Alembic
-const MTypeId AlembicNode::mMayaNodeId(0x00082697);
+#ifndef ABCFILETRANSLATOR_VERSION
+#  define ABCFILETRANSLATOR_VERSION "1.0"
 #endif
 
 static MStatus CheckLoadPlugin(const MString &name)
@@ -68,50 +58,53 @@ static MStatus CheckLoadPlugin(const MString &name)
 
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
-    MString name = PREFIX_NAME("Alembic");
-    MString commandName = PREFIX_NAME("AbcImport");
     MString trname = PREFIX_NAME("AbcFileTranslator");
-    MString nodeName = PREFIX_NAME("AlembicNode");
+    MString impname = PREFIX_NAME("AbcImport");
+    MString expname = PREFIX_NAME("AbcExport");
+    MString name = PREFIX_NAME("Alembic");
     MStatus status;
 
-    MFnPlugin plugin(obj, name.asChar(), ABCIMPORT_VERSION, "Any");
+    MFnPlugin plugin(obj, name.asChar(), ABCFILETRANSLATOR_VERSION, "Any");
 
-    MGlobal::executeCommand("optionVar -intValue \"" + commandName + "_loading\" 1;");
+    MGlobal::executeCommand("optionVar -intValue \"" + trname + "_loading\" 1;");
 
-    status = CheckLoadPlugin(trname);
+    status = CheckLoadPlugin(impname);
     if (!status)
     {
-        status.perror(commandName);
-        MGlobal::executeCommand("optionVar -intValue \"" + commandName + "_loading\" 0;");
+        status.perror(PREFIX_NAME("AbcFileTranslator"));
+        MGlobal::executeCommand("optionVar -intValue \"" + trname + "_loading\" 0;");
         return status;
     }
 
-    status = plugin.registerCommand(commandName, AbcImport::creator, AbcImport::createSyntax);
+    status = CheckLoadPlugin(expname);
     if (!status)
     {
-        status.perror("registerCommand");
-        MGlobal::executeCommand("optionVar -intValue \"" + commandName + "_loading\" 0;");
+        status.perror(PREFIX_NAME("AbcFileTranslator"));
+        MGlobal::executeCommand("optionVar -intValue \"" + trname + "_loading\" 0;");
         return status;
     }
 
-    status = plugin.registerNode(nodeName,
-                                AlembicNode::mMayaNodeId,
-                                &AlembicNode::creator,
-                                &AlembicNode::initialize);
+    status = plugin.registerFileTranslator(name,
+                                           NULL,
+                                           AlembicFileTranslator::creator,
+                                           "alembicTranslatorOptions",
+                                           "",
+                                           true);
     if (!status)
     {
-        status.perror("registerNode");
-        MGlobal::executeCommand("optionVar -intValue \"" + commandName + "_loading\" 0;");
+        status.perror("registerFileTranslator");
+        MGlobal::executeCommand("optionVar -intValue \"" + trname + "_loading\" 0;");
         return status;
     }
 
-    MString info = commandName + " v";
-    info += ABCIMPORT_VERSION;
+    MString info = trname;
+    info += " v";
+    info += ABCFILETRANSLATOR_VERSION;
     info += " using ";
     info += Alembic::AbcCoreAbstract::GetLibraryVersion().c_str();
     MGlobal::displayInfo(info);
 
-    MGlobal::executeCommand("optionVar -intValue \"" + commandName + "_loading\" 0;");
+    MGlobal::executeCommand("optionVar -intValue \"" + trname + "_loading\" 0;");
 
     return status;
 }
@@ -120,21 +113,16 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
 {
     MFnPlugin plugin(obj);
 
-    MString commandName = PREFIX_NAME("AbcImport");
+    MString name = PREFIX_NAME("Alembic");
 
     MStatus status;
 
-    status = plugin.deregisterNode(AlembicNode::mMayaNodeId);
+    status = plugin.deregisterFileTranslator(name);
     if (!status)
     {
-        status.perror("deregisterNode");
-    }
-
-    status = plugin.deregisterCommand(commandName);
-    if (!status)
-    {
-        status.perror("deregisterCommand");
+        status.perror("deregisterFileTranslator");
     }
 
     return status;
 }
+

@@ -37,7 +37,6 @@
 #include "AbcExport.h"
 #include "AbcWriteJob.h"
 #include "MayaUtility.h"
-#include "AlembicExportFileTranslator.h"
 
 #include <maya/MFnPlugin.h>
 #include <maya/MFileObject.h>
@@ -1073,6 +1072,16 @@ catch (std::exception & e)
 }
 
 
+static MStatus CheckLoadPlugin(const MString &name)
+{
+    MString scr = "";
+    scr += "if (!`pluginInfo -query -loaded \"" + name + "\"`) {\n";
+    scr += "  if (`optionVar -query \"" + name + "_loading\"` == 0) {\n";
+    scr += "    loadPlugin \"" + name + "\";\n";
+    scr += "  }\n";
+    scr += "}";
+    return MGlobal::executeCommand(scr);
+}
 
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
@@ -1080,34 +1089,34 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
     
     MString name = PREFIX_NAME("Alembic");
     MString commandName = PREFIX_NAME("AbcExport");
-    
+    MString trname = PREFIX_NAME("AbcFileTranslator");
+
     MFnPlugin plugin(obj, name.asChar(), ABCEXPORT_VERSION, "Any");
 
-    status = plugin.registerCommand(
-        commandName, AbcExport::creator,
-        AbcExport::createSyntax );
+    MGlobal::executeCommand("optionVar -intValue \"" + commandName + "_loading\" 1;");
 
+    status = CheckLoadPlugin(trname);
+    if (!status)
+    {
+        status.perror(commandName);
+        MGlobal::executeCommand("optionVar -intValue \"" + commandName + "_loading\" 0;");
+        return status;
+    }
+
+    status = plugin.registerCommand(commandName, AbcExport::creator, AbcExport::createSyntax);
     if (!status)
     {
         status.perror("registerCommand");
-    }
-    
-    status = plugin.registerFileTranslator(name + " Export",
-                                NULL,
-                                AlembicExportFileTranslator::creator,
-                                "alembicExportOptions",
-                                "",
-                                true);
-    if (!status)
-    {
-        status.perror("registerFileTranslator");
+        return status;
     }
 
-    MString info = MString(PREFIX_NAME("AbcExport")) + " v";
+    MString info = commandName + " v";
     info += ABCEXPORT_VERSION;
     info += " using ";
     info += Alembic::Abc::GetLibraryVersion().c_str();
     MGlobal::displayInfo(info);
+
+    MGlobal::executeCommand("optionVar -intValue \"" + commandName + "_loading\" 0;");
 
     return status;
 }
@@ -1117,14 +1126,7 @@ PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
     MStatus status;
     MFnPlugin plugin(obj);
 
-    MString name = PREFIX_NAME("Alembic");
     MString commandName = PREFIX_NAME("AbcExport");
-
-    status = plugin.deregisterFileTranslator(name + " Export");
-    if (!status)
-    {
-        status.perror("deregisterFileTranslator");
-    }
 
     status = plugin.deregisterCommand(commandName);
     if (!status)

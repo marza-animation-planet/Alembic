@@ -34,20 +34,31 @@
 //
 //-*****************************************************************************
 
-#ifndef ABCIMPORT_ALEMBIC_IMPORT_FILE_TRANSLATOR_H_
-#define ABCIMPORT_ALEMBIC_IMPORT_FILE_TRANSLATOR_H_
+#ifndef ABCIMPORT_ALEMBIC_FILE_TRANSLATOR_H_
+#define ABCIMPORT_ALEMBIC_FILE_TRANSLATOR_H_
 
 #include <maya/MPxFileTranslator.h>
 
-class AlembicImportFileTranslator : public MPxFileTranslator
+#ifdef NAME_PREFIX
+#   define PREFIX_NAME(s) NAME_PREFIX s
+#else
+#   define PREFIX_NAME(s) s
+#   define NAME_PREFIX ""
+#endif
+
+class AlembicFileTranslator : public MPxFileTranslator
 {
 public:
 
-    AlembicImportFileTranslator() : MPxFileTranslator() {}
+    AlembicFileTranslator() : MPxFileTranslator() {}
 
-    virtual ~AlembicImportFileTranslator() {}
+    virtual ~AlembicFileTranslator() {}
 
     MStatus reader (const MFileObject& file,
+                    const MString& optionsString,
+                    MPxFileTranslator::FileAccessMode mode);
+
+    MStatus writer (const MFileObject& file,
                     const MString& optionsString,
                     MPxFileTranslator::FileAccessMode mode);
 
@@ -56,6 +67,11 @@ public:
                            short size) const;
 
     bool haveReadMethod() const
+    {
+        return true;
+    }
+
+    bool haveWriteMethod() const
     {
         return true;
     }
@@ -77,8 +93,8 @@ public:
 
     static void* creator()
     {
-        return new AlembicImportFileTranslator;
+        return new AlembicFileTranslator;
     }
 };
 
-#endif  // ABCIMPORT_ALEMBIC_IMPORT_FILE_TRANSLATOR_H_
+#endif  // ABCIMPORT_ALEMBIC_FILE_TRANSLATOR_H_
