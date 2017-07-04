@@ -35,7 +35,7 @@
 //-*****************************************************************************
 
 #include <Alembic/AbcGeom/All.h>
-#include <Alembic/AbcCoreHDF5/All.h>
+#include <Alembic/AbcCoreOgawa/All.h>
 #include <ImathRandom.h>
 #include <Alembic/AbcCoreAbstract/Tests/Assert.h>
 
@@ -298,7 +298,7 @@ void RunAndWriteParticles
 //-*****************************************************************************
 void ReadParticles( const std::string &iFileName )
 {
-    IArchive archive( Alembic::AbcCoreHDF5::ReadArchive(),
+    IArchive archive( Alembic::AbcCoreOgawa::ReadArchive(),
                       iFileName );
     IObject topObj( archive, kTop );
 
@@ -334,7 +334,7 @@ void ReadParticles( const std::string &iFileName )
 void pointTestReadWrite()
 {
     {
-        OArchive archive( Alembic::AbcCoreHDF5::WriteArchive(),
+        OArchive archive( Alembic::AbcCoreOgawa::WriteArchive(),
             "particlesOut2.abc" );
         OObject topObj( archive, kTop );
         OPoints ptsObj(topObj, "somePoints");
@@ -363,7 +363,7 @@ void pointTestReadWrite()
     }
 
     {
-        IArchive archive( Alembic::AbcCoreHDF5::ReadArchive(),
+        IArchive archive( Alembic::AbcCoreOgawa::ReadArchive(),
                           "particlesOut2.abc" );
 
         IObject topObj = archive.getTop();
@@ -404,7 +404,7 @@ void optPropTest()
 {
     std::string name = "pointsOptPropTest.abc";
     {
-        OArchive archive( Alembic::AbcCoreHDF5::WriteArchive(), name );
+        OArchive archive( Alembic::AbcCoreOgawa::WriteArchive(), name );
         OPoints ptObj( OObject( archive, kTop ), "pts" );
         OPointsSchema &pt= ptObj.getSchema();
 
@@ -466,12 +466,79 @@ void optPropTest()
     }
 
     {
-        IArchive archive( Alembic::AbcCoreHDF5::ReadArchive(), name );
+        IArchive archive( Alembic::AbcCoreOgawa::ReadArchive(), name );
 
         IPoints ptsObj( IObject( archive, kTop ), "pts" );
         IPointsSchema &pts = ptsObj.getSchema();
         TESTING_ASSERT( 7 == pts.getNumSamples() );
         TESTING_ASSERT( 7 == pts.getVelocitiesProperty().getNumSamples() );
+    }
+}
+
+//-*****************************************************************************
+void sparseTest()
+{
+    std::string name = "sparsePointsTest.abc";
+    {
+        OArchive archive( Alembic::AbcCoreOgawa::WriteArchive(), name );
+        OPoints pointWidthObj( OObject( archive, kTop ), "pointWidths", kSparse );
+
+        // only set widths
+        size_t numWidths = 4;
+        float32_t widths[] = { 0.0f, 1.0f, 2.0f, 3.0f};
+        OPointsSchema::Sample pointSamp;
+        OFloatGeomParam::Sample widthSamp( Abc::FloatArraySample( (const float32_t *)widths, numWidths),
+                                           kVertexScope);
+        pointSamp.setWidths( widthSamp );
+        pointWidthObj.getSchema().set( pointSamp );
+
+        // only set positions
+        size_t numPositions = 4;
+        float32_t positions[] = {  0.0f, 0.0f, 0.0f,
+                                 1.0f, 1.0f, 1.0f,
+                                 2.0f, 2.0f, 2.0f,
+                                 3.0f, 3.0f, 3.0f
+                               };
+        OPoints pointPosObj( OObject( archive, kTop ), "pointPositions", kSparse );
+        OPointsSchema::Sample pointSamp2;
+        pointSamp2.setPositions( V3fArraySample( ( const V3f * )positions, numPositions ) );
+        pointPosObj.getSchema().set( pointSamp2 );
+    }
+
+    {
+        IArchive archive( Alembic::AbcCoreOgawa::ReadArchive(), name );
+
+        IObject curveUVsObj( IObject( archive, kTop ), "pointWidths" );
+
+        // This should NOT match
+        TESTING_ASSERT( !IPolyMeshSchema::matches( curveUVsObj.getMetaData() ) );
+        ICompoundProperty geomProp( curveUVsObj.getProperties(), ".geom" );
+
+        // This shouldn't match either
+        TESTING_ASSERT( !IPolyMeshSchema::matches( geomProp.getMetaData() ) );
+
+        // and we should ONLY have UVs
+        TESTING_ASSERT( geomProp.getNumProperties() == 1 &&
+            geomProp.getPropertyHeader(".widths") != NULL );
+
+        IArrayProperty uvsProp( geomProp, ".widths" );
+        TESTING_ASSERT( uvsProp.getNumSamples() == 1 );
+
+        IObject curvePosObj( IObject( archive, kTop ), "pointPositions" );
+
+        // This should NOT match
+        TESTING_ASSERT( !IPolyMeshSchema::matches( curvePosObj.getMetaData() ) );
+        geomProp = ICompoundProperty( curvePosObj.getProperties(), ".geom" );
+
+        // This shouldn't match either
+        TESTING_ASSERT( !IPolyMeshSchema::matches( geomProp.getMetaData() ) );
+        TESTING_ASSERT( geomProp.getNumProperties() == 2 &&
+            geomProp.getPropertyHeader("P") != NULL &&
+            geomProp.getPropertyHeader(".selfBnds") != NULL );
+        IArrayProperty ptsProp( geomProp, "P" );
+        TESTING_ASSERT( ptsProp.getNumSamples() == 1 );
+        IScalarProperty selfBndsProp( geomProp, ".selfBnds" );
+        TESTING_ASSERT( selfBndsProp.getNumSamples() == 1 );
     }
 }
 
@@ -496,7 +563,7 @@ int main( int argc, char *argv[] )
     params.emitColor = C3f( 0.85f, 0.9f, 0.1f );
 
     {
-        OArchive archive( Alembic::AbcCoreHDF5::WriteArchive(),
+        OArchive archive( Alembic::AbcCoreOgawa::WriteArchive(),
                           "particlesOut1.abc" );
         OObject topObj( archive, kTop );
 
@@ -510,6 +577,8 @@ int main( int argc, char *argv[] )
     pointTestReadWrite();
 
     optPropTest();
+
+    sparseTest();
 
     return 0;
 }

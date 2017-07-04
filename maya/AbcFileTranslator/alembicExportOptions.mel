@@ -76,9 +76,11 @@ global proc int alembicExportOptions(string $parent,
             checkBoxGrp -ncb 1 -l "" -l1 "No Normals" -adj 2 -cal 1 right -cal 2 left -v1 false optNoNormals;
             checkBoxGrp -ncb 1 -l "" -l1 "Write Primary UV" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteUV;
             checkBoxGrp -ncb 1 -l "" -l1 "Write All UVs" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteAllUVs;
+            checkBoxGrp -ncb 1 -l "" -l1 "Write UVs Only" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteUVsOnly;
             checkBoxGrp -ncb 1 -l "" -l1 "Write Color Sets" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteColors;
             checkBoxGrp -ncb 1 -l "" -l1 "Write Face Sets" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteFaceSets;
             checkBoxGrp -ncb 1 -l "" -l1 "Write Reference Mesh" -adj 2 -cal 1 right -cal 2 left -v1 false optWriteReferenceMesh;
+            checkBoxGrp -ncb 1 -l "" -l1 "Auto SubD" -adj 2 -cal 1 right -cal 2 left -v1 false optAutoSubD;
          setParent ..;
       setParent ..;
       
@@ -217,6 +219,10 @@ global proc int alembicExportOptions(string $parent,
             {
                checkBoxGrp -e -v1 ($val == "1") optWriteAllUVs;
             }
+            else if ($key == "uvo")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optWriteUVsOnly;
+            }
             else if ($key == "wcs")
             {
                checkBoxGrp -e -v1 ($val == "1") optWriteColors;
@@ -228,6 +234,10 @@ global proc int alembicExportOptions(string $parent,
             else if ($key == "wrm")
             {
                checkBoxGrp -e -v1 ($val == "1") optWriteReferenceMesh;
+            }
+            else if ($key == "as")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optAutoSubD;
             }
             else if ($key == "fc" || $key == "pc")
             {
@@ -373,6 +383,11 @@ global proc int alembicExportOptions(string $parent,
       {
          $expOpts += ";wuvs=1";
       }
+
+      if (`checkBoxGrp -q -v1 optWriteUVsOnly` == true)
+      {
+         $expOpts += ";uvo=1";
+      }
       
       if (`checkBoxGrp -q -v1 optWriteColors` == true)
       {
@@ -389,6 +404,11 @@ global proc int alembicExportOptions(string $parent,
          $expOpts += ";wrm=1";
       }
       
+      if (`checkBoxGrp -q -v1 optAutoSubD` == true)
+      {
+         $expOpts += ";as=1";
+      }
+
       $text = `textFieldGrp -q -tx optGAList`;
       if (size($text) > 0)
       {
@@ -502,9 +522,11 @@ global proc int alembicExportOptions(string $parent,
                 $key == "nn" ||
                 $key == "uv" ||
                 $key == "wuvs" ||
+                $key == "uvo" ||
                 $key == "wcs" ||
                 $key == "wfs" ||
                 $key == "wrm" ||
+                $key == "as" ||
                 $key == "fc" ||
                 $key == "pc" ||
                 $key == "a" ||

@@ -1,6 +1,6 @@
 //-*****************************************************************************
 //
-// Copyright (c) 2009-2011,
+// Copyright (c) 2009-2015,
 //  Sony Pictures Imageworks Inc. and
 //  Industrial Light & Magic, a division of Lucasfilm Entertainment Company Ltd.
 //
@@ -43,10 +43,8 @@
 #include "ArbGeomParams.h"
 
 #include <Alembic/AbcGeom/All.h>
-#include <Alembic/AbcCoreHDF5/All.h>
-
+#include <Alembic/AbcCoreFactory/All.h>
 #include <regex.h>
-
 
 namespace
 {
@@ -108,11 +106,11 @@ void WalkObject( IObject parent, const ObjectHeader &ohead, ProcArgs &args,
 {
     //Accumulate transformation samples and pass along as an argument
     //to WalkObject
-    
+
     IObject nextParentObject;
-    
+
     std::auto_ptr<MatrixSampleMap> concatenatedXformSamples;
-    
+
     if ( IXform::matches( ohead ) )
     {
         if ( args.excludeXform )
@@ -122,24 +120,24 @@ void WalkObject( IObject parent, const ObjectHeader &ohead, ProcArgs &args,
         else
         {
             IXform xform( parent, ohead.getName() );
-            
+
             IXformSchema &xs = xform.getSchema();
-            
+
             if ( xs.getNumOps() > 0 )
-            { 
+            {
                 TimeSamplingPtr ts = xs.getTimeSampling();
                 size_t numSamples = xs.getNumSamples();
-                
+
                 SampleTimeSet sampleTimes;
                 GetRelevantSampleTimes( args, ts, numSamples, sampleTimes,
                         xformSamples);
-                
+
                 MatrixSampleMap localXformSamples;
-                
+
                 MatrixSampleMap * localXformSamplesToFill = 0;
-                
+
                 concatenatedXformSamples.reset(new MatrixSampleMap);
-                
+
                 if ( !xformSamples )
                 {
                     // If we don't have parent xform samples, we can fill
@@ -151,8 +149,8 @@ void WalkObject( IObject parent, const ObjectHeader &ohead, ProcArgs &args,
                     //otherwise we need to fill in a temporary map
                     localXformSamplesToFill = &localXformSamples;
                 }
-                
-                
+
+
                 for (SampleTimeSet::iterator I = sampleTimes.begin();
                         I != sampleTimes.end(); ++I)
                 {
@@ -160,7 +158,7 @@ void WalkObject( IObject parent, const ObjectHeader &ohead, ProcArgs &args,
                             Abc::ISampleSelector(*I));
                     (*localXformSamplesToFill)[(*I)] = sample.getMatrix();
                 }
-                
+
                 if ( xformSamples )
                 {
                     ConcatenateXformSamples(args,
@@ -168,12 +166,12 @@ void WalkObject( IObject parent, const ObjectHeader &ohead, ProcArgs &args,
                             localXformSamples,
                             *concatenatedXformSamples.get());
                 }
-                
-                
+
+
                 xformSamples = concatenatedXformSamples.get();
-                
+
             }
-            
+
             nextParentObject = xform;
         }
     }
@@ -251,13 +249,13 @@ void WalkObject( IObject parent, const ObjectHeader &ohead, ProcArgs &args,
     {
         std::cerr << "could not determine type of " << ohead.getName()
                   << std::endl;
-        
+
         std::cerr << ohead.getName() << " has MetaData: "
                   << ohead.getMetaData().serialize() << std::endl;
-        
+
         nextParentObject = parent.getChild(ohead.getName());
     }
-    
+
     if ( nextParentObject.valid() )
     {
         //std::cerr << nextParentObject.getFullName() << std::endl;
@@ -276,11 +274,11 @@ int ProcInit( struct AtNode *node, void **user_ptr )
     ProcArgs * args = new ProcArgs( AiNodeGetStr( node, "data" ) );
     args->proceduralNode = node;
     *user_ptr = args;
-    
+
 #if (AI_VERSION_ARCH_NUM == 3 && AI_VERSION_MAJOR_NUM < 3) || AI_VERSION_ARCH_NUM < 3
     #error Arnold version 3.3+ required for AlembicArnoldProcedural
 #endif
-    
+
     if (!AiCheckAPIVersion(AI_VERSION_ARCH, AI_VERSION_MAJOR, AI_VERSION_MINOR))
     {
         std::cout << PREFIX_NAME("AlembicArnoldProcedural") << " compiled with arnold-"
@@ -296,8 +294,9 @@ int ProcInit( struct AtNode *node, void **user_ptr )
         return 1;
     }
 
-    IArchive archive( ::Alembic::AbcCoreHDF5::ReadArchive(),
-                      args->filename );
+    Alembic::AbcCoreFactory::IFactory factory;
+    factory.setPolicy(ErrorHandler::kQuietNoopPolicy);
+    IArchive archive = factory.getArchive( args->filename );
 
     IObject root = archive.getTop();
 
@@ -361,12 +360,12 @@ int ProcNumNodes( void *user_ptr )
 struct AtNode* ProcGetNode(void *user_ptr, int i)
 {
     ProcArgs * args = reinterpret_cast<ProcArgs*>( user_ptr );
-    
+
     if ( i >= 0 && i < (int) args->createdNodes.size() )
     {
         return args->createdNodes[i];
     }
-    
+
     return NULL;
 }
 

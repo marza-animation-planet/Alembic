@@ -35,8 +35,8 @@
 //-*****************************************************************************
 
 #include <Alembic/AbcGeom/All.h>
-#include <Alembic/AbcCoreHDF5/All.h>
-
+#include <Alembic/AbcCoreOgawa/All.h>
+#include <Alembic/AbcCoreFactory/IFactory.h>
 #include <Alembic/AbcCoreAbstract/Tests/Assert.h>
 
 using namespace Alembic::AbcGeom;
@@ -72,7 +72,7 @@ void recurseCreateXform(OObject & iParent, int children, int level,
 //-*****************************************************************************
 void xformTreeCreate()
 {
-    OArchive archive( Alembic::AbcCoreHDF5::WriteArchive(), "Xform_tree.abc" );
+    OArchive archive( Alembic::AbcCoreOgawa::WriteArchive(), "Xform_tree.abc" );
     std::vector<OXform> xforms;
     OObject root( archive, kTop);
     recurseCreateXform( root, 4, 4, xforms );
@@ -99,7 +99,7 @@ void xformTreeCreate()
 //-*****************************************************************************
 void xformOut()
 {
-    OArchive archive( Alembic::AbcCoreHDF5::WriteArchive(), "Xform1.abc" );
+    OArchive archive( Alembic::AbcCoreOgawa::WriteArchive(), "Xform1.abc" );
 
     OXform a( OObject( archive, kTop ), "a" );
     OXform b( a, "b" );
@@ -178,7 +178,7 @@ void xformOut()
 //-*****************************************************************************
 void xformIn()
 {
-    IArchive archive( Alembic::AbcCoreHDF5::ReadArchive(), "Xform1.abc" );
+    IArchive archive( Alembic::AbcCoreOgawa::ReadArchive(), "Xform1.abc" );
 
     Abc::M44d identity;
     XformSample xs;
@@ -273,7 +273,7 @@ void someOpsXform()
 {
     std::string name = "someOpsXform.abc";
     {
-        OArchive archive( Alembic::AbcCoreHDF5::WriteArchive(), name );
+        OArchive archive( Alembic::AbcCoreOgawa::WriteArchive(), name );
 
         OXform a( OObject( archive, kTop ), "a" );
 
@@ -342,7 +342,7 @@ void someOpsXform()
     }
 
     {
-        IArchive archive( Alembic::AbcCoreHDF5::ReadArchive(), name );
+        IArchive archive( Alembic::AbcCoreOgawa::ReadArchive(), name );
 
         IXform a( IObject( archive, kTop ), "a" );
         IBox3dProperty bnds = GetIArchiveBounds( archive );
@@ -472,12 +472,111 @@ void someOpsXform()
 }
 
 //-*****************************************************************************
+void sparseTest()
+{
+    XformOp transOp( kTranslateOperation, kTranslateHint );
+    XformOp scaleOp( kScaleOperation, kScaleHint );
+
+    std::string nameA = "sparseXformTestA.abc";
+    {
+        OArchive archive( Alembic::AbcCoreOgawa::WriteArchive(), nameA );
+
+        OXform transStatic( OObject( archive ),  "transStatic" );
+        XformSample asamp;
+        asamp.addOp( scaleOp, V3d( 2.0, 1.0, 2.0 ) );
+        transStatic.getSchema().set( asamp );
+
+        OXform transAnim( transStatic, "transAnim" );
+        XformSample bsamp;
+        bsamp.addOp( transOp, V3d( 3.0, 4.0, 5.0 ) );
+        transAnim.getSchema().set( bsamp );
+        bsamp[0].setTranslate( V3d( 4.0, 5.0, 6.0 ) );
+        transAnim.getSchema().set( bsamp );
+
+        OXform identA( transAnim, "ident" );
+        OXform identB( identA, "ident" );
+
+        OXform transStatic2( identB, "transStatic" );
+        transStatic2.getSchema().set( asamp );
+
+        OXform transAnim2( transStatic2, "transAnim" );
+        transAnim2.getSchema().set( bsamp );
+        bsamp[0].setTranslate( V3d( 5.0, 6.0, 7.0 ) );
+        transAnim.getSchema().set( bsamp );
+
+    }
+
+    std::string nameB = "sparseXformTestB.abc";
+    {
+        OArchive archive( Alembic::AbcCoreOgawa::WriteArchive(), nameB );
+
+        // set this now as animated translate
+        OXform transStatic( OObject( archive ),  "transStatic", kSparse );
+        XformSample asamp;
+        asamp.addOp( transOp, V3d( 1.0, 1.0, 1.0) );
+        transStatic.getSchema().set( asamp );
+        asamp[0].setTranslate( V3d( 2.0, 2.0, 2.0 ) );
+        transStatic.getSchema().set( asamp );
+
+        // this one will be static
+        OXform transAnim( transStatic, "transAnim", kSparse );
+        XformSample bsamp;
+        bsamp.addOp( scaleOp, V3d( 0.5, 0.5, 0.5 ) );
+        transAnim.getSchema().set( bsamp );
+
+        // from identity to static
+        OXform identA( transAnim, "ident", kSparse );
+        identA.getSchema().set( bsamp );
+
+        // from identity to animated
+        OXform identB( identA, "ident", kSparse );
+        identB.getSchema().set( asamp );
+        asamp[0].setTranslate( V3d( 3.0, 3.0, 3.0 ) );
+        identB.getSchema().set( asamp );
+
+        // don't set anything on these so they will be identity
+        OXform transStatic2( identB, "transStatic", kSparse );
+        OXform transAnim2( transStatic2, "transAnim", kSparse );
+    }
+
+    {
+        std::vector< std::string > names;
+        names.push_back( nameA );
+        names.push_back( nameB );
+        Alembic::AbcCoreFactory::IFactory factory;
+        IArchive archive = factory.getArchive( names );
+
+        IXform transStatic( IObject( archive ), "transStatic" );
+        TESTING_ASSERT( !transStatic.getSchema().isConstantIdentity() );
+        TESTING_ASSERT( !transStatic.getSchema().isConstant() );
+
+        IXform transAnim( transStatic, "transAnim" );
+        TESTING_ASSERT( !transAnim.getSchema().isConstantIdentity() );
+        TESTING_ASSERT( transAnim.getSchema().isConstant() );
+
+        IXform identA( transAnim, "ident" );
+        TESTING_ASSERT( !identA.getSchema().isConstantIdentity() );
+        TESTING_ASSERT( identA.getSchema().isConstant() );
+
+        IXform identB( identA, "ident");
+        TESTING_ASSERT( !identB.getSchema().isConstantIdentity() );
+        TESTING_ASSERT( !identB.getSchema().isConstant() );
+
+        IXform transStatic2( identB, "transStatic" );
+        TESTING_ASSERT( transStatic2.getSchema().isConstantIdentity() );
+
+        IXform transAnim2( transStatic2, "transAnim" );
+        TESTING_ASSERT( transAnim2.getSchema().isConstantIdentity() );
+    }
+}
+
+//-*****************************************************************************
 int main( int argc, char *argv[] )
 {
     xformOut();
     xformIn();
     someOpsXform();
     xformTreeCreate();
-
+    sparseTest();
     return 0;
 }

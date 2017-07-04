@@ -1,6 +1,6 @@
 //-*****************************************************************************
 //
-// Copyright (c) 2009-2012,
+// Copyright (c) 2009-2015,
 //  Sony Pictures Imageworks Inc. and
 //  Industrial Light & Magic, a division of Lucasfilm Entertainment Company Ltd.
 //
@@ -38,13 +38,15 @@
 #define _Alembic_AbcCollection_OCollections_h_
 
 #include <Alembic/Abc/All.h>
+#include <Alembic/Util/Export.h>
 #include <Alembic/AbcCollection/SchemaInfoDeclarations.h>
 
 namespace Alembic {
 namespace AbcCollection {
 namespace ALEMBIC_VERSION_NS {
 
-class OCollectionsSchema : public Abc::OSchema<CollectionsSchemaInfo>
+class ALEMBIC_EXPORT OCollectionsSchema
+    : public Abc::OSchema<CollectionsSchemaInfo>
 {
 public:
 
@@ -52,27 +54,32 @@ public:
 
     OCollectionsSchema() {}
 
-    template <class CPROP_PTR>
-    OCollectionsSchema( CPROP_PTR iParent,
+    //! This constructor creates a new collections writer.
+    //! The first argument is an CompoundPropertyWriterPtr to use as a parent.
+    //! The next is the name to give the schema which is usually the default
+    //! name given by OCollections (.collection)   The remaining optional
+    //! arguments can be used to override the ErrorHandlerPolicy, to specify
+    //! MetaData, specify sparse sampling and to set TimeSampling.
+    OCollectionsSchema(
+        Alembic::AbcCoreAbstract::CompoundPropertyWriterPtr iParent,
+        const std::string &iName,
+        const Abc::Argument &iArg0 = Abc::Argument(),
+        const Abc::Argument &iArg1 = Abc::Argument(),
+        const Abc::Argument &iArg2 = Abc::Argument(),
+        const Abc::Argument &iArg3 = Abc::Argument() );
+
+    //! This constructor creates a new collections writer.
+    //! The first argument is an OCompundProperty to use as a parent, and from
+    //! which the ErrorHandlerPolicy is derived.  The next is the name to give
+    //! the schema which is usually the default name given by OCollections
+    //! (.collection) The remaining optional arguments can be used to specify
+    //! MetaData, specify sparse sampling and to set TimeSampling.
+    OCollectionsSchema( Abc::OCompoundProperty iParent,
                         const std::string &iName,
                         const Abc::Argument &iArg0 = Abc::Argument(),
                         const Abc::Argument &iArg1 = Abc::Argument(),
-                        const Abc::Argument &iArg2 = Abc::Argument() )
-    : Abc::OSchema<CollectionsSchemaInfo>( iParent, iName,
-                                           iArg0, iArg1, iArg2 )
-    {
-    }
-    
-    template <class CPROP_PTR>
-    explicit OCollectionsSchema( CPROP_PTR iParent,
-                                 const Abc::Argument &iArg0 = Abc::Argument(),
-                                 const Abc::Argument &iArg1 = Abc::Argument(),
-                                 const Abc::Argument &iArg2 = Abc::Argument() )
-      : Abc::OSchema<CollectionsSchemaInfo>( iParent,
-                                             iArg0, iArg1, iArg2 )
-    {
-    }
-    
+                        const Abc::Argument &iArg2 = Abc::Argument() );
+
     //! Copy constructor.
     OCollectionsSchema( const OCollectionsSchema& iCopy )
         : Abc::OSchema<CollectionsSchemaInfo>()

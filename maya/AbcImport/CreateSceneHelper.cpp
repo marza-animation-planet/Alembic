@@ -294,23 +294,69 @@ namespace
     //     unsigned int length = iPatterns.length();
     //     if (length == 0)
     //         return true;
-    //     
+    // 
     //     for (unsigned int i=0; i<length; ++i)
     //     {
     //         // use 'match' function provided in the maya mel script.
     //         MString scriptStr, result;
     //         scriptStr.format("match \"^1s\" \"^2s\";", iPatterns[i], iName);
     //         MGlobal::executeCommand(scriptStr, result);
-    //     
+    // 
     //         // found a match!
     //         if (result.length() > 0)
     //         {
     //             return true;
     //         }
     //     }
-    //     
+    // 
     //     return false;
     // }
+
+    void connectIntermediateMesh(MFnMesh& ioFn, MFnMesh& fn)
+    {
+        // Maya doesn't allow to delete history on a referenced mesh. We
+        // can't disconnect the history and change it via MFnMesh directly.
+        // Instead, we could create an intermediate mesh and connect it to
+        // the inMesh plug of the referenced mesh.
+        // To avoid leaving orphan intermediate mesh in the scene, we
+        // tag the intermediate mesh with a dynamic attribute so that
+        // it can be deleted properly when imported again.
+        MDGModifier modifier;
+
+        // Create the dynamic attribute to indicate that the mesh is an
+        // intermediate mesh.
+        MFnNumericAttribute numericAttr;
+        MObject aioAttr = numericAttr.create(
+            "AlembicIntermediateObject", "aio", MFnNumericData::kBoolean);
+        modifier.addAttribute(ioFn.object(), aioAttr);
+        modifier.doIt();
+
+        // Set the intermediate mesh as Maya intermediate object and
+        // connect it to the inMesh plug
+        modifier.renameNode(ioFn.object(), fn.name() + "Orig");
+        modifier.newPlugValueBool(ioFn.findPlug("intermediateObject"), true);
+        modifier.newPlugValueBool(ioFn.findPlug(aioAttr), true);
+        modifier.connect(ioFn.findPlug("outMesh"), fn.findPlug("inMesh"));
+        modifier.doIt();
+    }
+
+    void deleteIntermediateMesh(MFnMesh& fn)
+    {
+        // When merge with a referenced node with history, delete the
+        // previous intermediate mesh that is created by Alembic plug-in.
+        MPlugArray sources;
+        fn.findPlug("inMesh").connectedTo(sources, true, false);
+        if (sources.length() > 0)
+        {
+            MObject io = sources[0].node();
+            if (MFnMesh(io).hasAttribute("AlembicIntermediateObject"))
+            {
+                MDGModifier modifier;
+                modifier.deleteNode(io);
+                modifier.doIt();
+            }
+        }
+    }
 }
 
 
@@ -512,6 +558,22 @@ void CreateSceneVisitor::applyShaderSelection()
         curSet.addMembers(i->second);
     }
     mShaderMeshMap.clear();
+}
+
+// add face sets after connections are made
+void CreateSceneVisitor::addFaceSetsAfterConnection()
+{
+    std::map < MObject, Alembic::Abc::IObject, ltMObj >::iterator i =
+        mAddFaceSetsMap.begin();
+
+    std::map < MObject, Alembic::Abc::IObject, ltMObj >::iterator end =
+        mAddFaceSetsMap.end();
+
+    for (; i != end; ++i)
+    {
+        MObject dagNode = i->first;
+        addFaceSets(dagNode, i->second);
+    }
 }
 
 void CreateSceneVisitor::addToPropList(std::size_t iFirst, MObject & iObject)
@@ -1229,6 +1291,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ISubD& iNode)
         if (!isConstant || colorAnim)
         {
             mData.mSubDObjList.push_back(subDObj);
+            mAddFaceSetsMap[subDObj] = iNode;
         }
     }
 
@@ -1266,15 +1329,30 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ISubD& iNode)
             return MS::kFailure;
         }
 
+        // the mesh from Alembic is static but the Maya mesh is referenced.
+        // direct changes to the Maya mesh will lost after unloading/loading
+        // the reference file. we create an intermediate mesh and connect
+        // it to the Maya mesh.
+        MFnMesh ioFn;
+        if (isConstant && fn.isFromReferencedFile())
+        {
+            deleteIntermediateMesh(fn);
+            ioFn.setObject(createSubD(mFrame, subdAndFriends, mParent));
+        }
+
         if (mConnectDagNode.isValid())
         {
             checkShaderSelection(fn, mConnectDagNode.instanceNumber());
         }
 
         disconnectMesh(subDObj, mData.mPropList, firstProp);
+        fn.setObject(subDObj);
         if (isConstant && CONNECT == mAction)
         {
-            readSubD(mFrame, fn, subDObj, subdAndFriends, false);
+            if (ioFn.object().hasFn(MFn::kMesh))
+                connectIntermediateMesh(ioFn, fn);
+            else
+                readSubD(mFrame, fn, subDObj, subdAndFriends, false);
         }
         addToPropList(firstProp, subDObj);
     }
@@ -1351,6 +1429,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPolyMesh& iNode)
         if (!isConstant || colorAnim)
         {
             mData.mPolyMeshObjList.push_back(polyObj);
+            mAddFaceSetsMap[polyObj] = iNode;
         }
     }
 
@@ -1388,13 +1467,28 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPolyMesh& iNode)
             return status;
         }
 
+        // the mesh from Alembic is static but the Maya mesh is referenced.
+        // direct changes to the Maya mesh will lost after unloading/loading
+        // the reference file. we create an intermediate mesh and connect
+        // it to the Maya mesh.
+        MFnMesh ioFn;
+        if (isConstant && fn.isFromReferencedFile())
+        {
+            deleteIntermediateMesh(fn);
+            ioFn.setObject(createPoly(mFrame, mReadMeshNormals, meshAndFriends, mParent));
+        }
+
         if (mConnectDagNode.isValid())
             checkShaderSelection(fn, mConnectDagNode.instanceNumber());
 
         disconnectMesh(polyObj, mData.mPropList, firstProp);
+        fn.setObject(polyObj);
         if (isConstant && CONNECT == mAction)
         {
-            readPoly(mFrame, mReadMeshNormals, fn, polyObj, meshAndFriends, false);
+            if (ioFn.object().hasFn(MFn::kMesh))
+                connectIntermediateMesh(ioFn, fn);
+            else
+                readPoly(mFrame, mReadMeshNormals, fn, polyObj, meshAndFriends, false);
         }
         addToPropList(firstProp, polyObj);
     }

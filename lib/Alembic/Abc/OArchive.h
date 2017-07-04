@@ -37,6 +37,7 @@
 #ifndef _Alembic_Abc_OArchive_h_
 #define _Alembic_Abc_OArchive_h_
 
+#include <Alembic/Util/Export.h>
 #include <Alembic/Abc/Foundation.h>
 #include <Alembic/Abc/Base.h>
 #include <Alembic/Abc/Argument.h>
@@ -48,7 +49,7 @@ namespace ALEMBIC_VERSION_NS {
 class OObject;
 
 //-*****************************************************************************
-class OArchive : public Base
+class ALEMBIC_EXPORT OArchive : public Base
 {
 public:
     //! By convention, we always define "this_type" in every Abc
@@ -91,12 +92,19 @@ public:
         //! ...
         AbcA::ArchiveWriterPtr iPtr,
 
-        //! Wrap existing. Here cosmetically, for consistency.
-        //! ...
-        WrapExistingFlag /* iWrap */,
-
         //! Optional error handling policy
         //! ...
+        ErrorHandler::Policy iPolicy = ErrorHandler::kThrowPolicy )
+      : m_archive( iPtr )
+    {
+        // Set the error handling policy.
+        getErrorHandler().setPolicy( iPolicy );
+    }
+
+    // Deprecated in favor of the constructor above
+    OArchive(
+        AbcA::ArchiveWriterPtr iPtr,
+        WrapExistingFlag /* iWrap */,
         ErrorHandler::Policy iPolicy = ErrorHandler::kThrowPolicy )
       : m_archive( iPtr )
     {

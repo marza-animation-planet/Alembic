@@ -287,7 +287,14 @@ namespace
         Alembic::Abc::P3fArraySamplePtr iPoints,
         Alembic::Abc::P3fArraySamplePtr iCeilPoints, double alpha)
     {
+       if(!iPoints)
+           return;
+
         unsigned int numPoints = static_cast<unsigned int>(iPoints->size());
+
+        if(!numPoints)
+           return;
+
         oPointArray.setLength(numPoints);
 
         if (alpha == 0 || iCeilPoints == NULL)
@@ -324,7 +331,7 @@ namespace
         // since we are changing the topology we will be creating a new mesh
 
         // Get face count info
-        unsigned int numPolys = static_cast<unsigned int>(iCounts->size());
+        unsigned int numPolys = iCounts ? static_cast<unsigned int>(iCounts->size()) : 0;
         MIntArray polyCounts;
         polyCounts.setLength(numPolys);
 
@@ -333,7 +340,7 @@ namespace
             polyCounts[i] = (*iCounts)[i];
         }
 
-        unsigned int numConnects = static_cast<unsigned int>(iIndices->size());
+        unsigned int numConnects = iIndices ? static_cast<unsigned int>(iIndices->size()) : 0;
 
         MIntArray polyConnects;
         polyConnects.setLength(numConnects);
@@ -518,8 +525,7 @@ namespace
                 ioMesh.getPolygonVertices (faceIndex, vertexList);
                 for (int v = 0; v < numVertices; ++v, ++nIndex)
                 {
-                    uvIds[nIndex] =
-                        (int)(*iSampIndices)[vertexList[v]];
+                    uvIds[nIndex] = (int)(*iSampIndices)[vertexList[v]];
                 }
             }
         }
@@ -857,7 +863,6 @@ namespace
             }
         }
 
-        MStatus status = MStatus::kSuccess;
         MString colorSetName(iC3f.getName().c_str());
         Alembic::Abc::UInt32ArraySamplePtr indices = samp.getIndices();
         setColor(ioMesh, colorList, indices, faceVarying, colorSetName, MFnMesh::kRGB,
@@ -965,7 +970,6 @@ namespace
             }
         }
 
-        MStatus status = MStatus::kSuccess;
         MString colorSetName(iC4f.getName().c_str());
         Alembic::Abc::UInt32ArraySamplePtr indices = samp.getIndices();
         setColor(ioMesh, colorList, indices, faceVarying, colorSetName, MFnMesh::kRGBA,
@@ -1235,8 +1239,11 @@ void readPoly(double iFrame, bool iReadNormals, MFnMesh & ioMesh, MObject & iPar
                 Alembic::Abc::ISampleSelector(ceilIndex) );
         }
 
-        fillPoints(pointArray, points, ceilPoints, alpha);
-        ioMesh.setPoints(pointArray, MSpace::kObject);
+       fillPoints(pointArray, points, ceilPoints, alpha);
+       if(pointArray.length() > 0)
+       {
+           ioMesh.setPoints(pointArray, MSpace::kObject);
+       }
 
         setColorsAndUVs(iFrame, ioMesh, schema.getUVsParam(),
             iNode.mV2s, iNode.mC3s, iNode.mC4s,
@@ -1373,7 +1380,7 @@ void disconnectMesh(MObject & iMeshObject,
 
 MObject createPoly(double iFrame, bool iReadNormals, PolyMeshAndFriends & iNode, MObject & iParent)
 {
-    Alembic::AbcGeom::IPolyMeshSchema schema = iNode.mMesh.getSchema();
+    Alembic::AbcGeom::IPolyMeshSchema &schema = iNode.mMesh.getSchema();
     MString name(iNode.mMesh.getName().c_str());
 
     MObject obj;

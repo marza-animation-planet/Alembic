@@ -1,6 +1,6 @@
 //-*****************************************************************************
 //
-// Copyright (c) 2013,
+// Copyright (c) 2013-2015,
 //  Sony Pictures Imageworks Inc. and
 //  Industrial Light & Magic, a division of Lucasfilm Entertainment Company Ltd.
 //
@@ -34,9 +34,14 @@
 //
 //-*****************************************************************************
 
-#include <Alembic/AbcCoreHDF5/All.h>
+#include <fstream>
 #include <Alembic/AbcCoreOgawa/All.h>
+#include <Alembic/AbcCoreLayer/Read.h>
 #include <Alembic/AbcCoreFactory/IFactory.h>
+
+#ifdef ALEMBIC_WITH_HDF5
+#include <Alembic/AbcCoreHDF5/All.h>
+#endif
 
 namespace Alembic {
 namespace AbcCoreFactory {
@@ -69,6 +74,7 @@ Alembic::Abc::IArchive IFactory::getArchive( const std::string & iFileName,
         return archive;
     }
 
+#ifdef ALEMBIC_WITH_HDF5
     Alembic::AbcCoreHDF5::ReadArchive hdf( m_cacheHierarchy );
     archive = Alembic::Abc::IArchive( hdf, iFileName,
         Alembic::Abc::ErrorHandler::kQuietNoopPolicy, m_cachePtr );
@@ -78,6 +84,26 @@ Alembic::Abc::IArchive IFactory::getArchive( const std::string & iFileName,
         archive.getErrorHandler().setPolicy( m_policy );
         return archive;
     }
+#else
+    // check the first 8 bytes to see if this is an HDF5 file according to
+    // www.hdfgroup.org/HDF5/doc/H5.format.html#Superblock
+    std::ifstream filestream;
+    filestream.open(iFileName.c_str(), std::ios::binary);
+
+    if (filestream.is_open())
+    {
+        char bf[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+        filestream.read(bf, 8);
+        filestream.close();
+
+        if (bf[0] == '\211' && bf[1] == 'H' && bf[2] == 'D' && bf[3] == 'F' &&
+            bf[4] == '\r' && bf[5] == '\n' && bf[6] == '\032' && bf[7] == '\n')
+        {
+            oType = kHDF5;
+            return Alembic::Abc::IArchive();
+        }
+    }
+#endif
 
     oType = kUnknown;
     return Alembic::Abc::IArchive();
@@ -87,6 +113,45 @@ Alembic::Abc::IArchive IFactory::getArchive( const std::string & iFileName )
 {
     CoreType coreType;
     return getArchive( iFileName, coreType );
+}
+
+Alembic::Abc::IArchive IFactory::getArchive(
+    const std::vector< std::string > & iFileNames)
+{
+    CoreType coreType;
+    return getArchive(iFileNames, coreType);
+}
+
+Alembic::Abc::IArchive IFactory::getArchive(
+    const std::vector< std::string > & iFileNames, CoreType & oType )
+{
+    Alembic::AbcCoreLayer::ReadArchive layer;
+
+    Alembic::AbcCoreLayer::ArchiveReaderPtrs archives;
+
+    // first read our archives, skipping over bad ones
+    std::vector< std::string >::const_iterator it = iFileNames.begin();
+    for ( ; it != iFileNames.end(); ++it )
+    {
+        Alembic::Abc::IArchive archive = getArchive( *it );
+        if ( archive.getPtr() )
+        {
+            archives.push_back( archive.getPtr() );
+        }
+    }
+
+
+    if ( ! archives.empty() )
+    {
+        Alembic::AbcCoreAbstract::ArchiveReaderPtr arPtr = layer( archives );
+        oType = kLayer;
+        return Alembic::Abc::IArchive( arPtr, Alembic::Abc::kWrapExisting,
+                                       m_policy );
+    }
+
+    // no valid archives pushed, so invalid
+    oType = kUnknown;
+    return Alembic::Abc::IArchive();
 }
 
 Alembic::Abc::IArchive IFactory::getArchive(
