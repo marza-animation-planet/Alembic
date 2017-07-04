@@ -24,11 +24,11 @@ version_str = ".".join(map(str, version_tpl))
 
 use_boost = True
 use_tr1 = False
-use_hdf5 = (excons.GetArgument("hdf5-support", 0, int) != 0)
+use_hdf5 = (excons.GetArgument("alembic-hdf5-support", 0, int) != 0)
 
-link_static = (excons.GetArgument("link-static", 1, int) != 0)
+link_static = (excons.GetArgument("alembic-link-static", 1, int) != 0)
 
-nameprefix = excons.GetArgument("name-prefix", default="")
+nameprefix = excons.GetArgument("alembic-maya-prefix", default="")
 
 regexSrcDir = "lib/SceneHelper/regex-2.7/src"
 regexInc = [regexSrcDir + "/regex.h"] if sys.platform == "win32" else []
@@ -231,15 +231,15 @@ lib_headers += env.Install("%s/AbcOpenGL" % out_headers_dir, glob.glob("abcview/
 
 prjs.append({"name": ("libAlembic" if sys.platform == "win32" else "Alembic"),
              "type": "staticlib",
-             "bldprefix": "lib/static",
              "alias": "alembic-static",
+             "desc": "Alembic library",
              "srcs": lib_sources,
              "custom": [RequireAlembic(static=True)]})
 
 prjs.append({"name": "Alembic",
              "type": "sharedlib",
-             "bldprefix": "lib/shared",
              "alias": "alembic-shared",
+             "desc": "Alembic library",
              "symvis": "hidden",
              "defines": ["ALEMBIC_EXPORTS"],
              "version": version_str,
@@ -251,12 +251,14 @@ prjs.append({"name": "Alembic",
 prjs.append({"name": ("libAlembicAbcOpenGL" if sys.platform == "win32" else "AlembicAbcOpenGL"),
              "type": "staticlib",
              "alias": "alembicgl-static",
+             "desc": "Alembic OpenGL library",
              "srcs": excons.glob("abcview/lib/AbcOpenGL/*.cpp"),
              "custom": [RequireAlembic(static=True, withGL=True)]})
 
 prjs.append({"name": "AlembicAbcOpenGL",
              "type": "sharedlib",
              "alias": "alembicgl-shared",
+             "desc": "Alembic OpenGL library",
              "symvis": "hidden",
              "defines": ["ABC_OPENGL_EXPORTS"],
              "version": "1.1.0",
@@ -513,13 +515,22 @@ if withMaya:
                                   "maya/python": [AbcShapeHelper]},
                       "custom": [RequireAlembicHelper(static=link_static), mtoa.Require, arnold.Require, maya.Require]})
 
-excons.AddHelpTargets({"alembic-libs": "Alembic static and shared libraries",
+excons.AddHelpTargets({"alembic-static": "Alembic static library",
+                       "alembic-shared": "Alembic shared library",
+                       "alembicgl-static": "Alembic OpenGL static library",
+                       "alembicgl-shared": "Alembic OpenGL shared library",
+                       "alembic-libs": "Alembic static and shared libraries",
                        "alembic-tools": "Alembic command line tools",
                        "alembic-maya": "All alembic maya plugins",
                        "alembic-arnold": "Arnold procedural",
-                       "alembic-mtoa": "MtoA translator for alembic shape",
+                       "alembic-mtoa": "MtoA translator for alembic AbcShape",
                        "alembic-vray": "V-Ray procedural",
                        "eco": "Arnold procedural ecosystem package"})
+
+excons.AddHelpOptions(alembic="""ALEMBIC OPTIONS
+  alembic-hdf5-support=0|1  : Build with HDF5 support.                   [0]
+  alembic-link-static=0|1   : Link static alembic library into binaries. [1]
+  alembic-maya-prefix=<str> : Maya plugin name prefix.                   ['']""")
 
 targets = excons.DeclareTargets(env, prjs)
 
