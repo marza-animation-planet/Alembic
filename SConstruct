@@ -77,7 +77,7 @@ else:
 
 
 # static or shared?
-def RequireAlembic(static=True, withPython=False, withGL=False):
+def RequireAlembic(static=True, withPython=False, withGL=False, linkCore=True, linkGL=True):
    
    def _RequireFunc(env):
       if sys.platform == "darwin":
@@ -109,7 +109,7 @@ def RequireAlembic(static=True, withPython=False, withGL=False):
       
       defs = []
       incdirs = ["lib"]
-      libdirs = []
+      libdirs = [excons.OutputBaseDirectory() + "/lib"]
       libs = []
       
       if sys.platform == "win32":
@@ -117,7 +117,7 @@ def RequireAlembic(static=True, withPython=False, withGL=False):
          if not static:
             defs.append("ALEMBIC_DLL")
             if withGL:
-               defs.append("ABCVIEW_DLL")
+               defs.append("ABC_OPENGL_DLL")
       
       elif sys.platform == "darwin":
          defs.extend(["PLATFORM_DARWIN", "PLATFORM=DARWIN"])
@@ -134,12 +134,21 @@ def RequireAlembic(static=True, withPython=False, withGL=False):
       if libdirs:
          env.Append(LIBPATH=libdirs)
       
-      if withGL:
-         excons.Link(env, "AlembicAbcOpenGL", static=static, force=True, silent=True)
+      if withGL and linkGL:
+         if sys.platform == "win32" and static:
+            libname = "libAlembicAbcOpenGL"
+         else:
+            libname = "AlembicAbcOpenGL"
+         excons.Link(env, libname, static=static, force=True, silent=True)
          #env.Append(LIBS=["AlembicAbcOpenGL"])
       
-      #env.Append(LIBS=["Alembic"])
-      excons.Link(env, "Alembic", static=static, force=True, silent=True)
+      if linkCore:
+         #env.Append(LIBS=["Alembic"])
+         if sys.platform == "win32" and static:
+            libname = "libAlembic"
+         else:
+            libname = "Alembic"
+         excons.Link(env, libname, static=static, force=True, silent=True)
       
       reqs = []
       
@@ -231,39 +240,37 @@ lib_headers += env.Install("%s/AbcOpenGL" % out_headers_dir, glob.glob("abcview/
 
 prjs.append({"name": ("libAlembic" if sys.platform == "win32" else "Alembic"),
              "type": "staticlib",
-             "bldprefix": "lib/static",
              "alias": "alembic-static",
              "srcs": lib_sources,
-             "custom": [RequireAlembic(static=True)]})
+             "custom": [RequireAlembic(static=True, linkCore=False)]})
 
 prjs.append({"name": "Alembic",
              "type": "sharedlib",
-             "bldprefix": "lib/shared",
              "alias": "alembic-shared",
              "symvis": "hidden",
-             "defines": ["ALEMBIC_EXPORTS"],
+             "defs": ["ALEMBIC_EXPORTS"],
              "version": version_str,
              "install_name": "libAlembic.1.dylib",
              "soname": "libAlembic.so.1",
              "srcs": lib_sources,
-             "custom": [RequireAlembic(static=False)]})
+             "custom": [RequireAlembic(static=False, linkCore=False)]})
 
 prjs.append({"name": ("libAlembicAbcOpenGL" if sys.platform == "win32" else "AlembicAbcOpenGL"),
              "type": "staticlib",
              "alias": "alembicgl-static",
              "srcs": excons.glob("abcview/lib/AbcOpenGL/*.cpp"),
-             "custom": [RequireAlembic(static=True, withGL=True)]})
+             "custom": [RequireAlembic(static=True, withGL=True, linkGL=False)]})
 
 prjs.append({"name": "AlembicAbcOpenGL",
              "type": "sharedlib",
              "alias": "alembicgl-shared",
              "symvis": "hidden",
-             "defines": ["ABC_OPENGL_EXPORTS"],
+             "defs": ["ABC_OPENGL_EXPORTS"],
              "version": "1.1.0",
              "install_name": "libAlembicAbcOpenGL.1.dylib",
              "soname": "libAlembicAbcOpenGL.so.1",
              "srcs": excons.glob("abcview/lib/AbcOpenGL/*.cpp"),
-             "custom": [RequireAlembic(static=False, withGL=True)]})
+             "custom": [RequireAlembic(static=False, withGL=True, linkGL=False)]})
 
 # Python modules
 pydefs = []
