@@ -19,7 +19,7 @@ from excons.tools import vray
 
 excons.InitGlobals()
 
-version_tpl = (1, 7, 1)
+version_tpl = (1, 7, 2)
 version_str = ".".join(map(str, version_tpl))
 
 use_boost = True
