@@ -3267,17 +3267,33 @@ void Dso::transferUserParams(AtNode *dst)
          if (mptype != ptype)
          {
             // Do some simple type aliasing
-            if ((mptype == AI_TYPE_ENUM && (ptype == AI_TYPE_INT || ptype == AI_TYPE_STRING)) ||
+            if (// int -> enum, string -> enum
+                (mptype == AI_TYPE_ENUM && (ptype == AI_TYPE_INT || ptype == AI_TYPE_STRING)) ||
+                // string -> node
                 (mptype == AI_TYPE_NODE && ptype == AI_TYPE_STRING) ||
+                // int -> byte
                 (mptype == AI_TYPE_BYTE && ptype == AI_TYPE_INT) ||
+                // byte -> int
                 (mptype == AI_TYPE_INT && ptype == AI_TYPE_BYTE))
             {
                // Noop
             }
             else
             {
-               AiMsgWarning("[abcproc]     Parameter type mismatch \"%s\": %s on destination, %s on source", pname, AiParamGetTypeName(AiParamGetType(pe)), AiParamGetTypeName(ptype));
                doCopy = false;
+               if (mptype == AI_TYPE_ARRAY && ptype == AI_TYPE_STRING)
+               {
+                  AtArray *a = AiNodeGetArray(dst, pname);
+                  if (a && a->type == AI_TYPE_NODE)
+                  {
+                     // string -> node[]
+                     doCopy = true;
+                  }
+               }
+               if (!doCopy)
+               {
+                  AiMsgWarning("[abcproc]     Parameter type mismatch \"%s\": %s on destination, %s on source", pname, AiParamGetTypeName(AiParamGetType(pe)), AiParamGetTypeName(ptype));
+               }
             }
          }
       }
@@ -3509,10 +3525,22 @@ void Dso::transferUserParams(AtNode *dst)
                   }
                   break;
                case AI_TYPE_ARRAY: {
-                  // just pass the array on?
-                  AtArray *val = AiNodeGetArray(mProcNode, pname);
-                  AtArray *valCopy = AiArrayCopy(val);
-                  AiNodeSetArray(dst, pname, valCopy);
+                  if (ptype == AI_TYPE_STRING)
+                  {
+                     // The only special case for mptype == AI_TYPE_ARRAY
+                     const char *nn = AiNodeGetStr(mProcNode, pname);
+                     AtNode *n = AiNodeLookUpByName(nn);
+                     AtArray *nodes = AiArrayAllocate(1, 1, AI_TYPE_NODE);
+                     AiArraySetPtr(nodes, 0, n);
+                     AiNodeSetArray(dst, pname, nodes);
+                  }
+                  else
+                  {
+                     // just pass the array on?
+                     AtArray *val = AiNodeGetArray(mProcNode, pname);
+                     AtArray *valCopy = AiArrayCopy(val);
+                     AiNodeSetArray(dst, pname, valCopy);
+                  }
                   break;
                }
                default:
