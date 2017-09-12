@@ -182,9 +182,8 @@ def RequireAlembic(static=True, withPython=False, withGL=False, linkCore=True, l
 def RequireRegex(env):
    global regexSrcDir
    
-   if sys.platform == "win32":
-      env.Append(CPPDEFINES=["REGEX_STATIC"])
-      env.Append(CPPPATH=[regexSrcDir])
+   env.Append(CPPDEFINES=["REGEX_STATIC"])
+   env.Append(CPPPATH=[regexSrcDir])
 
 
 def RequireAlembicHelper(static=True, withPython=False, withGL=False):
