@@ -499,8 +499,8 @@ if withMaya:
 
    if withArnold:
       A, M, m = mtoa.Version(asString=False)
-      # So far MtoA 1.>=2 supported only
-      if A == 1 and M >= 2:
+      # So far MtoA 2.>=0 supported only
+      if A >= 2:
          AbcShapeMtoaAE = "maya/AbcShape/mtoa/%sMtoa.py" % AbcShapeName
          AbcShapeHelper = "maya/AbcShape/mtoa/%sHelper.py" % AbcShapeName
          
@@ -509,7 +509,7 @@ if withMaya:
          
          if not os.path.exists(AbcShapeHelper) or os.stat(AbcShapeHelper).st_mtime < os.stat("maya/AbcShape/mtoa/AbcShapeHelper.py.tpl").st_mtime:
             replace_in_file("maya/AbcShape/mtoa/AbcShapeHelper.py.tpl", AbcShapeHelper, "<<NodeName>>", AbcShapeName)
-         
+
          prjs.append({"name": "%sAbcShapeMtoa" % nameprefix,
                       "type": "dynamicmodule",
                       "alias": "alembic-mtoa",

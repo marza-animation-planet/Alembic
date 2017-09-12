@@ -76,14 +76,11 @@ std::string GetArnoldTypeString( GeometryScope scope, int arnoldAPIType)
         case AI_TYPE_RGBA:
             buffer << "RGBA";
             break;
-        case AI_TYPE_POINT:
-            buffer << "POINT";
-            break;
         case AI_TYPE_VECTOR:
             buffer << "VECTOR";
             break;
-        case AI_TYPE_POINT2:
-            buffer << "POINT2";
+        case AI_TYPE_VECTOR2:
+            buffer << "VECTOR2";
             break;
         case AI_TYPE_MATRIX:
             buffer << "MATRIX";
@@ -185,17 +182,6 @@ void AddArbitraryGeomParam( ICompoundProperty & parent,
                 
                 break;
             }
-            case AI_TYPE_POINT:
-            {
-                const float32_t * data = 
-                        reinterpret_cast<const float32_t *>(
-                                valueSample->get() );
-                
-                AiNodeSetPnt( primNode, param.getName().c_str(),
-                        data[0], data[1], data[2]);
-                
-                break;
-            }
             case AI_TYPE_VECTOR:
             {
                 const float32_t * data = 
@@ -207,13 +193,13 @@ void AddArbitraryGeomParam( ICompoundProperty & parent,
                 
                 break;
             }
-            case AI_TYPE_POINT2:
+            case AI_TYPE_VECTOR2:
             {
                 const float32_t * data = 
                         reinterpret_cast<const float32_t *>(
                                 valueSample->get() );
                 
-                AiNodeSetPnt2( primNode, param.getName().c_str(),
+                AiNodeSetVec2( primNode, param.getName().c_str(),
                         data[0], data[1] );
                 break;
             }
@@ -378,7 +364,7 @@ void AddArbitraryGeomParams( ICompoundProperty &parent,
                     propHeader,
                     sampleSelector,
                     primNode,
-                    AI_TYPE_POINT2);
+                    AI_TYPE_VECTOR2);
         }
         else if ( IV3fGeomParam::matches( propHeader ) )
         {
@@ -396,7 +382,7 @@ void AddArbitraryGeomParams( ICompoundProperty &parent,
                     propHeader,
                     sampleSelector,
                     primNode,
-                    AI_TYPE_POINT);
+                    AI_TYPE_VECTOR);
         }
         else if ( IN3fGeomParam::matches( propHeader ) )
         {

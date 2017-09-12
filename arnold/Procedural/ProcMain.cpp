@@ -82,16 +82,16 @@ void ProcessMeshFacesets( MeshClass &mesh, ProcArgs &args, regex_t *expr, AtNode
         {
             AtArray *nsides = AiNodeGetArray( amesh, "nsides" );
             
-            bool *faceVisArray = new bool[nsides->nelements];
+            bool *faceVisArray = new bool[AiArrayGetNumElements(nsides)];
             
-            for ( unsigned int i=0; i<nsides->nelements; ++i )
+            for ( unsigned int i=0; i<AiArrayGetNumElements(nsides); ++i )
             {
                 faceVisArray[i] = ( facesToKeep.find( i ) != facesToKeep.end() );
             }
             
             if ( AiNodeDeclare( amesh, "face_visibility", "uniform BOOL" ) )
             {
-                AiNodeSetArray( amesh, "face_visibility", ArrayConvert( nsides->nelements, 1, AI_TYPE_BOOLEAN, faceVisArray ) );
+                AiNodeSetArray( amesh, "face_visibility", ArrayConvert( AiArrayGetNumElements(nsides), 1, AI_TYPE_BOOLEAN, faceVisArray ) );
             }
             
             delete[] faceVisArray;
@@ -187,7 +187,7 @@ void WalkObject( IObject parent, const ObjectHeader &ohead, ProcArgs &args,
             
             AtNode *amesh = ( args.createdNodes.size() == nn ? 0 : args.createdNodes.back() );
             
-            if ( amesh && AiNodeIs( amesh, "polymesh" ) )
+            if ( amesh && AiNodeIs( amesh, (AtString)"polymesh" ) )
             {
                 ProcessMeshFacesets( subd, args, expr, amesh );
             }
@@ -205,7 +205,7 @@ void WalkObject( IObject parent, const ObjectHeader &ohead, ProcArgs &args,
             
             AtNode *amesh = ( args.createdNodes.size() == nn ? 0 : args.createdNodes.back() );
             
-            if ( amesh && AiNodeIs( amesh, "polymesh" ) )
+            if ( amesh && AiNodeIs( amesh, (AtString)"polymesh" ) )
             {
                 ProcessMeshFacesets( polymesh, args, expr, amesh );
             }
@@ -373,12 +373,12 @@ struct AtNode* ProcGetNode(void *user_ptr, int i)
 
 
 
-proc_loader
-{
-    vtable->Init        = ProcInit;
-    vtable->Cleanup     = ProcCleanup;
-    vtable->NumNodes    = ProcNumNodes;
-    vtable->GetNode     = ProcGetNode;
-    strcpy(vtable->version, AI_VERSION);
-    return 1;
-}
+// proc_loader
+// {
+//     vtable->Init        = ProcInit;
+//     vtable->Cleanup     = ProcCleanup;
+//     vtable->NumNodes    = ProcNumNodes;
+//     vtable->GetNode     = ProcGetNode;
+//     strcpy(vtable->version, AI_VERSION);
+//     return 1;
+// }

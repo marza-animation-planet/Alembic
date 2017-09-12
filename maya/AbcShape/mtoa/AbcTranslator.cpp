@@ -26,12 +26,12 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    
    // reference
    
-   data.defaultValue.BOOL = false;
+   data.defaultValue.BOOL() = false;
    data.name = "mtoa_constant_abc_outputReference";
    data.shortName = "outref";
    helper.MakeInputBoolean(data);
    
-   data.defaultValue.INT = 0;
+   data.defaultValue.INT() = 0;
    data.enums.clear();
    data.enums.append("attributes_then_file");
    data.enums.append("attributes");
@@ -56,7 +56,7 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.shortName = "reffp";
    helper.MakeInputString(data);
    
-   data.defaultValue.FLT = 0.0f;
+   data.defaultValue.FLT() = 0.0f;
    data.name = "mtoa_constant_abc_referenceFrame";
    data.shortName = "reffrm";
    data.hasMin = false;
@@ -67,15 +67,15 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    
    // velocity
    
-   data.defaultValue.FLT = 1.0f;
+   data.defaultValue.FLT() = 1.0f;
    data.name = "mtoa_constant_abc_velocityScale";
    data.shortName = "velscl";
    data.hasMin = false;
    data.hasSoftMin = true;
-   data.softMin.FLT = 0.0f;
+   data.softMin.FLT() = 0.0f;
    data.hasMax = false;
    data.hasSoftMax = true;
-   data.softMax.FLT = 10.0f;
+   data.softMax.FLT() = 10.0f;
    helper.MakeInputFloat(data);
    
    data.stringDefault = "";
@@ -88,25 +88,25 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.shortName = "accan";
    helper.MakeInputString(data);
    
-   data.defaultValue.BOOL = false;
+   data.defaultValue.BOOL() = false;
    data.name = "mtoa_constant_abc_forceVelocityBlur";
    data.shortName = "fvmb";
    helper.MakeInputBoolean(data);
    
    // bounding box
    
-   data.defaultValue.FLT = 0.0f;
+   data.defaultValue.FLT() = 0.0f;
    data.name = "mtoa_constant_abc_boundsPadding";
    data.shortName = "bndpad";
    data.hasMin = false;
    data.hasSoftMin = true;
-   data.softMin.FLT = 0.0f;
+   data.softMin.FLT() = 0.0f;
    data.hasMax = false;
    data.hasSoftMax = true;
-   data.softMax.FLT = 100.0f;
+   data.softMax.FLT() = 100.0f;
    helper.MakeInputFloat(data);
    
-   data.defaultValue.BOOL = false;
+   data.defaultValue.BOOL() = false;
    data.name = "mtoa_constant_abc_useOverrideBounds";
    data.shortName = "uovbnd";
    helper.MakeInputBoolean(data);
@@ -121,12 +121,12 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.shortName = "ovbdma";
    helper.MakeInputString(data);
    
-   data.defaultValue.BOOL = false;
+   data.defaultValue.BOOL() = false;
    data.name = "mtoa_constant_abc_computeVelocityExpandedBounds";
    data.shortName = "cvebnd";
    helper.MakeInputBoolean(data);
    
-   data.defaultValue.BOOL = false;
+   data.defaultValue.BOOL() = false;
    data.name = "mtoa_constant_abc_padBoundsWithPeakRadius";
    data.shortName = "pkrpad";
    helper.MakeInputBoolean(data);
@@ -136,7 +136,7 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.shortName = "pkrdn";
    helper.MakeInputString(data);
    
-   data.defaultValue.BOOL = false;
+   data.defaultValue.BOOL() = false;
    data.name = "mtoa_constant_abc_padBoundsWithPeakWidth";
    data.shortName = "pkwpad";
    helper.MakeInputBoolean(data);
@@ -160,31 +160,31 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.shortName = "radnam";
    helper.MakeInputString(data);
    
-   data.defaultValue.FLT = 1.0;
+   data.defaultValue.FLT() = 1.0;
    data.name = "mtoa_constant_abc_radiusScale";
    data.shortName = "radscl";
    data.hasMin = true;
-   data.min.FLT = 0.0;
+   data.min.FLT() = 0.0;
    data.hasSoftMin = false;
    data.hasMax = false;
    data.hasSoftMax = false;
    helper.MakeInputFloat(data);
    
-   data.defaultValue.FLT = 0.0;
+   data.defaultValue.FLT() = 0.0;
    data.name = "mtoa_constant_abc_radiusMin";
    data.shortName = "radmin";
    data.hasMin = true;
-   data.min.FLT = 0.0;
+   data.min.FLT() = 0.0;
    data.hasSoftMin = false;
    data.hasMax = false;
    data.hasSoftMax = false;
    helper.MakeInputFloat(data);
    
-   data.defaultValue.FLT = 1000000.0;
+   data.defaultValue.FLT() = 1000000.0;
    data.name = "mtoa_constant_abc_radiusMax";
    data.shortName = "radmax";
    data.hasMin = true;
-   data.min.FLT = 0.0;
+   data.min.FLT() = 0.0;
    data.hasSoftMin = false;
    data.hasMax = false;
    data.hasSoftMax = false;
@@ -192,47 +192,47 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    
    // curves
    
-   data.defaultValue.BOOL = true;
+   data.defaultValue.BOOL() = true;
    data.name = "mtoa_constant_abc_ignoreNurbs";
    data.shortName = "ignnrb";
    helper.MakeInputBoolean(data);
    
-   data.defaultValue.INT = 5;
+   data.defaultValue.INT() = 5;
    data.name = "mtoa_constant_abc_nurbsSampleRate";
    data.shortName = "nurbssr";
    data.hasMin = true;
-   data.min.INT = 1;
+   data.min.INT() = 1;
    data.hasSoftMin = false;
    data.hasMax = false;
    data.hasSoftMax = true;
-   data.softMax.INT = 10;
+   data.softMax.INT() = 10;
    helper.MakeInputInt(data);
    
-   data.defaultValue.FLT = 1.0;
+   data.defaultValue.FLT() = 1.0;
    data.name = "mtoa_constant_abc_widthScale";
    data.shortName = "wdtscl";
    data.hasMin = true;
-   data.min.FLT = 0.0;
+   data.min.FLT() = 0.0;
    data.hasSoftMin = false;
    data.hasMax = false;
    data.hasSoftMax = false;
    helper.MakeInputFloat(data);
    
-   data.defaultValue.FLT = 0.0;
+   data.defaultValue.FLT() = 0.0;
    data.name = "mtoa_constant_abc_widthMin";
    data.shortName = "wdtmin";
    data.hasMin = true;
-   data.min.FLT = 0.0;
+   data.min.FLT() = 0.0;
    data.hasSoftMin = false;
    data.hasMax = false;
    data.hasSoftMax = false;
    helper.MakeInputFloat(data);
    
-   data.defaultValue.FLT = 1000000.0;
+   data.defaultValue.FLT() = 1000000.0;
    data.name = "mtoa_constant_abc_widthMax";
    data.shortName = "wdtmax";
    data.hasMin = true;
-   data.min.FLT = 0.0;
+   data.min.FLT() = 0.0;
    data.hasSoftMin = false;
    data.hasMax = false;
    data.hasSoftMax = false;
@@ -240,27 +240,27 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    
    // attributes
    
-   data.defaultValue.BOOL = false;
+   data.defaultValue.BOOL() = false;
    data.name = "mtoa_constant_abc_objectAttribs";
    data.shortName = "objatrs";
    helper.MakeInputBoolean(data);
    
-   data.defaultValue.BOOL = false;
+   data.defaultValue.BOOL() = false;
    data.name = "mtoa_constant_abc_primitiveAttribs";
    data.shortName = "pratrs";
    helper.MakeInputBoolean(data);
    
-   data.defaultValue.BOOL = false;
+   data.defaultValue.BOOL() = false;
    data.name = "mtoa_constant_abc_pointAttribs";
    data.shortName = "ptatrs";
    helper.MakeInputBoolean(data);
    
-   data.defaultValue.BOOL = false;
+   data.defaultValue.BOOL() = false;
    data.name = "mtoa_constant_abc_vertexAttribs";
    data.shortName = "vtxatrs";
    helper.MakeInputBoolean(data);
    
-   data.defaultValue.INT = 0;
+   data.defaultValue.INT() = 0;
    data.enums.clear();
    data.enums.append("render");
    data.enums.append("shutter");
@@ -288,18 +288,18 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    
    // samples expansion
    
-   data.defaultValue.INT = 0;
+   data.defaultValue.INT() = 0;
    data.name = "mtoa_constant_abc_samplesExpandIterations";
    data.shortName = "sampexpiter";
    data.hasMin = true;
-   data.min.INT = 0;
+   data.min.INT() = 0;
    data.hasSoftMin = false;
    data.hasMax = true;
-   data.max.INT = 10;
+   data.max.INT() = 10;
    data.hasSoftMax = false;
    helper.MakeInputInt(data);
    
-   data.defaultValue.BOOL = false;
+   data.defaultValue.BOOL() = false;
    data.name = "mtoa_constant_abc_optimizeSamples";
    data.shortName = "optsamp";
    helper.MakeInputBoolean(data);
@@ -307,18 +307,18 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    // others
    
    // volume
-   data.defaultValue.FLT = 0.0f;
+   data.defaultValue.FLT() = 0.0f;
    data.name = "aiStepSize";
    data.shortName = "ai_step_size";
    data.hasMin = true;
-   data.min.FLT = 0.f;
+   data.min.FLT() = 0.f;
    data.hasSoftMin = false;
    data.hasMax = false;
    data.hasSoftMax = true;
-   data.softMax.FLT = 1.f;
+   data.softMax.FLT() = 1.f;
    helper.MakeInputFloat(data);
    
-   data.defaultValue.BOOL = false;
+   data.defaultValue.BOOL() = false;
    data.name = "mtoa_constant_abc_verbose";
    data.shortName = "vrbexp";
    helper.MakeInputBoolean(data);
@@ -834,25 +834,25 @@ void CAbcTranslator::ExportVisibility(AtNode *proc)
       plug = FindMayaPlug("visibleInReflections"); // maya shape built-in attribute
       if (!plug.isNull() && !plug.asBool())
       {
-         visibility &= ~AI_RAY_REFLECTED;
+         visibility &= ~AI_RAY_SPECULAR_REFLECT;
       }
 
       plug = FindMayaPlug("visibleInRefractions"); // maya shape built-in attribute
       if (!plug.isNull() && !plug.asBool())
       {
-         visibility &= ~AI_RAY_REFRACTED;
+         visibility &= ~AI_RAY_SPECULAR_TRANSMIT;
       }
 
       plug = FindMayaPlug("aiVisibleInDiffuse");
       if (!plug.isNull() && !plug.asBool())
       {
-         visibility &= ~AI_RAY_DIFFUSE;
+         visibility &= ~(AI_RAY_ALL_DIFFUSE | AI_RAY_VOLUME);
       }
 
       plug = FindMayaPlug("aiVisibleInGlossy");
       if (!plug.isNull() && !plug.asBool())
       {
-         visibility &= ~AI_RAY_GLOSSY;
+         visibility &= ~AI_RAY_SPECULAR_REFLECT;
       }
    }
 
@@ -994,7 +994,7 @@ void CAbcTranslator::ExportShader(AtNode *proc, bool update)
          if (!plug.isNull())
          {
             outputDispPadding = true;
-            dispPadding = MAX(dispPadding, plug.asFloat());
+            dispPadding = AiMax(dispPadding, plug.asFloat());
          }
          
          plug = dispNode.findPlug("aiDisplacementAutoBump");
@@ -1254,7 +1254,7 @@ static bool ReadSinglePnt(const float *fdata, const double *ddata, size_t dim, s
 {
    if (dim == 3 && count >= 1)
    {
-      AtPoint *pnt = (AtPoint*) userData;
+      AtVector *pnt = (AtVector*) userData;
       
       if (fdata)
       {
@@ -1734,7 +1734,7 @@ void CAbcTranslator::ReadAlembicAttributes(double time)
          
          if (m_overrideBounds)
          {
-            AtPoint min, max;
+            AtVector min, max;
             
             bool hasMin = ReadFloat3Attribute(time, userProps, geomParams, m_overrideBoundsMin, Alembic::AbcGeom::kConstantScope, ReadSinglePnt, &min);
             if (!hasMin && promoteMin)
@@ -1744,7 +1744,7 @@ void CAbcTranslator::ReadAlembicAttributes(double time)
             }
             if (hasMin)
             {
-               AtPoint max;
+               AtVector max;
                
                bool hasMax = ReadFloat3Attribute(time, userProps, geomParams, m_overrideBoundsMax, Alembic::AbcGeom::kConstantScope, ReadSinglePnt, &max);
                if (!hasMax && promoteMax)
@@ -2132,20 +2132,20 @@ void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
          
          if (m_boundsOverridden)
          {
-            AiNodeSetPnt(proc, "min", m_min.x, m_min.y, m_min.z);
-            AiNodeSetPnt(proc, "max", m_max.x, m_max.y, m_max.z);
+            AiNodeSetVec(proc, "min", m_min.x, m_min.y, m_min.z);
+            AiNodeSetVec(proc, "max", m_max.x, m_max.y, m_max.z);
          }
          else
          {
-            AiNodeSetPnt(proc, "min", static_cast<float>(bmin.x), static_cast<float>(bmin.y), static_cast<float>(bmin.z));
-            AiNodeSetPnt(proc, "max", static_cast<float>(bmax.x), static_cast<float>(bmax.y), static_cast<float>(bmax.z));
+            AiNodeSetVec(proc, "min", static_cast<float>(bmin.x), static_cast<float>(bmin.y), static_cast<float>(bmin.z));
+            AiNodeSetVec(proc, "max", static_cast<float>(bmax.x), static_cast<float>(bmax.y), static_cast<float>(bmax.z));
          }
       }
       else
       {
          AiNodeSetBool(proc, "load_at_init", true);
-         AiNodeSetPnt(proc, "min", 0.0f, 0.0f, 0.0f);
-         AiNodeSetPnt(proc, "max", 0.0f, 0.0f, 0.0f);
+         AiNodeSetVec(proc, "min", 0.0f, 0.0f, 0.0f);
+         AiNodeSetVec(proc, "max", 0.0f, 0.0f, 0.0f);
       }
    }
    else if (singleShape)
@@ -2165,8 +2165,8 @@ void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
                SampleWidths(m_widths, m_sampleTime, m_maxWidth);
             }
             
-            AtPoint cmin = AiNodeGetPnt(proc, "min");
-            AtPoint cmax = AiNodeGetPnt(proc, "max");
+            AtVector cmin = AiNodeGetVec(proc, "min");
+            AtVector cmax = AiNodeGetVec(proc, "max");
             
             // merge bmin, max in cmin, cmax
             if (bmin.x < cmin.x)
@@ -2182,8 +2182,8 @@ void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
             if (bmax.z > cmax.z)
                cmax.z = static_cast<float>(bmax.z);
             
-            AiNodeSetPnt(proc, "min", cmin.x, cmin.y, cmin.z);
-            AiNodeSetPnt(proc, "max", cmax.x, cmax.y, cmax.z);
+            AiNodeSetVec(proc, "min", cmin.x, cmin.y, cmin.z);
+            AiNodeSetVec(proc, "max", cmax.x, cmax.y, cmax.z);
          }
          else
          {
@@ -2191,8 +2191,8 @@ void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
             float dframe = m_renderFrame - m_sampleFrame;
             if (-0.001f < dframe && dframe < 0.001f)
             {
-               AiNodeSetPnt(proc, "min", static_cast<float>(bmin.x), static_cast<float>(bmin.y), static_cast<float>(bmin.z));
-               AiNodeSetPnt(proc, "max", static_cast<float>(bmax.x), static_cast<float>(bmax.y), static_cast<float>(bmax.z));
+               AiNodeSetVec(proc, "min", static_cast<float>(bmin.x), static_cast<float>(bmin.y), static_cast<float>(bmin.z));
+               AiNodeSetVec(proc, "max", static_cast<float>(bmax.x), static_cast<float>(bmax.y), static_cast<float>(bmax.z));
             }
          }
       }
@@ -2863,7 +2863,7 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
       // Write out samples list if necessary
       if (m_samples.size() > 0)
       {
-         MString data = AiNodeGetStr(proc, "data");
+         MString data = AiNodeGetStr(proc, "data").c_str();
 
          std::sort(m_samples.begin(), m_samples.end());
 
@@ -2879,8 +2879,8 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
       // Write out final bounding box including padding
       const AtNodeEntry *nodeEntry = AiNodeGetNodeEntry(proc);
 
-      AtPoint cmin = AiNodeGetPnt(proc, "min");
-      AtPoint cmax = AiNodeGetPnt(proc, "max");
+      AtVector cmin = AiNodeGetVec(proc, "min");
+      AtVector cmax = AiNodeGetVec(proc, "max");
 
       if (m_computeVelocityExpandedBounds)
       {
@@ -2935,7 +2935,7 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
       cmax.y += padding;
       cmax.z += padding;
 
-      AiNodeSetPnt(proc, "min", cmin.x, cmin.y, cmin.z);
-      AiNodeSetPnt(proc, "max", cmax.x, cmax.y, cmax.z);
+      AiNodeSetVec(proc, "min", cmin.x, cmin.y, cmin.z);
+      AiNodeSetVec(proc, "max", cmax.x, cmax.y, cmax.z);
    }
 }

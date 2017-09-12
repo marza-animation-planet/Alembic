@@ -1209,7 +1209,7 @@ bool Dso::cleanAttribName(std::string &name) const
 
 void Dso::readFromDataParam()
 {
-   std::string data = AiNodeGetStr(mProcNode, "data");
+   std::string data = AiNodeGetStr(mProcNode, "data").c_str();
    
    // split data string
    
@@ -1975,7 +1975,7 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            std::string rootDrive = AiNodeGetStr(mProcNode, pname);
+            std::string rootDrive = AiNodeGetStr(mProcNode, pname).c_str();
             
             if (rootDrive.length() == 1 && 
                 ((rootDrive[0] >= 'a' && rootDrive[0] <= 'z') ||
@@ -1997,7 +1997,7 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            mCommonParams.filePath = AiNodeGetStr(mProcNode, pname);
+            mCommonParams.filePath = AiNodeGetStr(mProcNode, pname).c_str();
          }
          else
          {
@@ -2019,7 +2019,7 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            mCommonParams.referenceFilePath = AiNodeGetStr(mProcNode, pname);
+            mCommonParams.referenceFilePath = AiNodeGetStr(mProcNode, pname).c_str();
          }
          else
          {
@@ -2030,7 +2030,7 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            mCommonParams.objectPath = AiNodeGetStr(mProcNode, pname);
+            mCommonParams.objectPath = AiNodeGetStr(mProcNode, pname).c_str();
          }
          else
          {
@@ -2041,7 +2041,7 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            mCommonParams.namePrefix = AiNodeGetStr(mProcNode, pname);
+            mCommonParams.namePrefix = AiNodeGetStr(mProcNode, pname).c_str();
          }
          else
          {
@@ -2129,7 +2129,7 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            std::string val = AiNodeGetStr(mProcNode, pname);
+            std::string val = AiNodeGetStr(mProcNode, pname).c_str();
             toLower(val);
             
             int i = 0;
@@ -2184,8 +2184,8 @@ void Dso::readFromUserParams()
             
             if (samples)
             {
-               unsigned int ne = samples->nelements;
-               unsigned int nk = samples->nkeys;
+               unsigned int ne = AiArrayGetNumElements(samples);
+               unsigned int nk = AiArrayGetNumKeys(samples);
                
                if (ne * nk > 0)
                {
@@ -2197,7 +2197,7 @@ void Dso::readFromUserParams()
                      ne = 1;
                   }
                   
-                  for (unsigned int i=0, j=0; i<samples->nkeys; ++i, j+=samples->nelements)
+                  for (unsigned int i=0, j=0; i<AiArrayGetNumKeys(samples); ++i, j+=AiArrayGetNumElements(samples))
                   {
                      for (unsigned int k=0; k<ne; ++k)
                      {
@@ -2322,7 +2322,7 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            std::string val = AiNodeGetStr(mProcNode, pname);
+            std::string val = AiNodeGetStr(mProcNode, pname).c_str();
             toLower(val);
             
             int i = 0;
@@ -2373,7 +2373,7 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            mCommonParams.referencePositionName = AiNodeGetStr(mProcNode, pname);
+            mCommonParams.referencePositionName = AiNodeGetStr(mProcNode, pname).c_str();
             if (mCommonParams.referencePositionName.length() == 0)
             {
                mCommonParams.referencePositionName = "Pref";
@@ -2388,7 +2388,7 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            mCommonParams.referenceNormalName = AiNodeGetStr(mProcNode, pname);
+            mCommonParams.referenceNormalName = AiNodeGetStr(mProcNode, pname).c_str();
             if (mCommonParams.referenceNormalName.length() == 0)
             {
                mCommonParams.referenceNormalName = "Nref";
@@ -2415,7 +2415,7 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            mCommonParams.velocityName = AiNodeGetStr(mProcNode, pname);
+            mCommonParams.velocityName = AiNodeGetStr(mProcNode, pname).c_str();
          }
          else
          {
@@ -2426,7 +2426,7 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            mCommonParams.accelerationName = AiNodeGetStr(mProcNode, pname);
+            mCommonParams.accelerationName = AiNodeGetStr(mProcNode, pname).c_str();
          }
          else
          {
@@ -2439,7 +2439,7 @@ void Dso::readFromUserParams()
          
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            std::string names = AiNodeGetStr(mProcNode, pname);
+            std::string names = AiNodeGetStr(mProcNode, pname).c_str();
             std::string name;
             
             size_t p0 = 0;
@@ -2473,9 +2473,9 @@ void Dso::readFromUserParams()
             
             if (names)
             {
-               for (unsigned int i=0; i<names->nelements; ++i)
+               for (unsigned int i=0; i<AiArrayGetNumElements(names); ++i)
                {
-                  mMultiParams.overrideAttribs.insert(AiArrayGetStr(names, i));
+                  mMultiParams.overrideAttribs.insert(AiArrayGetStr(names, i).c_str());
                }
             }
          }
@@ -2490,7 +2490,7 @@ void Dso::readFromUserParams()
          
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            std::string names = AiNodeGetStr(mProcNode, pname);
+            std::string names = AiNodeGetStr(mProcNode, pname).c_str();
             std::string name;
             
             size_t p0 = 0;
@@ -2524,9 +2524,9 @@ void Dso::readFromUserParams()
             
             if (names)
             {
-               for (unsigned int i=0; i<names->nelements; ++i)
+               for (unsigned int i=0; i<AiArrayGetNumElements(names); ++i)
                {
-                  mCommonParams.promoteToObjectAttribs.insert(AiArrayGetStr(names, i));
+                  mCommonParams.promoteToObjectAttribs.insert(AiArrayGetStr(names, i).c_str());
                }
             }
          }
@@ -2572,7 +2572,7 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            const char *n = AiNodeGetStr(mProcNode, pname);
+            const char *n = AiNodeGetStr(mProcNode, pname).c_str();
             if (n && strlen(n) > 0)
             {
                mMultiParams.overrideBoundsMinName = n;
@@ -2587,7 +2587,7 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            const char *n = AiNodeGetStr(mProcNode, pname);
+            const char *n = AiNodeGetStr(mProcNode, pname).c_str();
             if (n && strlen(n) > 0)
             {
                mMultiParams.overrideBoundsMaxName = n;
@@ -2613,7 +2613,7 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            const char *n = AiNodeGetStr(mProcNode, pname);
+            const char *n = AiNodeGetStr(mProcNode, pname).c_str();
             if (n && strlen(n) > 0)
             {
                mMultiParams.peakRadiusName = n;
@@ -2639,7 +2639,7 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            const char *n = AiNodeGetStr(mProcNode, pname);
+            const char *n = AiNodeGetStr(mProcNode, pname).c_str();
             if (n && strlen(n) > 0)
             {
                mMultiParams.peakWidthName = n;
@@ -2698,7 +2698,7 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            std::string val = AiNodeGetStr(mProcNode, pname);
+            std::string val = AiNodeGetStr(mProcNode, pname).c_str();
             toLower(val);
             
             int i = 0;
@@ -2740,7 +2740,7 @@ void Dso::readFromUserParams()
          
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            std::string prefices = AiNodeGetStr(mProcNode, pname);
+            std::string prefices = AiNodeGetStr(mProcNode, pname).c_str();
             std::string prefix;
             
             size_t p0 = 0;
@@ -2774,9 +2774,9 @@ void Dso::readFromUserParams()
             
             if (prefices)
             {
-               for (unsigned int i=0; i<prefices->nelements; ++i)
+               for (unsigned int i=0; i<AiArrayGetNumElements(prefices); ++i)
                {
-                  mSingleParams.attribPreficesToRemove.insert(AiArrayGetStr(prefices, i));
+                  mSingleParams.attribPreficesToRemove.insert(AiArrayGetStr(prefices, i).c_str());
                }
             }
          }
@@ -2791,7 +2791,7 @@ void Dso::readFromUserParams()
          
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            std::string uvnames = AiNodeGetStr(mProcNode, pname);
+            std::string uvnames = AiNodeGetStr(mProcNode, pname).c_str();
             std::string uvname;
             
             size_t p0 = 0;
@@ -2825,9 +2825,9 @@ void Dso::readFromUserParams()
             
             if (uvnames)
             {
-               for (unsigned int i=0; i<uvnames->nelements; ++i)
+               for (unsigned int i=0; i<AiArrayGetNumElements(uvnames); ++i)
                {
-                  mSingleParams.computeTangents.insert(AiArrayGetStr(uvnames, i));
+                  mSingleParams.computeTangents.insert(AiArrayGetStr(uvnames, i).c_str());
                }
             }
          }
@@ -2840,7 +2840,7 @@ void Dso::readFromUserParams()
       {
          if (AiUserParamGetType(p) == AI_TYPE_STRING)
          {
-            mSingleParams.radiusName = AiNodeGetStr(mProcNode, pname);
+            mSingleParams.radiusName = AiNodeGetStr(mProcNode, pname).c_str();
          }
          else
          {
@@ -3176,11 +3176,8 @@ void Dso::transferUserParams(AtNode *dst)
             case AI_TYPE_VECTOR:
                if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " VECTOR").c_str());
                break;
-            case AI_TYPE_POINT:
-               if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " POINT").c_str());
-               break;
-            case AI_TYPE_POINT2:
-               if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " POINT2").c_str());
+            case AI_TYPE_VECTOR2:
+               if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " VECTOR2").c_str());
                break;
             case AI_TYPE_STRING:
                if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " STRING").c_str());
@@ -3193,7 +3190,7 @@ void Dso::transferUserParams(AtNode *dst)
                break;
             case AI_TYPE_ARRAY: {
                AtArray *val = AiNodeGetArray(mProcNode, pname);
-               switch (val->type)
+               switch (AiArrayGetType(val))
                {
                case AI_TYPE_BYTE:
                   if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " ARRAY BYTE").c_str());
@@ -3219,11 +3216,8 @@ void Dso::transferUserParams(AtNode *dst)
                case AI_TYPE_VECTOR:
                   if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " ARRAY VECTOR").c_str());
                   break;
-               case AI_TYPE_POINT:
-                  if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " ARRAY POINT").c_str());
-                  break;
-               case AI_TYPE_POINT2:
-                  if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " ARRAY POINT2").c_str());
+               case AI_TYPE_VECTOR2:
+                  if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " ARRAY VECTOR2").c_str());
                   break;
                case AI_TYPE_STRING:
                   if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " ARRAY STRING").c_str());
@@ -3284,7 +3278,7 @@ void Dso::transferUserParams(AtNode *dst)
                if (mptype == AI_TYPE_ARRAY && ptype == AI_TYPE_STRING)
                {
                   AtArray *a = AiNodeGetArray(dst, pname);
-                  if (a && a->type == AI_TYPE_NODE)
+                  if (a && AiArrayGetType(a) == AI_TYPE_NODE)
                   {
                      // string -> node[]
                      doCopy = true;
@@ -3321,19 +3315,19 @@ void Dso::transferUserParams(AtNode *dst)
                switch (pcat)
                {
                case AI_USERDEF_UNIFORM:
-                  if (AiNodeIs(dst, "polymesh"))
+                  if (AiNodeIs(dst, (AtString)"polymesh"))
                   {
                      AtArray *a = AiNodeGetArray(dst, "nsides");
-                     if (val->nelements != a->nelements)
+                     if (AiArrayGetNumElements(val) != AiArrayGetNumElements(a))
                      {
                         AiMsgWarning("[abcproc]     Polygon count mismatch for uniform attribute");
                         continue;
                      }
                   }
-                  else if (AiNodeIs(dst, "curves"))
+                  else if (AiNodeIs(dst, (AtString)"curves"))
                   {
                      AtArray *a = AiNodeGetArray(dst, "num_points");
-                     if (val->nelements != a->nelements)
+                     if (AiArrayGetNumElements(val) != AiArrayGetNumElements(a))
                      {
                         AiMsgWarning("[abcproc]     Curve count mismatch for uniform attribute");
                         continue;
@@ -3349,28 +3343,28 @@ void Dso::transferUserParams(AtNode *dst)
                   }
                   break;
                case AI_USERDEF_VARYING: // varying
-                  if (AiNodeIs(dst, "polymesh"))
+                  if (AiNodeIs(dst, (AtString)"polymesh"))
                   {
                      AtArray *a = AiNodeGetArray(dst, "vlist");
-                     if (val->nelements != a->nelements)
+                     if (AiArrayGetNumElements(val) != AiArrayGetNumElements(a))
                      {
                         AiMsgWarning("[gto DSO]     Point count mismatch for varying attribute");
                         continue;
                      }
                   }
-                  else if (AiNodeIs(dst, "curves"))
+                  else if (AiNodeIs(dst, (AtString)"curves"))
                   {
                      AtArray *a = AiNodeGetArray(dst, "points");
-                     if (val->nelements != a->nelements)
+                     if (AiArrayGetNumElements(val) != AiArrayGetNumElements(a))
                      {
                         AiMsgWarning("[gto DSO]     Point count mismatch for varying attribute");
                         continue;
                      }
                   }
-                  else if (AiNodeIs(dst, "points"))
+                  else if (AiNodeIs(dst, (AtString)"points"))
                   {
                      AtArray *a = AiNodeGetArray(dst, "points");
-                     if (val->nelements != a->nelements)
+                     if (AiArrayGetNumElements(val) != AiArrayGetNumElements(a))
                      {
                         AiMsgWarning("[gto DSO]     Point count mismatch for varying attribute");
                         continue;
@@ -3386,7 +3380,7 @@ void Dso::transferUserParams(AtNode *dst)
                   }
                   break;
                case AI_USERDEF_INDEXED:
-                  if (AiNodeIs(dst, "polymesh"))
+                  if (AiNodeIs(dst, (AtString)"polymesh"))
                   {
                      // get the idxs attribute count
                      AtArray *a = AiNodeGetArray(dst, "vidxs");
@@ -3394,7 +3388,7 @@ void Dso::transferUserParams(AtNode *dst)
                      if (plen > 4 && !strncmp(pname + plen - 4, "idxs", 4))
                      {
                         // direcly compare size
-                        if (val->nelements != a->nelements)
+                        if (AiArrayGetNumElements(val) != AiArrayGetNumElements(a))
                         {
                            AiMsgWarning("[gto DSO]     Count mismatch for indexed attribute");
                            continue;
@@ -3404,7 +3398,7 @@ void Dso::transferUserParams(AtNode *dst)
                      {
                         // get idxs attribute and compare size [if exists]
                         AtArray *idxs = AiNodeGetArray(mProcNode, indexAttr.c_str());
-                        if (!idxs || idxs->nelements != a->nelements)
+                        if (!idxs || AiArrayGetNumElements(idxs) != AiArrayGetNumElements(a))
                         {
                            AiMsgWarning("[gto DSO]     Count mismatch for indexed attribute");
                            continue;
@@ -3474,14 +3468,9 @@ void Dso::transferUserParams(AtNode *dst)
                   AiNodeSetVec(dst, pname, val.x, val.y, val.z);
                   break;
                }
-               case AI_TYPE_POINT: {
-                  AtPoint val = AiNodeGetPnt(mProcNode, pname);
-                  AiNodeSetPnt(dst, pname, val.x, val.y, val.z);
-                  break;
-               }
-               case AI_TYPE_POINT2: {
-                  AtPoint2 val = AiNodeGetPnt2(mProcNode, pname);
-                  AiNodeSetPnt2(dst, pname, val.x, val.y);
+               case AI_TYPE_VECTOR2: {
+                  AtVector2 val = AiNodeGetVec2(mProcNode, pname);
+                  AiNodeSetVec2(dst, pname, val.x, val.y);
                   break;
                }
                case AI_TYPE_STRING:
@@ -3498,7 +3487,7 @@ void Dso::transferUserParams(AtNode *dst)
                case AI_TYPE_NODE:
                   if (ptype == AI_TYPE_STRING)
                   {
-                     const char *nn = AiNodeGetStr(mProcNode, pname);
+                     const char *nn = AiNodeGetStr(mProcNode, pname).c_str();
                      AtNode *n = AiNodeLookUpByName(nn);
                      AiNodeSetPtr(dst, pname, (void*)n);
                   }
@@ -3508,8 +3497,7 @@ void Dso::transferUserParams(AtNode *dst)
                   }
                   break;
                case AI_TYPE_MATRIX: {
-                  AtMatrix val;
-                  AiNodeGetMatrix(mProcNode, pname, val);
+                  AtMatrix val = AiNodeGetMatrix(mProcNode, pname);
                   AiNodeSetMatrix(dst, pname, val);
                   break;
                 }

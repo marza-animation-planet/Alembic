@@ -139,7 +139,7 @@ void ProcessIndexedBuiltinParam(
         geomParamT param,
         const SampleTimeSet & sampleTimes,
         std::vector<float> & values,
-        std::vector<AtUInt32> & idxs,
+        std::vector<uint32_t> & idxs,
         size_t elementSize)
 {
     if ( !param.valid() ) { return; }
@@ -230,7 +230,7 @@ template <typename primT>
 AtNode * ProcessPolyMeshBase(
         primT & prim, ProcArgs & args,
         SampleTimeSet & sampleTimes,
-        std::vector<AtUInt32> & vidxs,
+        std::vector<uint32_t> & vidxs,
         int subdiv_iterations,
         MatrixSampleMap * xformSamples, 
         const std::string & facesetName = "" )
@@ -313,11 +313,11 @@ AtNode * ProcessPolyMeshBase(
     singleSampleTimes.insert( args.frame / args.fps );
     
     
-    std::vector<AtByte> nsides;
+    std::vector<uint8_t> nsides;
     std::vector<float> vlist;
     
     std::vector<float> uvlist;
-    std::vector<AtUInt32> uvidxs;
+    std::vector<uint32_t> uvidxs;
     
     
     // POTENTIAL OPTIMIZATIONS LEFT TO THE READER
@@ -344,7 +344,7 @@ AtNode * ProcessPolyMeshBase(
                     return NULL;
                 }
                 
-                nsides.push_back( (AtByte) n );
+                nsides.push_back( (uint8_t) n );
             }
             
             size_t vidxSize = sample.getFaceIndices()->size();
@@ -520,7 +520,7 @@ void ProcessPolyMesh( IPolyMesh &polymesh, ProcArgs &args,
         MatrixSampleMap * xformSamples, const std::string & facesetName )
 {
     SampleTimeSet sampleTimes;
-    std::vector<AtUInt32> vidxs;
+    std::vector<uint32_t> vidxs;
     
     AtNode * meshNode = ProcessPolyMeshBase(
             polymesh, args, sampleTimes, vidxs, 0, xformSamples,
@@ -536,7 +536,7 @@ void ProcessPolyMesh( IPolyMesh &polymesh, ProcArgs &args,
     IPolyMeshSchema &ps = polymesh.getSchema();
     
     std::vector<float> nlist;
-    std::vector<AtUInt32> nidxs;
+    std::vector<uint32_t> nidxs;
     
     ProcessIndexedBuiltinParam(
             ps.getNormalsParam(),
@@ -573,7 +573,7 @@ void ProcessSubD( ISubD &subd, ProcArgs &args,
         MatrixSampleMap * xformSamples, const std::string & facesetName )
 {
     SampleTimeSet sampleTimes;
-    std::vector<AtUInt32> vidxs;
+    std::vector<uint32_t> vidxs;
     
     AtNode * meshNode = ProcessPolyMeshBase(
             subd, args, sampleTimes, vidxs, args.subdIterations,

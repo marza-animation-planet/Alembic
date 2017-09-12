@@ -29,19 +29,16 @@ bool ResizeUserAttribute(UserAttribute &ua, unsigned int newSize)
    }
    
    bool boolDef = false;
-   AtByte byteDef = 0;
+   uint8_t byteDef = 0;
    int intDef = 0;
    unsigned int uintDef = 0;
    float floatDef = 0.0f;
-   AtPoint2 pnt2Def = {0.0f, 0.0f};
-   AtPoint pntDef = {0.0f, 0.0f, 0.0f};
-   AtVector vecDef = {0.0f, 0.0f, 0.0f};
-   AtColor rgbDef = {0.0f, 0.0f, 0.0f};
-   AtRGBA rgbaDef = {0.0f, 0.0f, 0.0f, 1.0f};
-   AtMatrix matrixDef;
+   AtVector2 vec2Def(0.0f, 0.0f);
+   AtVector vecDef(0.0f, 0.0f, 0.0f);
+   AtRGB rgbDef(0.0f, 0.0f, 0.0f);
+   AtRGBA rgbaDef(0.0f, 0.0f, 0.0f, 1.0f);
+   AtMatrix matrixDef = AiM4Identity();
    const char *strDef = 0;
-   
-   AiM4Identity(matrixDef);
    
    std::set<std::string>::iterator it = ua.strings.insert("").first;
    strDef = it->c_str();
@@ -58,7 +55,7 @@ bool ResizeUserAttribute(UserAttribute &ua, unsigned int newSize)
       defaultValue = &boolDef;
       break;
    case AI_TYPE_BYTE:
-      podSize = sizeof(AtByte);
+      podSize = sizeof(uint8_t);
       defaultValue = &byteDef;
       break;
    case AI_TYPE_INT:
@@ -73,12 +70,8 @@ bool ResizeUserAttribute(UserAttribute &ua, unsigned int newSize)
       defaultValue = &floatDef;
       podSize = sizeof(float);
       break;
-   case AI_TYPE_POINT2:
-      defaultValue = &(pnt2Def.x);
-      podSize = sizeof(float);
-      break;
-   case AI_TYPE_POINT:
-      defaultValue = &(pntDef.x);
+   case AI_TYPE_VECTOR2:
+      defaultValue = &(vec2Def.x);
       podSize = sizeof(float);
       break;
    case AI_TYPE_VECTOR:
@@ -178,7 +171,7 @@ bool CopyUserAttribute(UserAttribute &src, unsigned int srcIdx, unsigned int cou
       podSize = sizeof(bool);
       break;
    case AI_TYPE_BYTE:
-      podSize = sizeof(AtByte);
+      podSize = sizeof(uint8_t);
       break;
    case AI_TYPE_INT:
       podSize = sizeof(int);
@@ -187,8 +180,7 @@ bool CopyUserAttribute(UserAttribute &src, unsigned int srcIdx, unsigned int cou
       podSize = sizeof(unsigned int);
       break;
    case AI_TYPE_FLOAT:
-   case AI_TYPE_POINT2:
-   case AI_TYPE_POINT:
+   case AI_TYPE_VECTOR2:
    case AI_TYPE_VECTOR:
    case AI_TYPE_RGB:
    case AI_TYPE_RGBA:
@@ -738,7 +730,7 @@ bool ReadUserAttribute(UserAttribute &ua,
       if (ua.dataDim != 1) return false;
       ua.arnoldType = AI_TYPE_BYTE;
       ua.arnoldTypeStr = "BYTE";
-      return _ReadUserAttribute<Alembic::Abc::Int8TPTraits, Alembic::Util::int8_t, AtByte>(ua, parent, header, t, geoparam, interpolate);
+      return _ReadUserAttribute<Alembic::Abc::Int8TPTraits, Alembic::Util::int8_t, uint8_t>(ua, parent, header, t, geoparam, interpolate);
    
    case Alembic::Util::kUint8POD:
       if (ua.dataDim != 1) return false;
@@ -826,8 +818,8 @@ bool ReadUserAttribute(UserAttribute &ua,
          ua.arnoldTypeStr = "FLOAT";
          return _ReadUserAttribute<Alembic::Abc::Float32TPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
       case 2:
-         ua.arnoldType = AI_TYPE_POINT2;
-         ua.arnoldTypeStr = "POINT2";
+         ua.arnoldType = AI_TYPE_VECTOR2;
+         ua.arnoldTypeStr = "VECTOR2";
          if (interp.find("point") != std::string::npos)
          {
             return _ReadUserAttribute<Alembic::Abc::P2fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
@@ -846,13 +838,7 @@ bool ReadUserAttribute(UserAttribute &ua,
             return false;
          }
       case 3:
-         if (interp.find("point") != std::string::npos)
-         {
-            ua.arnoldType = AI_TYPE_POINT;
-            ua.arnoldTypeStr = "POINT";
-            return _ReadUserAttribute<Alembic::Abc::P3fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
-         }
-         else if (interp.find("rgb") != std::string::npos)
+         if (interp.find("rgb") != std::string::npos)
          {
             ua.arnoldType = AI_TYPE_RGB;
             ua.arnoldTypeStr = "RGB";
@@ -862,7 +848,11 @@ bool ReadUserAttribute(UserAttribute &ua,
          {
             ua.arnoldType = AI_TYPE_VECTOR;
             ua.arnoldTypeStr = "VECTOR";
-            if (interp.find("normal") != std::string::npos)
+            if (interp.find("point") != std::string::npos)
+            {
+               return _ReadUserAttribute<Alembic::Abc::P3fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
+            }
+            else if (interp.find("normal") != std::string::npos)
             {
                return _ReadUserAttribute<Alembic::Abc::N3fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
             }
@@ -905,8 +895,8 @@ bool ReadUserAttribute(UserAttribute &ua,
          ua.arnoldTypeStr = "FLOAT";
          return _ReadUserAttribute<Alembic::Abc::Float64TPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
       case 2:
-         ua.arnoldType = AI_TYPE_POINT2;
-         ua.arnoldTypeStr = "POINT2";
+         ua.arnoldType = AI_TYPE_VECTOR2;
+         ua.arnoldTypeStr = "VECTOR2";
          if (interp.find("point") != std::string::npos)
          {
             return _ReadUserAttribute<Alembic::Abc::P2dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
@@ -926,29 +916,25 @@ bool ReadUserAttribute(UserAttribute &ua,
          }
       case 3:
          // no C3dTPTraits (rgb)
+         ua.arnoldType = AI_TYPE_VECTOR;
+         ua.arnoldTypeStr = "VECTOR";
+
          if (interp.find("point") != std::string::npos)
          {
-            ua.arnoldType = AI_TYPE_POINT;
-            ua.arnoldTypeStr = "POINT";
             return _ReadUserAttribute<Alembic::Abc::P3dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
+         }
+         else if (interp.find("normal") != std::string::npos)
+         {
+            return _ReadUserAttribute<Alembic::Abc::N3dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
+         }
+         else if (interp.find("vector") != std::string::npos)
+         {
+            return _ReadUserAttribute<Alembic::Abc::V3dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
          }
          else
          {
-            ua.arnoldType = AI_TYPE_VECTOR;
-            ua.arnoldTypeStr = "VECTOR";
-            if (interp.find("normal") != std::string::npos)
-            {
-               return _ReadUserAttribute<Alembic::Abc::N3dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
-            }
-            else if (interp.find("vector") != std::string::npos)
-            {
-               return _ReadUserAttribute<Alembic::Abc::V3dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
-            }
-            else
-            {
-               AiMsgWarning("[abcproc] Unhandled interpretation \"%s\" for Float64[3] data", interp.c_str());
-               return false;
-            }
+            AiMsgWarning("[abcproc] Unhandled interpretation \"%s\" for Float64[3] data", interp.c_str());
+            return false;
          }
       case 16:
          ua.arnoldType = AI_TYPE_MATRIX;
@@ -994,7 +980,7 @@ void _NodeSet<AI_TYPE_BOOLEAN, bool>(AtNode *node, const char *name, bool *vals)
 }
 
 template <>
-void _NodeSet<AI_TYPE_BYTE, AtByte>(AtNode *node, const char *name, AtByte *vals)
+void _NodeSet<AI_TYPE_BYTE, uint8_t>(AtNode *node, const char *name, uint8_t *vals)
 {
    AiNodeSetBool(node, name, vals[0]);
 }
@@ -1018,15 +1004,9 @@ void _NodeSet<AI_TYPE_FLOAT, float>(AtNode *node, const char *name, float *vals)
 }
 
 template <>
-void _NodeSet<AI_TYPE_POINT2, float>(AtNode *node, const char *name, float *vals)
+void _NodeSet<AI_TYPE_VECTOR2, float>(AtNode *node, const char *name, float *vals)
 {
-   AiNodeSetPnt2(node, name, vals[0], vals[1]);
-}
-
-template <>
-void _NodeSet<AI_TYPE_POINT, float>(AtNode *node, const char *name, float *vals)
-{
-   AiNodeSetPnt(node, name, vals[0], vals[1], vals[2]);
+   AiNodeSetVec2(node, name, vals[0], vals[1]);
 }
 
 template <>
@@ -1097,7 +1077,7 @@ void _ArraySet<AI_TYPE_BOOLEAN, bool>(AtArray *ary, unsigned int count, bool *va
 }
 
 template <>
-void _ArraySet<AI_TYPE_BYTE, AtByte>(AtArray *ary, unsigned int count, AtByte *vals, unsigned int *idxs)
+void _ArraySet<AI_TYPE_BYTE, uint8_t>(AtArray *ary, unsigned int count, uint8_t *vals, unsigned int *idxs)
 {
    if (idxs)
    {
@@ -1173,53 +1153,26 @@ void _ArraySet<AI_TYPE_FLOAT, float>(AtArray *ary, unsigned int count, float *va
 }
 
 template <>
-void _ArraySet<AI_TYPE_POINT2, float>(AtArray *ary, unsigned int count, float *vals, unsigned int *idxs)
+void _ArraySet<AI_TYPE_VECTOR2, float>(AtArray *ary, unsigned int count, float *vals, unsigned int *idxs)
 {
-   AtPoint2 pnt;
+   AtVector2 vec;
    if (idxs)
    {
       for (unsigned int i=0, j=0; i<count; ++i)
       {
          j = idxs[i] * 2;
-         pnt.x = vals[j+0];
-         pnt.y = vals[j+1];
-         AiArraySetPnt2(ary, i, pnt);
+         vec.x = vals[j+0];
+         vec.y = vals[j+1];
+         AiArraySetVec2(ary, i, vec);
       }
    }
    else
    {
       for (unsigned int i=0, j=0; i<count; ++i, j+=2)
       {
-         pnt.x = vals[j+0];
-         pnt.y = vals[j+1];
-         AiArraySetPnt2(ary, i, pnt);
-      }
-   }
-}
-
-template <>
-void _ArraySet<AI_TYPE_POINT, float>(AtArray *ary, unsigned int count, float *vals, unsigned int *idxs)
-{
-   AtPoint pnt;
-   if (idxs)
-   {
-      for (unsigned int i=0, j=0; i<count; ++i)
-      {
-         j = idxs[i] * 3;
-         pnt.x = vals[j+0];
-         pnt.y = vals[j+1];
-         pnt.z = vals[j+2];
-         AiArraySetPnt(ary, i, pnt);
-      }
-   }
-   else
-   {
-      for (unsigned int i=0, j=0; i<count; ++i, j+=3)
-      {
-         pnt.x = vals[j+0];
-         pnt.y = vals[j+1];
-         pnt.z = vals[j+2];
-         AiArraySetPnt(ary, i, pnt);
+         vec.x = vals[j+0];
+         vec.y = vals[j+1];
+         AiArraySetVec2(ary, i, vec);
       }
    }
 }
@@ -1540,7 +1493,7 @@ void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigne
       _SetUserAttribute<AI_TYPE_BOOLEAN, bool>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_BYTE:
-      _SetUserAttribute<AI_TYPE_BYTE, AtByte>(node, valsName, idxsName, ua, remapIndices);
+      _SetUserAttribute<AI_TYPE_BYTE, uint8_t>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_INT:
       _SetUserAttribute<AI_TYPE_INT, int>(node, valsName, idxsName, ua, remapIndices);
@@ -1551,11 +1504,8 @@ void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigne
    case AI_TYPE_FLOAT:
       _SetUserAttribute<AI_TYPE_FLOAT, float>(node, valsName, idxsName, ua, remapIndices);
       break;
-   case AI_TYPE_POINT2:
-      _SetUserAttribute<AI_TYPE_POINT2, float>(node, valsName, idxsName, ua, remapIndices);
-      break;
-   case AI_TYPE_POINT:
-      _SetUserAttribute<AI_TYPE_POINT, float>(node, valsName, idxsName, ua, remapIndices);
+   case AI_TYPE_VECTOR2:
+      _SetUserAttribute<AI_TYPE_VECTOR2, float>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_VECTOR:
       _SetUserAttribute<AI_TYPE_VECTOR, float>(node, valsName, idxsName, ua, remapIndices);
@@ -1699,8 +1649,8 @@ bool PromoteToObjectAttrib(const UserAttribute &src, UserAttribute &dst)
          break;
       case AI_TYPE_BYTE:
          {
-            dst.data = AiMalloc(sizeof(AtByte));
-            ((AtByte*)dst.data)[0] = ((AtByte*)src.data)[0];
+            dst.data = AiMalloc(sizeof(uint8_t));
+            ((uint8_t*)dst.data)[0] = ((uint8_t*)src.data)[0];
          }
          break;
       case AI_TYPE_INT:
@@ -1721,7 +1671,7 @@ bool PromoteToObjectAttrib(const UserAttribute &src, UserAttribute &dst)
             ((float*)dst.data)[0] = ((float*)src.data)[0];
          }
          break;
-      case AI_TYPE_POINT2:
+      case AI_TYPE_VECTOR2:
          {
             dst.data = AiMalloc(2 * sizeof(float));
             float *srcf = (float*) src.data;
@@ -1730,7 +1680,6 @@ bool PromoteToObjectAttrib(const UserAttribute &src, UserAttribute &dst)
             dstf[1] = srcf[1];
          }
          break;
-      case AI_TYPE_POINT:
       case AI_TYPE_VECTOR:
       case AI_TYPE_RGB:
          {

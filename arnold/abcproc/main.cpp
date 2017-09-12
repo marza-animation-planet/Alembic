@@ -182,6 +182,8 @@ int ProcCleanup(void *user_ptr)
 
 // ---
 
+#ifdef ALEMBIC_WITH_HDF5
+
 #include <H5public.h>
 
 #ifdef H5_HAVE_THREADSAFE
@@ -218,13 +220,14 @@ static void __attribute__((destructor)) on_dlclose(void)
 
 #endif // H5_HAVE_THREADSAFE
 
-proc_loader
-{
-   vtable->Init     = ProcInit;
-   vtable->Cleanup  = ProcCleanup;
-   vtable->NumNodes = ProcNumNodes;
-   vtable->GetNode  = ProcGetNode;
-   strcpy(vtable->version, AI_VERSION);
-   return 1;
-}
+#endif // ALEMBIC_WITH_HDF5
 
+// proc_loader
+// {
+//    vtable->Init     = ProcInit;
+//    vtable->Cleanup  = ProcCleanup;
+//    vtable->NumNodes = ProcNumNodes;
+//    vtable->GetNode  = ProcGetNode;
+//    strcpy(vtable->version, AI_VERSION);
+//    return 1;
+// }

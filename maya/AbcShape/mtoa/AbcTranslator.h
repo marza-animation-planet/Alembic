@@ -91,8 +91,8 @@ private:
    double m_renderTime;
    std::string m_overrideBoundsMin;
    std::string m_overrideBoundsMax;
-   AtPoint m_min;
-   AtPoint m_max;
+   AtVector m_min;
+   AtVector m_max;
    AlembicScene *m_scene;
    bool m_padBoundsWithPeakRadius;
    std::string m_peakRadius;

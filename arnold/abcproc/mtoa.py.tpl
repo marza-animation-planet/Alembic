@@ -203,8 +203,8 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
          bmin = cmds.getAttr(nodeName+".outBoxMin")[0]
          bmax = cmds.getAttr(nodeName+".outBoxMax")[0]
          
-         arnold.AiNodeSetPnt(node, "min", bmin[0]-pad, bmin[1]-pad, bmin[2]-pad)
-         arnold.AiNodeSetPnt(node, "max", bmax[0]+pad, bmax[1]+pad, bmax[2]+pad)
+         arnold.AiNodeSetVec(node, "min", bmin[0]-pad, bmin[1]-pad, bmin[2]-pad)
+         arnold.AiNodeSetVec(node, "max", bmax[0]+pad, bmax[1]+pad, bmax[2]+pad)
          
          return ["dso", "data", "min", "max"]
       
@@ -223,8 +223,8 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
          bmin = map(lambda x: x-pad, cmds.getAttr(nodeName+".outBoxMin")[0])
          bmax = map(lambda x: x+pad, cmds.getAttr(nodeName+".outBoxMax")[0])
          
-         curmin = arnold.AiNodeGetPnt(node, "min")
-         curmax = arnold.AiNodeGetPnt(node, "max")
+         curmin = arnold.AiNodeGetVec(node, "min")
+         curmax = arnold.AiNodeGetVec(node, "max")
          
          if bmin[0] < curmin.x:
             curmin.x = bmin[0]
@@ -240,8 +240,8 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
          if bmax[2] > curmax.z:
             curmax.z = bmax[2]
          
-         arnold.AiNodeSetPnt(node, "min", curmin.x, curmin.y, curmin.z)
-         arnold.AiNodeSetPnt(node, "max", curmax.x, curmax.y, curmax.z)
+         arnold.AiNodeSetVec(node, "min", curmin.x, curmin.y, curmin.z)
+         arnold.AiNodeSetVec(node, "max", curmax.x, curmax.y, curmax.z)
       
       if deformationBlur or transformationBlur:
          relativeSamples = stu.GetOverrideAttr(nodeName, "mtoa_abc_relativeSamples", None)

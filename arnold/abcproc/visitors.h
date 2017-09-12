@@ -136,7 +136,6 @@ public:
    inline AtNode* node(size_t i) const { return (i < numNodes() ? mNodes[i] : 0); }
    inline const char* path(size_t i) const { return (i < numNodes() ? mPaths[i].c_str() : 0); }
    inline bool isFloat3(UserAttribute &attr) const { return (attr.arnoldType == AI_TYPE_VECTOR ||
-                                                             attr.arnoldType == AI_TYPE_POINT ||
                                                              (attr.arnoldType == AI_TYPE_FLOAT && attr.dataDim == 3)); }
    
 private:
@@ -670,8 +669,8 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
       AiNodeSetStr(proc, "dso", AiNodeGetStr(mDso->procNode(), "dso"));
       AiNodeSetStr(proc, "data", mDso->dataString(targetNode->path().c_str()).c_str());
       AiNodeSetBool(proc, "load_at_init", false);
-      AiNodeSetPnt(proc, "min", box.min.x, box.min.y, box.min.z);
-      AiNodeSetPnt(proc, "max", box.max.x, box.max.y, box.max.z);
+      AiNodeSetVec(proc, "min", box.min.x, box.min.y, box.min.z);
+      AiNodeSetVec(proc, "max", box.max.x, box.max.y, box.max.z);
       
       if (!mDso->ignoreTransforms() && mMatrixSamplesStack.size() > 0)
       {
@@ -1017,7 +1016,6 @@ inline bool MakeShape::isVaryingFloat3(Info &info, const UserAttribute &ua)
 {
    if (ua.arnoldCategory == AI_USERDEF_VARYING &&
        ((ua.arnoldType == AI_TYPE_VECTOR && ua.dataCount == info.pointCount) ||
-        (ua.arnoldType == AI_TYPE_POINT && ua.dataCount == info.pointCount) ||
         (ua.arnoldType == AI_TYPE_FLOAT && ua.dataCount == 3 * info.pointCount)))
    {
       return true;
@@ -1032,7 +1030,7 @@ inline bool MakeShape::isIndexedFloat3(MeshInfo &info, const UserAttribute &ua)
 {
    if (ua.arnoldCategory == AI_USERDEF_INDEXED &&
        ua.indicesCount == info.vertexCount &&
-       (ua.arnoldType == AI_TYPE_VECTOR || ua.arnoldType == AI_TYPE_POINT))
+       (ua.arnoldType == AI_TYPE_VECTOR))
    {
       return true;
    }
@@ -1140,11 +1138,11 @@ AtNode* MakeShape::generateVolumeBox(Schema &schema)
       }
    }
    
-   AiNodeSetPnt(node, "min", box.min.x, box.min.y, box.min.z);
-   AiNodeSetPnt(node, "max", box.max.x, box.max.y, box.max.z);
+   AiNodeSetVec(node, "min", box.min.x, box.min.y, box.min.z);
+   AiNodeSetVec(node, "max", box.max.x, box.max.y, box.max.z);
    
    AtArray *shaders = AiNodeGetArray(mDso->procNode(), "shader");
-   if (shaders && shaders->nelements > 0)
+   if (shaders && AiArrayGetNumElements(shaders) > 0)
    {
       if (mDso->verbose())
       {
@@ -1209,7 +1207,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
    
    AtNode *mesh = createArnoldNode("polymesh", (instance ? *instance : node), true);
    
-   AtPoint pnt;
+   AtVector pnt;
    
    if (meshSamples.size() == 1 && !info.varyingTopology)
    {
@@ -1226,7 +1224,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
       info.vertexPointIndex = (unsigned int*) AiMalloc(sizeof(unsigned int) * FI->size());
       info.arnoldVertexIndex = (unsigned int*) AiMalloc(sizeof(unsigned int) * FI->size());
       
-      vlist = AiArrayAllocate(P->size(), 1, AI_TYPE_POINT);
+      vlist = AiArrayAllocate(P->size(), 1, AI_TYPE_VECTOR);
       nsides = AiArrayAllocate(FC->size(), 1, AI_TYPE_UINT);
       vidxs = AiArrayAllocate(FI->size(), 1, AI_TYPE_UINT);
       
@@ -1274,7 +1272,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
          pnt.y = p.y;
          pnt.z = p.z;
          
-         AiArraySetPnt(vlist, i, pnt);
+         AiArraySetVec(vlist, i, pnt);
       }
       
       if (smoothNormals)
@@ -1457,7 +1455,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
          if (!vel)
          {
             // Note: samp0->time() not necessarily == renderTime
-            vlist = AiArrayAllocate(P->size(), 1, AI_TYPE_POINT);
+            vlist = AiArrayAllocate(P->size(), 1, AI_TYPE_VECTOR);
             
             for (size_t i=0; i<P->size(); ++i)
             {
@@ -1467,7 +1465,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
                pnt.y = p.y;
                pnt.z = p.z;
                
-               AiArraySetPnt(vlist, i, pnt);
+               AiArraySetVec(vlist, i, pnt);
             }
             
             if (smoothNormals)
@@ -1477,7 +1475,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
          }
          else
          {
-            vlist = AiArrayAllocate(P->size(), mDso->numMotionSamples(), AI_TYPE_POINT);
+            vlist = AiArrayAllocate(P->size(), mDso->numMotionSamples(), AI_TYPE_VECTOR);
             
             // extrapolated positions to use for smooth normal computation
             float *eP = 0;
@@ -1507,7 +1505,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
                      pnt.y = p.y + dt * (vvel[1] + 0.5 * dt * vacc[1]);
                      pnt.z = p.z + dt * (vvel[2] + 0.5 * dt * vacc[2]);
                      
-                     AiArraySetPnt(vlist, j+k, pnt);
+                     AiArraySetVec(vlist, j+k, pnt);
                      
                      if (eP)
                      {
@@ -1529,7 +1527,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
                      pnt.y = p.y + dt * vvel[1];
                      pnt.z = p.z + dt * vvel[2];
                      
-                     AiArraySetPnt(vlist, j+k, pnt);
+                     AiArraySetVec(vlist, j+k, pnt);
                      
                      if (eP)
                      {
@@ -1556,7 +1554,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
       }
       else
       {
-         AtPoint pnt;
+         AtVector pnt;
          
          for (size_t i=0, j=0; i<mDso->numMotionSamples(); ++i)
          {
@@ -1641,7 +1639,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
             
             if (!vlist)
             {
-               vlist = AiArrayAllocate(P0->size(), mDso->numMotionSamples(), AI_TYPE_POINT);
+               vlist = AiArrayAllocate(P0->size(), mDso->numMotionSamples(), AI_TYPE_VECTOR);
             }
             
             if (b > 0.0)
@@ -1664,7 +1662,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
                   pnt.y = a * p0.y + b * p1.y;
                   pnt.z = a * p0.z + b * p1.z;
                   
-                  AiArraySetPnt(vlist, j+k, pnt);
+                  AiArraySetVec(vlist, j+k, pnt);
                }
                
                if (smoothNormals)
@@ -1687,7 +1685,7 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
                   pnt.y = p.y;
                   pnt.z = p.z;
                   
-                  AiArraySetPnt(vlist, j+k, pnt);
+                  AiArraySetVec(vlist, j+k, pnt);
                }
                
                if (smoothNormals)
@@ -1820,9 +1818,9 @@ bool MakeShape::computeMeshTangentSpace(AlembicNodeT<Alembic::Abc::ISchemaObject
             p2 = P0->get()[pi[2]];
          }
          
-         AtPoint2 uv0 = AiArrayGetPnt2(uvlist, AiArrayGetUInt(uvidxs, v));
-         AtPoint2 uv1 = AiArrayGetPnt2(uvlist, AiArrayGetUInt(uvidxs, v+fv-1));
-         AtPoint2 uv2 = AiArrayGetPnt2(uvlist, AiArrayGetUInt(uvidxs, v+fv));
+         AtVector2 uv0 = AiArrayGetVec2(uvlist, AiArrayGetUInt(uvidxs, v));
+         AtVector2 uv1 = AiArrayGetVec2(uvlist, AiArrayGetUInt(uvidxs, v+fv-1));
+         AtVector2 uv2 = AiArrayGetVec2(uvlist, AiArrayGetUInt(uvidxs, v+fv));
          
          // For any point Q(u,v) in triangle:
          // (0) Q - p0 = T * (u - u0) + B * (v - v0)
@@ -1926,7 +1924,7 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
       if (sampler.update(uvit->second, mDso->renderTime(), mDso->renderTime(), true))
       {
          double blend = 0.0;
-         AtPoint2 pnt2;
+         AtVector2 vec2;
          
          AtArray *uvlist = 0;
          AtArray *uvidxs = 0;
@@ -1967,7 +1965,7 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
                      }
                      else
                      {
-                        uvlist = AiArrayAllocate(idxs0->size(), 1, AI_TYPE_POINT2);
+                        uvlist = AiArrayAllocate(idxs0->size(), 1, AI_TYPE_VECTOR2);
                         uvidxs = AiArrayAllocate(idxs0->size(), 1, AI_TYPE_UINT);
                         
                         for (size_t i=0; i<idxs0->size(); ++i)
@@ -1975,10 +1973,10 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
                            Alembic::Abc::V2f val0 = vals0->get()[idxs0->get()[i]];
                            Alembic::Abc::V2f val1 = vals1->get()[idxs1->get()[i]];
                            
-                           pnt2.x = a * val0.x + blend * val1.x;
-                           pnt2.y = a * val0.y + blend * val1.y;
+                           vec2.x = a * val0.x + blend * val1.x;
+                           vec2.y = a * val0.y + blend * val1.y;
                            
-                           AiArraySetPnt2(uvlist, i, pnt2);
+                           AiArraySetVec2(uvlist, i, vec2);
                            AiArraySetUInt(uvidxs, info.arnoldVertexIndex[i], i);
                         }
                      }
@@ -1992,7 +1990,7 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
                      }
                      else
                      {
-                        uvlist = AiArrayAllocate(idxs0->size(), 1, AI_TYPE_POINT2);
+                        uvlist = AiArrayAllocate(idxs0->size(), 1, AI_TYPE_VECTOR2);
                         uvidxs = AiArrayAllocate(idxs0->size(), 1, AI_TYPE_UINT);
                         
                         for (size_t i=0; i<idxs0->size(); ++i)
@@ -2000,10 +1998,10 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
                            Alembic::Abc::V2f val0 = vals0->get()[idxs0->get()[i]];
                            Alembic::Abc::V2f val1 = vals1->get()[i];
                            
-                           pnt2.x = a * val0.x + blend * val1.x;
-                           pnt2.y = a * val0.y + blend * val1.y;
+                           vec2.x = a * val0.x + blend * val1.x;
+                           vec2.y = a * val0.y + blend * val1.y;
                            
-                           AiArraySetPnt2(uvlist, i, pnt2);
+                           AiArraySetVec2(uvlist, i, vec2);
                            AiArraySetUInt(uvidxs, info.arnoldVertexIndex[i], i);
                         }
                      }
@@ -2026,7 +2024,7 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
                      }
                      else
                      {
-                        uvlist = AiArrayAllocate(vals0->size(), 1, AI_TYPE_POINT2);
+                        uvlist = AiArrayAllocate(vals0->size(), 1, AI_TYPE_VECTOR2);
                         uvidxs = AiArrayAllocate(vals0->size(), 1, AI_TYPE_UINT);
                         
                         for (size_t i=0; i<vals0->size(); ++i)
@@ -2034,10 +2032,10 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
                            Alembic::Abc::V2f val0 = vals0->get()[i];
                            Alembic::Abc::V2f val1 = vals1->get()[idxs1->get()[i]];
                            
-                           pnt2.x = a * val0.x + blend * val1.x;
-                           pnt2.y = a * val0.y + blend * val1.y;
+                           vec2.x = a * val0.x + blend * val1.x;
+                           vec2.y = a * val0.y + blend * val1.y;
                            
-                           AiArraySetPnt2(uvlist, i, pnt2);
+                           AiArraySetVec2(uvlist, i, vec2);
                            AiArraySetUInt(uvidxs, info.arnoldVertexIndex[i], i);
                         }
                      }
@@ -2050,7 +2048,7 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
                      }
                      else
                      {
-                        uvlist = AiArrayAllocate(vals0->size(), 1, AI_TYPE_POINT2);
+                        uvlist = AiArrayAllocate(vals0->size(), 1, AI_TYPE_VECTOR2);
                         uvidxs = AiArrayAllocate(vals0->size(), 1, AI_TYPE_UINT);
                         
                         for (size_t i=0; i<vals0->size(); ++i)
@@ -2058,10 +2056,10 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
                            Alembic::Abc::V2f val0 = vals0->get()[i];
                            Alembic::Abc::V2f val1 = vals1->get()[i];
                            
-                           pnt2.x = a * val0.x + blend * val1.x;
-                           pnt2.y = a * val0.y + blend * val1.y;
+                           vec2.x = a * val0.x + blend * val1.x;
+                           vec2.y = a * val0.y + blend * val1.y;
                            
-                           AiArraySetPnt2(uvlist, i, pnt2);
+                           AiArraySetVec2(uvlist, i, vec2);
                            AiArraySetUInt(uvidxs, info.arnoldVertexIndex[i], i);
                         }
                      }
@@ -2085,17 +2083,17 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
                      AiMsgInfo("[abcproc] Read %lu uv indices", idxs->size());
                   }
                   
-                  uvlist = AiArrayAllocate(vals->size(), 1, AI_TYPE_POINT2);
+                  uvlist = AiArrayAllocate(vals->size(), 1, AI_TYPE_VECTOR2);
                   uvidxs = AiArrayAllocate(idxs->size(), 1, AI_TYPE_UINT);
                   
                   for (size_t i=0; i<vals->size(); ++i)
                   {
                      Alembic::Abc::V2f val = vals->get()[i];
                      
-                     pnt2.x = val.x;
-                     pnt2.y = val.y;
+                     vec2.x = val.x;
+                     vec2.y = val.y;
                      
-                     AiArraySetPnt2(uvlist, i, pnt2);
+                     AiArraySetVec2(uvlist, i, vec2);
                   }
                   
                   for (size_t i=0; i<idxs->size(); ++i)
@@ -2105,17 +2103,17 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
                }
                else
                {
-                  uvlist = AiArrayAllocate(vals->size(), 1, AI_TYPE_POINT2);
+                  uvlist = AiArrayAllocate(vals->size(), 1, AI_TYPE_VECTOR2);
                   uvidxs = AiArrayAllocate(vals->size(), 1, AI_TYPE_UINT);
                   
                   for (size_t i=0; i<vals->size(); ++i)
                   {
                      Alembic::Abc::V2f val = vals->get()[i];
                      
-                     pnt2.x = val.x;
-                     pnt2.y = val.y;
+                     vec2.x = val.x;
+                     vec2.y = val.y;
                      
-                     AiArraySetPnt2(uvlist, i, pnt2);
+                     AiArraySetVec2(uvlist, i, vec2);
                      AiArraySetUInt(uvidxs, info.arnoldVertexIndex[i], i);
                   }
                }
@@ -2130,7 +2128,7 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
             {
                std::string iname = uvit->first + "idxs";
                
-               AiNodeDeclare(mesh, uvit->first.c_str(), "indexed POINT2");
+               AiNodeDeclare(mesh, uvit->first.c_str(), "indexed VECTOR2");
                AiNodeSetArray(mesh, uvit->first.c_str(), uvlist);
                AiNodeSetArray(mesh, iname.c_str(), uvidxs);
                
@@ -2333,13 +2331,13 @@ bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<
             
             ua.dataDim = 3;
             ua.dataCount = info.pointCount;
-            ua.arnoldType = AI_TYPE_POINT;
-            ua.arnoldTypeStr = "POINT";
+            ua.arnoldType = AI_TYPE_VECTOR;
+            ua.arnoldTypeStr = "VECTOR";
          }
          else if (ua.arnoldType == AI_TYPE_VECTOR)
          {
-            ua.arnoldType = AI_TYPE_POINT;
-            ua.arnoldTypeStr = "POINT";
+            ua.arnoldType = AI_TYPE_VECTOR;
+            ua.arnoldTypeStr = "VECTOR";
          }
          
          if (mDso->verbose())
@@ -2431,8 +2429,8 @@ bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<
                // Aliasing (maybe a float[3 * info.pointCount])
                uait->second.dataDim = 3;
                uait->second.dataCount = info.pointCount;
-               uait->second.arnoldType = AI_TYPE_POINT;
-               uait->second.arnoldTypeStr = "POINT";
+               uait->second.arnoldType = AI_TYPE_VECTOR;
+               uait->second.arnoldTypeStr = "VECTOR";
             }
             else
             {
@@ -2450,8 +2448,8 @@ bool MakeShape::fillReferencePositions(AlembicNodeT<Alembic::Abc::ISchemaObject<
             InitUserAttribute(ua);
             
             ua.arnoldCategory = AI_USERDEF_VARYING;
-            ua.arnoldType = AI_TYPE_POINT;
-            ua.arnoldTypeStr = "POINT";
+            ua.arnoldType = AI_TYPE_VECTOR;
+            ua.arnoldTypeStr = "VECTOR";
             ua.isArray = true;
             ua.dataDim = 3;
             ua.dataCount = info.pointCount;
