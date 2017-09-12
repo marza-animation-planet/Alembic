@@ -78,9 +78,9 @@ AtNode* ProcGetNode(void *user_ptr, int i)
          AtNode *output = 0;
          std::string masterNodeName;
          
-         GlobalLock::Acquire();
+         AbcProcGlobalLock::Acquire();
          bool isInstance = dso->isInstance(&masterNodeName);
-         GlobalLock::Release();
+         AbcProcGlobalLock::Release();
          
          // Keep track of procedural node name
          const char *procName = AiNodeGetName(dso->procNode());
@@ -97,7 +97,7 @@ AtNode* ProcGetNode(void *user_ptr, int i)
             {
                dso->transferUserParams(output);
                
-               GlobalLock::Acquire();
+               AbcProcGlobalLock::Acquire();
                
                if (dso->isInstance(&masterNodeName))
                {
@@ -121,7 +121,7 @@ AtNode* ProcGetNode(void *user_ptr, int i)
                   dso->setMasterNodeName(AiNodeGetName(output));
                }
                
-               GlobalLock::Release();
+               AbcProcGlobalLock::Release();
             }
          }
          
@@ -136,7 +136,7 @@ AtNode* ProcGetNode(void *user_ptr, int i)
                   AiMsgInfo("[abcproc] Create a new instance of \"%s\"", AiNodeGetName(master));
                }
                
-               GlobalLock::Acquire();
+               AbcProcGlobalLock::Acquire();
                output = AiNode("ginstance");
                // rename source procedural node if needed
                if (!strcmp(AiNodeGetName(dso->procNode()), procName))
@@ -148,7 +148,7 @@ AtNode* ProcGetNode(void *user_ptr, int i)
                }
                // use procedural name for newly generated instance
                AiNodeSetStr(output, "name", procName);
-               GlobalLock::Release();
+               AbcProcGlobalLock::Release();
                
                AiNodeSetBool(output, "inherit_xform", false);
                AiNodeSetPtr(output, "node", master);

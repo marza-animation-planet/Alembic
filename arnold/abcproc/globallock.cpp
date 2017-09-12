@@ -1,3 +1,3 @@
 #include "globallock.h"
 
-GlobalLock GlobalLock::msInstance;
+AbcProcGlobalLock AbcProcGlobalLock::msInstance;

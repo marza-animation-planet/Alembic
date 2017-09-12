@@ -575,7 +575,7 @@ Dso::Dso(AtNode *node)
    //   multi-threaded reads by itself
    // Same with Ogawa backend
    {
-      ScopeLock _lock;
+      AbcProcScopeLock _lock;
       
       char id[64];
       sprintf(id, "%p", AiThreadSelf());
@@ -889,7 +889,7 @@ Dso::Dso(AtNode *node)
 
 Dso::~Dso()
 {
-   ScopeLock _lock;
+   AbcProcScopeLock _lock;
    
    char id[64];
    sprintf(id, "%p", AiThreadSelf());

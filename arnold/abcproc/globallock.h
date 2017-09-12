@@ -3,11 +3,11 @@
 
 #include <ai.h>
 
-class GlobalLock
+class AbcProcGlobalLock
 {
 public:
    
-   inline ~GlobalLock()
+   inline ~AbcProcGlobalLock()
    {
       AiCritSecClose(&mCS);
    }
@@ -24,7 +24,7 @@ public:
 
 private:
    
-   inline GlobalLock()
+   inline AbcProcGlobalLock()
    {
       AiCritSecInit(&mCS);
    }
@@ -43,21 +43,21 @@ private:
    
    AtCritSec mCS;
    
-   static GlobalLock msInstance;
+   static AbcProcGlobalLock msInstance;
 };
 
-class ScopeLock
+class AbcProcScopeLock
 {
 public:
    
-   inline ScopeLock()
+   inline AbcProcScopeLock()
    {
-      GlobalLock::Acquire();
+      AbcProcGlobalLock::Acquire();
    }
    
-   inline ~ScopeLock()
+   inline ~AbcProcScopeLock()
    {
-      GlobalLock::Release();
+      AbcProcGlobalLock::Release();
    }
 };
 

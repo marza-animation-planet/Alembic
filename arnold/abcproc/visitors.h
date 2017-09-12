@@ -650,14 +650,14 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
       AlembicNode *targetNode = (instance ? instance : &node);
       
       // Format name 'a la maya'
-      GlobalLock::Acquire();
+      AbcProcGlobalLock::Acquire();
       
       std::string targetName = targetNode->formatPartialPath(mDso->namePrefix().c_str(), AlembicNode::LocalPrefix, '|');
       std::string name = mDso->uniqueName(targetName);
       AtNode *proc = AiNode("procedural");
       AiNodeSetStr(proc, "name", name.c_str());
 
-      GlobalLock::Release();
+      AbcProcGlobalLock::Release();
 
       if (mDso->verbose())
       {

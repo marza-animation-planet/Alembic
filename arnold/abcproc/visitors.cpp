@@ -979,7 +979,7 @@ MakeShape::MakeShape(Dso *dso)
 
 AtNode* MakeShape::createArnoldNode(const char *nodeType, AlembicNode &node, bool useProcName) const
 {
-   GlobalLock::Acquire();
+   AbcProcGlobalLock::Acquire();
 
    AtNode *anode = AiNode(nodeType);
 
@@ -1001,7 +1001,7 @@ AtNode* MakeShape::createArnoldNode(const char *nodeType, AlembicNode &node, boo
       AiNodeSetStr(anode, "name", mDso->uniqueName(name).c_str());
    }
 
-   GlobalLock::Release();
+   AbcProcGlobalLock::Release();
 
    return anode;
 }
