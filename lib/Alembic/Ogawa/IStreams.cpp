@@ -40,7 +40,7 @@
 #include <fcntl.h>
 
 #ifdef _MSC_VER
-
+#include <sys/stat.h>
 #include <io.h>
 
 Alembic::Util::int32_t OPENFILE(const char * iFileName, Alembic::Util::int32_t iFlag)
