@@ -10,6 +10,11 @@
 #include <maya/MGlobal.h>
 #include <maya/MBoundingBox.h>
 #include <maya/MDGContext.h>
+#include <maya/MTypes.h>
+
+#if MAYA_API_VERSION >= 2018000
+#  include <maya/MDGContextGuard.h>
+#endif
 
 void* CAbcTranslator::Create()
 {
@@ -508,11 +513,24 @@ void CAbcTranslator::GetFrames(double inRenderFrame, double inSampleFrame,
    MStatus st;
    MTime t;
    
-   t = pTime.asMTime(ctx0, &st);
-   outRenderFrame = (st == MS::kSuccess ? t.asUnits(MTime::uiUnit()) : inRenderFrame);
-   
-   t = pTime.asMTime(ctx1, &st);
-   outSampleFrame = (st == MS::kSuccess ? t.asUnits(MTime::uiUnit()) : inSampleFrame);
+   #if MAYA_API_VERSION >= 2018000
+      {
+         MDGContextGuard guard(ctx0);
+         t = pTime.asMTime(&st);
+         outRenderFrame = (st == MS::kSuccess ? t.asUnits(MTime::uiUnit()) : inRenderFrame);
+      }
+      {
+         MDGContextGuard guard(ctx1);
+         t = pTime.asMTime(&st);
+         outSampleFrame = (st == MS::kSuccess ? t.asUnits(MTime::uiUnit()) : inSampleFrame);
+      }
+   #else
+      t = pTime.asMTime(ctx0, &st);
+      outRenderFrame = (st == MS::kSuccess ? t.asUnits(MTime::uiUnit()) : inRenderFrame);
+
+      t = pTime.asMTime(ctx1, &st);
+      outSampleFrame = (st == MS::kSuccess ? t.asUnits(MTime::uiUnit()) : inSampleFrame);
+   #endif
 }
 
 double CAbcTranslator::GetFPS()
