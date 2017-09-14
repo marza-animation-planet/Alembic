@@ -6,7 +6,20 @@
 
 // ---
 
-int ProcInit(AtNode *node, void **user_ptr)
+AI_PROCEDURAL_NODE_EXPORT_METHODS(AbcProcMtd);
+
+
+struct AbcProc
+{
+};
+
+
+node_parameters
+{
+}
+
+
+procedural_init
 {
    AiMsgDebug("[abcproc] ProcInit [thread %p]", AiThreadSelf());
    Dso *dso = new Dso(node);
@@ -14,7 +27,7 @@ int ProcInit(AtNode *node, void **user_ptr)
    return 1;
 }
 
-int ProcNumNodes(void *user_ptr)
+procedural_num_nodes
 {
    AiMsgDebug("[abcproc] ProcNumNodes [thread %p]", AiThreadSelf());
    Dso *dso = (Dso*) user_ptr;
@@ -22,7 +35,7 @@ int ProcNumNodes(void *user_ptr)
    return int(dso->numShapes());
 }
 
-AtNode* ProcGetNode(void *user_ptr, int i)
+procedural_get_node
 {
    // This function won't get call for the same procedural node from difference threads
    
@@ -172,7 +185,7 @@ AtNode* ProcGetNode(void *user_ptr, int i)
    return dso->generatedNode(i);
 }
 
-int ProcCleanup(void *user_ptr)
+procedural_cleanup
 {
    AiMsgDebug("[abcproc] ProcCleanup [thread %p]", AiThreadSelf());
    Dso *dso = (Dso*) user_ptr;
@@ -222,12 +235,19 @@ static void __attribute__((destructor)) on_dlclose(void)
 
 #endif // ALEMBIC_WITH_HDF5
 
-// proc_loader
-// {
-//    vtable->Init     = ProcInit;
-//    vtable->Cleanup  = ProcCleanup;
-//    vtable->NumNodes = ProcNumNodes;
-//    vtable->GetNode  = ProcGetNode;
-//    strcpy(vtable->version, AI_VERSION);
-//    return 1;
-// }
+
+node_loader
+{
+  if (i > 0)
+  {
+    return false;
+  }
+
+  node->methods = AbcProcMtd;
+  node->output_type = AI_TYPE_NONE;
+  node->name = "abcproc";
+  node->node_type = AI_NODE_SHAPE_PROCEDURAL;
+  strcpy(node->version, AI_VERSION);
+
+  return true;
+}
