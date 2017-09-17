@@ -419,6 +419,11 @@ MayaMeshWriter::MayaMeshWriter(MDagPath & iDag,
         mAttrs = AttributesWriterPtr(new AttributesWriter(cp, up, obj, lMesh,
             iTimeIndex, iArgs));
 
+        if (!mNoNormals)
+        {
+            mHardEdgeProp = Alembic::Abc::OV2iArrayProperty(mPolySchema.getUserProperties(), "hardEdges");
+        }
+
         writePoly(uvSamp);
     }
     
@@ -648,7 +653,7 @@ unsigned int MayaMeshWriter::getNumFaces()
     return lMesh.numPolygons();
 }
 
-void MayaMeshWriter::getPolyNormals(std::vector<float> & oNormals)
+void MayaMeshWriter::getPolyNormals(std::vector<float> & oNormals, std::vector<int> & oHardEdges)
 {
     MStatus status = MS::kSuccess;
     MFnMesh lMesh( mDagPath, &status );
@@ -692,11 +697,11 @@ void MayaMeshWriter::getPolyNormals(std::vector<float> & oNormals)
         }
 
         // we looped over all the normals and they were all calculated by Maya
-        // so we just need to check to see if any of the edges are hard
-        // before we decide not to write the normals.
+        // so we additionally need to store hard edge information to avoid locking the
+        // normals by setting them directly when imported later.
         if (!userSetNormals)
         {
-            bool hasHardEdges   = false;
+            int2 edgeVerts;
 
             // go through all edges and verify if any of them is hard edge
             unsigned int numEdges = lMesh.numEdges();
@@ -704,15 +709,10 @@ void MayaMeshWriter::getPolyNormals(std::vector<float> & oNormals)
             {
                 if (!lMesh.isEdgeSmooth(edgeIndex))
                 {
-                    hasHardEdges = true;
-                    break;
+                    lMesh.getEdgeVertices(edgeIndex, edgeVerts);
+                    oHardEdges.push_back(edgeVerts[0]);
+                    oHardEdges.push_back(edgeVerts[1]);
                 }
-            }
-
-            // all the edges were smooth, we don't need to write the normals
-            if (!hasHardEdges)
-            {
-                return;
             }
         }
     }
@@ -922,13 +922,20 @@ void MayaMeshWriter::writePoly(
     fillTopology(points, facePoints, pointCounts);
 
     Alembic::AbcGeom::ON3fGeomParam::Sample normalsSamp;
+    Alembic::Abc::V2iArraySample hardEdgesSamp;
     std::vector<float> normals;
-    getPolyNormals(normals);
+    std::vector<int> hardEdges;
+    getPolyNormals(normals, hardEdges);
     if (!normals.empty())
     {
         normalsSamp.setScope( Alembic::AbcGeom::kFacevaryingScope );
         normalsSamp.setVals(Alembic::AbcGeom::N3fArraySample(
             (const Imath::V3f *) &normals.front(), normals.size() / 3));
+    }
+    if ( !hardEdges.empty() )
+    {
+        hardEdgesSamp = Alembic::Abc::V2iArraySample(
+            (const Imath::V2i *) &hardEdges.front(), hardEdges.size() / 2 );
     }
 
     Alembic::AbcGeom::OPolyMeshSchema::Sample samp(
@@ -938,6 +945,7 @@ void MayaMeshWriter::writePoly(
         Alembic::Abc::Int32ArraySample(pointCounts), iUVs, normalsSamp);
 
     mPolySchema.set(samp);
+    mHardEdgeProp.set( hardEdgesSamp );
     writeColor();
     writeUVSets();
 }
