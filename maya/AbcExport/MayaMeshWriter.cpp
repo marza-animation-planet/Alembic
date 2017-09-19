@@ -419,11 +419,6 @@ MayaMeshWriter::MayaMeshWriter(MDagPath & iDag,
         mAttrs = AttributesWriterPtr(new AttributesWriter(cp, up, obj, lMesh,
             iTimeIndex, iArgs));
 
-        if (!mNoNormals)
-        {
-            mHardEdgeProp = Alembic::Abc::OV2iArrayProperty(mPolySchema.getUserProperties(), "hardEdges");
-        }
-
         writePoly(uvSamp);
     }
     
@@ -934,8 +929,13 @@ void MayaMeshWriter::writePoly(
     }
     if ( !hardEdges.empty() )
     {
+        if (!mHardEdgeProp.valid())
+        {
+            mHardEdgeProp = Alembic::Abc::OV2iArrayProperty(mPolySchema.getUserProperties(), "mayaHardEdges");
+        }
         hardEdgesSamp = Alembic::Abc::V2iArraySample(
             (const Imath::V2i *) &hardEdges.front(), hardEdges.size() / 2 );
+        mHardEdgeProp.set( hardEdgesSamp );
     }
 
     Alembic::AbcGeom::OPolyMeshSchema::Sample samp(
@@ -945,7 +945,6 @@ void MayaMeshWriter::writePoly(
         Alembic::Abc::Int32ArraySample(pointCounts), iUVs, normalsSamp);
 
     mPolySchema.set(samp);
-    mHardEdgeProp.set( hardEdgesSamp );
     writeColor();
     writeUVSets();
 }
