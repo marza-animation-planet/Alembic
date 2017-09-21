@@ -621,13 +621,16 @@ MStatus AlembicNode::compute(const MPlug & plug, MDataBlock & dataBlock)
         MPlug allSetsPlug = dep.findPlug("allColorSets");
         MPlug allUVsPlug = dep.findPlug("allUVSets");
         MPlug createInstPlug = dep.findPlug("createInstances");
+        MPlug readMeshNormalsPlug = dep.findPlug("readMeshNormals");
+        mReadMeshNormals = !readMeshNormalsPlug.isNull();
         
         // we don't know yet the frame range so we can't observe preserveStartFrame yet
         inputTime = computeAdjustedTime(inputTime, speed, offset/fps);
         
         CreateSceneVisitor visitor(inputTime, !allSetsPlug.isNull(), !allUVsPlug.isNull(),
             MObject::kNullObj, CreateSceneVisitor::NONE, "",
-            mIncludeFilterString, mExcludeFilterString, !createInstPlug.isNull());
+            mIncludeFilterString, mExcludeFilterString,
+            !createInstPlug.isNull(), mReadMeshNormals);
 
         visitor.walk(archive);
 
