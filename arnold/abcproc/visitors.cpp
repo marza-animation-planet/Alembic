@@ -1399,73 +1399,77 @@ float* MakeShape::computeMeshSmoothNormals(MakeShape::MeshInfo &info,
    float *smoothNormals = (float*) AiMalloc(bytesize);
    
    memset(smoothNormals, 0, bytesize);
-   
-   Alembic::Abc::V3f fN, p0, p1, p2, e0, e1;
+
+   Alembic::Abc::V3f fN, c, p0, p1, p2, e0, e1;
    
    for (unsigned int f=0, v=0; f<info.polygonCount; ++f)
    {
       unsigned int nfv = info.polygonVertexCount[f];
-      
-      for (unsigned int fv=2; fv<nfv; ++fv)
+
+      if (nfv == 0)
       {
-         unsigned int pi[3] = {info.vertexPointIndex[v         ],
-                               info.vertexPointIndex[v + fv - 1],
-                               info.vertexPointIndex[v + fv    ]};
-         
-         const float *P0a = P0 + 3 * pi[0];
-         const float *P0b = P0 + 3 * pi[1];
-         const float *P0c = P0 + 3 * pi[2];
-         
+         continue;
+      }
+
+      // Compute mass center
+      c.setValue(0.0f, 0.0f, 0.0f);
+      for (unsigned int fv=0; fv<nfv; ++fv)
+      {
+         const float *P = P0 + 3 * info.vertexPointIndex[v + fv];
+         c.x += P[0];
+         c.y += P[1];
+         c.z += P[2];
+      }
+      c /= float(nfv);
+
+      // Compute face normal
+      fN.setValue(0.0f, 0.0f, 0.0f);
+      for (unsigned int fv=0; fv<nfv; ++fv)
+      {
+         unsigned int pi0 = 3 * info.vertexPointIndex[v + fv];
+         unsigned int pi1 = 3 * info.vertexPointIndex[v + ((fv + 1) >= nfv ? 0 : (fv + 1))];
+         const float *P0a = P0 + pi0;
+         const float *P0b = P0 + pi1;
+
          if (P1)
          {
-            const float *P1a = P1 + 3 * pi[0];
-            const float *P1b = P1 + 3 * pi[1];
-            const float *P1c = P1 + 3 * pi[2];
-            
             float iblend = (1.0f - blend);
-            
+            const float *P1a = P1 + pi0;
+            const float *P1b = P1 + pi1;
+
             p0.x = iblend * P0a[0] + blend * P1a[0];
             p0.y = iblend * P0a[1] + blend * P1a[1];
             p0.z = iblend * P0a[2] + blend * P1a[2];
-            
             p1.x = iblend * P0b[0] + blend * P1b[0];
             p1.y = iblend * P0b[1] + blend * P1b[1];
             p1.z = iblend * P0b[2] + blend * P1b[2];
-            
-            p2.x = iblend * P0c[0] + blend * P1c[0];
-            p2.y = iblend * P0c[1] + blend * P1c[1];
-            p2.z = iblend * P0c[2] + blend * P1c[2];
          }
          else
          {
             p0.x = P0a[0];
             p0.y = P0a[1];
             p0.z = P0a[2];
-            
             p1.x = P0b[0];
             p1.y = P0b[1];
             p1.z = P0b[2];
-            
-            p2.x = P0c[0];
-            p2.y = P0c[1];
-            p2.z = P0c[2];
          }
-         
-         e0 = p1 - p0;
-         e1 = p2 - p1;
-         
-         // reverseWinding means CCW, CW otherwise, decides normal orientation
-         fN = (mDso->reverseWinding() ? e0.cross(e1) : e1.cross(e0));
-         fN.normalize();
-         
-         for (int i=0; i<3; ++i)
-         {
-            unsigned int off = 3 * pi[i];
-            for (int j=0; j<3; ++j)
-            {
-               smoothNormals[off+j] += fN[j];
-            }
-         }
+
+         e0 = p0 - c;
+         e1 = p1 - c;
+
+         fN += (mDso->reverseWinding() ? e0.cross(e1) : e1.cross(e0));
+      }
+
+      // Accumulate smooth normal (per point)
+      // fN.length() = 2.0 * area
+      // don't normalize so that the final normal is area weighted
+
+      for (unsigned int fv=0; fv<nfv; ++fv)
+      {
+         unsigned int pi = 3 * info.vertexPointIndex[v + fv];
+         smoothNormals[pi + 0] += fN.x;
+         smoothNormals[pi + 1] += fN.y;
+         smoothNormals[pi + 2] += fN.z;
       }
       
       v += nfv;
