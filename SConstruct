@@ -534,7 +534,7 @@ excons.AddHelpTargets({"alembic-static": "Alembic static library",
                        "alembic-arnold": "Arnold procedural",
                        "alembic-mtoa": "MtoA translator for alembic AbcShape",
                        "alembic-vray": "V-Ray procedural",
-                       "eco": "Arnold procedural ecosystem package"})
+                       "eco": "Alembic ecosystem package"})
 
 excons.AddHelpOptions(alembic="""ALEMBIC OPTIONS
   alembic-hdf5-support=0|1  : Build with HDF5 support.                   [0]
@@ -590,6 +590,6 @@ if "eco" in COMMAND_LINE_TARGETS:
             ecotgts["mtoa"] = targets[tgtname] + [AbcShapeMtoaAE]
             outdirs["mtoa"] = ecop + "/maya/plug-ins/%s/mtoa-%s" % (maya.Version(nice=True), mtoa.Version(compat=True))
 
-   excons.EcosystemDist(env, "alembic.env", outdirs, targets=ecotgts, name="alembic", version="1.7.1")
+   excons.EcosystemDist(env, "alembic.env", outdirs, targets=ecotgts, name="alembic", version=".".join(map(str, version_tpl)))
 
 

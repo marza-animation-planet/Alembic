@@ -1394,6 +1394,11 @@ void addProps(Alembic::Abc::ICompoundProperty & iParent, MObject & iObject,
             
             if (propHeader.isArray())
             {
+                if (propName == "mayaHardEdges")
+                {
+                    continue;
+                }
+
                 Alembic::Abc::IArrayProperty prop(iParent, propName);
                 if (prop.getNumSamples() == 0)
                 {
@@ -1402,8 +1407,7 @@ void addProps(Alembic::Abc::ICompoundProperty & iParent, MObject & iObject,
 
                     printWarning(warn);
                 }
-
-                if (!addArrayProp(prop, iObject))
+                else if (!addArrayProp(prop, iObject))
                 {
                     unsupportedWarning<Alembic::Abc::IArrayProperty>(prop);
                 }
@@ -1418,8 +1422,7 @@ void addProps(Alembic::Abc::ICompoundProperty & iParent, MObject & iObject,
 
                     printWarning(warn);
                 }
-
-                if (!addScalarProp(prop, iObject))
+                else if (!addScalarProp(prop, iObject))
                 {
                     unsupportedWarning<Alembic::Abc::IScalarProperty>(prop);
                 }
@@ -1595,6 +1598,10 @@ void getAnimatedProps(Alembic::Abc::ICompoundProperty & iParent,
         }
         else if (propHeader.isArray())
         {
+            if (propName == "mayaHardEdges")
+            {
+                continue;
+            }
             Alembic::Abc::IArrayProperty prop(iParent, propName);
             if (prop.getNumSamples() == 0 || prop.isConstant())
             {
@@ -3017,6 +3024,16 @@ MString connectAttr(ArgData & iArgData)
         alembicNodeFn.addAttribute(attrObj,
             MFnDependencyNode::kLocalDynamicAttr);
     }
+    
+    if (iArgData.mReadMeshNormals)
+    {
+        MFnNumericAttribute numAttr;
+        MObject attrObj = numAttr.create("readMeshNormals", "readMeshNormals",
+            MFnNumericData::kBoolean);
+        alembicNodeFn.addAttribute(attrObj,
+            MFnDependencyNode::kLocalDynamicAttr);
+    }
+    
     
     // set AlembicNode name
     MString fileName;
