@@ -36,6 +36,7 @@
 #ifndef _Alembic_Ogawa_IData_h_
 #define _Alembic_Ogawa_IData_h_
 
+#include <Alembic/Util/Export.h>
 #include <Alembic/Ogawa/Foundation.h>
 #include <Alembic/Ogawa/IStreams.h>
 
@@ -43,7 +44,7 @@ namespace Alembic {
 namespace Ogawa {
 namespace ALEMBIC_VERSION_NS {
 
-class IData
+class ALEMBIC_EXPORT IData
 {
 public:
 
@@ -64,7 +65,7 @@ private:
           std::size_t iThreadId);
 
     class PrivateData;
-    std::auto_ptr< PrivateData > mData;
+    Alembic::Util::unique_ptr< PrivateData > mData;
 };
 
 typedef Alembic::Util::shared_ptr< IData > IDataPtr;

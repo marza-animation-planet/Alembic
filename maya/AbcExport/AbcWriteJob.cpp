@@ -35,7 +35,11 @@
 //-*****************************************************************************
 
 #include "AbcWriteJob.h"
+
+#ifdef ALEMBIC_WITH_HDF5
 #include <Alembic/AbcCoreHDF5/All.h>
+#endif
+
 #include <Alembic/AbcCoreOgawa/All.h>
 namespace
 {
@@ -424,6 +428,11 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
     }
     if ( status == MS::kSuccess && riCurvesVal && writeOutAsGroup)
     {
+       if( !mArgs.writeCurvesGroup )
+       {
+           return;
+       }
+
         MayaNurbsCurveWriterPtr nurbsCurve;
         if (iParent == NULL)
         {
@@ -463,17 +472,17 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
     }
     else if (ob.hasFn(MFn::kTransform))
     {
+       MayaTransformWriterPtr trans;
+
         MFnTransform fnTrans(ob, &status);
         if (status != MS::kSuccess)
         {
             MString msg = "Initialize transform node ";
-            msg += mCurDag.fullPathName();
-            msg += " failed, skipping.";
-            MGlobal::displayWarning(msg);
+           msg += mCurDag.fullPathName();
+           msg += " failed, skipping.";
+           MGlobal::displayWarning(msg);
             return;
         }
-
-        MayaTransformWriterPtr trans;
 
         // parented to the root case
         if (iParent == NULL)
@@ -490,11 +499,13 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
 
         if (trans->isAnimated() && mTransTimeIndex != 0)
         {
-            mTransList.push_back(trans);
+           mTransList.push_back(trans);
             mStats.mTransAnimNum++;
         }
         else
+        {
             mStats.mTransStaticNum++;
+        }
 
         AttributesWriterPtr attrs = trans->getAttrs();
         if (mTransTimeIndex != 0 && attrs->isAnimated())
@@ -519,6 +530,11 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
     }
     else if (ob.hasFn(MFn::kLocator))
     {
+       if( !mArgs.writeLocators )
+       {
+           return;
+       }
+
         MFnDependencyNode fnLocator(ob, & status);
         if (status != MS::kSuccess)
         {
@@ -564,6 +580,11 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
     }
     else if (ob.hasFn(MFn::kParticle))
     {
+       if( !mArgs.writeParticles )
+       {
+           return;
+       }
+
         MFnParticleSystem mFnParticle(ob, &status);
         if (status != MS::kSuccess)
         {
@@ -610,6 +631,11 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
     }
     else if (ob.hasFn(MFn::kMesh))
     {
+       if( !mArgs.writeMeshes)
+       {
+           return;
+       }
+
         MFnMesh fnMesh(ob, &status);
         if (status != MS::kSuccess)
         {
@@ -676,6 +702,11 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
     }
     else if (ob.hasFn(MFn::kCamera))
     {
+       if( !mArgs.writeCameras )
+       {
+           return;
+       }
+
         MFnCamera fnCamera(ob, &status);
         if (status != MS::kSuccess)
         {
@@ -718,6 +749,11 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
     }
     else if (ob.hasFn(MFn::kNurbsSurface))
     {
+       if( !mArgs.writeNurbsSurfaces )
+       {
+           return;
+       }
+
         MFnNurbsSurface fnNurbsSurface(ob, &status);
         if (status != MS::kSuccess)
         {
@@ -764,6 +800,11 @@ void AbcWriteJob::setup(double iFrame, MayaTransformWriterPtr iParent, GetMember
     }
     else if (ob.hasFn(MFn::kNurbsCurve))
     {
+       if( !mArgs.writeNurbsCurves )
+       {
+           return;
+       }
+
         MFnNurbsCurve fnNurbsCurve(ob, &status);
         if (status != MS::kSuccess)
         {
@@ -846,6 +887,7 @@ bool AbcWriteJob::eval(double iFrame)
             userInfo = "";
         }
 
+#ifdef ALEMBIC_WITH_HDF5
         if (mAsOgawa)
         {
             mRoot = CreateArchiveWithInfo(Alembic::AbcCoreOgawa::WriteArchive(),
@@ -858,6 +900,13 @@ bool AbcWriteJob::eval(double iFrame)
                 mFileName, appWriter, userInfo,
                 Alembic::Abc::ErrorHandler::kThrowPolicy);
         }
+#else
+        // just write it out as Ogawa
+        mRoot = CreateArchiveWithInfo(Alembic::AbcCoreOgawa::WriteArchive(),
+            mFileName, appWriter, userInfo,
+            Alembic::Abc::ErrorHandler::kThrowPolicy);
+#endif
+
         mShapeTimeIndex = mRoot.addTimeSampling(*mShapeTime);
         mTransTimeIndex = mRoot.addTimeSampling(*mTransTime);
 
@@ -869,6 +918,8 @@ bool AbcWriteJob::eval(double iFrame)
             std::string theError = "Unable to create abc file";
             throw std::runtime_error(theError);
         }
+
+        mArgs.setFirstAnimShape = (iFrame == *mShapeFrames.begin());
 
         util::ShapeSet::const_iterator end = mArgs.dagPaths.end();
         GetMembersMap gmMap;

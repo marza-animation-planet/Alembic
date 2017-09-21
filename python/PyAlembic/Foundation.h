@@ -1,6 +1,6 @@
 //-*****************************************************************************
 //
-// Copyright (c) 2009-2012,
+// Copyright (c) 2009-2016,
 //  Sony Pictures Imageworks Inc. and
 //  Industrial Light & Magic, a division of Lucasfilm Entertainment Company Ltd.
 //
@@ -39,7 +39,10 @@
 #include <Python.h>
 #include <Alembic/Abc/All.h>
 #include <Alembic/AbcCoreAbstract/All.h>
+#include <Alembic/Util/Config.h>
+#ifdef ALEMBIC_WITH_HDF5
 #include <Alembic/AbcCoreHDF5/All.h>
+#endif
 #include <Alembic/AbcCoreOgawa/All.h>
 #include <Alembic/AbcCoreFactory/All.h>
 #include <Alembic/AbcCollection/All.h>
@@ -48,14 +51,13 @@
 #include <string>
 
 #include <boost/version.hpp>
-#include <boost/config.hpp>
 
-// if Alembic::Util::shared_ptr resolves to boost::shared_ptr then we
-// don't need this since it's defined elsewhere
-#if !defined(ALEMBIC_LIB_USES_BOOST) && (BOOST_VERSION < 105000 || defined(BOOST_NO_CXX11_SMART_PTR))
+// if Alembic uses shared_ptr from boost, then we don't need this function because boost provides it
+// if Alembic uses shared_ptr from std, then we don't need this function because boost provides it since 1.53
+// if Alembic uses shared_ptr from tr1, then we do need this function
+#if defined(ALEMBIC_LIB_USES_TR1) || (BOOST_VERSION < 105300 && !defined(ALEMBIC_LIB_USES_BOOST))
 namespace boost
 {
-
 template<class T>
 inline T * get_pointer( Alembic::Util::shared_ptr<T> const & p )
 {
@@ -71,7 +73,9 @@ inline T * get_pointer( Alembic::Util::shared_ptr<T> const & p )
 namespace Abc  = ::Alembic::Abc;
 namespace AbcA = ::Alembic::AbcCoreAbstract;
 namespace AbcF = ::Alembic::AbcCoreFactory;
+#ifdef ALEMBIC_WITH_HDF5
 namespace AbcH = ::Alembic::AbcCoreHDF5;
+#endif
 namespace AbcO = ::Alembic::AbcCoreOgawa;
 namespace AbcC = ::Alembic::AbcCollection;
 namespace AbcG = ::Alembic::AbcGeom;

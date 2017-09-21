@@ -86,8 +86,9 @@ class MayaMeshWriter
         std::vector<Alembic::Util::uint32_t> & indices,
         std::string & name);
 
-    void getPolyNormals(std::vector<float> & oNormals);
+    void getPolyNormals(std::vector<float> & oNormals, std::vector<int> & oHardEdges);
     bool mNoNormals;
+    bool mWriteGeometry;
     bool mWriteUVs;
     bool mWriteColorSets;
     bool mWriteUVSets;
@@ -107,6 +108,8 @@ class MayaMeshWriter
     void writeUVSets();
     typedef std::vector<Alembic::AbcGeom::OV2fGeomParam> UVParamsVec;
     UVParamsVec mUVparams;
+
+    Alembic::Abc::OV2iArrayProperty mHardEdgeProp;
 };
 
 #endif  // _AbcExport_MayaMeshWriter_h_

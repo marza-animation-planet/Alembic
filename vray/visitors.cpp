@@ -966,7 +966,7 @@ float* UpdateGeometry::computeMeshSmoothNormals(AlembicGeometrySource::GeomInfo 
       
       // e1.cross(e2)
       fN = e0.cross(e1);
-      fN.normalize();
+      //fN.normalize();
       
       for (int i=0; i<3; ++i)
       {

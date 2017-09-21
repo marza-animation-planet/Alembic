@@ -1,6 +1,6 @@
 //-*****************************************************************************
 //
-// Copyright (c) 2009-2012,
+// Copyright (c) 2009-2016,
 //  Sony Pictures Imageworks, Inc. and
 //  Industrial Light & Magic, a division of Lucasfilm Entertainment Company Ltd.
 //
@@ -104,6 +104,16 @@ enum WrapExistingFlag
 enum TopFlag
 {
     kTop
+};
+
+//-*****************************************************************************
+//! Flag used during write which indicates whether we are writing out the
+//! full schema, or just parts of it.
+//-*****************************************************************************
+enum SparseFlag
+{
+    kFull,
+    kSparse
 };
 
 //-*****************************************************************************

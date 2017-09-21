@@ -242,7 +242,7 @@ public:
 class ArgData
 {
 public:
-    ArgData(MString iFileName = "",
+    ArgData(std::vector<std::string>& iFileNames,
         bool    iDebugOn = false,
         MObject iReparentObj = MObject::kNullObj,
         bool    iConnect = false,
@@ -259,12 +259,12 @@ public:
     ArgData(const ArgData & rhs);
     ArgData & operator=(const ArgData & rhs);
 
-    MString     mFileName;
-    double      mSequenceStartTime;
-    double      mSequenceEndTime;
-    bool        mDebugOn;
+    std::vector<std::string>     mFileNames;
+    double                     mSequenceStartTime;
+    double                     mSequenceEndTime;
+    bool                       mDebugOn;
 
-    MObject     mReparentObj;
+    MObject                    mReparentObj;
 
     bool        mRecreateColorSets;
     bool        mRecreateUVSets;

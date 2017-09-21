@@ -93,6 +93,69 @@ namespace
         }
     }
 
+    void setPolySmoothEdges(double iFrame, MFnMesh & ioMesh, Alembic::Abc::IV2iArrayProperty iHardEdges)
+    {
+        if (!iHardEdges)
+        {
+            return;
+        }
+
+        Alembic::AbcCoreAbstract::index_t index, ceilIndex;
+        double alpha = getWeightAndIndex(iFrame,
+            iHardEdges.getTimeSampling(), iHardEdges.getNumSamples(),
+            index, ceilIndex);
+
+        Alembic::Abc::V2iArraySamplePtr samp = iHardEdges.getValue(Alembic::Abc::ISampleSelector(index));
+        // ceilSamp?
+
+        // Build set of hard edges
+        std::pair<int, int> edge;
+        std::set<std::pair<int, int> > hardEdgesSet;
+
+        for (size_t i=0; i<samp->size(); ++i)
+        {
+            int v0 = (*samp)[i].x;
+            int v1 = (*samp)[i].y;
+            if (v0 < v1)
+            {
+                edge.first = v0;
+                edge.second = v1;
+            }
+            else
+            {
+                edge.first = v1;
+                edge.second = v0;
+            }
+            hardEdgesSet.insert(edge);
+        }
+
+        // Loop edges to set 'smooth' flag
+        for (unsigned int e=0; e<ioMesh.numEdges(); ++e)
+        {
+            int2 i2;
+            ioMesh.getEdgeVertices(e, i2);
+            edge.first = i2[0];
+            edge.second = i2[1];
+            if (hardEdgesSet.find(edge) != hardEdgesSet.end())
+            {
+                ioMesh.setEdgeSmoothing(e, false);
+            }
+            else
+            {
+                edge.first = i2[1];
+                edge.second = i2[0];
+                if (hardEdgesSet.find(edge) != hardEdgesSet.end())
+                {
+                    ioMesh.setEdgeSmoothing(e, false);
+                }
+                else
+                {
+                    ioMesh.setEdgeSmoothing(e, true);
+                }
+            }
+        }
+    }
+
     // normal vector is packed differently in file
     // from the format Maya accepts directly
     void setPolyNormals(double iFrame, MFnMesh & ioMesh,
@@ -287,7 +350,14 @@ namespace
         Alembic::Abc::P3fArraySamplePtr iPoints,
         Alembic::Abc::P3fArraySamplePtr iCeilPoints, double alpha)
     {
+       if(!iPoints)
+           return;
+
         unsigned int numPoints = static_cast<unsigned int>(iPoints->size());
+
+        if(!numPoints)
+           return;
+
         oPointArray.setLength(numPoints);
 
         if (alpha == 0 || iCeilPoints == NULL)
@@ -324,7 +394,7 @@ namespace
         // since we are changing the topology we will be creating a new mesh
 
         // Get face count info
-        unsigned int numPolys = static_cast<unsigned int>(iCounts->size());
+        unsigned int numPolys = iCounts ? static_cast<unsigned int>(iCounts->size()) : 0;
         MIntArray polyCounts;
         polyCounts.setLength(numPolys);
 
@@ -333,7 +403,7 @@ namespace
             polyCounts[i] = (*iCounts)[i];
         }
 
-        unsigned int numConnects = static_cast<unsigned int>(iIndices->size());
+        unsigned int numConnects = iIndices ? static_cast<unsigned int>(iIndices->size()) : 0;
 
         MIntArray polyConnects;
         polyConnects.setLength(numConnects);
@@ -518,8 +588,7 @@ namespace
                 ioMesh.getPolygonVertices (faceIndex, vertexList);
                 for (int v = 0; v < numVertices; ++v, ++nIndex)
                 {
-                    uvIds[nIndex] =
-                        (int)(*iSampIndices)[vertexList[v]];
+                    uvIds[nIndex] = (int)(*iSampIndices)[vertexList[v]];
                 }
             }
         }
@@ -857,7 +926,6 @@ namespace
             }
         }
 
-        MStatus status = MStatus::kSuccess;
         MString colorSetName(iC3f.getName().c_str());
         Alembic::Abc::UInt32ArraySamplePtr indices = samp.getIndices();
         setColor(ioMesh, colorList, indices, faceVarying, colorSetName, MFnMesh::kRGB,
@@ -965,7 +1033,6 @@ namespace
             }
         }
 
-        MStatus status = MStatus::kSuccess;
         MString colorSetName(iC4f.getName().c_str());
         Alembic::Abc::UInt32ArraySamplePtr indices = samp.getIndices();
         setColor(ioMesh, colorList, indices, faceVarying, colorSetName, MFnMesh::kRGBA,
@@ -1235,13 +1302,26 @@ void readPoly(double iFrame, bool iReadNormals, MFnMesh & ioMesh, MObject & iPar
                 Alembic::Abc::ISampleSelector(ceilIndex) );
         }
 
-        fillPoints(pointArray, points, ceilPoints, alpha);
-        ioMesh.setPoints(pointArray, MSpace::kObject);
+       fillPoints(pointArray, points, ceilPoints, alpha);
+       if(pointArray.length() > 0)
+       {
+           ioMesh.setPoints(pointArray, MSpace::kObject);
+       }
 
         setColorsAndUVs(iFrame, ioMesh, schema.getUVsParam(),
             iNode.mV2s, iNode.mC3s, iNode.mC4s,
             remapIndices, mayaVertexIndices, abcVertexIndices,
             !iInitialized);
+
+        if (!iInitialized && iReadNormals)
+        {
+            Alembic::Abc::ICompoundProperty up = schema.getUserProperties();
+            if (up && up.getPropertyHeader("mayaHardEdges") != NULL)
+            {
+                Alembic::Abc::IV2iArrayProperty hardEdgesProp(up, "mayaHardEdges");
+                setPolySmoothEdges(iFrame, ioMesh, hardEdgesProp);
+            }
+        }
 
         if (iReadNormals && schema.getNormalsParam().getNumSamples() > 1)
         {
@@ -1373,7 +1453,7 @@ void disconnectMesh(MObject & iMeshObject,
 
 MObject createPoly(double iFrame, bool iReadNormals, PolyMeshAndFriends & iNode, MObject & iParent)
 {
-    Alembic::AbcGeom::IPolyMeshSchema schema = iNode.mMesh.getSchema();
+    Alembic::AbcGeom::IPolyMeshSchema &schema = iNode.mMesh.getSchema();
     MString name(iNode.mMesh.getName().c_str());
 
     MObject obj;
@@ -1421,8 +1501,14 @@ MObject createPoly(double iFrame, bool iReadNormals, PolyMeshAndFriends & iNode,
 
         if (iReadNormals)
         {
-            setPolyNormals(iFrame, fnMesh, schema.getNormalsParam(),
-                           remapIndices, mayaVertexIndices, abcVertexIndices);
+            // setPolyNormals(iFrame, fnMesh, schema.getNormalsParam(),
+            //                remapIndices, mayaVertexIndices, abcVertexIndices);
+            Alembic::Abc::ICompoundProperty up = schema.getUserProperties();
+            if (up && up.getPropertyHeader("mayaHardEdges") != NULL)
+            {
+                Alembic::Abc::IV2iArrayProperty hardEdgesProp(up, "mayaHardEdges");
+                setPolySmoothEdges(iFrame, fnMesh, hardEdgesProp);
+            }
         }
 
         obj = fnMesh.object();

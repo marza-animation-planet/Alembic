@@ -1,6 +1,6 @@
 //-*****************************************************************************
 //
-// Copyright (c) 2013,
+// Copyright (c) 2013-2015,
 //  Sony Pictures Imageworks, Inc. and
 //  Industrial Light & Magic, a division of Lucasfilm Entertainment Company Ltd.
 //
@@ -39,12 +39,13 @@
 
 #include <Alembic/AbcCoreAbstract/ReadArraySampleCache.h>
 #include <Alembic/Abc/IArchive.h>
+#include <Alembic/Util/Export.h>
 
 namespace Alembic {
 namespace AbcCoreFactory {
 namespace ALEMBIC_VERSION_NS {
 
-class IFactory
+class ALEMBIC_EXPORT IFactory
 {
 public:
     IFactory();
@@ -55,6 +56,7 @@ public:
     {
         kHDF5,
         kOgawa,
+        kLayer,
         kUnknown
     };
 
@@ -67,11 +69,25 @@ public:
     //! file or known type and invalid archive is returned.
     Alembic::Abc::IArchive getArchive( const std::string & iFileName );
 
+    //! Open a series of alembic files, layering each file on top of the next
+    //! to present a single IArchive
+    Alembic::Abc::IArchive getArchive(
+        const std::vector< std::string > & iFileNames );
+
+    //! Try to open and layer a series of files file and return IArchive.
+    //! If all of the files are invalid, an invalid archive is returned.
+    //! If only some of the archives are invalid, only the good ones are
+    //! opened and layered, while invalid ones are ignored.
+    Alembic::Abc::IArchive getArchive(
+        const std::vector< std::string > & iFileNames, CoreType & oType );
+
     //! Use the streams (Alembic does not take ownership) to read the data from
     //! This is currently only valid for Ogawa.  The streams must all reference
     //! the same data.
     Alembic::Abc::IArchive getArchive(
         const std::vector< std::istream * > & iStreams, CoreType & oType );
+
+    // TODO, how do we best layer streams, and strings
 
     //! If opening an HDF5 file, sets whether to use the cached hierarchy
     //! if it exists, the default value is true

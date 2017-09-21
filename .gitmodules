@@ -4,3 +4,9 @@
 [submodule "openexr"]
 	path = openexr
 	url = git://github.com/gatgui/openexr.git
+[submodule "abcview"]
+	path = abcview
+	url = git://github.com/gatgui/abcview
+[submodule "cask"]
+	path = cask
+	url = git://github.com/gatgui/cask

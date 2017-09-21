@@ -42,6 +42,7 @@
 #include <Alembic/AbcCoreFactory/IFactory.h>
 
 #include <maya/MDoubleArray.h>
+#include <maya/MFloatArray.h>
 #include <maya/MIntArray.h>
 #include <maya/MFnIntArrayData.h>
 #include <maya/MPlug.h>
@@ -50,6 +51,7 @@
 #include <maya/MStringArray.h>
 #include <maya/MFnData.h>
 #include <maya/MFnDoubleArrayData.h>
+#include <maya/MFnFloatArrayData.h>
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnNumericData.h>
@@ -494,7 +496,7 @@ bool addArrayProp(Alembic::Abc::IArrayProperty & iProp, MObject & iParent)
                 }
                 else
                 {
-                    MFnDoubleArrayData fnData;
+                    MFnFloatArrayData fnData;
                     MObject arrObj;
 
                     if (iProp.isConstant())
@@ -502,7 +504,7 @@ bool addArrayProp(Alembic::Abc::IArrayProperty & iProp, MObject & iParent)
                         Alembic::AbcCoreAbstract::ArraySamplePtr samp;
                         iProp.get(samp);
 
-                        MDoubleArray arr((float *) samp->getData(),
+                        MFloatArray arr((float *) samp->getData(),
                             static_cast<unsigned int>(samp->size()));
                         arrObj = fnData.create(arr);
                         if (!plug.isNull())
@@ -513,12 +515,12 @@ bool addArrayProp(Alembic::Abc::IArrayProperty & iProp, MObject & iParent)
                     }
                     else
                     {
-                        MDoubleArray arr;
+                        MFloatArray arr;
                         arrObj = fnData.create(arr);
                     }
 
                     attrObj = typedAttr.create(attrName, attrName,
-                        MFnData::kDoubleArray, arrObj);
+                        MFnData::kFloatArray, arrObj);
                 }
 
             }
@@ -1062,6 +1064,9 @@ addScalarExtentThreeProp(Alembic::Abc::IScalarProperty& iProp,
             if (numChildren > extent)
                 numChildren = extent;
 
+            if (numChildren > 3)
+                numChildren = 3;
+
             for (unsigned int i = 0; i < numChildren; ++i)
                 plug.child(i).setValue(val[i]);
         }
@@ -1389,6 +1394,11 @@ void addProps(Alembic::Abc::ICompoundProperty & iParent, MObject & iObject,
             
             if (propHeader.isArray())
             {
+                if (propName == "mayaHardEdges")
+                {
+                    continue;
+                }
+
                 Alembic::Abc::IArrayProperty prop(iParent, propName);
                 if (prop.getNumSamples() == 0)
                 {
@@ -1397,8 +1407,7 @@ void addProps(Alembic::Abc::ICompoundProperty & iParent, MObject & iObject,
 
                     printWarning(warn);
                 }
-
-                if (!addArrayProp(prop, iObject))
+                else if (!addArrayProp(prop, iObject))
                 {
                     unsupportedWarning<Alembic::Abc::IArrayProperty>(prop);
                 }
@@ -1413,8 +1422,7 @@ void addProps(Alembic::Abc::ICompoundProperty & iParent, MObject & iObject,
 
                     printWarning(warn);
                 }
-
-                if (!addScalarProp(prop, iObject))
+                else if (!addScalarProp(prop, iObject))
                 {
                     unsupportedWarning<Alembic::Abc::IScalarProperty>(prop);
                 }
@@ -1590,6 +1598,10 @@ void getAnimatedProps(Alembic::Abc::ICompoundProperty & iParent,
         }
         else if (propHeader.isArray())
         {
+            if (propName == "mayaHardEdges")
+            {
+                continue;
+            }
             Alembic::Abc::IArrayProperty prop(iParent, propName);
             if (prop.getNumSamples() == 0 || prop.isConstant())
             {
@@ -2850,13 +2862,13 @@ void WriterData::getFrameRange(double & oMin, double & oMax)
     }
 }
 
-ArgData::ArgData(MString iFileName,
+ArgData::ArgData(std::vector<std::string>& iFileNames,
     bool iDebugOn, MObject iReparentObj, bool iConnect,
     MString iConnectRootNodes, bool iCreateIfNotFound, bool iRemoveIfNoUpdate,
     bool iRecreateColorSets, bool iRecreateUVSets, MString iFilterString,
     MString iExcludeFilterString, bool createInstances, bool readMeshNormals,
     bool createReferenceMesh) :
-        mFileName(iFileName),
+        mFileNames(iFileNames),
         mDebugOn(iDebugOn), mReparentObj(iReparentObj),
         mRecreateColorSets(iRecreateColorSets),
         mRecreateUVSets(iRecreateUVSets),
@@ -2881,7 +2893,7 @@ ArgData::ArgData(const ArgData & rhs)
 
 ArgData & ArgData::operator=(const ArgData & rhs)
 {
-    mFileName = rhs.mFileName;
+    mFileNames = rhs.mFileNames;
     mSequenceStartTime = rhs.mSequenceStartTime;
     mSequenceEndTime = rhs.mSequenceEndTime;
 
@@ -2914,10 +2926,11 @@ MString createScene(ArgData & iArgData)
     Alembic::Abc::IArchive archive;
     Alembic::AbcCoreFactory::IFactory factory;
     factory.setPolicy(Alembic::Abc::ErrorHandler::kQuietNoopPolicy);
-    archive = factory.getArchive(iArgData.mFileName.asUTF8());
+    archive = factory.getArchive(iArgData.mFileNames);
+
     if (!archive.valid())
     {
-        MString theError = iArgData.mFileName;
+        MString theError = (*iArgData.mFileNames.begin()).c_str();
         theError += MString(" not a valid Alembic file.");
         printError(theError);
         return returnName;
@@ -2956,6 +2969,8 @@ MString createScene(ArgData & iArgData)
     {
         visitor.applyShaderSelection();
     }
+
+    visitor.addFaceSetsAfterConnection();
 
     return returnName;
 }
@@ -3010,15 +3025,46 @@ MString connectAttr(ArgData & iArgData)
             MFnDependencyNode::kLocalDynamicAttr);
     }
     
+    if (iArgData.mReadMeshNormals)
+    {
+        MFnNumericAttribute numAttr;
+        MObject attrObj = numAttr.create("readMeshNormals", "readMeshNormals",
+            MFnNumericData::kBoolean);
+        alembicNodeFn.addAttribute(attrObj,
+            MFnDependencyNode::kLocalDynamicAttr);
+    }
+    
+    
     // set AlembicNode name
     MString fileName;
-    stripFileName(iArgData.mFileName, fileName);
+    stripFileName((*iArgData.mFileNames.begin()).c_str(), fileName);
     MString alembicNodeName = fileName +"_AlembicNode";
     alembicNodeFn.setName(alembicNodeName, &status);
 
-    // set input file name
+    // set input file name (Deprecated but leaving here for legacy support)
     MPlug plug = alembicNodeFn.findPlug("abc_File", true, &status);
-    plug.setValue(iArgData.mFileName);
+    plug.setValue((*iArgData.mFileNames.begin()).c_str());
+
+    // set input layer filename(s)
+    MPlug layerFilesPlug = alembicNodeFn.findPlug("abc_layerFiles", true, &status);
+
+    if( status == MStatus::kSuccess )
+    {
+        MStringArray filenameStorage;
+        std::vector< std::string > &argFilenames = iArgData.mFileNames;
+
+        for( size_t i = 0; i < argFilenames.size(); i++ )
+        {
+            filenameStorage.append( argFilenames[i].c_str() );
+        }
+
+        MObject updatedFilenameData = MFnStringArrayData().create( filenameStorage, &status );
+
+        if( status == MStatus::kSuccess )
+        {
+            layerFilesPlug.setValue( updatedFilenameData );
+        }
+    }
 
     // set sequence start and end in frames
     MTime sec(1.0, MTime::kSeconds);

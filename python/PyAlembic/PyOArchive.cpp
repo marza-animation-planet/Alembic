@@ -1,6 +1,6 @@
 //-*****************************************************************************
 //
-// Copyright (c) 2012,
+// Copyright (c) 2012-2016,
 //  Sony Pictures Imageworks Inc. and
 //  Industrial Light & Magic, a division of Lucasfilm Entertainment Company Ltd.
 //
@@ -39,15 +39,19 @@
 using namespace boost::python;
 
 //-*****************************************************************************
-static Abc::OArchive* mkOArchive( const std::string &iName, 
-                                  bool asOgawa = false )
+static Abc::OArchive* mkOArchive( const std::string &iName,
+                                  bool asOgawa = true )
 {
-    if ( asOgawa == true ) {
-        return new Abc::OArchive( AbcO::WriteArchive(), iName );
-    }
-    else {
+    if ( !asOgawa )
+    {
+#ifdef ALEMBIC_WITH_HDF5
         return new Abc::OArchive( AbcH::WriteArchive(), iName );
-    };
+#else
+        throwPythonException( "Unsupported core type: HDF5" );
+#endif
+    }
+
+    return new Abc::OArchive( AbcO::WriteArchive(), iName );
 }
 
 //-*****************************************************************************
@@ -61,7 +65,7 @@ void register_oarchive()
               make_constructor(
                   mkOArchive,
                   default_call_policies(),
-                  ( arg( "fileName" ), arg( "asOgawa" ) = false ) ),
+                  ( arg( "fileName" ), arg( "asOgawa" ) = true ) ),
               "Create an OArchive with the given file name" )
         .def( "getName",
               &Abc::OArchive::getName,

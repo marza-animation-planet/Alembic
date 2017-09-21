@@ -115,6 +115,14 @@ bool getRotOrder(MTransformationMatrix::RotationOrder iOrder,
 // copy from mayapit code (MayaPit.h .cpp)
 bool isAnimated(MObject & object, bool checkParent = false);
 
+// determine if a joint is driven by FBIK.
+// The joint is animated but has no input connections.
+bool isDrivenByFBIK(const MFnIkJoint & iJoint);
+
+// determine if a joint is driven by a spline ik.
+// The joint's is animated but has no input connections.
+bool isDrivenBySplineIK(const MFnIkJoint & iJoint);
+
 // determine if a Maya Object is intermediate
 bool isIntermediate(const MObject & object);
 
@@ -154,14 +162,25 @@ struct JobArgs
         excludeInvisible = false;
         filterEulerRotations = false;
         noNormals = false;
+        setFirstAnimShape = false;
         stripNamespace = 0;
         useSelectionList = false;
         worldSpace = false;
         writeVisibility = false;
         writeUVs = false;
-        writeUVSets = false;
         writeColorSets = false;
         writeFaceSets = false;
+        writeUVSets = false;
+        writeGeometry = true;
+        writeCurvesGroup = true;
+        writeTransforms = true;
+        writeLocators = true;
+        writeParticles = true;
+        writeMeshes = true;
+        writeCameras = true;
+        writeNurbsSurfaces = true;
+        writeNurbsCurves = true;
+        autoSubd = false;
         writeInstances = false;
         writeReferenceMesh = false;
     }
@@ -169,16 +188,27 @@ struct JobArgs
     bool excludeInvisible;
     bool filterEulerRotations;
     bool noNormals;
+    bool setFirstAnimShape;
     unsigned int stripNamespace;
     bool useSelectionList;
+    bool writeGeometry;
     bool worldSpace;
     bool writeVisibility;
     bool writeUVs;
-    bool writeUVSets;
     bool writeColorSets;
     bool writeFaceSets;
     bool writeInstances;
     bool writeReferenceMesh;
+    bool writeUVSets;
+    bool writeCurvesGroup;
+    bool writeTransforms;
+    bool writeLocators;
+    bool writeParticles;
+    bool writeMeshes;
+    bool writeCameras;
+    bool writeNurbsSurfaces;
+    bool writeNurbsCurves;
+    bool autoSubd;
 
     std::string melPerFrameCallback;
     std::string melPostCallback;

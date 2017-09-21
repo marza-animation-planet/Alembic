@@ -475,6 +475,20 @@ MStatus AlembicFileTranslator::writer(const MFileObject& file,
                 jobopts += " -wuvs";
             }
         }
+        else if (key == "uvo")
+        {
+            if (val == "1")
+            {
+                jobopts += " -uvo";
+            }
+        }
+        else if (key == "as")
+        {
+            if (val == "1")
+            {
+                jobopts += " -as";
+            }
+        }
         else if (key == "wcs")
         {
             if (val == "1")

@@ -35,7 +35,7 @@
 //-*****************************************************************************
 
 #include <Alembic/AbcGeom/All.h>
-#include <Alembic/AbcCoreHDF5/All.h>
+#include <Alembic/AbcCoreOgawa/All.h>
 
 // We include some global mesh data to test with from an external source
 // to keep this example code clean.
@@ -82,7 +82,7 @@ void doSample( OCurves &iCurves )
 
 void Example1_CurvesOut()
 {
-    OArchive archive( Alembic::AbcCoreHDF5::WriteArchive(),
+    OArchive archive( Alembic::AbcCoreOgawa::WriteArchive(),
                       "curves1.abc" );
 
     OCurves myCurves( OObject( archive, kTop ),
@@ -102,7 +102,7 @@ void Example1_CurvesOut()
 
 void Example1_CurvesIn()
 {
-    IArchive archive( Alembic::AbcCoreHDF5::ReadArchive(), "curves1.abc" );
+    IArchive archive( Alembic::AbcCoreOgawa::ReadArchive(), "curves1.abc" );
     std::cout << "Reading: " << archive.getName() << std::endl;
 
     std::cout <<"constructing curves" << std::endl;
@@ -134,7 +134,7 @@ void Example1_CurvesIn()
 
 void Example2_CurvesOut()
 {
-    OArchive archive( Alembic::AbcCoreHDF5::WriteArchive(),
+    OArchive archive( Alembic::AbcCoreOgawa::WriteArchive(),
                       "curves2.abc" );
 
     OCurves myCurves( OObject( archive, kTop ), "nurbsCurve" );
@@ -179,7 +179,7 @@ void Example2_CurvesOut()
 
 void Example2_CurvesIn()
 {
-    IArchive archive( Alembic::AbcCoreHDF5::ReadArchive(), "curves2.abc" );
+    IArchive archive( Alembic::AbcCoreOgawa::ReadArchive(), "curves2.abc" );
 
     ICurves myCurves( IObject( archive, kTop) , "nurbsCurve");
     ICurvesSchema &curves = myCurves.getSchema();
@@ -218,6 +218,67 @@ void Example2_CurvesIn()
 }
 
 //-*****************************************************************************
+void sparseTest()
+{
+    std::string name = "sparseCurveTest.abc";
+    {
+        OArchive archive( Alembic::AbcCoreOgawa::WriteArchive(), name );
+        OCurves curveUVsObj( OObject( archive, kTop ), "curveUVs", kSparse );
+
+        // only set UVs
+        OCurvesSchema::Sample curveSamp;
+        OV2fGeomParam::Sample uvSamp(
+            V2fArraySample( (const V2f *)g_uvs, g_totalVerts ),
+            kVertexScope );
+        curveSamp.setUVs( uvSamp );
+        curveUVsObj.getSchema().set( curveSamp );
+
+        // only set positions
+        OCurves curvePosObj( OObject( archive, kTop ), "curvePositions", kSparse );
+        OCurvesSchema::Sample curveSamp2;
+        curveSamp2.setPositions(
+            V3fArraySample( ( const V3f * )g_verts, g_totalVerts ) );
+        curvePosObj.getSchema().set( curveSamp2 );
+    }
+
+    {
+        IArchive archive( Alembic::AbcCoreOgawa::ReadArchive(), name );
+
+        IObject curveUVsObj( IObject( archive, kTop ), "curveUVs" );
+
+        // This should NOT match
+        TESTING_ASSERT( !IPolyMeshSchema::matches( curveUVsObj.getMetaData() ) );
+        ICompoundProperty geomProp( curveUVsObj.getProperties(), ".geom" );
+
+        // This shouldn't match either
+        TESTING_ASSERT( !IPolyMeshSchema::matches( geomProp.getMetaData() ) );
+
+        // and we should ONLY have UVs
+        TESTING_ASSERT( geomProp.getNumProperties() == 1 &&
+            geomProp.getPropertyHeader("uv") != NULL );
+
+        IArrayProperty uvsProp( geomProp, "uv" );
+        TESTING_ASSERT( uvsProp.getNumSamples() == 1 );
+
+        IObject curvePosObj( IObject( archive, kTop ), "curvePositions" );
+
+        // This should NOT match
+        TESTING_ASSERT( !IPolyMeshSchema::matches( curvePosObj.getMetaData() ) );
+        geomProp = ICompoundProperty( curvePosObj.getProperties(), ".geom" );
+
+        // This shouldn't match either
+        TESTING_ASSERT( !IPolyMeshSchema::matches( geomProp.getMetaData() ) );
+        TESTING_ASSERT( geomProp.getNumProperties() == 2 &&
+            geomProp.getPropertyHeader("P") != NULL &&
+            geomProp.getPropertyHeader(".selfBnds") != NULL );
+        IArrayProperty ptsProp( geomProp, "P" );
+        TESTING_ASSERT( ptsProp.getNumSamples() == 1 );
+        IScalarProperty selfBndsProp( geomProp, ".selfBnds" );
+        TESTING_ASSERT( selfBndsProp.getNumSamples() == 1 );
+    }
+}
+
+//-*****************************************************************************
 //-*****************************************************************************
 //-*****************************************************************************
 // MAIN FUNCTION!
@@ -241,6 +302,8 @@ int main( int argc, char *argv[] )
 
     Example2_CurvesOut();
     Example2_CurvesIn();
+
+    sparseTest();
 
     return 0;
 }

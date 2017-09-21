@@ -55,7 +55,7 @@ namespace
 {
     MString usage(
 "                                                                           \n"
-NAME_PREFIX "AbcImport  [options] File                                    \n\n"
+NAME_PREFIX "AbcImport  [options] File [File2 File3 ... ]                 \n\n"
 "Options:                                                                   \n\
 -rpr/ reparent      DagPath                                                 \n\
                     reparent the whole hierarchy under a node in the        \n\
@@ -111,14 +111,16 @@ scene but doesn't exist in the archive, children of that node will be connected\
 the input regular expressions.                                              \n\
 -h  / help          Print this message                                      \n\
 -d  / debug         Turn on debug message printout                        \n\n\
+Specifying more than one file will layer those files together.            \n\n\
 Example:                                                                    \n"
 NAME_PREFIX "AbcImport -h;                                                  \n"
 NAME_PREFIX "AbcImport -d -m open \"/tmp/test.abc\";                        \n"
-NAME_PREFIX "AbcImport -ftr -ct \"/\" -crt -rm \"/mcp/test.abc\";           \n"
-NAME_PREFIX "AbcImport -ct \"root1 root2 root3 ...\" \"/mcp/test.abc\";     \n"
-);  // usage
+NAME_PREFIX "AbcImport -ftr -ct \"/\" -crt -rm \"/tmp/test.abc\";           \n"
+NAME_PREFIX "AbcImport -ct \"root1 root2 root3 ...\" \"/tmp/test.abc\";     \n"
+NAME_PREFIX "AbcImport \"/tmp/test.abc\" \"/tmp/justUVs.abc\" \"/tmp/other.abc\" \n"
+);
 
-};
+}
 
 
 AbcImport::AbcImport()
@@ -153,7 +155,7 @@ MSyntax AbcImport::createSyntax()
     syntax.addFlag("-ft",   "-filterObjects",    MSyntax::kString);
     syntax.addFlag("-eft",  "-excludeFilterObjects",    MSyntax::kString);
 
-    syntax.addArg(MSyntax::kString);
+    syntax.setObjectType( MSyntax::kStringObjects, 1, 1024 );
 
     syntax.enableQuery(true);
     syntax.enableEdit(false);
@@ -166,7 +168,6 @@ void* AbcImport::creator()
 {
     return new AbcImport();
 }
-
 
 MStatus AbcImport::doIt(const MArgList & args)
 {
@@ -282,11 +283,19 @@ MStatus AbcImport::doIt(const MArgList & args)
         createReferenceMesh = true;
     }
 
-    status = argData.getCommandArgument(0, filename);
     MString abcNodeName;
-    if (status == MS::kSuccess)
+
+    MStringArray filenameArray;
+    status = argData.getObjects( filenameArray );
+
+    if( ( status == MStatus::kSuccess ) && ( filenameArray.length() > 0 ) )
     {
+        std::vector< std::string > filenameList;
+
+        for(unsigned int fileNum = 0; fileNum < filenameArray.length(); fileNum++)
         {
+            filename = filenameArray[ fileNum ];
+
             MString fileRule, expandName;
             MString alembicFileRule = "alembicCache";
             MString alembicFilePath = "cache/alembic";
@@ -322,6 +331,7 @@ MStatus AbcImport::doIt(const MArgList & args)
             MFileObject absoluteFile;
             absoluteFile.setResolveMethod(MFileObject::kInputFile);
             absoluteFile.setRawFullName(filename);
+            absoluteFile.setResolveMethod(MFileObject::kInputFile);
 #if MAYA_API_VERSION < 201300
             if (absoluteFile.resolvedFullName() !=
                 absoluteFile.expandedFullName())
@@ -338,13 +348,25 @@ MStatus AbcImport::doIt(const MArgList & args)
             {
                 filename = absoluteFile.resolvedFullName();
             }
+
+            MFileObject fileObj;
+            status = fileObj.setRawFullName(filename);
+            if (status == MS::kSuccess && fileObj.exists())
+            {
+                filenameList.push_back( filename.asUTF8() );
+            }
+            else
+            {
+                MString theError("In AbcImport::doIt(), ");
+                theError += filename;
+                theError += MString(" doesn't exist");
+                printError(theError);
+            }
         }
 
-        MFileObject fileObj;
-        status = fileObj.setRawFullName(filename);
-        if (status == MS::kSuccess && fileObj.exists())
+        if( filenameList.size() > 0 )
         {
-            ArgData inputData(filename, debugOn, reparentObj,
+            ArgData inputData(filenameList, debugOn, reparentObj,
                 swap, connectRootNodes, createIfNotFound, removeIfNoUpdate,
                 recreateColorSets, recreateUVSets, filterString, excludeFilterString,
                 createInstances, readMeshNormals, createReferenceMesh);
@@ -369,13 +391,6 @@ MStatus AbcImport::doIt(const MArgList & args)
                         sec.as(MTime::uiUnit()) );
                 }
             }
-        }
-        else
-        {
-            MString theError("In AbcImport::doIt(), ");
-            theError += filename;
-            theError += MString(" doesn't exist");
-            printError(theError);
         }
     }
 
