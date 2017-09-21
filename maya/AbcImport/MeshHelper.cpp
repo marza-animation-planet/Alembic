@@ -93,6 +93,69 @@ namespace
         }
     }
 
+    void setPolySmoothEdges(double iFrame, MFnMesh & ioMesh, Alembic::Abc::IV2iArrayProperty iHardEdges)
+    {
+        if (!iHardEdges)
+        {
+            return;
+        }
+
+        Alembic::AbcCoreAbstract::index_t index, ceilIndex;
+        double alpha = getWeightAndIndex(iFrame,
+            iHardEdges.getTimeSampling(), iHardEdges.getNumSamples(),
+            index, ceilIndex);
+
+        Alembic::Abc::V2iArraySamplePtr samp = iHardEdges.getValue(Alembic::Abc::ISampleSelector(index));
+        // ceilSamp?
+
+        // Build set of hard edges
+        std::pair<int, int> edge;
+        std::set<std::pair<int, int> > hardEdgesSet;
+
+        for (size_t i=0; i<samp->size(); ++i)
+        {
+            int v0 = (*samp)[i].x;
+            int v1 = (*samp)[i].y;
+            if (v0 < v1)
+            {
+                edge.first = v0;
+                edge.second = v1;
+            }
+            else
+            {
+                edge.first = v1;
+                edge.second = v0;
+            }
+            hardEdgesSet.insert(edge);
+        }
+
+        // Loop edges to set 'smooth' flag
+        for (unsigned int e=0; e<ioMesh.numEdges(); ++e)
+        {
+            int2 i2;
+            ioMesh.getEdgeVertices(e, i2);
+            edge.first = i2[0];
+            edge.second = i2[1];
+            if (hardEdgesSet.find(edge) != hardEdgesSet.end())
+            {
+                ioMesh.setEdgeSmoothing(e, false);
+            }
+            else
+            {
+                edge.first = i2[1];
+                edge.second = i2[0];
+                if (hardEdgesSet.find(edge) != hardEdgesSet.end())
+                {
+                    ioMesh.setEdgeSmoothing(e, false);
+                }
+                else
+                {
+                    ioMesh.setEdgeSmoothing(e, true);
+                }
+            }
+        }
+    }
+
     // normal vector is packed differently in file
     // from the format Maya accepts directly
     void setPolyNormals(double iFrame, MFnMesh & ioMesh,
@@ -1243,6 +1306,16 @@ void readPoly(double iFrame, bool iReadNormals, MFnMesh & ioMesh, MObject & iPar
             remapIndices, mayaVertexIndices, abcVertexIndices,
             !iInitialized);
 
+        if (!iInitialized && iReadNormals)
+        {
+            Alembic::Abc::ICompoundProperty up = schema.getUserProperties();
+            if (up && up.getPropertyHeader("mayaHardEdges") != NULL)
+            {
+                Alembic::Abc::IV2iArrayProperty hardEdgesProp(up, "mayaHardEdges");
+                setPolySmoothEdges(iFrame, ioMesh, hardEdgesProp);
+            }
+        }
+
         if (iReadNormals && schema.getNormalsParam().getNumSamples() > 1)
         {
             setPolyNormals(iFrame, ioMesh, schema.getNormalsParam(),
@@ -1421,8 +1494,14 @@ MObject createPoly(double iFrame, bool iReadNormals, PolyMeshAndFriends & iNode,
 
         if (iReadNormals)
         {
-            setPolyNormals(iFrame, fnMesh, schema.getNormalsParam(),
-                           remapIndices, mayaVertexIndices, abcVertexIndices);
+            // setPolyNormals(iFrame, fnMesh, schema.getNormalsParam(),
+            //                remapIndices, mayaVertexIndices, abcVertexIndices);
+            Alembic::Abc::ICompoundProperty up = schema.getUserProperties();
+            if (up && up.getPropertyHeader("mayaHardEdges") != NULL)
+            {
+                Alembic::Abc::IV2iArrayProperty hardEdgesProp(up, "mayaHardEdges");
+                setPolySmoothEdges(iFrame, fnMesh, hardEdgesProp);
+            }
         }
 
         obj = fnMesh.object();
