@@ -45,6 +45,7 @@ global proc int alembicImportOptions(string $parent,
          columnLayout;
             checkBoxGrp -ncb 1 -l "" -l1 "Recreate All Color Sets" -adj 2 -cal 1 right -cal 2 left -v1 false optColSets;
             checkBoxGrp -ncb 1 -l "" -l1 "Recreate All UV Sets" -adj 2 -cal 1 right -cal 2 left -v1 false optUVSets;
+            checkBoxGrp -ncb 1 -l "" -l1 "Read Normals" -adj 2 -cal 1 right -cal 2 left -v1 false optReadNormals;
             checkBoxGrp -ncb 1 -l "" -l1 "Create Reference Object" -adj 2 -cal 1 right -cal 2 left -v1 false optRefObj;
          setParent ..;
       setParent ..;
@@ -72,6 +73,7 @@ global proc int alembicImportOptions(string $parent,
          // parse option string and set UI
          string $optlist[];
          int $n = tokenize($initialSettings, ";", $optlist);
+         string $options = "";
          
          for ($i=0; $i<$n; $i++)
          {
@@ -91,6 +93,20 @@ global proc int alembicImportOptions(string $parent,
                $val += $keyval[$j];
             }
             
+            if (size(match($key+"=", $options)) > 0)
+            {
+               // options already processed
+               continue;
+            }
+            else
+            {
+               if (size($options) > 0)
+               {
+                  $options += ";";
+               }
+               $options += $optlist[$i];
+            }
+            
             if ($key == "ftr")
             {
                checkBoxGrp -e -v1 ($val == "1") optFitTime;
@@ -102,6 +118,10 @@ global proc int alembicImportOptions(string $parent,
             else if ($key == "rus")
             {
                checkBoxGrp -e -v1 ($val == "1") optUVSets;
+            }
+            else if ($key == "rmn")
+            {
+               checkBoxGrp -e -v1 ($val == "1") optReadNormals;
             }
             else if ($key == "crm")
             {
@@ -144,6 +164,9 @@ global proc int alembicImportOptions(string $parent,
                checkBoxGrp -e -v1 ($val == "1") optCreateInst;
             }
          }
+
+         // at this point, $options is a 'clean' version of $initialSettings
+         $initialSettings = $options;
       }
       
       // Update editable state
@@ -197,6 +220,11 @@ global proc int alembicImportOptions(string $parent,
       if (`checkBoxGrp -q -v1 optUVSets` == true)
       {
          $impOpts += ";rus=1";
+      }
+      
+      if (`checkBoxGrp -q -v1 optReadNormals` == true)
+      {
+         $impOpts += ";rmn=1";
       }
       
       if (`checkBoxGrp -q -v1 optRefObj` == true)
@@ -263,6 +291,7 @@ global proc int alembicImportOptions(string $parent,
             if ($key == "ftr" ||
                 $key == "rcs" ||
                 $key == "rus" ||
+                $key == "rmn" ||
                 $key == "crm" ||
                 $key == "d" ||
                 $key == "ft" ||
@@ -278,6 +307,11 @@ global proc int alembicImportOptions(string $parent,
             }
             else
             {
+               if (size(match($key+"=", $expOpts)) > 0)
+               {
+                  // Import option is already set
+                  continue;
+               }
                if (size($expOpts) > 0)
                {
                   $expOpts += ";";
