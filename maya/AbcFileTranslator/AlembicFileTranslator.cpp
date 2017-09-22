@@ -140,6 +140,13 @@ MStatus AlembicFileTranslator::reader(const MFileObject& file,
                 options += " -rus";
             }
         }
+        else if (key == "rmn")
+        {
+            if (val == "1")
+            {
+                options += " -rmn";
+            }
+        }
         else if (key == "d")
         {
             if (val == "1")
