@@ -9,15 +9,83 @@
 AI_PROCEDURAL_NODE_EXPORT_METHODS(AbcProcMtd);
 
 
-struct AbcProc
-{
-};
-
-
 node_parameters
 {
-}
+   // Common parameters
+   AiParameterStr("filename", "");
+   AiParameterStr("objectpath", "");
 
+   AiParameterFlt("frame", 0.0f);
+   AiParameterArray("samples", AiArray(0, 1, AI_TYPE_FLOAT));
+   AiParameterBool("relative_samples", false);
+   AiParameterFlt("fps", 0.0f);
+   AiParameterEnum("cycle", CT_hold, CycleTypeNames);
+   AiParameterFlt("start_frame", std::numeric_limits<float>::max());
+   AiParameterFlt("end_frame", -std::numeric_limits<float>::max());
+   AiParameterFlt("speed", 1.0f);
+   AiParameterFlt("offset", 0.0f);
+   AiParameterBool("preserve_start_frame", false);
+
+   //AiParameterBool("ignore_motion_blur", false);
+   AiParameterBool("ignore_deform_blur", false);
+   AiParameterBool("ignore_transform_blur", false);
+   AiParameterBool("ignore_visibility", false);
+   AiParameterBool("ignore_transforms", false);
+   AiParameterBool("ignore_instances", false);
+   AiParameterBool("ignore_nurbs", false);
+
+   AiParameterFlt("velocity_scale", 1.0f);
+   AiParameterStr("velocity_name", "");
+   AiParameterStr("acceleration_name", "");
+   AiParameterBool("force_velocity_blur", false)
+
+   AiParameterBool("output_reference", false);
+   AiParameterEnum("reference_source", RS_attributes_then_file, ReferenceSourceNames);
+   AiParameterStr("reference_position_name", "Pref");
+   AiParameterStr("reference_normal_name", "Nref");
+   AiParameterStr("reference_filename", "");
+   AiParameterFlt("reference_frame", -std::numeric_limits<float>::max());
+
+   AiParameterArray("demote_to_object_attribute", AiArray(0, 1, AI_TYPE_STRING));
+
+   AiParameterInt("samples_expand_iterations", 0);
+   AiParameterBool("optimize_samples", false);
+
+   AiParameterStr("nameprefix", "");
+
+   // Multi shapes parameters
+   AiParameterFlt("bounds_padding", 0.0f);
+   AiParameterBool("compute_velocity_expanded_bounds", false);
+   AiParameterBool("use_override_bounds", false);
+   AiParameterStr("override_bounds_min_name", "overrideBoundsMin");
+   AiParameterStr("override_bounds_min_name", "overrideBoundsMax");
+   AiParameterBool("pad_bounds_with_peak_radius", false);
+   AiParameterStr("peak_radius_name", "peakRadius");
+   AiParameterBool("pad_bounds_with_peak_width", false);
+   AiParameterStr("peak_width_name", "peakWidth");
+   AiParameterArray("override_attributes", AiArray(0, 1, AI_TYPE_STRING));
+
+   // Single shape parameters
+   AiParameterBool("read_object_attributes", false);
+   AiParameterBool("read_primitive_attributes", false);
+   AiParameterBool("read_point_attributes", false);
+   AiParameterBool("read_vertex_attributes", false);
+   AiParameterEnum("attributes_frame", AF_render, AttributeFrameNames);
+   AiParameterArray("attribute_prefices_to_remove", AiArray(0, 1, AI_TYPE_STRING));
+   AiParameterArray("compute_tangents", AiArray(0, 1, AI_TYPE_STRING));
+   AiParameterStr("radius_name", "");
+   AiParameterFlt("radius_min", 0.0f);
+   AiParameterFlt("radius_max", 1000000.0f);
+   AiParameterFlt("radius_scale", 1.0f);
+   AiParameterFlt("width_min", 0.0f);
+   AiParameterFlt("width_max", 1000000.0f);
+   AiParameterFlt("width_scale", 1.0f);
+   AiParameterInt("nurbs_sample_rate", 5);
+
+   // Others
+   AiParameterBool("verbose", false);
+   AiParameterStr("rootdrive", "");
+}
 
 procedural_init
 {

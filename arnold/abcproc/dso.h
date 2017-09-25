@@ -46,6 +46,8 @@ enum ProceduralMode
 
 extern const char* CycleTypeNames[];
 extern const char* AttributeFrameNames[];
+extern const char* ReferenceSourceNames[];
+
 
 class Dso
 {
