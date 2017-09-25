@@ -109,7 +109,9 @@ def RequireAlembic(static=True, withPython=False, withGL=False, linkCore=True, l
       
       defs = []
       incdirs = ["lib"]
-      libdirs = [excons.OutputBaseDirectory() + "/lib"]
+      libdir = excons.OutputBaseDirectory() + "/lib"
+      libprefix = ("lib" if (sys.platform != "win32" or static) else "")
+      libext = (".lib" if sys.platform == "win32" else (".a" if static else excons.SharedLibraryLinkExt()))
       libs = []
       
       if sys.platform == "win32":
@@ -131,24 +133,13 @@ def RequireAlembic(static=True, withPython=False, withGL=False, linkCore=True, l
       
       env.Append(CPPPATH=incdirs)
       
-      if libdirs:
-         env.Append(LIBPATH=libdirs)
+      env.Append(LIBPATH=[libdir])
       
       if withGL and linkGL:
-         if sys.platform == "win32" and static:
-            libname = "libAlembicAbcOpenGL"
-         else:
-            libname = "AlembicAbcOpenGL"
-         excons.Link(env, libname, static=static, force=True, silent=True)
-         #env.Append(LIBS=["AlembicAbcOpenGL"])
+         excons.Link(env, libdir + "/" + libprefix + "AlembicAbcOpenGL" + libext, static=static, force=True, silent=True)
       
       if linkCore:
-         #env.Append(LIBS=["Alembic"])
-         if sys.platform == "win32" and static:
-            libname = "libAlembic"
-         else:
-            libname = "Alembic"
-         excons.Link(env, libname, static=static, force=True, silent=True)
+         excons.Link(env, libdir + "/" + libprefix + "Alembic" + libext, static=static, force=True, silent=True)
       
       reqs = []
       
