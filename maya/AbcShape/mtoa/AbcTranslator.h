@@ -58,12 +58,16 @@ private:
    void ExportVisibility(AtNode *atNode);
    void ExportSubdivAttribs(AtNode *atNode);
    void ExportMeshAttribs(AtNode *atNode);
+#if MTOA_ARCH_VERSION_NUM == 1
    void ExportBounds(AtNode *atNode, unsigned int step);
+#endif
    void ExportShader(AtNode *atNode, bool update);
    
    bool IsSingleShape() const;
+#if MTOA_ARCH_VERSION_NUM == 1
    bool IsRenderable(MDagPath dagPath) const;
    bool IsRenderable(MFnDagNode &node) const;
+#endif
 
    double GetSampleFrame(unsigned int step);
    void GetFrames(double inRenderFrame, double inSampleFrame,

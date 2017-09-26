@@ -762,6 +762,8 @@ void CAbcTranslator::ExportMeshAttribs(AtNode *proc)
    }
 }
 
+#if MTOA_ARCH_VERSION_NUM == 1
+
 bool CAbcTranslator::IsRenderable(MFnDagNode &node) const
 {
    MStatus status;
@@ -827,13 +829,21 @@ bool CAbcTranslator::IsRenderable(MDagPath dagPath) const
    return true;
 }
 
+#endif
+
 void CAbcTranslator::ExportVisibility(AtNode *proc)
 {
+   ProcessRenderFlags(proc);
+   /*
    MPlug plug;
 
    int visibility = AI_RAY_UNDEFINED;
 
+#if MTOA_ARCH_VERSION_NUM >= 2
+   if (IsRenderable())
+#else
    if (IsRenderable(m_dagPath))
+#endif
    {
       visibility = AI_RAY_ALL;
 
@@ -909,6 +919,7 @@ void CAbcTranslator::ExportVisibility(AtNode *proc)
    {
       AiNodeSetBool(proc, "matte", plug.asBool());
    }
+   */
 }
 
 void CAbcTranslator::ExportShader(AtNode *proc, bool update)
@@ -2035,6 +2046,8 @@ void CAbcTranslator::ReadAlembicAttributes(double time)
    }
 }
 
+#if MTOA_ARCH_VERSION_NUM == 1
+
 void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
 {
    MFnDagNode node(m_dagPath.node());
@@ -2216,6 +2229,8 @@ void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
       }
    }
 }
+
+#endif
 
 void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFrame, double sampleFrame)
 {
@@ -2750,7 +2765,9 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
 #endif
 
    ExportProc(proc, step, renderFrame, sampleFrame);
+#if MTOA_ARCH_VERSION_NUM == 1
    ExportBounds(proc, step);
+#endif
 #ifdef OLD_API
    ExportMatrix(proc, step);
 #else
