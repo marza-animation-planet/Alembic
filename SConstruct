@@ -350,8 +350,9 @@ if nameprefix:
 
 if withArnold:
    A, M, m, p = arnold.Version(asString=False)
-   if A < 4 or (A == 4 and (M < 2 or (M == 2 and m < 3))):
-      print("Arnold procedural requires arnold 4.2.3.0 or above.")
+   #if A < 4 or (A == 4 and (M < 2 or (M == 2 and m < 3))):
+   if A < 5:
+      print("Arnold procedural requires arnold 5.0.0.0 or above.")
       sys.exit(1)
 
    prjs.append({"name": "%sAlembicArnoldProcedural" % nameprefix,
