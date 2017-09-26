@@ -58,7 +58,7 @@ node_parameters
    AiParameterBool("compute_velocity_expanded_bounds", false);
    AiParameterBool("use_override_bounds", false);
    AiParameterStr("override_bounds_min_name", "overrideBoundsMin");
-   AiParameterStr("override_bounds_min_name", "overrideBoundsMax");
+   AiParameterStr("override_bounds_max_name", "overrideBoundsMax");
    AiParameterBool("pad_bounds_with_peak_radius", false);
    AiParameterStr("peak_radius_name", "peakRadius");
    AiParameterBool("pad_bounds_with_peak_width", false);
