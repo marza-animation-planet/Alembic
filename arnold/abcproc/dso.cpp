@@ -1,6 +1,6 @@
-#include "dso.h"
-#include "visitors.h"
-#include "globallock.h"
+#include <dso.h>
+#include <visitors.h>
+#include <globallock.h>
 #include <sstream>
 #include <fstream>
 
@@ -31,6 +31,77 @@ const char* ReferenceSourceNames[] =
    "frame",
    NULL
 };
+
+// ---
+
+// Common 
+AtString Dso::p_filename("filename");
+AtString Dso::p_objectpath("objectpath");
+AtString Dso::p_frame("frame");
+AtString Dso::p_samples("samples");
+AtString Dso::p_relative_samples("relative_samples");
+AtString Dso::p_fps("fps");
+AtString Dso::p_cycle("cycle");
+AtString Dso::p_start_frame("start_frame");
+AtString Dso::p_end_frame("end_frame");
+AtString Dso::p_speed("speed");
+AtString Dso::p_offset("offset");
+AtString Dso::p_preserve_start_frame("preserve_start_frame");
+
+//AtString Dso::p_ignore_motion_blur("ignore_motion_blur");
+AtString Dso::p_ignore_deform_blur("ignore_deform_blur");
+AtString Dso::p_ignore_transform_blur("ignore_transform_blur");
+AtString Dso::p_ignore_visibility("ignore_visibility");
+AtString Dso::p_ignore_transforms("ignore_transforms");
+AtString Dso::p_ignore_instances("ignore_instances");
+AtString Dso::p_ignore_nurbs("ignore_nurbs");
+AtString Dso::p_velocity_scale("velocity_scale");
+AtString Dso::p_velocity_name("velocity_name");
+AtString Dso::p_acceleration_name("acceleration_name");
+AtString Dso::p_force_velocity_blur("force_velocity_blur");
+AtString Dso::p_output_reference("output_reference");
+AtString Dso::p_reference_source("reference_source");
+AtString Dso::p_reference_position_name("reference_position_name");
+AtString Dso::p_reference_normal_name("reference_normal_name");
+AtString Dso::p_reference_filename("reference_filename");
+AtString Dso::p_reference_frame("reference_frame");
+AtString Dso::p_demote_to_object_attribute("demote_to_object_attribute");
+AtString Dso::p_samples_expand_iterations("samples_expand_iterations");
+AtString Dso::p_optimize_samples("optimize_samples");
+AtString Dso::p_nameprefix("nameprefix");
+
+// Multi shapes parameters
+AtString Dso::p_bounds_padding("bounds_padding");
+AtString Dso::p_compute_velocity_expanded_bounds("compute_velocity_expanded_bounds");
+AtString Dso::p_use_override_bounds("use_override_bounds");
+AtString Dso::p_override_bounds_min_name("override_bounds_min_name");
+AtString Dso::p_override_bounds_max_name("override_bounds_max_name");
+AtString Dso::p_pad_bounds_with_peak_radius("pad_bounds_with_peak_radius");
+AtString Dso::p_peak_radius_name("peak_radius_name");
+AtString Dso::p_pad_bounds_with_peak_width("pad_bounds_with_peak_width");
+AtString Dso::p_peak_width_name("peak_width_name");
+AtString Dso::p_override_attributes("override_attributes");
+
+// Single shape parameters
+AtString Dso::p_read_object_attributes("read_object_attributes");
+AtString Dso::p_read_primitive_attributes("read_primitive_attributes");
+AtString Dso::p_read_point_attributes("read_point_attributes");
+AtString Dso::p_read_vertex_attributes("read_vertex_attributes");
+AtString Dso::p_attributes_frame("attributes_frame");
+AtString Dso::p_attribute_prefices_to_remove("attribute_prefices_to_remove");
+AtString Dso::p_compute_tangents("compute_tangents");
+AtString Dso::p_radius_name("radius_name");
+AtString Dso::p_radius_min("radius_min");
+AtString Dso::p_radius_max("radius_max");
+AtString Dso::p_radius_scale("radius_scale");
+AtString Dso::p_width_min("width_min");
+AtString Dso::p_width_max("width_max");
+AtString Dso::p_width_scale("width_scale");
+AtString Dso::p_nurbs_sample_rate("nurbs_sample_rate");
+
+// Others
+AtString Dso::p_verbose("verbose");
+AtString Dso::p_rootdrive("rootdrive");
 
 // ---
 
@@ -79,149 +150,6 @@ void Dso::CommonParameters::reset()
    promoteToObjectAttribs.clear();
    
    ignoreNurbs = false;
-}
-
-std::string Dso::CommonParameters::dataString(const char *targetShape) const
-{
-   std::ostringstream oss;
-   
-   oss << std::fixed << std::setprecision(6);
-   
-   if (filePath.length() > 0)
-   {
-      oss << " -filename " << filePath;
-   }
-   if (outputReference)
-   {
-      oss << " -outputreference -referencesource " << ReferenceSourceNames[referenceSource];
-      if (referenceSource == RS_attributes || referenceSource == RS_attributes_then_file)
-      {
-         if (referencePositionName.length() > 0)
-         {
-            oss << " -referencepositionname " << referencePositionName;
-         }
-         if (referenceNormalName.length() > 0)
-         {
-            oss << " -referencenormalname " << referenceNormalName;
-         }
-      }
-      if (referenceSource == RS_frame)
-      {
-         oss << " -referenceframe " << referenceFrame;
-      }
-      if (referenceSource == RS_file || referenceSource == RS_attributes_then_file)
-      {
-         if (referenceFilePath.length() > 0)
-         {
-            oss << " -referencefilename " << referenceFilePath;
-         }
-      }
-   }
-   if (namePrefix.length() > 0)
-   {
-      oss << " -nameprefix " << namePrefix;
-   }
-   if (targetShape)
-   {
-      oss << " -objectpath " << targetShape; 
-   }
-   else if (objectPath.length() > 0)
-   {
-      oss << " -objectpath " << objectPath;
-   }
-   oss << " -frame " << frame;
-   if (startFrame < endFrame)
-   {
-      oss << " -startframe " << startFrame << " -endframe " << endFrame;
-   }
-   if (relativeSamples)
-   {
-      oss << " -relativesamples";
-   }
-   if (samples.size() > 0)
-   {
-      oss << " -samples";
-      for (size_t i=0; i<samples.size(); ++i)
-      {
-         oss << " " << samples[i];
-      }
-   }
-   if (cycle >= CT_hold && cycle < CT_MAX)
-   {
-      oss << " -cycle " << CycleTypeNames[cycle];
-   }
-   oss << " -speed " << speed;
-   oss << " -offset " << offset;
-   oss << " -fps " << fps;
-   if (preserveStartFrame)
-   {
-      oss << " -preservestartframe";
-   }
-   oss << " -velocityscale " << velocityScale;
-   if (velocityName.length() > 0)
-   {
-      oss << " -velocityname " << velocityName;
-   }
-   if (accelerationName.length() > 0)
-   {
-      oss << " -accelerationname " << accelerationName;
-   }
-   if (ignoreTransformBlur)
-   {
-      oss << " -ignoretransformblur";
-   }
-   if (ignoreDeformBlur)
-   {
-      oss << " -ignoredeformblur";
-   }
-   if (targetShape || ignoreTransforms)
-   {
-      oss << " -ignoretransforms";
-   }
-   if (targetShape || ignoreInstances)
-   {
-      oss << " -ignoreinstances";
-   }
-   if (targetShape || ignoreVisibility)
-   {
-      oss << " -ignorevisibility";
-   }
-   if (ignoreNurbs)
-   {
-      oss << " -ignorenurbs";
-   }
-   if (samplesExpandIterations > 0)
-   {
-      oss << " -samplesexpanditerations " << samplesExpandIterations;
-      if (optimizeSamples)
-      {
-         oss << " -optimizesamples";
-      }
-   }
-   else
-   {
-      oss << " -samplesexpanditerations 0";
-   }
-   if (promoteToObjectAttribs.size() > 0)
-   {
-      oss << " -promotetoobjectattribs";
-      std::set<std::string>::const_iterator it = promoteToObjectAttribs.begin();
-      while (it != promoteToObjectAttribs.end())
-      {
-         oss << " " << *it;
-         ++it;
-      }
-   }
-   if (forceVelocityBlur)
-   {
-      oss << " -forcevelocityblur";
-   }
-   if (verbose)
-   {
-      oss << " -verbose";
-   }
-   
-   return oss.str();
 }
 
 std::string Dso::CommonParameters::shapeKey() const
@@ -351,65 +279,6 @@ void Dso::MultiParameters::reset()
    peakWidthName = "peakWidth";
 }
 
-std::string Dso::MultiParameters::dataString() const
-{
-   std::ostringstream oss;
-   
-   if (overrideAttribs.size() > 0)
-   {
-      oss << " -overrideattribs";
-      std::set<std::string>::const_iterator it = overrideAttribs.begin();
-      while (it != overrideAttribs.end())
-      {
-         oss << " " << *it;
-         ++it;
-      }
-   }
-   
-   if (useOverrideBounds)
-   {
-      oss << " -useoverridebounds";
-      if (overrideBoundsMinName.length() > 0 && overrideBoundsMinName != "overrideBoundsMin")
-      {
-         oss << " -overrideboundsminname " << overrideBoundsMinName;
-      }
-      
-      if (overrideBoundsMaxName.length() > 0 && overrideBoundsMaxName != "overrideBoundsMax")
-      {
-         oss << " -overrideboundsmaxname " << overrideBoundsMaxName;
-      }
-   }
-   else if (computeVelocityExpandedBounds)
-   {
-      oss << " -computevelocityexpandedbounds";
-   }
-   
-   if (boundsPadding > 0)
-   {
-      oss << " -boundspadding " << boundsPadding;
-   }
-   
-   if (padBoundsWithPeakRadius)
-   {
-      oss << " -padboundswithpeakradius";
-      if (peakRadiusName.length() > 0 && peakRadiusName != "peakRadius")
-      {
-         oss << " -peakradiusname " << peakRadiusName;
-      }
-   }
-   
-   if (padBoundsWithPeakWidth)
-   {
-      oss << " -padboundswithpeakwidth";
-      if (peakWidthName.length() > 0 && peakWidthName != "peakWidth")
-      {
-         oss << " -peakwidthname " << peakWidthName;
-      }
-   }
-   
-   return oss.str();
-}
-
 void Dso::SingleParameters::reset()
 {
    readObjectAttribs = false;
@@ -433,7 +302,7 @@ void Dso::SingleParameters::reset()
    nurbsSampleRate = 5;
 }
 
-std::string Dso::SingleParameters::dataString() const
+std::string Dso::SingleParameters::shapeKey() const
 {
    std::ostringstream oss;
    
@@ -494,11 +363,6 @@ std::string Dso::SingleParameters::dataString() const
    return oss.str();
 }
 
-std::string Dso::SingleParameters::shapeKey() const
-{
-   return dataString();
-}
-   
 // ---
 
 std::map<std::string, std::string> Dso::msMasterNodes;
@@ -511,26 +375,22 @@ Dso::Dso(AtNode *node)
    , mRefScene(0)
    , mRootDrive("")
    , mRenderTime(0.0)
-   , mSetTimeSamples(false)
+   , mSetMotionRange(false)
    , mStepSize(-1.0f)
+   , mVolumePadding(0.0f)
    , mNumShapes(0)
    , mShapeKey("")
    , mInstanceNum(0)
-   , mShutterOpen(std::numeric_limits<double>::max())
-   , mShutterClose(-std::numeric_limits<double>::max())
-   , mShutterStep(0)
    , mMotionStart(std::numeric_limits<double>::max())
    , mMotionEnd(-std::numeric_limits<double>::max())
    , mReverseWinding(true)
+   , mGlobalFrame(0.0)
 {
    mCommonParams.reset();
    mSingleParams.reset();
    mMultiParams.reset();
    
-   readFromDataParam();
-   
-   // Override values from "data" string
-   readFromUserParams();
+   readParams();
    
    AtNode *opts = AiUniverseGetOptions();
 
@@ -553,6 +413,35 @@ Dso::Dso(AtNode *node)
       }
    }
    
+   // Set global frame
+   if (AiNodeLookUpUserParameter(opts, "frame") != 0)
+   {
+      mGlobalFrame = AiNodeGetFlt(opts, "frame");
+   }
+   else
+   {
+      AiMsgWarning("[abcproc] Use abcproc node 'frame' parameter value as render frame.");
+      mGlobalFrame = mCommonParams.frame;
+   }
+
+   // Compute motion start and end frames
+   mMotionStart = mGlobalFrame + AiNodeGetFlt(mProcNode, Strings::motion_start);
+   mMotionEnd = mGlobalFrame + AiNodeGetFlt(mProcNode, Strings::motion_end);
+
+   // Compute shutter open and close frames
+   double shutterOpenFrame = mMotionStart;
+   double shutterCloseFrame = mMotionEnd;
+   AtNode *cam = AiUniverseGetCamera();
+   if (cam)
+   {
+      shutterOpenFrame = (mGlobalFrame + AiCameraGetShutterStart());
+      shutterCloseFrame = (mGlobalFrame + AiCameraGetShutterEnd());
+   }
+   else
+   {
+      AiMsgWarning("[abcproc] No current camera in scene, use motion_start and motion_end time for shutter open and close time.");
+   }
+
    // Check frame and get from options node if needed? ('frame' user attribute)
    bool useReferenceFile = mCommonParams.outputReference &&
                            (mCommonParams.referenceSource == RS_file ||
@@ -567,7 +456,8 @@ Dso::Dso(AtNode *node)
    }
    normalizeFilePath(mCommonParams.referenceFilePath);
    
-   mReverseWinding = AiNodeGetBool(opts, "CCW_points");
+   // mReverseWinding = AiNodeGetBool(opts, "CCW_points");
+   mReverseWinding = true;
    
    // Only acquire global lock when create new alembic scenes
    //
@@ -662,50 +552,25 @@ Dso::Dso(AtNode *node)
             }
             mMode = PM_single;
          }
-         
-         
+
+         // Compute samples frame times
+         std::vector<double> sampleFrames;
+
          mTimeSamples.clear();
-         
+         mExpandedTimeSamples.clear();
+
          if (ignoreMotionBlur() || (mMode == PM_single && ignoreDeformBlur()))
          {
+            sampleFrames.push_back(mCommonParams.frame);
             mTimeSamples.push_back(mRenderTime);
          }
          else
          {
             if (mCommonParams.samples.size() == 0)
             {
-               //AiMsgWarning("[abcproc] No samples set");
-               if (mShutterOpen <= mShutterClose)
-               {
-                  if (mShutterOpen < mShutterClose)
-                  {
-                     double step = mShutterClose - mShutterOpen;
-                     
-                     if (mShutterStep > 1)
-                     {
-                        step /= (mShutterStep - 1);
-                     }
-                     
-                     if (mShutterStep > 0)
-                     {
-                        
-                     }
-                     
-                     for (double relSample=mShutterOpen; relSample<=mShutterClose; relSample+=step)
-                     {
-                        mTimeSamples.push_back(computeTime(mCommonParams.frame + relSample));
-                     }
-                  }
-                  else
-                  {
-                     mTimeSamples.push_back(computeTime(mCommonParams.frame + mShutterOpen));
-                  }
-               }
-               else
-               {
-                  AiMsgWarning("[abcproc] No samples set, use render frame");
-                  mTimeSamples.push_back(mRenderTime);
-               }
+               AiMsgWarning("[abcproc] No samples set, use render frame");
+               sampleFrames.push_back(mCommonParams.frame);
+               mTimeSamples.push_back(mRenderTime);
             }
             else
             {
@@ -713,132 +578,109 @@ Dso::Dso(AtNode *node)
                {
                   for (size_t i=0; i<mCommonParams.samples.size(); ++i)
                   {
-                     mTimeSamples.push_back(computeTime(mCommonParams.frame + mCommonParams.samples[i]));
+                     double sampleFrame = mCommonParams.frame + mCommonParams.samples[i];
+                     sampleFrames.push_back(sampleFrame);
+                     mTimeSamples.push_back(computeTime(sampleFrame));
                   }
                }
                else
                {
                   for (size_t i=0; i<mCommonParams.samples.size(); ++i)
                   {
-                     mTimeSamples.push_back(computeTime(mCommonParams.samples[i]));
+                     double sampleFrame = mCommonParams.samples[i];
+                     sampleFrames.push_back(sampleFrame);
+                     mTimeSamples.push_back(computeTime(sampleFrame));
                   }
                }
             }
          }
-         
-         mExpandedTimeSamples = mTimeSamples;
-         
-         // Expand time samples
+
+         std::vector<double> expandedSampleFrames = sampleFrames;
+
+         // Expand samples
          if (mTimeSamples.size() > 1 && mCommonParams.samplesExpandIterations > 0)
          {
-            std::vector<double> samples;
-            
+            std::vector<double> newSampleFrames;
+
             for (int i=0; i<mCommonParams.samplesExpandIterations; ++i)
             {
-               samples.push_back(mExpandedTimeSamples[0]);
+               newSampleFrames.push_back(expandedSampleFrames[0]);
                
-               for (size_t j=1; j<mExpandedTimeSamples.size(); ++j)
+               for (size_t j=1; j<expandedSampleFrames.size(); ++j)
                {
-                  double mid = 0.5 * (mExpandedTimeSamples[j-1] + mExpandedTimeSamples[j]);
-                  samples.push_back(mid);
-                  samples.push_back(mExpandedTimeSamples[j]);
+                  double mid = 0.5 * (expandedSampleFrames[j-1] + expandedSampleFrames[j]);
+                  newSampleFrames.push_back(mid);
+                  newSampleFrames.push_back(expandedSampleFrames[j]);
                }
-               
+
                // Arnold doesn't accept more than 255 motion keys
-               if (samples.size() > 255)
+               if (newSampleFrames.size() > 255)
                {
                   break;
                }
-               
-               std::swap(mExpandedTimeSamples, samples);
-               samples.clear();
+
+               std::swap(expandedSampleFrames, newSampleFrames);
+               newSampleFrames.clear();
             }
          }
-         
+
          // Optimize time samples
-         if ((mExpandedTimeSamples.size() > mTimeSamples.size()) && mCommonParams.optimizeSamples)
+         if ((expandedSampleFrames.size() > sampleFrames.size()) && mCommonParams.optimizeSamples)
          {
             // Remove samples outside of camera shutter range
-            AtNode *cam = AiUniverseGetCamera();
             
-            if (cam)
+            // With arnold 5, each shape node has 'motion_start' and 'motion_end'
+            // attributes to specify frame relative sample ranges.
+            // Samples within that range are considered uniform and shared for 
+            // both deformation and transformation
+            
+            std::vector<double> newSampleFrames;
+            
+            for (size_t i=0; i<expandedSampleFrames.size(); ++i)
             {
-               AtNode *opts = AiUniverseGetOptions();
+               double sampleFrame = expandedSampleFrames[i];
                
-               if (AiNodeLookUpUserParameter(opts, "motion_start_frame") &&
-                   AiNodeLookUpUserParameter(opts, "motion_end_frame"))
+               if (sampleFrame < shutterOpenFrame)
                {
-                  std::vector<double> samples;
-                  
-                  mMotionStart = AiNodeGetFlt(opts, "motion_start_frame");
-                  mMotionEnd = AiNodeGetFlt(opts, "motion_end_frame");
-                  
-                  if (AiNodeLookUpUserParameter(opts, "frame") &&
-                      AiNodeLookUpUserParameter(opts, "relative_motion_frame") &&
-                      AiNodeGetBool(opts, "relative_motion_frame"))
+                  continue;
+               }
+               else if (sampleFrame > shutterCloseFrame)
+               {
+                  if (newSampleFrames.size() > 0 && newSampleFrames.back() < shutterCloseFrame)
                   {
-                     float frame = AiNodeGetFlt(opts, "frame");
-                     mMotionStart += frame;
-                     mMotionEnd += frame;
-                  }
-                  
-                  mMotionStart /= mCommonParams.fps;
-                  mMotionEnd /= mCommonParams.fps;
-                  
-                  double motionLength = mMotionEnd - mMotionStart;
-                  
-                  double shutterOpen = (mMotionStart + AiCameraGetShutterStart() * motionLength);
-                  double shutterClose = (mMotionStart + AiCameraGetShutterEnd() * motionLength);
-                  
-                  for (size_t i=0; i<mExpandedTimeSamples.size(); ++i)
-                  {
-                     double sample = mExpandedTimeSamples[i];
-                     
-                     if (sample < shutterOpen)
-                     {
-                        continue;
-                     }
-                     else if (sample > shutterClose)
-                     {
-                        if (samples.size() > 0 && samples.back() < shutterClose)
-                        {
-                           samples.push_back(sample);
-                        }
-                     }
-                     else
-                     {
-                        if (samples.size() == 0 && i > 0 && sample > shutterOpen)
-                        {
-                           samples.push_back(mExpandedTimeSamples[i-1]);
-                        }
-                        samples.push_back(sample);
-                     }
-                  }
-                  
-                  if (samples.size() > 0 && samples.size() < mExpandedTimeSamples.size())
-                  {
-                     std::swap(samples, mExpandedTimeSamples);
-                     mSetTimeSamples = true;
+                     newSampleFrames.push_back(sampleFrame);
                   }
                }
                else
                {
-                 AiMsgWarning("[abcproc] Cannot optimize motion blur samples (missing motion sample range info)");
+                  if (newSampleFrames.size() == 0 && i > 0 && sampleFrame > shutterOpenFrame)
+                  {
+                     newSampleFrames.push_back(expandedSampleFrames[i-1]);
+                  }
+                  newSampleFrames.push_back(sampleFrame);
                }
             }
-            else
+            
+            if (newSampleFrames.size() > 0 && newSampleFrames.size() < expandedSampleFrames.size())
             {
-               AiMsgWarning("[abcproc] Cannot optimize motion blur samples (no camera set)");
+               std::swap(expandedSampleFrames, newSampleFrames);
+               mSetMotionRange = true;
+               mMotionStart = expandedSampleFrames.front();
+               mMotionEnd = expandedSampleFrames.back();
             }
          }
-         
+
+         // Convert expanded samples frames to time (in seconds)
+         for (size_t i=0; i<expandedSampleFrames.size(); ++i)
+         {
+            mExpandedTimeSamples.push_back(computeTime(expandedSampleFrames[i]));
+         }
+
          // Compute shape key
          mShapeKey = shapeKey();
          
          if (mCommonParams.verbose)
          {
-            AiMsgInfo("[abcproc] Procedural parameters: \"%s\"", dataString(0).c_str());
-            
             for (size_t i=0; i<mExpandedTimeSamples.size(); ++i)
             {
                AiMsgInfo("[abcproc] Add motion sample time: %lf", mExpandedTimeSamples[i]);
@@ -850,30 +692,44 @@ Dso::Dso(AtNode *node)
             // Read instance_num attribute
             mInstanceNum = 0;
             
-            const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mProcNode, "instance_num");
+            const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mProcNode, Strings::instance_num);
             if (pe)
             {
                int pt = AiUserParamGetType(pe);
                if (pt == AI_TYPE_INT)
                {
-                  mInstanceNum = AiNodeGetInt(mProcNode, "instance_num");
+                  mInstanceNum = AiNodeGetInt(mProcNode, Strings::instance_num);
                }
                else if (pt == AI_TYPE_UINT)
                {
-                  mInstanceNum = int(AiNodeGetUInt(mProcNode, "instance_num"));
+                  mInstanceNum = int(AiNodeGetUInt(mProcNode, Strings::instance_num));
                }
                else if (pt == AI_TYPE_BYTE)
                {
-                  mInstanceNum = int(AiNodeGetByte(mProcNode, "instance_num"));
+                  mInstanceNum = int(AiNodeGetByte(mProcNode, Strings::instance_num));
                }
             }
          }
          
          // Check if we should export a box for volume shading rather than a new procedural or shape
-         const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mProcNode, "step_size");
+         const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mProcNode, Strings::step_size);
          if (pe)
          {
-            mStepSize = AiNodeGetFlt(mProcNode, "step_size");
+            mStepSize = AiNodeGetFlt(mProcNode, Strings::step_size);
+         }
+
+         pe = AiNodeLookUpUserParameter(mProcNode, Strings::volume_padding);
+         if (pe)
+         {
+            mVolumePadding = AiNodeGetFlt(mProcNode, Strings::volume_padding);
+         }
+         else
+         {
+            pe = AiNodeLookUpUserParameter(mProcNode, Strings::bounds_slack);
+            if (pe)
+            {
+               mVolumePadding = AiNodeGetFlt(mProcNode, Strings::bounds_slack);
+            }
          }
       }
       else
@@ -943,37 +799,6 @@ std::string Dso::getReferencePath(const std::string &basePath) const
    return refPath;
 }
 
-std::string Dso::dataString(const char *targetShape) const
-{
-   if (targetShape && strlen(targetShape) == 0)
-   {
-      targetShape = 0;
-   }
-   
-   std::string rv = mCommonParams.dataString(targetShape);
-   
-   if (!targetShape)
-   {
-      rv += mMultiParams.dataString();
-   }
-   
-   rv += mSingleParams.dataString();
-   
-   if (mRootDrive.length() > 0)
-   {
-      rv += " -rootdrive " + mRootDrive.substr(0, 1);
-   }
-   
-   if (rv.length() > 0 && rv[0] == ' ')
-   {
-      return rv.substr(1);
-   }
-   else
-   {
-      return rv;
-   }
-}
-
 std::string Dso::shapeKey() const
 {
    return mCommonParams.shapeKey() + ":" + mSingleParams.shapeKey();
@@ -988,31 +813,11 @@ void Dso::setGeneratedNode(size_t idx, AtNode *node)
 {
    if (idx < mGeneratedNodes.size())
    {
-      if (mSetTimeSamples)
+      if (mSetMotionRange)
       {
-         float invMotionLength = 1.0 / (mMotionEnd - mMotionStart);
-        
-         AtArray *dtimes = AiArrayAllocate(mExpandedTimeSamples.size(), 1, AI_TYPE_FLOAT);
-         AtArray *xtimes = AiArrayAllocate(mExpandedTimeSamples.size(), 1, AI_TYPE_FLOAT);
-        
-         for (size_t i=0; i<mExpandedTimeSamples.size(); ++i)
-         {
-            float t = (mExpandedTimeSamples[i] - mMotionStart) * invMotionLength;
-          
-            AiArraySetFlt(dtimes, i, t);
-            AiArraySetFlt(xtimes, i, t);
-         }
-         
-         AiNodeSetArray(node, "transform_time_samples", xtimes);
-         AiNodeSetArray(node, "deform_time_samples", dtimes);
+         AiNodeSetFlt(node, Strings::motion_start, mMotionStart);
+         AiNodeSetFlt(node, Strings::motion_end, mMotionEnd);
       }
-      
-      // Add '_proc_generator' user attribute
-      if (AiNodeLookUpUserParameter(node, "_proc_generator") == NULL)
-      {
-         AiNodeDeclare(node, "_proc_generator", "constant STRING");
-      }
-      AiNodeSetStr(node, "_proc_generator", AiNodeGetName(mProcNode));
       
       mGeneratedNodes[idx] = node;
    }
@@ -1020,27 +825,18 @@ void Dso::setGeneratedNode(size_t idx, AtNode *node)
 
 double Dso::attribsTime(AttributeFrame af) const
 {
-   double shutterOpen = AiCameraGetShutterStart();
-   double shutterClose = AiCameraGetShutterEnd();
-   double shutterCenter = 0.5 * (shutterOpen + shutterClose);
-   
-   double motionStart = mRenderTime;
-   double motionEnd = mRenderTime;
-   
-   if (mExpandedTimeSamples.size() > 0)
-   {
-      motionStart = mExpandedTimeSamples[0];
-      motionEnd = mExpandedTimeSamples.back();
-   }
+   double shutterOpenFrame = AiCameraGetShutterStart();
+   double shutterCloseFrame = AiCameraGetShutterEnd();
+   double shutterCenterFrame = 0.5 * (shutterOpenFrame + shutterCloseFrame);
    
    switch (af)
    {
    case AF_shutter:
-      return motionStart + shutterCenter * (motionEnd - motionStart);
+      return computeTime(mMotionStart + shutterCenterFrame * (mMotionEnd - mMotionStart));
    case AF_shutter_open:
-      return motionStart + shutterOpen * (motionEnd - motionStart);
+      return computeTime(mMotionStart + shutterOpenFrame * (mMotionEnd - mMotionStart));
    case AF_shutter_close:
-      return motionStart + shutterClose * (motionEnd - motionStart);
+      return computeTime(mMotionStart + shutterCloseFrame * (mMotionEnd - mMotionStart));
    case AF_render:
    default:
       return mRenderTime;
@@ -1051,6 +847,8 @@ std::string Dso::uniqueName(const std::string &baseName) const
 {
    size_t i = 0;
    std::string name = baseName;
+
+   // should I specify the scope here (mProcNode)
 
    while (AiNodeLookUpByName(name.c_str()) != 0)
    {
@@ -1207,66 +1005,6 @@ bool Dso::cleanAttribName(std::string &name) const
    return false;
 }
 
-void Dso::readFromDataParam()
-{
-   std::string data = AiNodeGetStr(mProcNode, "data").c_str();
-   
-   // split data string
-   
-   std::string arg;
-   std::vector<std::string> args;
-   
-   size_t p0 = 0;
-   size_t p1 = data.find(' ', p0);
-   
-   while (p1 != std::string::npos)
-   {
-      arg = data.substr(p0, p1-p0);
-      
-      strip(arg);
-      
-      if (arg.length() > 0)
-      {
-         args.push_back(arg);
-      }
-      
-      p0 = p1 + 1;
-      p1 = data.find(' ', p0);
-   }
-   
-   arg = data.substr(p0);
-   strip(arg);
-   
-   if (arg.length() > 0)
-   {
-      args.push_back(arg);
-   }
-   
-   // process args
-   
-   for (size_t i=0; i<args.size(); ++i)
-   {
-      if (isFlag(args[i]))
-      {
-         size_t j = i;
-         
-         if (!processFlag(args, j))
-         {
-            AiMsgWarning("[abcproc] Failed processing flag \"%s\"", args[i].c_str());
-            ++i;
-         }
-         else
-         {
-            i = j;
-         }
-      }
-      else
-      {
-         AiMsgWarning("[abcproc] Ignore arguments: \"%s\"", args[i].c_str());
-      }
-   }
-}
-
 void Dso::normalizeFilePath(std::string &path) const
 {
    // Convert \ to /
@@ -1344,1612 +1082,260 @@ void Dso::toLower(std::string &s) const
    }
 }
 
-bool Dso::isFlag(std::string &s) const
+void Dso::setSingleParams(AtNode *node, const std::string &objectPath) const
 {
-   return (s.length() > 0 && s[0] == '-');
+   if (!node)
+   {
+      return;
+   }
+
+   size_t count;
+   AtArray *array;
+   std::set<std::string>::const_iterator it;
+
+   // Common parameters
+   AiNodeSetStr(node, p_filename, mCommonParams.filePath.c_str());
+   AiNodeSetStr(node, p_objectpath, objectPath.c_str());
+   AiNodeSetStr(node, p_nameprefix, mCommonParams.namePrefix.c_str());
+   AiNodeSetStr(node, p_rootdrive, mRootDrive.c_str());
+   //  Framing
+   AiNodeSetFlt(node, p_fps, mCommonParams.fps);
+   AiNodeSetFlt(node, p_frame, mCommonParams.frame);
+   AiNodeSetFlt(node, p_speed, mCommonParams.speed);
+   AiNodeSetFlt(node, p_offset, mCommonParams.offset);
+   AiNodeSetFlt(node, p_start_frame, mCommonParams.startFrame);
+   AiNodeSetFlt(node, p_end_frame, mCommonParams.endFrame);
+   AiNodeSetBool(node, p_preserve_start_frame, mCommonParams.preserveStartFrame);
+   AiNodeSetInt(node, p_cycle, (int)mCommonParams.cycle);
+   //  Sampling
+   AiNodeSetBool(node, p_relative_samples, mCommonParams.relativeSamples);
+   count = mCommonParams.samples.size();
+   array = AiArray(count, 1, AI_TYPE_FLOAT);
+   for (size_t i=0; i<count; ++i)
+   {
+      AiArraySetFlt(array, i, mCommonParams.samples[i]);
+   }
+   AiNodeSetArray(node, p_samples, array);
+   AiNodeSetInt(node, p_samples_expand_iterations, mCommonParams.samplesExpandIterations);
+   AiNodeSetBool(node, p_optimize_samples, mCommonParams.optimizeSamples);
+   //  Ignores
+   AiNodeSetBool(node, p_ignore_deform_blur, mCommonParams.ignoreDeformBlur);
+   AiNodeSetBool(node, p_ignore_transform_blur, mCommonParams.ignoreTransformBlur);
+   AiNodeSetBool(node, p_ignore_visibility, true);
+   AiNodeSetBool(node, p_ignore_instances, true);
+   AiNodeSetBool(node, p_ignore_transforms, true);
+   AiNodeSetBool(node, p_ignore_nurbs, mCommonParams.ignoreNurbs);
+   //  Reference data
+   AiNodeSetBool(node, p_output_reference, mCommonParams.outputReference);
+   AiNodeSetStr(node, p_reference_filename, mCommonParams.referenceFilePath.c_str());
+   AiNodeSetInt(node, p_reference_source, (int)mCommonParams.referenceSource);
+   AiNodeSetFlt(node, p_reference_frame, mCommonParams.referenceFrame);
+   AiNodeSetStr(node, p_reference_position_name, mCommonParams.referencePositionName.c_str());
+   AiNodeSetStr(node, p_reference_normal_name, mCommonParams.referenceNormalName.c_str());
+   //  Velocity data
+   AiNodeSetStr(node, p_velocity_name, mCommonParams.velocityName.c_str());
+   AiNodeSetStr(node, p_acceleration_name, mCommonParams.accelerationName.c_str());
+   AiNodeSetFlt(node, p_velocity_scale, mCommonParams.velocityScale);
+   AiNodeSetBool(node, p_force_velocity_blur, mCommonParams.forceVelocityBlur);
+   //  Others
+   count = mCommonParams.promoteToObjectAttribs.size();
+   array = AiArray(count, 1, AI_TYPE_STRING);
+   it = mCommonParams.promoteToObjectAttribs.begin();
+   for (size_t i=0; i<count; ++i, ++it)
+   {
+      AiArraySetStr(array, i, it->c_str());
+   }
+   AiNodeSetArray(node, p_demote_to_object_attribute, array);
+   AiNodeSetBool(node, p_verbose, mCommonParams.verbose);
+
+   // Single shape mode parameters
+   AiNodeSetBool(node, p_read_object_attributes, mSingleParams.readObjectAttribs);
+   AiNodeSetBool(node, p_read_primitive_attributes, mSingleParams.readPrimitiveAttribs);
+   AiNodeSetBool(node, p_read_point_attributes, mSingleParams.readPointAttribs);
+   AiNodeSetBool(node, p_read_vertex_attributes, mSingleParams.readVertexAttribs);
+   AiNodeSetInt(node, p_attributes_frame, (int)mSingleParams.attribsFrame);
+   count = mSingleParams.attribPreficesToRemove.size();
+   array = AiArray(count, 1, AI_TYPE_STRING);
+   it = mSingleParams.attribPreficesToRemove.begin();
+   for (size_t i=0; i<count; ++i, ++it)
+   {
+      AiArraySetStr(array, i, it->c_str());
+   }
+   AiNodeSetArray(node, p_attribute_prefices_to_remove, array);
+   count = mSingleParams.computeTangents.size();
+   array = AiArray(count, 1, AI_TYPE_STRING);
+   it = mSingleParams.computeTangents.begin();
+   for (size_t i=0; i<count; ++i, ++it)
+   {
+      AiArraySetStr(array, i, it->c_str());
+   }
+   AiNodeSetArray(node, p_compute_tangents, array);
+   AiNodeSetStr(node, p_radius_name, mSingleParams.radiusName.c_str());
+   AiNodeSetFlt(node, p_radius_min, mSingleParams.radiusMin);
+   AiNodeSetFlt(node, p_radius_max, mSingleParams.radiusMax);
+   AiNodeSetFlt(node, p_radius_scale, mSingleParams.radiusScale);
+   AiNodeSetFlt(node, p_width_min, mSingleParams.widthMin);
+   AiNodeSetFlt(node, p_width_max, mSingleParams.widthMax);
+   AiNodeSetFlt(node, p_width_scale, mSingleParams.widthScale);
+   AiNodeSetInt(node, p_nurbs_sample_rate, mSingleParams.nurbsSampleRate);
+
+   // Those two?
+   // AiNodeSetFlt(node, Strings::motion_start, mMotionStart);
+   // AiNodeSetFlt(node, Strings::motion_end, mMotionEnd);
 }
 
-bool Dso::processFlag(std::vector<std::string> &args, size_t &i)
-{
-   toLower(args[i]);
-   
-   if (args[i] == "-rootdrive")
-   {
-      ++i;
-      if (i >= args.size())
-      {
-         return false;
-      }
-      
-      std::string rootDrive = args[i];
-      if (rootDrive.length() == 1 && 
-          ((rootDrive[0] >= 'a' && rootDrive[0] <= 'z') ||
-           (rootDrive[0] >= 'A' && rootDrive[0] <= 'Z')))
-      {
-         mRootDrive = rootDrive + ":";
-      }
-   }
-   // First start with flags supported in official procedural
-   else if (args[i] == "-frame")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%lf", &(mCommonParams.frame)) != 1)
-      {
-         return false;
-      }
-   }
-   else if (args[i] == "-fps")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%lf", &(mCommonParams.fps)) != 1)
-      {
-         return false;
-      }
-   }
-   else if (args[i] == "-filename")
-   {
-      ++i;
-      if (i >= args.size() || isFlag(args[i]))
-      {
-         return false;
-      }
-      mCommonParams.filePath = args[i];
-   }
-   else if (args[i] == "-nameprefix")
-   {
-      ++i;
-      if (i >= args.size() || isFlag(args[i]))
-      {
-         return false;
-      }
-      mCommonParams.namePrefix = args[i];
-   }
-   else if (args[i] == "-objectpath")
-   {
-      ++i;
-      if (i >= args.size() || isFlag(args[i]))
-      {
-         return false;
-      }
-      mCommonParams.objectPath = args[i];
-   }
-   else if (args[i] == "-excludexform")
-   {
-      mCommonParams.ignoreTransforms = true;
-   }
-   else if (args[i] == "-subditerations")
-   {
-      ++i;
-      if (i >= args.size())
-      {
-         return false;
-      }
-      // Don't use
-   }
-   else if (args[i] == "-makeinstance")
-   {
-      // Don't use
-   }
-   else if (args[i] == "-shutteropen")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%lf", &mShutterOpen) != 1)
-      {
-         return false;
-      }
-   }
-   else if (args[i] == "-shutterclose")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%lf", &mShutterClose) != 1)
-      {
-         return false;
-      }
-   }
-   else if (args[i] == "-shutterstep")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%d", &mShutterStep) != 1)
-      {
-         return false;
-      }
-   }
-   // Process common parameters
-   else if (args[i] == "-outputreference")
-   {
-      mCommonParams.outputReference = true;
-   }
-   else if (args[i] == "-referencefilename")
-   {
-      ++i;
-      if (i < args.size() && !isFlag(args[i]))
-      {
-         mCommonParams.referenceFilePath = args[i];
-      }
-   }
-   else if (args[i] == "-offset")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%lf", &(mCommonParams.offset)) != 1)
-      {
-         return false;
-      }
-   }
-   else if (args[i] == "-speed")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%lf", &(mCommonParams.speed)) != 1)
-      {
-         return false;
-      }
-   }
-   else if (args[i] == "-startframe")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%lf", &(mCommonParams.startFrame)) != 1)
-      {
-         return false;
-      }
-   }
-   else if (args[i] == "-endframe")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%lf", &(mCommonParams.endFrame)) != 1)
-      {
-         return false;
-      }
-   }
-   else if (args[i] == "-preservestartframe")
-   {
-      mCommonParams.preserveStartFrame = true;
-   }
-   else if (args[i] == "-ignoremotionblur")
-   {
-      mCommonParams.ignoreTransformBlur = true;
-      mCommonParams.ignoreDeformBlur = true;
-   }
-   else if (args[i] == "-ignoredeformblur")
-   {
-      mCommonParams.ignoreDeformBlur = true;
-   }
-   else if (args[i] == "-ignoretransformblur")
-   {
-      mCommonParams.ignoreTransformBlur = true;
-   }
-   else if (args[i] == "-ignoretransforms")
-   {
-      mCommonParams.ignoreTransforms = true;
-   }
-   else if (args[i] == "-ignorevisibility")
-   {
-      mCommonParams.ignoreVisibility = true;
-   }
-   else if (args[i] == "-ignoreinstances")
-   {
-      mCommonParams.ignoreInstances = true;
-   }
-   else if (args[i] == "-cycle")
-   {
-      ++i;
-      
-      if (i >= args.size())
-      {
-         return false;
-      }
-      
-      std::string cts = args[i];
-      
-      int ival = -1;
-      
-      if (sscanf(cts.c_str(), "%d", &ival) == 1)
-      {
-         if (ival >= 0 && ival < CT_MAX)
-         {
-            mCommonParams.cycle = (CycleType) ival;
-         }
-      }
-      else
-      {
-         toLower(cts);
-         
-         for (size_t j=0; j<CT_MAX; ++j)
-         {
-            if (cts == CycleTypeNames[j])
-            {
-               mCommonParams.cycle = (CycleType)j;
-               break;
-            }
-         }
-      }
-   }
-   else if (args[i] == "-relativesamples")
-   {
-      mCommonParams.relativeSamples = true;
-   }
-   else if (args[i] == "-samples")
-   {
-      ++i;
-      
-      double sample;
-      
-      while (i < args.size() && sscanf(args[i].c_str(), "%lf", &sample) == 1)
-      {
-         mCommonParams.samples.push_back(sample);
-         ++i;
-      }
-      --i;
-   }
-   else if (args[i] == "-samplesexpanditerations")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%d", &(mCommonParams.samplesExpandIterations)) != 1)
-      {
-         return false;
-      }
-   }
-   else if (args[i] == "-optimizesamples")
-   {
-      mCommonParams.optimizeSamples = true;
-   }
-   else if (args[i] == "-verbose")
-   {
-      mCommonParams.verbose = true;
-   }
-   else if (args[i] == "-referencesource")
-   {
-      ++i;
-      
-      if (i >= args.size())
-      {
-         return false;
-      }
-      
-      std::string rs = args[i];
-      
-      int ival = -1;
-      
-      if (sscanf(rs.c_str(), "%d", &ival) == 1)
-      {
-         if (ival >= 0 && ival < RS_MAX)
-         {
-            mCommonParams.referenceSource = (ReferenceSource) ival;
-         }
-      }
-      else
-      {
-         toLower(rs);
-         
-         for (size_t j=0; j<RS_MAX; ++j)
-         {
-            if (rs == ReferenceSourceNames[j])
-            {
-               mCommonParams.referenceSource = (ReferenceSource)j;
-               break;
-            }
-         }
-      }
-   }
-   else if (args[i] == "-referenceframe")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%f", &(mCommonParams.referenceFrame)) != 1)
-      {
-         return false;
-      }
-   }
-   else if (args[i] == "-referencepositionname")
-   {
-      ++i;
-      if (i < args.size() && !isFlag(args[i]))
-      {
-         mCommonParams.referencePositionName = (args[i].length() == 0 ? "Pref" : args[i]);
-      }
-   }
-   else if (args[i] == "-referencenormalname")
-   {
-      ++i;
-      if (i < args.size() && !isFlag(args[i]))
-      {
-         mCommonParams.referenceNormalName = (args[i].length() == 0 ? "Nref" : args[i]);
-      }
-   }
-   else if (args[i] == "-velocityscale")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%f", &(mCommonParams.velocityScale)) != 1)
-      {
-         return false;
-      }
-   }
-   else if (args[i] == "-velocityname")
-   {
-      ++i;
-      if (i < args.size() && !isFlag(args[i]))
-      {
-         mCommonParams.velocityName = args[i];
-      }
-   }
-   else if (args[i] == "-accelerationname")
-   {
-      ++i;
-      if (i < args.size() && !isFlag(args[i]))
-      {
-         mCommonParams.accelerationName = args[i];
-      }
-   }
-   // Process multi params
-   else if (args[i] == "-overrideattribs")
-   {
-      ++i;
-      while (i < args.size() && !isFlag(args[i]))
-      {
-         mMultiParams.overrideAttribs.insert(args[i]);
-         ++i;
-      }
-      --i;
-   }
-   else if (args[i] == "-promotetoobjectattribs")
-   {
-      ++i;
-      while (i < args.size() && !isFlag(args[i]))
-      {
-         mCommonParams.promoteToObjectAttribs.insert(args[i]);
-         ++i;
-      }
-      --i;
-   }
-   else if (args[i] == "-boundspadding")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%f", &(mMultiParams.boundsPadding)) != 1)
-      {
-         return false;
-      }
-   }
-   else if (args[i] == "-computevelocityexpandedbounds")
-   {
-      mMultiParams.computeVelocityExpandedBounds = true;
-   }
-   else if (args[i] == "-useoverridebounds")
-   {
-      mMultiParams.useOverrideBounds = true;
-   }
-   else if (args[i] == "-overrideboundsminname")
-   {
-      ++i;
-      if (i < args.size() && !isFlag(args[i]))
-      {
-         if (args[i].length() > 0)
-         {
-            mMultiParams.overrideBoundsMinName = args[i];
-         }
-      }
-   }
-   else if (args[i] == "-overrideboundsmaxname")
-   {
-      ++i;
-      if (i < args.size() && !isFlag(args[i]))
-      {
-         if (args[i].length() > 0)
-         {
-            mMultiParams.overrideBoundsMaxName = args[i];
-         }
-      }
-   }
-   else if (args[i] == "-padboundswithpeakradius")
-   {
-      mMultiParams.padBoundsWithPeakRadius = true;
-   }
-   else if (args[i] == "-peakradiusname")
-   {
-      ++i;
-      if (i < args.size() && !isFlag(args[i]))
-      {
-         if (args[i].length() > 0)
-         {
-            mMultiParams.peakRadiusName = args[i];
-         }
-      }
-   }
-   else if (args[i] == "-padboundswithpeakwidth")
-   {
-      mMultiParams.padBoundsWithPeakWidth = true;
-   }
-   else if (args[i] == "-peakwidthname")
-   {
-      ++i;
-      if (i < args.size() && !isFlag(args[i]))
-      {
-         if (args[i].length() > 0)
-         {
-            mMultiParams.peakWidthName = args[i];
-         }
-      }
-   }
-   // Process single params
-   else if (args[i] == "-objectattribs")
-   {
-      mSingleParams.readObjectAttribs = true;
-   }
-   else if (args[i] == "-primitiveattribs")
-   {
-      mSingleParams.readPrimitiveAttribs = true;
-   }
-   else if (args[i] == "-pointattribs")
-   {
-      mSingleParams.readPointAttribs = true;
-   }
-   else if (args[i] == "-vertexattribs")
-   {
-      mSingleParams.readVertexAttribs = true;
-   }
-   else if (args[i] == "-attribsframe")
-   {
-      ++i;
-      if (i >= args.size())
-      {
-         return false;
-      }
-      
-      std::string afs = args[i];
-      
-      int ival = -1;
-      
-      if (sscanf(afs.c_str(), "%d", &ival) == 1)
-      {
-         if (ival >= 0 && ival < AF_MAX)
-         {
-            mSingleParams.attribsFrame = (AttributeFrame) ival;
-         }
-      }
-      else
-      {
-         toLower(afs);
-         
-         for (size_t j=0; j<AF_MAX; ++j)
-         {
-            if (afs == AttributeFrameNames[j])
-            {
-               mSingleParams.attribsFrame = (AttributeFrame)j;
-               break;
-            }
-         }
-      }
-   }
-   else if (args[i] == "-removeattribprefices")
-   {
-      ++i;
-      while (i < args.size() && !isFlag(args[i]))
-      {
-         mSingleParams.attribPreficesToRemove.insert(args[i]);
-         ++i;
-      }
-      --i;
-   }
-   else if (args[i] == "-computetangents")
-   {
-      ++i;
-      while (i < args.size() && !isFlag(args[i]))
-      {
-         mSingleParams.computeTangents.insert(args[i]);
-         ++i;
-      }
-      --i;
-   }
-   else if (args[i] == "-radiusname")
-   {
-      ++i;
-      if (i < args.size() && !isFlag(args[i]))
-      {
-         mSingleParams.radiusName = args[i];
-      }
-   }
-   else if (args[i] == "-radiusmin")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%f", &(mSingleParams.radiusMin)) != 1)
-      {
-         return false;
-      }
-   }
-   else if (args[i] == "-radiusmax")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%f", &(mSingleParams.radiusMax)) != 1)
-      {
-         return false;
-      }
-   }
-   else if (args[i] == "-radiusscale")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%f", &(mSingleParams.radiusScale)) != 1)
-      {
-         return false;
-      }
-   }
-   else if (args[i] == "-widthmin")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%f", &(mSingleParams.widthMin)) != 1)
-      {
-         return false;
-      }
-   }
-   else if (args[i] == "-widthmax")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%f", &(mSingleParams.widthMax)) != 1)
-      {
-         return false;
-      }
-   }
-   else if (args[i] == "-widthscale")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%f", &(mSingleParams.widthScale)) != 1)
-      {
-         return false;
-      }
-   }
-   else if (args[i] == "-ignorenurbs")
-   {
-      mCommonParams.ignoreNurbs = true;
-   }
-   else if (args[i] == "-forcevelocityblur")
-   {
-      mCommonParams.forceVelocityBlur = true;
-   }
-   else if (args[i] == "-nurbssamplerate")
-   {
-      ++i;
-      if (i >= args.size() ||
-          sscanf(args[i].c_str(), "%d", &(mSingleParams.nurbsSampleRate)) != 1)
-      {
-         return false;
-      }
-   }
-   else
-   {
-      AiMsgWarning("[abcproc] Unknown flag \"%s\"", args[i].c_str());
-      return false;
-   }
-   
-   return true;
-}
-
-void Dso::readFromUserParams()
+void Dso::readParams()
 {
    bool relativeSamples = false;
    bool samplesSet = false;
+   AtArray *array = 0;
+   std::string str;
 
-   AtUserParamIterator *pit = AiNodeGetUserParamIterator(mProcNode);
-   
-   while (!AiUserParamIteratorFinished(pit))
+   // Drive for directory mapping
+   str = AiNodeGetStr(mProcNode, p_rootdrive).c_str();
+   if (str.length() == 1 && 
+       ((str[0] >= 'a' && str[0] <= 'z') ||
+        (str[0] >= 'A' && str[0] <= 'Z')))
    {
-      const AtUserParamEntry *p = AiUserParamIteratorGetNext(pit);
-      if (!p)
-      {
-         continue;
-      }
+      mRootDrive = str + ":";
+   }
+   else if (str.length() > 0)
+   {
+      AiMsgWarning("[abcproc] 'rootdrive' parameter value should be a single letter");
+   }
 
-      const char *pname = AiUserParamGetName(p);
-      if (!pname)
+   // Common parameters
+   mCommonParams.filePath = AiNodeGetStr(mProcNode, p_filename).c_str();
+   mCommonParams.objectPath = AiNodeGetStr(mProcNode, p_objectpath).c_str();
+   mCommonParams.namePrefix = AiNodeGetStr(mProcNode, p_nameprefix).c_str();
+   //  Framing
+   mCommonParams.fps = AiNodeGetFlt(mProcNode, p_fps);
+   mCommonParams.frame = AiNodeGetFlt(mProcNode, p_frame);
+   mCommonParams.speed = AiNodeGetFlt(mProcNode, p_speed);
+   mCommonParams.offset = AiNodeGetFlt(mProcNode, p_offset);
+   mCommonParams.startFrame = AiNodeGetFlt(mProcNode, p_start_frame);
+   mCommonParams.endFrame = AiNodeGetFlt(mProcNode, p_end_frame);
+   mCommonParams.preserveStartFrame = AiNodeGetBool(mProcNode, p_preserve_start_frame);
+   mCommonParams.cycle = (CycleType) AiNodeGetInt(mProcNode, p_cycle);
+   //  Sampling
+   relativeSamples = AiNodeGetBool(mProcNode, p_relative_samples);
+   array = AiNodeGetArray(mProcNode, p_samples);
+   if (array)
+   {
+      unsigned int ne = AiArrayGetNumElements(array);
+      unsigned int nk = AiArrayGetNumKeys(array);
+      if (ne * nk > 0)
       {
-         continue;
-      }
-
-      if (strncmp(pname, "abc_", 4) != 0)
-      {
-         continue;
-      }
-      
-      if (AiUserParamGetCategory(p) != AI_USERDEF_CONSTANT)
-      {
-         continue;
-      }
-      
-      std::string param = pname + 4;
-      toLower(param);
-      
-      if (param == "rootdrive")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
+         mCommonParams.samples.clear();
+         // Either number of keys or number of elements
+         if (nk > 1)
          {
-            std::string rootDrive = AiNodeGetStr(mProcNode, pname).c_str();
-            
-            if (rootDrive.length() == 1 && 
-                ((rootDrive[0] >= 'a' && rootDrive[0] <= 'z') ||
-                 (rootDrive[0] >= 'A' && rootDrive[0] <= 'Z')))
+            ne = 1;
+         }
+         for (unsigned int i=0, j=0; i<AiArrayGetNumKeys(array); ++i, j+=AiArrayGetNumElements(array))
+         {
+            for (unsigned int k=0; k<ne; ++k)
             {
-               mRootDrive = rootDrive + ":";
-            }
-            else
-            {
-               AiMsgWarning("[abcproc] Ignore parameter \"%s\": Value should be a single letter", pname);
-            }
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
-         }
-      }
-      else if (param == "filename")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            mCommonParams.filePath = AiNodeGetStr(mProcNode, pname).c_str();
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
-         }
-      }
-      else if (param == "outputreference")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mCommonParams.outputReference = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "referencefilename")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            mCommonParams.referenceFilePath = AiNodeGetStr(mProcNode, pname).c_str();
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
-         }
-      }
-      else if (param == "objectpath")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            mCommonParams.objectPath = AiNodeGetStr(mProcNode, pname).c_str();
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
-         }
-      }
-      else if (param == "nameprefix")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            mCommonParams.namePrefix = AiNodeGetStr(mProcNode, pname).c_str();
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
-         }
-      }
-      else if (param == "fps")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
-         {
-            mCommonParams.fps = AiNodeGetFlt(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
-         }
-      }
-      else if (param == "frame")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
-         {
-            mCommonParams.frame = AiNodeGetFlt(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
-         }
-      }
-      else if (param == "speed")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
-         {
-            mCommonParams.speed = AiNodeGetFlt(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
-         }
-      }
-      else if (param == "offset")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
-         {
-            mCommonParams.offset = AiNodeGetFlt(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
-         }
-      }
-      else if (param == "startframe")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
-         {
-            mCommonParams.startFrame = AiNodeGetFlt(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
-         }
-      }
-      else if (param == "endframe")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
-         {
-            mCommonParams.endFrame = AiNodeGetFlt(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
-         }
-      }
-      else if (param == "preservestartframe")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mCommonParams.preserveStartFrame = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "cycle")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            std::string val = AiNodeGetStr(mProcNode, pname).c_str();
-            toLower(val);
-            
-            int i = 0;
-            
-            for (; i<CT_MAX; ++i)
-            {
-               if (val == CycleTypeNames[i])
-               {
-                  mCommonParams.cycle = (CycleType) i;
-                  break;
-               }
-            }
-            
-            if (i >= CT_MAX)
-            {
-               AiMsgWarning("[abcproc] Ignore parameter \"%s\": Invalid value", pname);
+               mCommonParams.samples.push_back(AiArrayGetFlt(array, j+k));
             }
          }
-         else if (AiUserParamGetType(p) == AI_TYPE_INT)
-         {
-            int val = AiNodeGetInt(mProcNode, pname);
-            if (val >= 0 && val < CT_MAX)
-            {
-               mCommonParams.cycle = (CycleType) val;
-            }
-            else
-            {
-               AiMsgWarning("[abcproc] Ignore parameter \"%s\": Invalid value", pname);
-            }
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an int or string value", pname);
-         }
-      }
-      else if (param == "relativesamples")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            relativeSamples = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "samples")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_ARRAY && AiUserParamGetArrayType(p) == AI_TYPE_FLOAT)
-         {
-            AtArray *samples = AiNodeGetArray(mProcNode, pname);
-            
-            if (samples)
-            {
-               unsigned int ne = AiArrayGetNumElements(samples);
-               unsigned int nk = AiArrayGetNumKeys(samples);
-               
-               if (ne * nk > 0)
-               {
-                  mCommonParams.samples.clear();
-                  
-                  // Either number of keys or number of elements
-                  if (nk > 1)
-                  {
-                     ne = 1;
-                  }
-                  
-                  for (unsigned int i=0, j=0; i<AiArrayGetNumKeys(samples); ++i, j+=AiArrayGetNumElements(samples))
-                  {
-                     for (unsigned int k=0; k<ne; ++k)
-                     {
-                        mCommonParams.samples.push_back(AiArrayGetFlt(samples, j+k));
-                     }
-                  }
-                  
-                  samplesSet = true;
-               }
-               else
-               {
-                  AiMsgWarning("[abcproc] Ignore parameter \"%s\": Empty value", pname);
-               }
-            }
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of float values", pname);
-         }
-      }
-      else if (param == "samplesexpanditerations")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_INT)
-         {
-            mCommonParams.samplesExpandIterations = AiNodeGetInt(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an integer value", pname);
-         }
-      }
-      else if (param == "optimizesamples")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mCommonParams.optimizeSamples = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "ignoremotionblur")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mCommonParams.ignoreDeformBlur = (AiNodeGetBool(mProcNode, pname) || mCommonParams.ignoreDeformBlur);
-            mCommonParams.ignoreTransformBlur = (AiNodeGetBool(mProcNode, pname) || mCommonParams.ignoreTransformBlur);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "ignoredeformblur")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mCommonParams.ignoreDeformBlur = (AiNodeGetBool(mProcNode, pname) || mCommonParams.ignoreDeformBlur);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "ignoretransformblur")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mCommonParams.ignoreTransformBlur = (AiNodeGetBool(mProcNode, pname) || mCommonParams.ignoreTransformBlur);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "ignorevisibility")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mCommonParams.ignoreVisibility = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "ignoreinstances")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mCommonParams.ignoreInstances = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "ignoretransforms")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mCommonParams.ignoreTransforms = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "verbose")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mCommonParams.verbose = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "referencesource")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            std::string val = AiNodeGetStr(mProcNode, pname).c_str();
-            toLower(val);
-            
-            int i = 0;
-            
-            for (; i<RS_MAX; ++i)
-            {
-               if (val == ReferenceSourceNames[i])
-               {
-                  mCommonParams.referenceSource = (ReferenceSource) i;
-                  break;
-               }
-            }
-            
-            if (i >= RS_MAX)
-            {
-               AiMsgWarning("[abcproc] Ignore parameter \"%s\": Invalid value", pname);
-            }
-         }
-         else if (AiUserParamGetType(p) == AI_TYPE_INT)
-         {
-            int val = AiNodeGetInt(mProcNode, pname);
-            if (val >= 0 && val < RS_MAX)
-            {
-               mCommonParams.referenceSource = (ReferenceSource) val;
-            }
-            else
-            {
-               AiMsgWarning("[abcproc] Ignore parameter \"%s\": Invalid value", pname);
-            }
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an int or string value", pname);
-         }
-      }
-      else if (param == "referenceframe")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
-         {
-            mCommonParams.referenceFrame = AiNodeGetFlt(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
-         }
-      }
-      else if (param == "referencepositionname")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            mCommonParams.referencePositionName = AiNodeGetStr(mProcNode, pname).c_str();
-            if (mCommonParams.referencePositionName.length() == 0)
-            {
-               mCommonParams.referencePositionName = "Pref";
-            }
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
-         }
-      }
-      else if (param == "referencenormalname")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            mCommonParams.referenceNormalName = AiNodeGetStr(mProcNode, pname).c_str();
-            if (mCommonParams.referenceNormalName.length() == 0)
-            {
-               mCommonParams.referenceNormalName = "Nref";
-            }
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
-         }
-      }
-      else if (param == "velocityscale")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
-         {
-            mCommonParams.velocityScale = AiNodeGetFlt(mProcNode, pname);
-         }
-         else
-         {
-            mCommonParams.velocityScale = 1.0f;
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
-         }
-      }
-      else if (param == "velocityname")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            mCommonParams.velocityName = AiNodeGetStr(mProcNode, pname).c_str();
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
-         }
-      }
-      else if (param == "accelerationname")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            mCommonParams.accelerationName = AiNodeGetStr(mProcNode, pname).c_str();
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
-         }
-      }
-      else if (param == "overrideattribs")
-      {
-         mMultiParams.overrideAttribs.clear();
-         
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            std::string names = AiNodeGetStr(mProcNode, pname).c_str();
-            std::string name;
-            
-            size_t p0 = 0;
-            size_t p1 = names.find(' ', p0);
-            
-            while (p1 != std::string::npos)
-            {
-               name = names.substr(p0, p1-p0);
-               strip(name);
-               
-               if (name.length() > 0)
-               {
-                  mMultiParams.overrideAttribs.insert(name);
-               }
-               
-               p0 = p1 + 1;
-               p1 = names.find(' ', p0);
-            }
-            
-            name = names.substr(p0);
-            strip(name);
-            
-            if (name.length() > 0)
-            {
-               mMultiParams.overrideAttribs.insert(name);
-            }
-         }
-         else if (AiUserParamGetType(p) == AI_TYPE_ARRAY && AiUserParamGetArrayType(p) == AI_TYPE_STRING)
-         {
-            AtArray *names = AiNodeGetArray(mProcNode, pname);
-            
-            if (names)
-            {
-               for (unsigned int i=0; i<AiArrayGetNumElements(names); ++i)
-               {
-                  mMultiParams.overrideAttribs.insert(AiArrayGetStr(names, i).c_str());
-               }
-            }
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
-         }
-      }
-      else if (param == "promotetoobjectattribs")
-      {
-         mCommonParams.promoteToObjectAttribs.clear();
-         
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            std::string names = AiNodeGetStr(mProcNode, pname).c_str();
-            std::string name;
-            
-            size_t p0 = 0;
-            size_t p1 = names.find(' ', p0);
-            
-            while (p1 != std::string::npos)
-            {
-               name = names.substr(p0, p1-p0);
-               strip(name);
-               
-               if (name.length() > 0)
-               {
-                  mCommonParams.promoteToObjectAttribs.insert(name);
-               }
-               
-               p0 = p1 + 1;
-               p1 = names.find(' ', p0);
-            }
-            
-            name = names.substr(p0);
-            strip(name);
-            
-            if (name.length() > 0)
-            {
-               mCommonParams.promoteToObjectAttribs.insert(name);
-            }
-         }
-         else if (AiUserParamGetType(p) == AI_TYPE_ARRAY && AiUserParamGetArrayType(p) == AI_TYPE_STRING)
-         {
-            AtArray *names = AiNodeGetArray(mProcNode, pname);
-            
-            if (names)
-            {
-               for (unsigned int i=0; i<AiArrayGetNumElements(names); ++i)
-               {
-                  mCommonParams.promoteToObjectAttribs.insert(AiArrayGetStr(names, i).c_str());
-               }
-            }
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
-         }
-      }
-      else if (param == "boundspadding")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
-         {
-            mMultiParams.boundsPadding = AiNodeGetFlt(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
-         }
-      }
-      else if (param == "computevelocityexpandedbounds")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mMultiParams.computeVelocityExpandedBounds = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "useoverridebounds")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mMultiParams.useOverrideBounds = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "overrideboundsminname")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            const char *n = AiNodeGetStr(mProcNode, pname).c_str();
-            if (n && strlen(n) > 0)
-            {
-               mMultiParams.overrideBoundsMinName = n;
-            }
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
-         }
-      }
-      else if (param == "overrideboundsmaxname")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            const char *n = AiNodeGetStr(mProcNode, pname).c_str();
-            if (n && strlen(n) > 0)
-            {
-               mMultiParams.overrideBoundsMaxName = n;
-            }
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
-         }
-      }
-      else if (param == "padboundswithpeakradius")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mMultiParams.padBoundsWithPeakRadius = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "peakradiusname")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            const char *n = AiNodeGetStr(mProcNode, pname).c_str();
-            if (n && strlen(n) > 0)
-            {
-               mMultiParams.peakRadiusName = n;
-            }
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
-         }
-      }
-      else if (param == "padboundswithpeakwidth")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mMultiParams.padBoundsWithPeakWidth = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "peakwidthname")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            const char *n = AiNodeGetStr(mProcNode, pname).c_str();
-            if (n && strlen(n) > 0)
-            {
-               mMultiParams.peakWidthName = n;
-            }
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
-         }
-      }
-      else if (param == "objectattribs")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mSingleParams.readObjectAttribs = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "primitiveattribs")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mSingleParams.readPrimitiveAttribs = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "pointattribs")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mSingleParams.readPointAttribs = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "vertexattribs")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mSingleParams.readVertexAttribs = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "attribsframe")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            std::string val = AiNodeGetStr(mProcNode, pname).c_str();
-            toLower(val);
-            
-            int i = 0;
-            
-            for (; i<AF_MAX; ++i)
-            {
-               if (val == AttributeFrameNames[i])
-               {
-                  mSingleParams.attribsFrame = (AttributeFrame) i;
-                  break;
-               }
-            }
-            
-            if (i >= AF_MAX)
-            {
-               AiMsgWarning("[abcproc] Ignore parameter \"%s\": Invalid value", pname);
-            }
-         }
-         else if (AiUserParamGetType(p) == AI_TYPE_INT)
-         {
-            int val = AiNodeGetInt(mProcNode, pname);
-            if (val >= 0 && val < AF_MAX)
-            {
-               mSingleParams.attribsFrame = (AttributeFrame) val;
-            }
-            else
-            {
-               AiMsgWarning("[abcproc] Ignore parameter \"%s\": Invalid value", pname);
-            }
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an int or string value", pname);
-         }
-      }
-      else if (param == "removeattribprefices")
-      {
-         mSingleParams.attribPreficesToRemove.clear();
-         
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            std::string prefices = AiNodeGetStr(mProcNode, pname).c_str();
-            std::string prefix;
-            
-            size_t p0 = 0;
-            size_t p1 = prefices.find(' ', p0);
-            
-            while (p1 != std::string::npos)
-            {
-               prefix = prefices.substr(p0, p1-p0);
-               strip(prefix);
-               
-               if (prefix.length() > 0)
-               {
-                  mSingleParams.attribPreficesToRemove.insert(prefix);
-               }
-               
-               p0 = p1 + 1;
-               p1 = prefices.find(' ', p0);
-            }
-            
-            prefix = prefices.substr(p0);
-            strip(prefix);
-            
-            if (prefix.length() > 0)
-            {
-               mSingleParams.attribPreficesToRemove.insert(prefix);
-            }
-         }
-         else if (AiUserParamGetType(p) == AI_TYPE_ARRAY && AiUserParamGetArrayType(p) == AI_TYPE_STRING)
-         {
-            AtArray *prefices = AiNodeGetArray(mProcNode, pname);
-            
-            if (prefices)
-            {
-               for (unsigned int i=0; i<AiArrayGetNumElements(prefices); ++i)
-               {
-                  mSingleParams.attribPreficesToRemove.insert(AiArrayGetStr(prefices, i).c_str());
-               }
-            }
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
-         }
-      }
-      else if (param == "computetangents")
-      {
-         mSingleParams.computeTangents.clear();
-         
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            std::string uvnames = AiNodeGetStr(mProcNode, pname).c_str();
-            std::string uvname;
-            
-            size_t p0 = 0;
-            size_t p1 = uvnames.find(' ', p0);
-            
-            while (p1 != std::string::npos)
-            {
-               uvname = uvnames.substr(p0, p1-p0);
-               strip(uvname);
-               
-               if (uvname.length() > 0)
-               {
-                  mSingleParams.computeTangents.insert(uvname);
-               }
-               
-               p0 = p1 + 1;
-               p1 = uvnames.find(' ', p0);
-            }
-            
-            uvname = uvnames.substr(p0);
-            strip(uvname);
-            
-            if (uvname.length() > 0)
-            {
-               mSingleParams.computeTangents.insert(uvname);
-            }
-         }
-         else if (AiUserParamGetType(p) == AI_TYPE_ARRAY && AiUserParamGetArrayType(p) == AI_TYPE_STRING)
-         {
-            AtArray *uvnames = AiNodeGetArray(mProcNode, pname);
-            
-            if (uvnames)
-            {
-               for (unsigned int i=0; i<AiArrayGetNumElements(uvnames); ++i)
-               {
-                  mSingleParams.computeTangents.insert(AiArrayGetStr(uvnames, i).c_str());
-               }
-            }
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an array of string values", pname);
-         }
-      }
-      else if (param == "radiusname")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_STRING)
-         {
-            mSingleParams.radiusName = AiNodeGetStr(mProcNode, pname).c_str();
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a string value", pname);
-         }
-      }
-      else if (param == "radiusmin")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
-         {
-            mSingleParams.radiusMin = AiNodeGetFlt(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
-         }
-      }
-      else if (param == "radiusmax")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
-         {
-            mSingleParams.radiusMax = AiNodeGetFlt(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
-         }
-      }
-      else if (param == "radiusscale")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
-         {
-            mSingleParams.radiusScale = AiNodeGetFlt(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
-         }
-      }
-      else if (param == "widthmin")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
-         {
-            mSingleParams.widthMin = AiNodeGetFlt(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
-         }
-      }
-      else if (param == "widthmax")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
-         {
-            mSingleParams.widthMax = AiNodeGetFlt(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
-         }
-      }
-      else if (param == "widthscale")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_FLOAT)
-         {
-            mSingleParams.widthScale = AiNodeGetFlt(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a float value", pname);
-         }
-      }
-      else if (param == "ignorenurbs")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mCommonParams.ignoreNurbs = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "forcevelocityblur")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_BOOLEAN)
-         {
-            mCommonParams.forceVelocityBlur = AiNodeGetBool(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected a boolean value", pname);
-         }
-      }
-      else if (param == "nurbssamplerate")
-      {
-         if (AiUserParamGetType(p) == AI_TYPE_INT)
-         {
-            mSingleParams.nurbsSampleRate = AiNodeGetInt(mProcNode, pname);
-         }
-         else
-         {
-            AiMsgWarning("[abcproc] Ignore parameter \"%s\": Expected an integer value", pname);
-         }
+         samplesSet = true;
       }
    }
-   
-   AiUserParamIteratorDestroy(pit);
-   
+   mCommonParams.samplesExpandIterations = AiNodeGetInt(mProcNode, p_samples_expand_iterations);
+   mCommonParams.optimizeSamples = AiNodeGetBool(mProcNode, p_optimize_samples);
+   //  Ignores
+   mCommonParams.ignoreDeformBlur = (AiNodeGetBool(mProcNode, p_ignore_deform_blur) || mCommonParams.ignoreDeformBlur);
+   mCommonParams.ignoreTransformBlur = (AiNodeGetBool(mProcNode, p_ignore_transform_blur) || mCommonParams.ignoreTransformBlur);
+   mCommonParams.ignoreVisibility = AiNodeGetBool(mProcNode, p_ignore_visibility);
+   mCommonParams.ignoreInstances = AiNodeGetBool(mProcNode, p_ignore_instances);
+   mCommonParams.ignoreTransforms = AiNodeGetBool(mProcNode, p_ignore_transforms);
+   mCommonParams.ignoreNurbs = AiNodeGetBool(mProcNode, p_ignore_nurbs);
+   //  Reference data
+   mCommonParams.outputReference = AiNodeGetBool(mProcNode, p_output_reference);
+   mCommonParams.referenceFilePath = AiNodeGetStr(mProcNode, p_reference_filename).c_str();
+   mCommonParams.referenceSource = (ReferenceSource) AiNodeGetInt(mProcNode, p_reference_source);
+   mCommonParams.referenceFrame = AiNodeGetFlt(mProcNode, p_reference_frame);
+   mCommonParams.referencePositionName = AiNodeGetStr(mProcNode, p_reference_position_name).c_str();
+   if (mCommonParams.referencePositionName.length() == 0)
+   {
+      mCommonParams.referencePositionName = "Pref";
+   }
+   mCommonParams.referenceNormalName = AiNodeGetStr(mProcNode, p_reference_normal_name).c_str();
+   if (mCommonParams.referenceNormalName.length() == 0)
+   {
+      mCommonParams.referenceNormalName = "Nref";
+   }
+   //  Velocity data
+   mCommonParams.velocityName = AiNodeGetStr(mProcNode, p_velocity_name).c_str();
+   mCommonParams.accelerationName = AiNodeGetStr(mProcNode, p_acceleration_name).c_str();
+   mCommonParams.velocityScale = AiNodeGetFlt(mProcNode, p_velocity_scale);
+   mCommonParams.forceVelocityBlur = AiNodeGetBool(mProcNode, p_force_velocity_blur);
+   //  Others
+   mCommonParams.promoteToObjectAttribs.clear();
+   array = AiNodeGetArray(mProcNode, p_demote_to_object_attribute);
+   if (array)
+   {
+      for (unsigned int i=0; i<AiArrayGetNumElements(array); ++i)
+      {
+         mCommonParams.promoteToObjectAttribs.insert(AiArrayGetStr(array, i).c_str());
+      }
+   }
+   mCommonParams.verbose = AiNodeGetBool(mProcNode, p_verbose);
+
+   // Multi mode specific parameters
+   mMultiParams.boundsPadding = AiNodeGetFlt(mProcNode, p_bounds_padding);
+   mMultiParams.computeVelocityExpandedBounds = AiNodeGetBool(mProcNode, p_compute_velocity_expanded_bounds);
+   mMultiParams.useOverrideBounds = AiNodeGetBool(mProcNode, p_use_override_bounds);
+   mMultiParams.overrideBoundsMinName = AiNodeGetStr(mProcNode, p_override_bounds_min_name).c_str();
+   mMultiParams.overrideBoundsMaxName = AiNodeGetStr(mProcNode, p_override_bounds_max_name).c_str();
+   mMultiParams.padBoundsWithPeakRadius = AiNodeGetBool(mProcNode, p_pad_bounds_with_peak_width);
+   mMultiParams.peakRadiusName = AiNodeGetStr(mProcNode, p_peak_radius_name).c_str();
+   mMultiParams.padBoundsWithPeakWidth = AiNodeGetBool(mProcNode, p_pad_bounds_with_peak_width);
+   mMultiParams.peakWidthName = AiNodeGetStr(mProcNode, p_peak_width_name).c_str();
+   mMultiParams.overrideAttribs.clear();
+   array = AiNodeGetArray(mProcNode, p_override_attributes);
+   if (array)
+   {
+      for (unsigned int i=0; i<AiArrayGetNumElements(array); ++i)
+      {
+         mMultiParams.overrideAttribs.insert(AiArrayGetStr(array, i).c_str());
+      }
+   }
+
+   // Single shape mode parameters
+   mSingleParams.readObjectAttribs = AiNodeGetBool(mProcNode, p_read_object_attributes);
+   mSingleParams.readPrimitiveAttribs = AiNodeGetBool(mProcNode, p_read_primitive_attributes);
+   mSingleParams.readPointAttribs = AiNodeGetBool(mProcNode, p_read_point_attributes);
+   mSingleParams.readVertexAttribs = AiNodeGetBool(mProcNode, p_read_vertex_attributes);
+   mSingleParams.attribsFrame = (AttributeFrame) AiNodeGetInt(mProcNode, p_attributes_frame);
+   mSingleParams.attribPreficesToRemove.clear();
+   array = AiNodeGetArray(mProcNode, p_attribute_prefices_to_remove);
+   if (array)
+   {
+      for (unsigned int i=0; i<AiArrayGetNumElements(array); ++i)
+      {
+         mSingleParams.attribPreficesToRemove.insert(AiArrayGetStr(array, i).c_str());
+      }
+   }
+   mSingleParams.computeTangents.clear();
+   array = AiNodeGetArray(mProcNode, p_compute_tangents);
+   if (array)
+   {
+      for (unsigned int i=0; i<AiArrayGetNumElements(array); ++i)
+      {
+         mSingleParams.computeTangents.insert(AiArrayGetStr(array, i).c_str());
+      }
+   }
+   mSingleParams.radiusName = AiNodeGetStr(mProcNode, p_radius_name).c_str();
+   mSingleParams.radiusMin = AiNodeGetFlt(mProcNode, p_radius_min);
+   mSingleParams.radiusMax = AiNodeGetFlt(mProcNode, p_radius_max);
+   mSingleParams.radiusScale = AiNodeGetFlt(mProcNode, p_radius_scale);
+   mSingleParams.widthMin = AiNodeGetFlt(mProcNode, p_width_min);
+   mSingleParams.widthMax = AiNodeGetFlt(mProcNode, p_width_max);
+   mSingleParams.widthScale = AiNodeGetFlt(mProcNode, p_width_scale);
+   mSingleParams.nurbsSampleRate = AiNodeGetInt(mProcNode, p_nurbs_sample_rate);
+
    // Only override relative samples if samples were read from user attribute
    if (samplesSet)
    {
@@ -2959,49 +1345,45 @@ void Dso::readFromUserParams()
 
 void Dso::transferInstanceParams(AtNode *dst)
 {
-   // As of arnold 4.1, type has changed to Byte
-   AiNodeSetInt(dst, "id", AiNodeGetInt(mProcNode, "id"));
-   AiNodeSetBool(dst, "receive_shadows", AiNodeGetBool(mProcNode, "receive_shadows"));
-   AiNodeSetBool(dst, "self_shadows", AiNodeGetBool(mProcNode, "self_shadows"));
-   AiNodeSetBool(dst, "invert_normals", AiNodeGetBool(mProcNode, "invert_normals"));
-   AiNodeSetBool(dst, "opaque", AiNodeGetBool(mProcNode, "opaque"));
-   AiNodeSetBool(dst, "use_light_group", AiNodeGetBool(mProcNode, "use_light_group"));
-   AiNodeSetBool(dst, "use_shadow_group", AiNodeGetBool(mProcNode, "use_shadow_group"));
-   AiNodeSetFlt(dst, "ray_bias", AiNodeGetFlt(mProcNode, "ray_bias"));
-   #ifdef ARNOLD_4_1_OR_ABOVE
-   AiNodeSetByte(dst, "visibility", AiNodeGetByte(mProcNode, "visibility"));
-   AiNodeSetByte(dst, "sidedness", AiNodeGetByte(mProcNode, "sidedness"));
-   #else
-   AiNodeSetInt(dst, "visibility", AiNodeGetInt(mProcNode, "visibility"));
-   AiNodeSetInt(dst, "sidedness", AiNodeGetInt(mProcNode, "sidedness"));
-   AiNodeSetInt(dst, "sss_sample_distribution", AiNodeGetInt(mProcNode, "sss_sample_distribution"));
-   AiNodeSetFlt(dst, "sss_sample_spacing", AiNodeGetFlt(mProcNode, "sss_sample_spacing"));
-   #endif
+   AiNodeSetInt(dst, Strings::id, AiNodeGetInt(mProcNode, Strings::id));
+   AiNodeSetBool(dst, Strings::receive_shadows, AiNodeGetBool(mProcNode, Strings::receive_shadows));
+   AiNodeSetBool(dst, Strings::self_shadows, AiNodeGetBool(mProcNode, Strings::self_shadows));
+   AiNodeSetBool(dst, Strings::invert_normals, AiNodeGetBool(mProcNode, Strings::invert_normals));
+   AiNodeSetBool(dst, Strings::opaque, AiNodeGetBool(mProcNode, Strings::opaque));
+   AiNodeSetBool(dst, Strings::matte, AiNodeGetBool(mProcNode, Strings::matte));
+   AiNodeSetBool(dst, Strings::use_light_group, AiNodeGetBool(mProcNode, Strings::use_light_group));
+   AiNodeSetBool(dst, Strings::use_shadow_group, AiNodeGetBool(mProcNode, Strings::use_shadow_group));
+   AiNodeSetFlt(dst, Strings::ray_bias, AiNodeGetFlt(mProcNode, Strings::ray_bias));
+   AiNodeSetByte(dst, Strings::visibility, AiNodeGetByte(mProcNode, Strings::visibility));
+   AiNodeSetByte(dst, Strings::sidedness, AiNodeGetByte(mProcNode, Strings::sidedness));
+   AiNodeSetFlt(dst, Strings::motion_start, AiNodeGetFlt(mProcNode, Strings::motion_start));
+   AiNodeSetFlt(dst, Strings::motion_end, AiNodeGetFlt(mProcNode, Strings::motion_end));
+   AiNodeSetInt(dst, Strings::transform_type, AiNodeGetInt(mProcNode, Strings::transform_type));
      
    AtArray *ary;
   
-   ary = AiNodeGetArray(mProcNode, "shader");
+   ary = AiNodeGetArray(mProcNode, Strings::shader);
    if (ary)
    {
-      AiNodeSetArray(dst, "shader", AiArrayCopy(ary));
+      AiNodeSetArray(dst, Strings::shader, AiArrayCopy(ary));
    }
 
-   ary = AiNodeGetArray(mProcNode, "light_group");
+   ary = AiNodeGetArray(mProcNode, Strings::light_group);
    if (ary)
    {
-      AiNodeSetArray(dst, "light_group", AiArrayCopy(ary));
+      AiNodeSetArray(dst, Strings::light_group, AiArrayCopy(ary));
    }
 
-   ary = AiNodeGetArray(mProcNode, "shadow_group");
+   ary = AiNodeGetArray(mProcNode, Strings::shadow_group);
    if (ary)
    {
-      AiNodeSetArray(dst, "shadow_group", AiArrayCopy(ary));
+      AiNodeSetArray(dst, Strings::shadow_group, AiArrayCopy(ary));
    }
 
-   ary = AiNodeGetArray(mProcNode, "trace_sets");
+   ary = AiNodeGetArray(mProcNode, Strings::trace_sets);
    if (ary)
    {
-      AiNodeSetArray(dst, "trace_sets", AiArrayCopy(ary));
+      AiNodeSetArray(dst, Strings::trace_sets, AiArrayCopy(ary));
    }
 }
 
@@ -3041,22 +1423,6 @@ void Dso::transferUserParams(AtNode *dst)
          if (verbose())
          {
             AiMsgInfo("[abcproc]   Skip unnamed parameter");
-         }
-         continue;
-      }
-      else if (!strncmp(pname, "abc_", 4))
-      {
-         if (verbose())
-         {
-            AiMsgInfo("[abcproc]   Skip DSO parmeter \"%s\"", pname+4);
-         }
-         continue;
-      }
-      else if (!strcmp(pname, "_proc_generator"))
-      {
-         if (verbose())
-         {
-            AiMsgInfo("[abcproc]   Skip DSO parmeter \"%s\"", pname);
          }
          continue;
       }

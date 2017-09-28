@@ -1,7 +1,7 @@
 #include <ai.h>
-#include "dso.h"
-#include "visitors.h"
-#include "globallock.h"
+#include <dso.h>
+#include <visitors.h>
+#include <globallock.h>
 
 
 // ---
@@ -12,79 +12,79 @@ AI_PROCEDURAL_NODE_EXPORT_METHODS(AbcProcMtd);
 node_parameters
 {
    // Common parameters
-   AiParameterStr("filename", "");
-   AiParameterStr("objectpath", "");
+   AiParameterStr(Dso::p_filename, "");
+   AiParameterStr(Dso::p_objectpath, "");
 
-   AiParameterFlt("frame", 0.0f);
-   AiParameterArray("samples", AiArray(0, 1, AI_TYPE_FLOAT));
-   AiParameterBool("relative_samples", false);
-   AiParameterFlt("fps", 0.0f);
-   AiParameterEnum("cycle", CT_hold, CycleTypeNames);
-   AiParameterFlt("start_frame", std::numeric_limits<float>::max());
-   AiParameterFlt("end_frame", -std::numeric_limits<float>::max());
-   AiParameterFlt("speed", 1.0f);
-   AiParameterFlt("offset", 0.0f);
-   AiParameterBool("preserve_start_frame", false);
+   AiParameterFlt(Dso::p_frame, 0.0f);
+   AiParameterArray(Dso::p_samples, AiArray(0, 1, AI_TYPE_FLOAT));
+   AiParameterBool(Dso::p_relative_samples, false);
+   AiParameterFlt(Dso::p_fps, 0.0f);
+   AiParameterEnum(Dso::p_cycle, CT_hold, CycleTypeNames);
+   AiParameterFlt(Dso::p_start_frame, std::numeric_limits<float>::max());
+   AiParameterFlt(Dso::p_end_frame, -std::numeric_limits<float>::max());
+   AiParameterFlt(Dso::p_speed, 1.0f);
+   AiParameterFlt(Dso::p_offset, 0.0f);
+   AiParameterBool(Dso::p_preserve_start_frame, false);
 
-   //AiParameterBool("ignore_motion_blur", false);
-   AiParameterBool("ignore_deform_blur", false);
-   AiParameterBool("ignore_transform_blur", false);
-   AiParameterBool("ignore_visibility", false);
-   AiParameterBool("ignore_transforms", false);
-   AiParameterBool("ignore_instances", false);
-   AiParameterBool("ignore_nurbs", false);
+   //AiParameterBool(Dso::p_ignore_motion_blur, false);
+   AiParameterBool(Dso::p_ignore_deform_blur, false);
+   AiParameterBool(Dso::p_ignore_transform_blur, false);
+   AiParameterBool(Dso::p_ignore_visibility, false);
+   AiParameterBool(Dso::p_ignore_transforms, false);
+   AiParameterBool(Dso::p_ignore_instances, false);
+   AiParameterBool(Dso::p_ignore_nurbs, false);
 
-   AiParameterFlt("velocity_scale", 1.0f);
-   AiParameterStr("velocity_name", "");
-   AiParameterStr("acceleration_name", "");
-   AiParameterBool("force_velocity_blur", false)
+   AiParameterFlt(Dso::p_velocity_scale, 1.0f);
+   AiParameterStr(Dso::p_velocity_name, "");
+   AiParameterStr(Dso::p_acceleration_name, "");
+   AiParameterBool(Dso::p_force_velocity_blur, false)
 
-   AiParameterBool("output_reference", false);
-   AiParameterEnum("reference_source", RS_attributes_then_file, ReferenceSourceNames);
-   AiParameterStr("reference_position_name", "Pref");
-   AiParameterStr("reference_normal_name", "Nref");
-   AiParameterStr("reference_filename", "");
-   AiParameterFlt("reference_frame", -std::numeric_limits<float>::max());
+   AiParameterBool(Dso::p_output_reference, false);
+   AiParameterEnum(Dso::p_reference_source, RS_attributes_then_file, ReferenceSourceNames);
+   AiParameterStr(Dso::p_reference_position_name, "Pref");
+   AiParameterStr(Dso::p_reference_normal_name, "Nref");
+   AiParameterStr(Dso::p_reference_filename, "");
+   AiParameterFlt(Dso::p_reference_frame, -std::numeric_limits<float>::max());
 
-   AiParameterArray("demote_to_object_attribute", AiArray(0, 1, AI_TYPE_STRING));
+   AiParameterArray(Dso::p_demote_to_object_attribute, AiArray(0, 1, AI_TYPE_STRING));
 
-   AiParameterInt("samples_expand_iterations", 0);
-   AiParameterBool("optimize_samples", false);
+   AiParameterInt(Dso::p_samples_expand_iterations, 0);
+   AiParameterBool(Dso::p_optimize_samples, false);
 
-   AiParameterStr("nameprefix", "");
+   AiParameterStr(Dso::p_nameprefix, "");
 
    // Multi shapes parameters
-   AiParameterFlt("bounds_padding", 0.0f);
-   AiParameterBool("compute_velocity_expanded_bounds", false);
-   AiParameterBool("use_override_bounds", false);
-   AiParameterStr("override_bounds_min_name", "overrideBoundsMin");
-   AiParameterStr("override_bounds_max_name", "overrideBoundsMax");
-   AiParameterBool("pad_bounds_with_peak_radius", false);
-   AiParameterStr("peak_radius_name", "peakRadius");
-   AiParameterBool("pad_bounds_with_peak_width", false);
-   AiParameterStr("peak_width_name", "peakWidth");
-   AiParameterArray("override_attributes", AiArray(0, 1, AI_TYPE_STRING));
+   AiParameterFlt(Dso::p_bounds_padding, 0.0f);
+   AiParameterBool(Dso::p_compute_velocity_expanded_bounds, false);
+   AiParameterBool(Dso::p_use_override_bounds, false);
+   AiParameterStr(Dso::p_override_bounds_min_name, "overrideBoundsMin");
+   AiParameterStr(Dso::p_override_bounds_max_name, "overrideBoundsMax");
+   AiParameterBool(Dso::p_pad_bounds_with_peak_radius, false);
+   AiParameterStr(Dso::p_peak_radius_name, "peakRadius");
+   AiParameterBool(Dso::p_pad_bounds_with_peak_width, false);
+   AiParameterStr(Dso::p_peak_width_name, "peakWidth");
+   AiParameterArray(Dso::p_override_attributes, AiArray(0, 1, AI_TYPE_STRING));
 
    // Single shape parameters
-   AiParameterBool("read_object_attributes", false);
-   AiParameterBool("read_primitive_attributes", false);
-   AiParameterBool("read_point_attributes", false);
-   AiParameterBool("read_vertex_attributes", false);
-   AiParameterEnum("attributes_frame", AF_render, AttributeFrameNames);
-   AiParameterArray("attribute_prefices_to_remove", AiArray(0, 1, AI_TYPE_STRING));
-   AiParameterArray("compute_tangents", AiArray(0, 1, AI_TYPE_STRING));
-   AiParameterStr("radius_name", "");
-   AiParameterFlt("radius_min", 0.0f);
-   AiParameterFlt("radius_max", 1000000.0f);
-   AiParameterFlt("radius_scale", 1.0f);
-   AiParameterFlt("width_min", 0.0f);
-   AiParameterFlt("width_max", 1000000.0f);
-   AiParameterFlt("width_scale", 1.0f);
-   AiParameterInt("nurbs_sample_rate", 5);
+   AiParameterBool(Dso::p_read_object_attributes, false);
+   AiParameterBool(Dso::p_read_primitive_attributes, false);
+   AiParameterBool(Dso::p_read_point_attributes, false);
+   AiParameterBool(Dso::p_read_vertex_attributes, false);
+   AiParameterEnum(Dso::p_attributes_frame, AF_render, AttributeFrameNames);
+   AiParameterArray(Dso::p_attribute_prefices_to_remove, AiArray(0, 1, AI_TYPE_STRING));
+   AiParameterArray(Dso::p_compute_tangents, AiArray(0, 1, AI_TYPE_STRING));
+   AiParameterStr(Dso::p_radius_name, "");
+   AiParameterFlt(Dso::p_radius_min, 0.0f);
+   AiParameterFlt(Dso::p_radius_max, 1000000.0f);
+   AiParameterFlt(Dso::p_radius_scale, 1.0f);
+   AiParameterFlt(Dso::p_width_min, 0.0f);
+   AiParameterFlt(Dso::p_width_max, 1000000.0f);
+   AiParameterFlt(Dso::p_width_scale, 1.0f);
+   AiParameterInt(Dso::p_nurbs_sample_rate, 5);
 
    // Others
-   AiParameterBool("verbose", false);
-   AiParameterStr("rootdrive", "");
+   AiParameterBool(Dso::p_verbose, false);
+   AiParameterStr(Dso::p_rootdrive, "");
 }
 
 procedural_init
@@ -105,7 +105,7 @@ procedural_num_nodes
 
 procedural_get_node
 {
-   // This function won't get call for the same procedural node from difference threads
+   // This function won't get call for the same procedural node from different threads
    
    AiMsgDebug("[abcproc] ProcGetNode [thread %p]", AiThreadSelf());
    Dso *dso = (Dso*) user_ptr;
@@ -191,8 +191,8 @@ procedural_get_node
                   
                   // reset name to avoid clashes when creating instance
                   name += "_disabled";
-                  AiNodeSetStr(output, "name", dso->uniqueName(name).c_str());
-                  AiNodeSetByte(output, "visibility", 0);
+                  AiNodeSetStr(output, Strings::name, dso->uniqueName(name).c_str());
+                  AiNodeSetByte(output, Strings::visibility, 0);
                   AiNodeSetDisabled(output, true);
                   
                   isInstance = true;
@@ -218,21 +218,22 @@ procedural_get_node
                }
                
                AbcProcGlobalLock::Acquire();
-               output = AiNode("ginstance");
+               
                // rename source procedural node if needed
                if (!strcmp(AiNodeGetName(dso->procNode()), procName))
                {
                   // procedural node hasn't been renamed yet
                   std::string name = "_";
                   name += procName;
-                  AiNodeSetStr(dso->procNode(), "name", dso->uniqueName(name).c_str());
+                  AiNodeSetStr(dso->procNode(), Strings::name, dso->uniqueName(name).c_str());
                }
                // use procedural name for newly generated instance
-               AiNodeSetStr(output, "name", procName);
+               output = AiNode(Strings::ginstance, procName, dso->procNode());
+               
                AbcProcGlobalLock::Release();
                
-               AiNodeSetBool(output, "inherit_xform", false);
-               AiNodeSetPtr(output, "node", master);
+               AiNodeSetBool(output, Strings::inherit_xform, false);
+               AiNodeSetPtr(output, Strings::node, master);
                
                // It seems that when ginstance node don't  inherit from the procedural
                //   attributes like standard shapes

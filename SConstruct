@@ -351,8 +351,8 @@ if nameprefix:
 if withArnold:
    A, M, m, p = arnold.Version(asString=False)
    #if A < 4 or (A == 4 and (M < 2 or (M == 2 and m < 3))):
-   if A < 5:
-      print("Arnold procedural requires arnold 5.0.0.0 or above.")
+   if A < 5 or (A == 5 and M == 0 and m < 1):
+      print("Arnold procedural requires arnold 5.0.1.0 or above.")
       sys.exit(1)
 
    prjs.append({"name": "%sAlembicArnoldProcedural" % nameprefix,
@@ -376,7 +376,7 @@ if withArnold:
                 "rpaths": ["../../lib"],
                 "bldprefix": "arnold-%s" % arnold.Version(),
                 "incdirs": ["arnold/abcproc"],
-                "srcs": glob.glob("arnold/abcproc/*.cpp"),
+                "srcs": glob.glob("arnold/abcproc/*.cpp") + glob.glob("arnold/abcproc/visitors/*.cpp"),
                 "custom": [arnold.Require, RequireAlembicHelper(static=link_static)]})
 
 if withVray:

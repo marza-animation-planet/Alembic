@@ -1,12 +1,9 @@
-#ifndef ABCARNOLD_PROCARGS_H_
-#define ABCARNOLD_PROCARGS_H_
+#ifndef ABCPROC_DSO_H_
+#define ABCPROC_DSO_H_
 
 #include <ai.h>
 #include <AlembicSceneCache.h>
-
-#if AI_VERSION_ARCH_NUM > 4 || (AI_VERSION_ARCH_NUM == 4 && AI_VERSION_MAJOR_NUM >= 1)
-#  define ARNOLD_4_1_OR_ABOVE
-#endif
+#include <strings.h>
 
 enum CycleType
 {
@@ -52,12 +49,82 @@ extern const char* ReferenceSourceNames[];
 class Dso
 {
 public:
+   // Common 
+   static AtString p_filename;
+   static AtString p_objectpath;
+   static AtString p_frame;
+   static AtString p_samples;
+   static AtString p_relative_samples;
+   static AtString p_fps;
+   static AtString p_cycle;
+   static AtString p_start_frame;
+   static AtString p_end_frame;
+   static AtString p_speed;
+   static AtString p_offset;
+   static AtString p_preserve_start_frame;
+
+   //static AtString p_ignore_motion_blur;
+   static AtString p_ignore_deform_blur;
+   static AtString p_ignore_transform_blur;
+   static AtString p_ignore_visibility;
+   static AtString p_ignore_transforms;
+   static AtString p_ignore_instances;
+   static AtString p_ignore_nurbs;
+   static AtString p_velocity_scale;
+   static AtString p_velocity_name;
+   static AtString p_acceleration_name;
+   static AtString p_force_velocity_blur;
+   static AtString p_output_reference;
+   static AtString p_reference_source;
+   static AtString p_reference_position_name;
+   static AtString p_reference_normal_name;
+   static AtString p_reference_filename;
+   static AtString p_reference_frame;
+   static AtString p_demote_to_object_attribute;
+   static AtString p_samples_expand_iterations;
+   static AtString p_optimize_samples;
+   static AtString p_nameprefix;
+
+   // Multi shapes parameters
+   static AtString p_bounds_padding;
+   static AtString p_compute_velocity_expanded_bounds;
+   static AtString p_use_override_bounds;
+   static AtString p_override_bounds_min_name;
+   static AtString p_override_bounds_max_name;
+   static AtString p_pad_bounds_with_peak_radius;
+   static AtString p_peak_radius_name;
+   static AtString p_pad_bounds_with_peak_width;
+   static AtString p_peak_width_name;
+   static AtString p_override_attributes;
+
+   // Single shape parameters
+   static AtString p_read_object_attributes;
+   static AtString p_read_primitive_attributes;
+   static AtString p_read_point_attributes;
+   static AtString p_read_vertex_attributes;
+   static AtString p_attributes_frame;
+   static AtString p_attribute_prefices_to_remove;
+   static AtString p_compute_tangents;
+   static AtString p_radius_name;
+   static AtString p_radius_min;
+   static AtString p_radius_max;
+   static AtString p_radius_scale;
+   static AtString p_width_min;
+   static AtString p_width_max;
+   static AtString p_width_scale;
+   static AtString p_nurbs_sample_rate;
+
+   // Others
+   static AtString p_verbose;
+   static AtString p_rootdrive;
+
+public:
    
    Dso(AtNode *node);
    ~Dso();
    
-   void readFromDataParam();
-   void readFromUserParams();
+   void readParams();
+   void setSingleParams(AtNode *node, const std::string &objectPath) const;
    
    void transferUserParams(AtNode *dst);
    void transferInstanceParams(AtNode *dst);
@@ -273,17 +340,13 @@ public:
       return mMultiParams.useOverrideBounds;
    }
    
-   //inline const char* overrideBoundsMinName() const
    inline const std::string& overrideBoundsMinName() const
    {
-      //return (mMultiParams.overrideBoundsMinName.length() > 0 ? mMultiParams.overrideBoundsMinName.c_str() : 0);
       return mMultiParams.overrideBoundsMinName;
    }
    
-   //inline const char* overrideBoundsMaxName() const
    inline const std::string& overrideBoundsMaxName() const
    {
-      //return (mMultiParams.overrideBoundsMaxName.length() > 0 ? mMultiParams.overrideBoundsMaxName.c_str() : 0);
       return mMultiParams.overrideBoundsMaxName;
    }
    
@@ -389,6 +452,11 @@ public:
       return mStepSize;
    }
    
+   inline float volumePadding() const
+   {
+      return mVolumePadding;
+   }
+
    // Instance tacking
    
    inline void setMasterNodeName(const std::string &name)
@@ -437,8 +505,6 @@ public:
    {
       return (idx < mGeneratedNodes.size() ? mGeneratedNodes[idx] : 0);
    }
-   
-   std::string dataString(const char *targetShape) const;
 
 private:
    
@@ -446,10 +512,6 @@ private:
    
    void strip(std::string &s) const;
    void toLower(std::string &s) const;
-   bool isFlag(std::string &s) const;
-   
-   bool processFlag(std::vector<std::string> &args, size_t &i);
-   
    void normalizeFilePath(std::string &path) const;
    
    void setGeneratedNodesCount(size_t n);
@@ -511,7 +573,6 @@ private:
       // peakWidth attribute name (curves)
       
       void reset();
-      std::string dataString(const char *targetShape) const;
       std::string shapeKey() const;
    };
    
@@ -534,7 +595,6 @@ private:
       std::string peakWidthName;
       
       void reset();
-      std::string dataString() const;
    };
    
    struct SingleParameters
@@ -563,7 +623,6 @@ private:
       float widthScale;
       
       void reset();
-      std::string dataString() const;
       std::string shapeKey() const;
    };
    
@@ -586,21 +645,17 @@ private:
    double mRenderTime;
    std::vector<double> mTimeSamples;
    std::vector<double> mExpandedTimeSamples;
-   bool mSetTimeSamples;
+   bool mSetMotionRange;
    
    float mStepSize;
+   float mVolumePadding;
    
    size_t mNumShapes;
    
    std::string mShapeKey;
    int mInstanceNum;
    
-   // fallback to official procedural way of defining motion sample range
-   double mShutterOpen;
-   double mShutterClose;
-   int mShutterStep;
-   
-   // on seconds
+   // in frames
    double mMotionStart;
    double mMotionEnd;
    
@@ -608,6 +663,8 @@ private:
    
    bool mReverseWinding;
    
+   double mGlobalFrame;
+
    static std::map<std::string, std::string> msMasterNodes;
 };
 
