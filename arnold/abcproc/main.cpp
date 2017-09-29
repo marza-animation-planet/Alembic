@@ -12,79 +12,79 @@ AI_PROCEDURAL_NODE_EXPORT_METHODS(AbcProcMtd);
 node_parameters
 {
    // Common parameters
-   AiParameterStr(Dso::p_filename, "");
-   AiParameterStr(Dso::p_objectpath, "");
+   AiParameterStr(Strings::filename, "");
+   AiParameterStr(Strings::objectpath, "");
+   AiParameterStr(Strings::nameprefix, "");
 
-   AiParameterFlt(Dso::p_frame, 0.0f);
-   AiParameterArray(Dso::p_samples, AiArray(0, 1, AI_TYPE_FLOAT));
-   AiParameterBool(Dso::p_relative_samples, false);
-   AiParameterFlt(Dso::p_fps, 0.0f);
-   AiParameterEnum(Dso::p_cycle, CT_hold, CycleTypeNames);
-   AiParameterFlt(Dso::p_start_frame, std::numeric_limits<float>::max());
-   AiParameterFlt(Dso::p_end_frame, -std::numeric_limits<float>::max());
-   AiParameterFlt(Dso::p_speed, 1.0f);
-   AiParameterFlt(Dso::p_offset, 0.0f);
-   AiParameterBool(Dso::p_preserve_start_frame, false);
+   AiParameterFlt(Strings::frame, 0.0f);
+   // use node's own 'motion_start' and 'motion_end' parameters
+   AiParameterInt(Strings::samples, 1);
+   AiParameterInt(Strings::expand_samples_iterations, 0);
+   AiParameterBool(Strings::optimize_samples, false);
+   AiParameterFlt(Strings::fps, 0.0f);
+   AiParameterEnum(Strings::cycle, CT_hold, CycleTypeNames);
+   AiParameterFlt(Strings::start_frame, std::numeric_limits<float>::max());
+   AiParameterFlt(Strings::end_frame, -std::numeric_limits<float>::max());
+   AiParameterFlt(Strings::speed, 1.0f);
+   AiParameterFlt(Strings::offset, 0.0f);
+   AiParameterBool(Strings::preserve_start_frame, false);
 
-   //AiParameterBool(Dso::p_ignore_motion_blur, false);
-   AiParameterBool(Dso::p_ignore_deform_blur, false);
-   AiParameterBool(Dso::p_ignore_transform_blur, false);
-   AiParameterBool(Dso::p_ignore_visibility, false);
-   AiParameterBool(Dso::p_ignore_transforms, false);
-   AiParameterBool(Dso::p_ignore_instances, false);
-   AiParameterBool(Dso::p_ignore_nurbs, false);
+   //AiParameterBool(Strings::ignore_motion_blur, false);
+   AiParameterBool(Strings::ignore_deform_blur, false);
+   AiParameterBool(Strings::ignore_transform_blur, false);
+   AiParameterBool(Strings::ignore_visibility, false);
+   AiParameterBool(Strings::ignore_transforms, false);
+   AiParameterBool(Strings::ignore_instances, false);
+   AiParameterBool(Strings::ignore_nurbs, false);
 
-   AiParameterFlt(Dso::p_velocity_scale, 1.0f);
-   AiParameterStr(Dso::p_velocity_name, "");
-   AiParameterStr(Dso::p_acceleration_name, "");
-   AiParameterBool(Dso::p_force_velocity_blur, false)
+   AiParameterFlt(Strings::velocity_scale, 1.0f);
+   AiParameterStr(Strings::velocity_name, Strings::_empty);
+   AiParameterStr(Strings::acceleration_name, Strings::_empty);
+   AiParameterBool(Strings::force_velocity_blur, false)
 
-   AiParameterBool(Dso::p_output_reference, false);
-   AiParameterEnum(Dso::p_reference_source, RS_attributes_then_file, ReferenceSourceNames);
-   AiParameterStr(Dso::p_reference_position_name, "Pref");
-   AiParameterStr(Dso::p_reference_normal_name, "Nref");
-   AiParameterStr(Dso::p_reference_filename, "");
-   AiParameterFlt(Dso::p_reference_frame, -std::numeric_limits<float>::max());
+   AiParameterBool(Strings::output_reference, false);
+   AiParameterEnum(Strings::reference_source, RS_attributes_then_file, ReferenceSourceNames);
+   AiParameterStr(Strings::reference_position_name, Strings::Pref);
+   AiParameterStr(Strings::reference_normal_name, Strings::Nref);
+   AiParameterStr(Strings::reference_filename, Strings::_empty);
+   AiParameterFlt(Strings::reference_frame, -std::numeric_limits<float>::max());
 
-   AiParameterArray(Dso::p_demote_to_object_attribute, AiArray(0, 1, AI_TYPE_STRING));
-
-   AiParameterInt(Dso::p_samples_expand_iterations, 0);
-   AiParameterBool(Dso::p_optimize_samples, false);
-
-   AiParameterStr(Dso::p_nameprefix, "");
+   AiParameterArray(Strings::demote_to_object_attribute, AiArray(0, 1, AI_TYPE_STRING));
 
    // Multi shapes parameters
-   AiParameterFlt(Dso::p_bounds_padding, 0.0f);
-   AiParameterBool(Dso::p_compute_velocity_expanded_bounds, false);
-   AiParameterBool(Dso::p_use_override_bounds, false);
-   AiParameterStr(Dso::p_override_bounds_min_name, "overrideBoundsMin");
-   AiParameterStr(Dso::p_override_bounds_max_name, "overrideBoundsMax");
-   AiParameterBool(Dso::p_pad_bounds_with_peak_radius, false);
-   AiParameterStr(Dso::p_peak_radius_name, "peakRadius");
-   AiParameterBool(Dso::p_pad_bounds_with_peak_width, false);
-   AiParameterStr(Dso::p_peak_width_name, "peakWidth");
-   AiParameterArray(Dso::p_override_attributes, AiArray(0, 1, AI_TYPE_STRING));
+   AiParameterFlt(Strings::bounds_padding, 0.0f);
+   AiParameterBool(Strings::compute_velocity_expanded_bounds, false);
+   AiParameterBool(Strings::use_override_bounds, false);
+   AiParameterStr(Strings::override_bounds_min_name, "overrideBoundsMin");
+   AiParameterStr(Strings::override_bounds_max_name, "overrideBoundsMax");
+   AiParameterBool(Strings::pad_bounds_with_peak_radius, false);
+   AiParameterStr(Strings::peak_radius_name, "peakRadius");
+   AiParameterBool(Strings::pad_bounds_with_peak_width, false);
+   AiParameterStr(Strings::peak_width_name, "peakWidth");
+   AiParameterArray(Strings::override_attributes, AiArray(0, 1, AI_TYPE_STRING));
 
    // Single shape parameters
-   AiParameterBool(Dso::p_read_object_attributes, false);
-   AiParameterBool(Dso::p_read_primitive_attributes, false);
-   AiParameterBool(Dso::p_read_point_attributes, false);
-   AiParameterBool(Dso::p_read_vertex_attributes, false);
-   AiParameterEnum(Dso::p_attributes_frame, AF_render, AttributeFrameNames);
-   AiParameterArray(Dso::p_attribute_prefices_to_remove, AiArray(0, 1, AI_TYPE_STRING));
-   AiParameterArray(Dso::p_compute_tangents, AiArray(0, 1, AI_TYPE_STRING));
-   AiParameterStr(Dso::p_radius_name, "");
-   AiParameterFlt(Dso::p_radius_min, 0.0f);
-   AiParameterFlt(Dso::p_radius_max, 1000000.0f);
-   AiParameterFlt(Dso::p_radius_scale, 1.0f);
-   AiParameterFlt(Dso::p_width_min, 0.0f);
-   AiParameterFlt(Dso::p_width_max, 1000000.0f);
-   AiParameterFlt(Dso::p_width_scale, 1.0f);
-   AiParameterInt(Dso::p_nurbs_sample_rate, 5);
+   AiParameterBool(Strings::read_object_attributes, false);
+   AiParameterBool(Strings::read_primitive_attributes, false);
+   AiParameterBool(Strings::read_point_attributes, false);
+   AiParameterBool(Strings::read_vertex_attributes, false);
+   AiParameterEnum(Strings::attributes_frame, AF_render, AttributeFrameNames);
+   AiParameterArray(Strings::attribute_prefices_to_remove, AiArray(0, 1, AI_TYPE_STRING));
+   AiParameterArray(Strings::compute_tangents, AiArray(0, 1, AI_TYPE_STRING));
+   AiParameterStr(Strings::radius_name, Strings::_empty);
+   AiParameterFlt(Strings::radius_min, 0.0f);
+   AiParameterFlt(Strings::radius_max, 1000000.0f);
+   AiParameterFlt(Strings::radius_scale, 1.0f);
+   AiParameterFlt(Strings::width_min, 0.0f);
+   AiParameterFlt(Strings::width_max, 1000000.0f);
+   AiParameterFlt(Strings::width_scale, 1.0f);
+   AiParameterInt(Strings::nurbs_sample_rate, 5);
 
    // Others
-   AiParameterBool(Dso::p_verbose, false);
-   AiParameterStr(Dso::p_rootdrive, "");
+   AiParameterBool(Strings::verbose, false);
+   AiParameterStr(Strings::rootdrive, Strings::_empty);
+
+   AiMetaDataSetBool(nentry, Strings::filename, Strings::filepath, true);
 }
 
 procedural_init

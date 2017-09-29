@@ -49,76 +49,6 @@ extern const char* ReferenceSourceNames[];
 class Dso
 {
 public:
-   // Common 
-   static AtString p_filename;
-   static AtString p_objectpath;
-   static AtString p_frame;
-   static AtString p_samples;
-   static AtString p_relative_samples;
-   static AtString p_fps;
-   static AtString p_cycle;
-   static AtString p_start_frame;
-   static AtString p_end_frame;
-   static AtString p_speed;
-   static AtString p_offset;
-   static AtString p_preserve_start_frame;
-
-   //static AtString p_ignore_motion_blur;
-   static AtString p_ignore_deform_blur;
-   static AtString p_ignore_transform_blur;
-   static AtString p_ignore_visibility;
-   static AtString p_ignore_transforms;
-   static AtString p_ignore_instances;
-   static AtString p_ignore_nurbs;
-   static AtString p_velocity_scale;
-   static AtString p_velocity_name;
-   static AtString p_acceleration_name;
-   static AtString p_force_velocity_blur;
-   static AtString p_output_reference;
-   static AtString p_reference_source;
-   static AtString p_reference_position_name;
-   static AtString p_reference_normal_name;
-   static AtString p_reference_filename;
-   static AtString p_reference_frame;
-   static AtString p_demote_to_object_attribute;
-   static AtString p_samples_expand_iterations;
-   static AtString p_optimize_samples;
-   static AtString p_nameprefix;
-
-   // Multi shapes parameters
-   static AtString p_bounds_padding;
-   static AtString p_compute_velocity_expanded_bounds;
-   static AtString p_use_override_bounds;
-   static AtString p_override_bounds_min_name;
-   static AtString p_override_bounds_max_name;
-   static AtString p_pad_bounds_with_peak_radius;
-   static AtString p_peak_radius_name;
-   static AtString p_pad_bounds_with_peak_width;
-   static AtString p_peak_width_name;
-   static AtString p_override_attributes;
-
-   // Single shape parameters
-   static AtString p_read_object_attributes;
-   static AtString p_read_primitive_attributes;
-   static AtString p_read_point_attributes;
-   static AtString p_read_vertex_attributes;
-   static AtString p_attributes_frame;
-   static AtString p_attribute_prefices_to_remove;
-   static AtString p_compute_tangents;
-   static AtString p_radius_name;
-   static AtString p_radius_min;
-   static AtString p_radius_max;
-   static AtString p_radius_scale;
-   static AtString p_width_min;
-   static AtString p_width_max;
-   static AtString p_width_scale;
-   static AtString p_nurbs_sample_rate;
-
-   // Others
-   static AtString p_verbose;
-   static AtString p_rootdrive;
-
-public:
    
    Dso(AtNode *node);
    ~Dso();
@@ -530,8 +460,9 @@ private:
       double frame;
       double startFrame;
       double endFrame;
-      bool relativeSamples;
-      std::vector<double> samples;
+      int samples;
+      int expandSamplesIterations;
+      bool optimizeSamples;
       CycleType cycle;
       double speed;
       bool preserveStartFrame;
@@ -543,9 +474,6 @@ private:
       bool ignoreVisibility;
       bool ignoreTransforms;
       bool ignoreInstances;
-      
-      int samplesExpandIterations;
-      bool optimizeSamples;
       
       bool verbose;
       
@@ -645,7 +573,6 @@ private:
    double mRenderTime;
    std::vector<double> mTimeSamples;
    std::vector<double> mExpandedTimeSamples;
-   bool mSetMotionRange;
    
    float mStepSize;
    float mVolumePadding;

@@ -2,6 +2,74 @@
 
 namespace Strings
 {
+   // Common 
+   AtString filename("filename");
+   AtString objectpath("objectpath");
+   AtString frame("frame");
+   AtString samples("samples");
+   AtString fps("fps");
+   AtString cycle("cycle");
+   AtString start_frame("start_frame");
+   AtString end_frame("end_frame");
+   AtString speed("speed");
+   AtString offset("offset");
+   AtString preserve_start_frame("preserve_start_frame");
+
+   //AtString ignore_motion_blur("ignore_motion_blur");
+   AtString ignore_deform_blur("ignore_deform_blur");
+   AtString ignore_transform_blur("ignore_transform_blur");
+   AtString ignore_visibility("ignore_visibility");
+   AtString ignore_transforms("ignore_transforms");
+   AtString ignore_instances("ignore_instances");
+   AtString ignore_nurbs("ignore_nurbs");
+   AtString velocity_scale("velocity_scale");
+   AtString velocity_name("velocity_name");
+   AtString acceleration_name("acceleration_name");
+   AtString force_velocity_blur("force_velocity_blur");
+   AtString output_reference("output_reference");
+   AtString reference_source("reference_source");
+   AtString reference_position_name("reference_position_name");
+   AtString reference_normal_name("reference_normal_name");
+   AtString reference_filename("reference_filename");
+   AtString reference_frame("reference_frame");
+   AtString demote_to_object_attribute("demote_to_object_attribute");
+   AtString expand_samples_iterations("expand_samples_iterations");
+   AtString optimize_samples("optimize_samples");
+   AtString nameprefix("nameprefix");
+
+   // Multi shapes parameters
+   AtString bounds_padding("bounds_padding");
+   AtString compute_velocity_expanded_bounds("compute_velocity_expanded_bounds");
+   AtString use_override_bounds("use_override_bounds");
+   AtString override_bounds_min_name("override_bounds_min_name");
+   AtString override_bounds_max_name("override_bounds_max_name");
+   AtString pad_bounds_with_peak_radius("pad_bounds_with_peak_radius");
+   AtString peak_radius_name("peak_radius_name");
+   AtString pad_bounds_with_peak_width("pad_bounds_with_peak_width");
+   AtString peak_width_name("peak_width_name");
+   AtString override_attributes("override_attributes");
+
+   // Single shape parameters
+   AtString read_object_attributes("read_object_attributes");
+   AtString read_primitive_attributes("read_primitive_attributes");
+   AtString read_point_attributes("read_point_attributes");
+   AtString read_vertex_attributes("read_vertex_attributes");
+   AtString attributes_frame("attributes_frame");
+   AtString attribute_prefices_to_remove("attribute_prefices_to_remove");
+   AtString compute_tangents("compute_tangents");
+   AtString radius_name("radius_name");
+   AtString radius_min("radius_min");
+   AtString radius_max("radius_max");
+   AtString radius_scale("radius_scale");
+   AtString width_min("width_min");
+   AtString width_max("width_max");
+   AtString width_scale("width_scale");
+   AtString nurbs_sample_rate("nurbs_sample_rate");
+
+   // Others
+   AtString verbose("verbose");
+   AtString rootdrive("rootdrive");
+
    AtString id("id");
    AtString receive_shadows("receive_shadows");
    AtString self_shadows("self_shadows");
@@ -36,4 +104,8 @@ namespace Strings
    AtString mode("mode");
    AtString node("node");
    AtString inherit_xform("inherit_xform");
+   AtString Pref("Pref");
+   AtString Nref("Nref");
+   AtString _empty("");
+   AtString filepath("filepath");
 }
