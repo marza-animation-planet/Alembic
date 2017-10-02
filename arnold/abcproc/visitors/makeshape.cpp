@@ -43,7 +43,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
                                       MakeShape::CollectFilter filter,
                                       void *filterArgs)
 {
-   if (userProps.valid() && objectAttrs && mDso->readObjectAttribs())
+   if (userProps.valid() && objectAttrs)
    {
       for (size_t i=0; i<userProps.getNumProperties(); ++i)
       {
@@ -53,15 +53,25 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
          {
             continue;
          }
-         
+
          std::pair<std::string, UserAttribute> ua;
-         
+
          ua.first = header.getName();
          mDso->cleanAttribName(ua.first);
+
+         if (mDso->ignoreAttribute(ua.first))
+         {
+            if (mDso->verbose())
+            {
+               AiMsgInfo("[abcproc] Ignore \"%s\" object attribute.", header.getName().c_str());
+            }
+            continue;
+         }
+
          InitUserAttribute(ua.second);
-         
+
          //ua.second.arnoldCategory = AI_USERDEF_CONSTANT;
-         
+
          if (ReadUserAttribute(ua.second, userProps, header, t, false, interpolate))
          {
             if (mDso->verbose())
@@ -80,46 +90,13 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
    
    if (geomParams.valid())
    {
-      std::set<std::string> specialPointNames;
-      std::set<std::string> specialVertexNames;
       std::set<std::string> ignorePointNames;
       std::set<std::string> ignoreVertexNames;
       
-      const char *accName = mDso->accelerationName();
-      if (!accName)
+      if (!mDso->outputReference() || (mDso->referenceSource() != RS_attributes &&
+                                       mDso->referenceSource() != RS_attributes_then_file))
       {
-         specialPointNames.insert("acceleration");
-         specialPointNames.insert("accel");
-         specialPointNames.insert("a");
-      }
-      else
-      {
-         specialPointNames.insert(accName);
-      }
-      
-      const char *velName = mDso->velocityName();
-      if (!velName)
-      {
-         specialPointNames.insert("velocity");
-         specialPointNames.insert("vel");
-         specialPointNames.insert("v");
-      }
-      else if (strcmp(velName, "<builtin>") != 0)
-      {
-         specialPointNames.insert(velName);
-      }
-      
-      if (mDso->outputReference() && (mDso->referenceSource() == RS_attributes ||
-                                      mDso->referenceSource() == RS_attributes_then_file))
-      {
-         // force reading reference attributes
-         specialPointNames.insert(mDso->referencePositionName());
-         specialPointNames.insert(mDso->referenceNormalName());
-         specialVertexNames.insert(mDso->referenceNormalName());
-      }
-      else
-      {
-         // force ignoring reference attributes
+         // force ignoring reference attributes, those will be set from a difference frame or file
          ignorePointNames.insert(mDso->referencePositionName());
          ignorePointNames.insert(mDso->referenceNormalName());
          ignoreVertexNames.insert(mDso->referenceNormalName());
@@ -148,28 +125,47 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
             
             UV.first = header.getName();
             mDso->cleanAttribName(UV.first);
+
+            if (mDso->ignoreAttribute(UV.first))
+            {
+               if (mDso->verbose())
+               {
+                  AiMsgInfo("[abcproc] Ignore UVs \"%s\".", header.getName().c_str());
+               }
+               continue;
+            }
+
             UV.second = Alembic::AbcGeom::IV2fGeomParam(geomParams, header.getName());
-            
             UVs->insert(UV);
          }
          else
          {
             std::pair<std::string, UserAttribute> ua;
-            
+
             UserAttributes *attrs = 0;
-            
+
             ua.first = header.getName();
             mDso->cleanAttribName(ua.first);
+
+            if (mDso->ignoreAttribute(ua.first))
+            {
+               if (mDso->verbose())
+               {
+                  AiMsgInfo("[abcproc] Ignore attribute \"%s\".", header.getName().c_str());
+               }
+               continue;
+            }
+
             InitUserAttribute(ua.second);
             
-            bool promoteToObject = mDso->isPromotedToObjectAttrib(ua.first);
+            bool forceConstant = mDso->forceConstantAttribute(ua.first);
             
             switch (scope)
             {
             case Alembic::AbcGeom::kFacevaryingScope:
-               if (promoteToObject)
+               if (forceConstant)
                {
-                  if (objectAttrs && mDso->readObjectAttribs())
+                  if (objectAttrs)
                   {
                      attrs = objectAttrs;
                      if (mDso->verbose())
@@ -181,8 +177,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
                }
                else
                {
-                  if (vertexAttrs && ignoreVertexNames.find(ua.first) == ignoreVertexNames.end() &&
-                      (mDso->readVertexAttribs() || specialVertexNames.find(ua.first) != specialVertexNames.end()))
+                  if (vertexAttrs && ignoreVertexNames.find(ua.first) == ignoreVertexNames.end())
                   {
                      //ua.second.arnoldCategory = AI_USERDEF_INDEXED;
                      attrs = vertexAttrs;
@@ -196,9 +191,9 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
                break;
             case Alembic::AbcGeom::kVaryingScope:
             case Alembic::AbcGeom::kVertexScope:
-               if (promoteToObject)
+               if (forceConstant)
                {
-                  if (objectAttrs && mDso->readObjectAttribs())
+                  if (objectAttrs)
                   {
                      attrs = objectAttrs;
                      if (mDso->verbose())
@@ -210,8 +205,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
                }
                else
                {
-                  if (pointAttrs && ignorePointNames.find(ua.first) == ignorePointNames.end() &&
-                      (mDso->readPointAttribs() || specialPointNames.find(ua.first) != specialPointNames.end()))
+                  if (pointAttrs && ignorePointNames.find(ua.first) == ignorePointNames.end())
                   {
                      //ua.second.arnoldCategory = AI_USERDEF_VARYING;
                      attrs = pointAttrs;
@@ -224,9 +218,9 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
                }
                break;
             case Alembic::AbcGeom::kUniformScope:
-               if (promoteToObject)
+               if (forceConstant)
                {
-                  if (objectAttrs && mDso->readObjectAttribs())
+                  if (objectAttrs)
                   {
                      attrs = objectAttrs;
                      if (mDso->verbose())
@@ -238,7 +232,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
                }
                else
                {
-                  if (primitiveAttrs && mDso->readPrimitiveAttribs())
+                  if (primitiveAttrs)
                   {
                      //ua.second.arnoldCategory = AI_USERDEF_UNIFORM;
                      attrs = primitiveAttrs;
@@ -251,7 +245,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
                }
                break;
             case Alembic::AbcGeom::kConstantScope:
-               if (objectAttrs && mDso->readObjectAttribs())
+               if (objectAttrs)
                {
                   //ua.second.arnoldCategory = AI_USERDEF_CONSTANT;
                   attrs = objectAttrs;
@@ -276,7 +270,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
                {
                   if (ReadUserAttribute(ua.second, geomParams, header, t, true, interpolate))
                   {
-                     if (!promoteToObject)
+                     if (!forceConstant)
                      {
                         attrs->insert(ua);
                      }
@@ -789,7 +783,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
    
    // Collect attributes
    
-   double attribsTime = (info.varyingTopology ? mDso->renderTime() : mDso->attribsTime(mDso->attribsFrame()));
+   double attribsTime = (info.varyingTopology ? mDso->renderTime() : mDso->attributesTime(mDso->attributesEvaluationTime()));
    
    bool interpolateAttribs = !info.varyingTopology;
    
@@ -1564,7 +1558,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
    
    // Collect attributes
    
-   double attribsTime = (info.varyingTopology ? mDso->renderTime() : mDso->attribsTime(mDso->attribsFrame()));
+   double attribsTime = (info.varyingTopology ? mDso->renderTime() : mDso->attributesTime(mDso->attributesEvaluationTime()));
    
    bool interpolateAttribs = !info.varyingTopology;
    
@@ -2158,14 +2152,14 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    {
       // Convert to point attribute 'radius'
       
-      if (info.pointAttrs.find(radiusName) != info.pointAttrs.end() && !mDso->isPromotedToObjectAttrib(radiusName))
+      if (info.pointAttrs.find(radiusName) != info.pointAttrs.end() && !mDso->forceConstantAttribute(radiusName))
       {
          if (mDso->verbose())
          {
             AiMsgInfo("[abcproc] Ignore alembic \"widths\" property: use \"%s\" attribute instead.", radiusName);
          }
       }
-      else if (checkAltName && info.pointAttrs.find("size") != info.pointAttrs.end() && !mDso->isPromotedToObjectAttrib("size"))
+      else if (checkAltName && info.pointAttrs.find("size") != info.pointAttrs.end() && !mDso->forceConstantAttribute("size"))
       {
          if (mDso->verbose())
          {
@@ -2320,7 +2314,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
       
       if (ait != info.pointAttrs.end())
       {
-         if (mDso->isPromotedToObjectAttrib(radiusName))
+         if (mDso->forceConstantAttribute(radiusName))
          {
             if (ait->second.dataCount >= 1)
             {
@@ -2342,7 +2336,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
          
          if (ait != info.pointAttrs.end())
          {
-            if (mDso->isPromotedToObjectAttrib("size"))
+            if (mDso->forceConstantAttribute("size"))
             {
                if (ait->second.dataCount >= 1 && constantRadius < 0.0f)
                {
@@ -3424,7 +3418,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
    
    // Collect attributes
    
-   double attribsTime = (info.varyingTopology ? mDso->renderTime() : mDso->attribsTime(mDso->attribsFrame()));
+   double attribsTime = (info.varyingTopology ? mDso->renderTime() : mDso->attributesTime(mDso->attributesEvaluationTime()));
    
    bool interpolateAttribs = !info.varyingTopology;
    

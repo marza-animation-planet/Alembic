@@ -1359,14 +1359,14 @@ void MakeShape::outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchem
                AiNodeSetArray(mesh, uvit->first.c_str(), uvlist);
                AiNodeSetArray(mesh, iname.c_str(), uvidxs);
                
-               computeTangents = mDso->computeTangents(uvit->first);
+               computeTangents = mDso->computeTangentsForUVs(uvit->first);
             }
             else
             {
                AiNodeSetArray(mesh, "uvlist", uvlist);
                AiNodeSetArray(mesh, "uvidxs", uvidxs);
                
-               computeTangents = mDso->computeTangents("uv");
+               computeTangents = mDso->computeTangentsForUVs("uv");
             }
             
             if (computeTangents)

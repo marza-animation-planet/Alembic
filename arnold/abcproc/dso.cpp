@@ -14,7 +14,7 @@ const char* CycleTypeNames[] =
    NULL
 };
    
-const char* AttributeFrameNames[] =
+const char* AttributesEvaluationTimeNames[] =
 {
    "render",
    "shutter",
@@ -39,60 +39,83 @@ void Dso::CommonParameters::reset()
    filePath = "";
    namePrefix = "";
    objectPath = "";
-   
+
    frame = 0.0;
    startFrame = std::numeric_limits<double>::max();
    endFrame = -std::numeric_limits<double>::max();
-   samples = 1;
    cycle = CT_hold;
    speed = 1.0;
    offset = 0.0;
    fps = 0.0;
    preserveStartFrame = false;
-   
+
+   samples = 1;
+   expandSamplesIterations = 0;
+   optimizeSamples = false;
+
    ignoreDeformBlur = false;
    ignoreTransformBlur = false;
    ignoreVisibility = false;
    ignoreTransforms = false;
    ignoreInstances = false;
-   
-   expandSamplesIterations = 0;
-   optimizeSamples = false;
-   
-   verbose = false;
-   
-   outputReference = false;
+   ignoreNurbs = false;
 
+   outputReference = false;
    referenceSource = RS_attributes_then_file;
    referenceFilePath = "";
    referencePositionName = "Pref";
    referenceNormalName = "Nref";
    referenceFrame = -std::numeric_limits<float>::max();
-   
+
    velocityScale = 1.0f;
    velocityName = "";
    accelerationName = "";
-   
    forceVelocityBlur = false;
 
-   promoteToObjectAttribs.clear();
-   
-   ignoreNurbs = false;
+   removeAttributePrefices.clear();
+   ignoreAttributes.clear();
+   forceConstantAttributes.clear();
+   attributesEvaluationTime = AET_render;
+
+   verbose = false;
 }
 
 std::string Dso::CommonParameters::shapeKey() const
 {
    std::ostringstream oss;
-   
+
    oss << std::fixed << std::setprecision(6);
-   
+
    if (filePath.length() > 0)
    {
       oss << " fn:" << filePath;
    }
+   if (objectPath.length() > 0)
+   {
+      oss << " op:" << objectPath;
+   }
+   // Framing
+   oss << " frm:" << frame;
+   if (startFrame < endFrame)
+   {
+      oss << " sf:" << startFrame << " ef:" << endFrame;
+   }
+   if (cycle >= CT_hold && cycle < CT_MAX)
+   {
+      oss << " cyc:" << CycleTypeNames[cycle];
+   }
+   oss << " spd:" << speed;
+   oss << " off:" << offset;
+   oss << " fps:" << fps;
+   oss << " psf:" << (preserveStartFrame ? "1" : "0");
+   // Sampling
+   oss << " smp:" << samples;
+   oss << " esi:" << (expandSamplesIterations <= 0 ? 0 : expandSamplesIterations);
+   oss << " osm:" << (optimizeSamples ? "1" : "0");
+   // Reference
    if (outputReference)
    {
-      oss << " orf rfs:" << ReferenceSourceNames[referenceSource];
+      oss << " rfs:" << ReferenceSourceNames[referenceSource];
       if (referenceSource == RS_attributes || referenceSource == RS_attributes_then_file)
       {
          if (referencePositionName.length() > 0)
@@ -116,150 +139,82 @@ std::string Dso::CommonParameters::shapeKey() const
          }
       }
    }
-   if (objectPath.length() > 0)
+   // Attributes
+   if (removeAttributePrefices.size() > 0)
    {
-      oss << " op:" << objectPath;
+      oss << " rap:";
+      std::set<std::string>::const_iterator it = removeAttributePrefices.begin();
+      while (it != removeAttributePrefices.end())
+      {
+         oss << " " << *it;
+         ++it;
+      }
    }
-   oss << " frm:" << frame;
-   if (startFrame < endFrame)
+   if (forceConstantAttributes.size() > 0)
    {
-      oss << " sf:" << startFrame << " ef:" << endFrame;
+      oss << " fca:";
+      std::set<std::string>::const_iterator it = forceConstantAttributes.begin();
+      while (it != forceConstantAttributes.end())
+      {
+         oss << " " << *it;
+         ++it;
+      }
    }
-   oss << " smp:" << samples;
-   if (cycle >= CT_hold && cycle < CT_MAX)
+   if (ignoreAttributes.size() > 0)
    {
-      oss << " cyc:" << CycleTypeNames[cycle];
+      oss << " ia:";
+      std::set<std::string>::const_iterator it = ignoreAttributes.begin();
+      while (it != ignoreAttributes.end())
+      {
+         oss << " " << *it;
+         ++it;
+      }
    }
-   oss << " spd:" << speed;
-   oss << " off:" << offset;
-   oss << " fps:" << fps;
-   if (preserveStartFrame)
+   if (attributesEvaluationTime >= AET_render && attributesEvaluationTime < AET_MAX)
    {
-      oss << " psf";
+      oss << " aet:" << AttributesEvaluationTimeNames[attributesEvaluationTime];
    }
-   if (ignoreDeformBlur)
-   {
-      oss << " idb";
-   }
-   else
+   // Others
+   oss << " idb:" << (ignoreDeformBlur ? "1" : "0");
+   oss << " inu:" << (ignoreNurbs ? "1" : "0");
+   if (!ignoreDeformBlur)
    {
       oss << " vls:" << velocityScale;
-      if (velocityName.length() > 0)
-      {
-         oss << " vln:" << velocityName;
-      }
-      if (accelerationName.length() > 0)
-      {
-         oss << " acn:" << accelerationName;
-      }
+      oss << " vln:" << velocityName;
+      oss << " acn:" << accelerationName;
+      oss << " fvb:" << (forceVelocityBlur ? "1" : "0");
    }
-   if (expandSamplesIterations > 0)
-   {
-      oss << " esi:" << expandSamplesIterations;
-   }
-   else
-   {
-      oss << " esi:0";
-   }
-   if (optimizeSamples)
-   {
-      oss << " osm";
-   }
-   if (ignoreNurbs)
-   {
-      oss << " inu";
-   }
-   if (forceVelocityBlur)
-   {
-      oss << " fvb";
-   }
-   
-   return oss.str();
-}
+   // NOTE: namePrefix doesn't change the content in terms of generated shape data
 
-void Dso::MultiParameters::reset()
-{
-   overrideAttribs.clear();
-   
-   boundsPadding = 0.0f;
-   
-   computeVelocityExpandedBounds = false;
-   
-   useOverrideBounds = false;
-   overrideBoundsMinName = "overrideBoundsMin";
-   overrideBoundsMaxName = "overrideBoundsMax";
-   
-   padBoundsWithPeakRadius = false;
-   peakRadiusName = "peakRadius";
-   
-   padBoundsWithPeakWidth = false;
-   peakWidthName = "peakWidth";
+   return oss.str();
 }
 
 void Dso::SingleParameters::reset()
 {
-   readObjectAttribs = false;
-   readPrimitiveAttribs = false;
-   readPointAttribs = false;
-   readVertexAttribs = false;
-   attribsFrame = AF_render;
-   attribPreficesToRemove.clear();
-   
-   computeTangents.clear();
-   
+   computeTangentsForUVs.clear();
+
    radiusName = "";
    radiusMin = 0.0f;
    radiusMax = 1000000.0f;
    radiusScale = 1.0f;
-   
+
    widthMin = 0.0f;
    widthMax = 1000000.0f;
    widthScale = 1.0f;
-   
    nurbsSampleRate = 5;
 }
 
 std::string Dso::SingleParameters::shapeKey() const
 {
    std::ostringstream oss;
-   
+
    oss << std::fixed << std::setprecision(6);
-   
-   if (readObjectAttribs)
+
+   if (computeTangentsForUVs.size() > 0)
    {
-      oss << " obja";
-   }
-   if (readPrimitiveAttribs)
-   {
-      oss << " prma";
-   }
-   if (readPointAttribs)
-   {
-      oss << " pnta";
-   }
-   if (readVertexAttribs)
-   {
-      oss << " vtxa";
-   }
-   if (attribsFrame >= AF_render && attribsFrame < AF_MAX)
-   {
-      oss << " atf:" << AttributeFrameNames[attribsFrame];
-   }
-   if (attribPreficesToRemove.size() > 0)
-   {
-      oss << " rap";
-      std::set<std::string>::const_iterator it = attribPreficesToRemove.begin();
-      while (it != attribPreficesToRemove.end())
-      {
-         oss << " " << *it;
-         ++it;
-      }
-   }
-   if (computeTangents.size() > 0)
-   {
-      oss << " ctg:";
-      std::set<std::string>::const_iterator it = computeTangents.begin();
-      while (it != computeTangents.end())
+      oss << " ctu:";
+      std::set<std::string>::const_iterator it = computeTangentsForUVs.begin();
+      while (it != computeTangentsForUVs.end())
       {
          oss << " " << *it;
          ++it;
@@ -272,11 +227,11 @@ std::string Dso::SingleParameters::shapeKey() const
    oss << " rdmi:" << radiusMin;
    oss << " rdma:" << radiusMax;
    oss << " rds:" << radiusScale;
-   oss << " nsr:" << nurbsSampleRate;
    oss << " wdmi:" << widthMin;
    oss << " wdma:" << widthMax;
    oss << " wds:" << widthScale;
-   
+   oss << " nsr:" << nurbsSampleRate;
+
    return oss.str();
 }
 
@@ -304,7 +259,6 @@ Dso::Dso(AtNode *node)
 {
    mCommonParams.reset();
    mSingleParams.reset();
-   mMultiParams.reset();
    
    readParams();
    
@@ -722,21 +676,21 @@ void Dso::setGeneratedNode(size_t idx, AtNode *node)
    }
 }
 
-double Dso::attribsTime(AttributeFrame af) const
+double Dso::attributesTime(AttributesEvaluationTime aet) const
 {
    double shutterOpenFrame = AiCameraGetShutterStart();
    double shutterCloseFrame = AiCameraGetShutterEnd();
    double shutterCenterFrame = 0.5 * (shutterOpenFrame + shutterCloseFrame);
    
-   switch (af)
+   switch (aet)
    {
-   case AF_shutter:
+   case AET_shutter:
       return computeTime(mGlobalFrame + shutterCenterFrame);
-   case AF_shutter_open:
+   case AET_shutter_open:
       return computeTime(mGlobalFrame + shutterOpenFrame);
-   case AF_shutter_close:
+   case AET_shutter_close:
       return computeTime(mGlobalFrame + shutterCloseFrame);
-   case AF_render:
+   case AET_render:
    default:
       return mRenderTime;
    }
@@ -876,9 +830,9 @@ bool Dso::cleanAttribName(std::string &name) const
    size_t len = name.length();
    size_t llen = 0;
    
-   std::set<std::string>::const_iterator it = mSingleParams.attribPreficesToRemove.begin();
+   std::set<std::string>::const_iterator it = mCommonParams.removeAttributePrefices.begin();
    
-   while (it != mSingleParams.attribPreficesToRemove.end())
+   while (it != mCommonParams.removeAttributePrefices.end())
    {
       size_t plen = it->length();
       
@@ -1027,38 +981,34 @@ void Dso::setSingleParams(AtNode *node, const std::string &objectPath) const
    AiNodeSetFlt(node, Strings::velocity_scale, mCommonParams.velocityScale);
    AiNodeSetBool(node, Strings::force_velocity_blur, mCommonParams.forceVelocityBlur);
    //  Others
-   count = mCommonParams.promoteToObjectAttribs.size();
+   count = mCommonParams.forceConstantAttributes.size();
    array = AiArray(count, 1, AI_TYPE_STRING);
-   it = mCommonParams.promoteToObjectAttribs.begin();
+   it = mCommonParams.forceConstantAttributes.begin();
    for (size_t i=0; i<count; ++i, ++it)
    {
       AiArraySetStr(array, i, it->c_str());
    }
-   AiNodeSetArray(node, Strings::demote_to_object_attribute, array);
+   AiNodeSetArray(node, Strings::force_constant_attributes, array);
+   count = mCommonParams.removeAttributePrefices.size();
+   array = AiArray(count, 1, AI_TYPE_STRING);
+   it = mCommonParams.removeAttributePrefices.begin();
+   for (size_t i=0; i<count; ++i, ++it)
+   {
+      AiArraySetStr(array, i, it->c_str());
+   }
+   AiNodeSetArray(node, Strings::remove_attribute_prefices, array);
+   AiNodeSetInt(node, Strings::attributes_evaluation_time, (int)mCommonParams.attributesEvaluationTime);
    AiNodeSetBool(node, Strings::verbose, mCommonParams.verbose);
 
    // Single shape mode parameters
-   AiNodeSetBool(node, Strings::read_object_attributes, mSingleParams.readObjectAttribs);
-   AiNodeSetBool(node, Strings::read_primitive_attributes, mSingleParams.readPrimitiveAttribs);
-   AiNodeSetBool(node, Strings::read_point_attributes, mSingleParams.readPointAttribs);
-   AiNodeSetBool(node, Strings::read_vertex_attributes, mSingleParams.readVertexAttribs);
-   AiNodeSetInt(node, Strings::attributes_frame, (int)mSingleParams.attribsFrame);
-   count = mSingleParams.attribPreficesToRemove.size();
+   count = mSingleParams.computeTangentsForUVs.size();
    array = AiArray(count, 1, AI_TYPE_STRING);
-   it = mSingleParams.attribPreficesToRemove.begin();
+   it = mSingleParams.computeTangentsForUVs.begin();
    for (size_t i=0; i<count; ++i, ++it)
    {
       AiArraySetStr(array, i, it->c_str());
    }
-   AiNodeSetArray(node, Strings::attribute_prefices_to_remove, array);
-   count = mSingleParams.computeTangents.size();
-   array = AiArray(count, 1, AI_TYPE_STRING);
-   it = mSingleParams.computeTangents.begin();
-   for (size_t i=0; i<count; ++i, ++it)
-   {
-      AiArraySetStr(array, i, it->c_str());
-   }
-   AiNodeSetArray(node, Strings::compute_tangents, array);
+   AiNodeSetArray(node, Strings::compute_tangents_for_uvs, array);
    AiNodeSetStr(node, Strings::radius_name, mSingleParams.radiusName.c_str());
    AiNodeSetFlt(node, Strings::radius_min, mSingleParams.radiusMin);
    AiNodeSetFlt(node, Strings::radius_max, mSingleParams.radiusMax);
@@ -1131,60 +1081,46 @@ void Dso::readParams()
    mCommonParams.accelerationName = AiNodeGetStr(mProcNode, Strings::acceleration_name).c_str();
    mCommonParams.velocityScale = AiNodeGetFlt(mProcNode, Strings::velocity_scale);
    mCommonParams.forceVelocityBlur = AiNodeGetBool(mProcNode, Strings::force_velocity_blur);
-   //  Others
-   mCommonParams.promoteToObjectAttribs.clear();
-   array = AiNodeGetArray(mProcNode, Strings::demote_to_object_attribute);
+   // Attributes
+   mCommonParams.attributesEvaluationTime = (AttributesEvaluationTime) AiNodeGetInt(mProcNode, Strings::attributes_evaluation_time);
+   mCommonParams.removeAttributePrefices.clear();
+   array = AiNodeGetArray(mProcNode, Strings::remove_attribute_prefices);
    if (array)
    {
       for (unsigned int i=0; i<AiArrayGetNumElements(array); ++i)
       {
-         mCommonParams.promoteToObjectAttribs.insert(AiArrayGetStr(array, i).c_str());
+         mCommonParams.removeAttributePrefices.insert(AiArrayGetStr(array, i).c_str());
       }
    }
+   mCommonParams.ignoreAttributes.clear();
+   array = AiNodeGetArray(mProcNode, Strings::ignore_attributes);
+   if (array)
+   {
+      for (unsigned int i=0; i<AiArrayGetNumElements(array); ++i)
+      {
+         mCommonParams.ignoreAttributes.insert(AiArrayGetStr(array, i).c_str());
+      }
+   }
+   mCommonParams.forceConstantAttributes.clear();
+   array = AiNodeGetArray(mProcNode, Strings::force_constant_attributes);
+   if (array)
+   {
+      for (unsigned int i=0; i<AiArrayGetNumElements(array); ++i)
+      {
+         mCommonParams.forceConstantAttributes.insert(AiArrayGetStr(array, i).c_str());
+      }
+   }
+   //  Others
    mCommonParams.verbose = AiNodeGetBool(mProcNode, Strings::verbose);
 
-   // Multi mode specific parameters
-   mMultiParams.boundsPadding = AiNodeGetFlt(mProcNode, Strings::bounds_padding);
-   mMultiParams.computeVelocityExpandedBounds = AiNodeGetBool(mProcNode, Strings::compute_velocity_expanded_bounds);
-   mMultiParams.useOverrideBounds = AiNodeGetBool(mProcNode, Strings::use_override_bounds);
-   mMultiParams.overrideBoundsMinName = AiNodeGetStr(mProcNode, Strings::override_bounds_min_name).c_str();
-   mMultiParams.overrideBoundsMaxName = AiNodeGetStr(mProcNode, Strings::override_bounds_max_name).c_str();
-   mMultiParams.padBoundsWithPeakRadius = AiNodeGetBool(mProcNode, Strings::pad_bounds_with_peak_width);
-   mMultiParams.peakRadiusName = AiNodeGetStr(mProcNode, Strings::peak_radius_name).c_str();
-   mMultiParams.padBoundsWithPeakWidth = AiNodeGetBool(mProcNode, Strings::pad_bounds_with_peak_width);
-   mMultiParams.peakWidthName = AiNodeGetStr(mProcNode, Strings::peak_width_name).c_str();
-   mMultiParams.overrideAttribs.clear();
-   array = AiNodeGetArray(mProcNode, Strings::override_attributes);
-   if (array)
-   {
-      for (unsigned int i=0; i<AiArrayGetNumElements(array); ++i)
-      {
-         mMultiParams.overrideAttribs.insert(AiArrayGetStr(array, i).c_str());
-      }
-   }
-
    // Single shape mode parameters
-   mSingleParams.readObjectAttribs = AiNodeGetBool(mProcNode, Strings::read_object_attributes);
-   mSingleParams.readPrimitiveAttribs = AiNodeGetBool(mProcNode, Strings::read_primitive_attributes);
-   mSingleParams.readPointAttribs = AiNodeGetBool(mProcNode, Strings::read_point_attributes);
-   mSingleParams.readVertexAttribs = AiNodeGetBool(mProcNode, Strings::read_vertex_attributes);
-   mSingleParams.attribsFrame = (AttributeFrame) AiNodeGetInt(mProcNode, Strings::attributes_frame);
-   mSingleParams.attribPreficesToRemove.clear();
-   array = AiNodeGetArray(mProcNode, Strings::attribute_prefices_to_remove);
+   mSingleParams.computeTangentsForUVs.clear();
+   array = AiNodeGetArray(mProcNode, Strings::compute_tangents_for_uvs);
    if (array)
    {
       for (unsigned int i=0; i<AiArrayGetNumElements(array); ++i)
       {
-         mSingleParams.attribPreficesToRemove.insert(AiArrayGetStr(array, i).c_str());
-      }
-   }
-   mSingleParams.computeTangents.clear();
-   array = AiNodeGetArray(mProcNode, Strings::compute_tangents);
-   if (array)
-   {
-      for (unsigned int i=0; i<AiArrayGetNumElements(array); ++i)
-      {
-         mSingleParams.computeTangents.insert(AiArrayGetStr(array, i).c_str());
+         mSingleParams.computeTangentsForUVs.insert(AiArrayGetStr(array, i).c_str());
       }
    }
    mSingleParams.radiusName = AiNodeGetStr(mProcNode, Strings::radius_name).c_str();
@@ -1269,6 +1205,8 @@ void Dso::transferUserParams(AtNode *dst)
       bool doCopy = true;
 
       const char *pname = AiUserParamGetName(upe);
+      // Shouldn't 'cleanAttrName' be called here?
+      // => No, those are only for attributes contained in alembic the alembic file
       int ptype = AiUserParamGetType(upe);
       int pcat = AiUserParamGetCategory(upe);
 
@@ -1282,7 +1220,7 @@ void Dso::transferUserParams(AtNode *dst)
       }
       else
       {
-         if (!overrideAttrib(pname))
+         if (ignoreAttribute(pname))
          {
             if (verbose())
             {
@@ -1330,6 +1268,8 @@ void Dso::transferUserParams(AtNode *dst)
          {
             AiMsgInfo("[abcproc]     Add non constant attribute name \"%s\"", pname);
          }
+         // Unless it is forced constant?
+         // => No, only for geoparams read from the alembic file
          ncattrs.insert(pname);
       }
 

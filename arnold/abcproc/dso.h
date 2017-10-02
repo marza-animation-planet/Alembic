@@ -15,13 +15,13 @@ enum CycleType
    CT_MAX
 };
 
-enum AttributeFrame
+enum AttributesEvaluationTime
 {
-   AF_render = 0,
-   AF_shutter,
-   AF_shutter_open,
-   AF_shutter_close,
-   AF_MAX
+   AET_render = 0,
+   AET_shutter,
+   AET_shutter_open,
+   AET_shutter_close,
+   AET_MAX
 };
 
 enum ReferenceSource
@@ -42,7 +42,7 @@ enum ProceduralMode
 };
 
 extern const char* CycleTypeNames[];
-extern const char* AttributeFrameNames[];
+extern const char* AttributesEvaluationTimeNames[];
 extern const char* ReferenceSourceNames[];
 
 
@@ -167,7 +167,7 @@ public:
       return mRenderTime;
    }
    
-   double attribsTime(AttributeFrame af) const;
+   double attributesTime(AttributesEvaluationTime aet) const;
    
    inline double fps() const
    {
@@ -212,93 +212,43 @@ public:
    double computeTime(double frame, bool *exclude=0) const;
    
    // Attributes
-   
-   inline AttributeFrame attribsFrame() const
+
+   inline AttributesEvaluationTime attributesEvaluationTime() const
    {
-      return mSingleParams.attribsFrame;
+      return mCommonParams.attributesEvaluationTime;
    }
-   
-   inline bool isPromotedToObjectAttrib(const std::string &name) const
+
+   inline bool forceConstantAttribute(const std::string &name) const
    {
-      return (mCommonParams.promoteToObjectAttribs.find(name) != mCommonParams.promoteToObjectAttribs.end());
+      return (mCommonParams.forceConstantAttributes.find(name) != mCommonParams.forceConstantAttributes.end());
    }
-   
-   inline bool readObjectAttribs() const
+
+   inline bool ignoreAttribute(const std::string &name) const
    {
-      return mSingleParams.readObjectAttribs;
+      return (mCommonParams.ignoreAttributes.find(name) != mCommonParams.ignoreAttributes.end());
    }
-   
-   inline bool readPrimitiveAttribs() const
-   {
-      return mSingleParams.readPrimitiveAttribs;
-   }
-   
-   inline bool readPointAttribs() const
-   {
-      return mSingleParams.readPointAttribs;
-   }
-   
-   inline bool readVertexAttribs() const
-   {
-      return mSingleParams.readVertexAttribs;
-   }
-   
-   inline const std::set<std::string>& overrideAttribs() const
-   {
-      return mMultiParams.overrideAttribs;
-   }
-   
-   inline bool overrideAttrib(const std::string &name) const
-   {
-      return (mMode == PM_single || mMultiParams.overrideAttribs.find(name) != mMultiParams.overrideAttribs.end());
-   }
-   
+
    bool cleanAttribName(std::string &name) const;
-   
-   inline float boundsPadding() const
-   {
-      return mMultiParams.boundsPadding;
-   }
-   
-   inline bool computeVelocityExpandedBounds() const
-   {
-      return (!mMultiParams.useOverrideBounds && mMultiParams.computeVelocityExpandedBounds);
-   }
-   
-   inline bool useOverrideBounds() const
-   {
-      return mMultiParams.useOverrideBounds;
-   }
-   
-   inline const std::string& overrideBoundsMinName() const
-   {
-      return mMultiParams.overrideBoundsMinName;
-   }
-   
-   inline const std::string& overrideBoundsMaxName() const
-   {
-      return mMultiParams.overrideBoundsMaxName;
-   }
-   
+
    // Shapes
-   
+
    inline size_t numShapes() const
    {
       return mNumShapes;
    }
-   
+
    std::string uniqueName(const std::string &name) const;
-   
+
    // Mesh
-   
+
    inline bool reverseWinding() const
    {
       return mReverseWinding;
    }
-   
-   inline bool computeTangents(const std::string &uvname) const
+
+   inline bool computeTangentsForUVs(const std::string &uvname) const
    {
-      return (mSingleParams.computeTangents.find(uvname) != mSingleParams.computeTangents.end());
+      return (mSingleParams.computeTangentsForUVs.find(uvname) != mSingleParams.computeTangentsForUVs.end());
    }
    
    // Points
@@ -307,69 +257,49 @@ public:
    {
       return (mSingleParams.radiusName.length() > 0 ? mSingleParams.radiusName.c_str() : 0);
    }
-   
+
    inline double radiusMin() const
    {
       return mSingleParams.radiusMin;
    }
-   
+
    inline double radiusMax() const
    {
       return mSingleParams.radiusMax;
    }
-   
+
    inline double radiusScale() const
    {
       return mSingleParams.radiusScale;
    }
-   
-   inline bool padBoundsWithPeakRadius() const
-   {
-      return mMultiParams.padBoundsWithPeakRadius;
-   }
-   
-   inline const std::string& peakRadiusName() const
-   {
-      return mMultiParams.peakRadiusName;
-   }
-   
+
    // Curves
-   
+
    inline bool ignoreNurbs() const
    {
       return mCommonParams.ignoreNurbs;
    }
-   
+
    inline int nurbsSampleRate() const
    {
       return mSingleParams.nurbsSampleRate;
    }
-   
+
    inline double widthMin() const
    {
       return mSingleParams.widthMin;
    }
-   
+
    inline double widthMax() const
    {
       return mSingleParams.widthMax;
    }
-   
+
    inline double widthScale() const
    {
       return mSingleParams.widthScale;
    }
-   
-   inline bool padBoundsWithPeakWidth() const
-   {
-      return mMultiParams.padBoundsWithPeakWidth;
-   }
-   
-   inline const std::string& peakWidthName() const
-   {
-      return mMultiParams.peakWidthName;
-   }
-   
+
    // Volume
    
    inline bool isVolume() const
@@ -456,27 +386,29 @@ private:
       std::string referenceFilePath;
       std::string namePrefix;
       std::string objectPath;
-      
+
       double frame;
       double startFrame;
       double endFrame;
-      int samples;
-      int expandSamplesIterations;
-      bool optimizeSamples;
       CycleType cycle;
       double speed;
       bool preserveStartFrame;
       double offset;
       double fps;
-      
+
+      int samples;
+      int expandSamplesIterations;
+      bool optimizeSamples;
+
       bool ignoreDeformBlur;
       bool ignoreTransformBlur;
       bool ignoreVisibility;
       bool ignoreTransforms;
       bool ignoreInstances;
-      
+      bool ignoreNurbs;
+
       bool verbose;
-      
+
       bool outputReference;
       // When a reference file is not provided, we must generate reference from
       //   current file by either:
@@ -490,66 +422,34 @@ private:
       float velocityScale;
       std::string velocityName;
       std::string accelerationName;
-      
-      std::set<std::string> promoteToObjectAttribs;
-      
-      bool ignoreNurbs;
-      
       bool forceVelocityBlur;
-      
-      // peakRadius attribute name (points)
-      // peakWidth attribute name (curves)
-      
+
+      std::set<std::string> removeAttributePrefices;
+      std::set<std::string> forceConstantAttributes;
+      std::set<std::string> ignoreAttributes;
+      AttributesEvaluationTime attributesEvaluationTime;
+
       void reset();
       std::string shapeKey() const;
    };
    
-   struct MultiParameters
-   {
-      std::set<std::string> overrideAttribs;
-      
-      float boundsPadding;
-      
-      bool computeVelocityExpandedBounds;
-      
-      bool useOverrideBounds;
-      std::string overrideBoundsMinName;
-      std::string overrideBoundsMaxName;
-      
-      bool padBoundsWithPeakRadius;
-      std::string peakRadiusName;
-      
-      bool padBoundsWithPeakWidth;
-      std::string peakWidthName;
-      
-      void reset();
-   };
-   
    struct SingleParameters
    {
-      // attributes
-      bool readObjectAttribs;
-      bool readPrimitiveAttribs;
-      bool readPointAttribs;
-      bool readVertexAttribs;
-      AttributeFrame attribsFrame;
-      std::set<std::string> attribPreficesToRemove;
-      
       // mesh
-      std::set<std::string> computeTangents;
-      
+      std::set<std::string> computeTangentsForUVs;
+
       // particles
       std::string radiusName;
       float radiusMin;
       float radiusMax;
       float radiusScale;
-      
+
       // curves
-      int nurbsSampleRate;
       float widthMin;
       float widthMax;
       float widthScale;
-      
+      int nurbsSampleRate;
+
       void reset();
       std::string shapeKey() const;
    };
@@ -561,7 +461,6 @@ private:
    ProceduralMode mMode;
    
    CommonParameters mCommonParams;
-   MultiParameters mMultiParams;
    SingleParameters mSingleParams;
    
    AlembicScene *mScene;

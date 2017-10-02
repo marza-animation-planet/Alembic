@@ -12,15 +12,12 @@ AI_PROCEDURAL_NODE_EXPORT_METHODS(AbcProcMtd);
 node_parameters
 {
    // Common parameters
-   AiParameterStr(Strings::filename, "");
-   AiParameterStr(Strings::objectpath, "");
-   AiParameterStr(Strings::nameprefix, "");
+   AiParameterStr(Strings::filename, Strings::_empty);
+   AiParameterStr(Strings::objectpath, Strings::_empty);
+   AiParameterStr(Strings::nameprefix, Strings::_empty);
 
-   AiParameterFlt(Strings::frame, 0.0f);
    // use node's own 'motion_start' and 'motion_end' parameters
-   AiParameterInt(Strings::samples, 1);
-   AiParameterInt(Strings::expand_samples_iterations, 0);
-   AiParameterBool(Strings::optimize_samples, false);
+   AiParameterFlt(Strings::frame, 0.0f);
    AiParameterFlt(Strings::fps, 0.0f);
    AiParameterEnum(Strings::cycle, CT_hold, CycleTypeNames);
    AiParameterFlt(Strings::start_frame, std::numeric_limits<float>::max());
@@ -29,7 +26,10 @@ node_parameters
    AiParameterFlt(Strings::offset, 0.0f);
    AiParameterBool(Strings::preserve_start_frame, false);
 
-   //AiParameterBool(Strings::ignore_motion_blur, false);
+   AiParameterInt(Strings::samples, 1);
+   AiParameterInt(Strings::expand_samples_iterations, 0);
+   AiParameterBool(Strings::optimize_samples, false);
+
    AiParameterBool(Strings::ignore_deform_blur, false);
    AiParameterBool(Strings::ignore_transform_blur, false);
    AiParameterBool(Strings::ignore_visibility, false);
@@ -49,35 +49,25 @@ node_parameters
    AiParameterStr(Strings::reference_filename, Strings::_empty);
    AiParameterFlt(Strings::reference_frame, -std::numeric_limits<float>::max());
 
-   AiParameterArray(Strings::demote_to_object_attribute, AiArray(0, 1, AI_TYPE_STRING));
+   AiParameterEnum(Strings::attributes_evaluation_time, AET_render, AttributesEvaluationTimeNames);
+   // Only applies to attributes read from the .abc files, not attributes already existing on arnold node
+   AiParameterArray(Strings::remove_attribute_prefices, AiArray(0, 1, AI_TYPE_STRING));
+   // Names in 'ignore_attributes' and 'force_constant_attributes' are without any prefix to remove
+   AiParameterArray(Strings::ignore_attributes, AiArray(0, 1, AI_TYPE_STRING));
+   // This only applies to GeoParams contained in alembic file
+   AiParameterArray(Strings::force_constant_attributes, AiArray(0, 1, AI_TYPE_STRING));
 
-   // Multi shapes parameters
-   AiParameterFlt(Strings::bounds_padding, 0.0f);
-   AiParameterBool(Strings::compute_velocity_expanded_bounds, false);
-   AiParameterBool(Strings::use_override_bounds, false);
-   AiParameterStr(Strings::override_bounds_min_name, "overrideBoundsMin");
-   AiParameterStr(Strings::override_bounds_max_name, "overrideBoundsMax");
-   AiParameterBool(Strings::pad_bounds_with_peak_radius, false);
-   AiParameterStr(Strings::peak_radius_name, "peakRadius");
-   AiParameterBool(Strings::pad_bounds_with_peak_width, false);
-   AiParameterStr(Strings::peak_width_name, "peakWidth");
-   AiParameterArray(Strings::override_attributes, AiArray(0, 1, AI_TYPE_STRING));
+   AiParameterArray(Strings::compute_tangents_for_uvs, AiArray(0, 1, AI_TYPE_STRING));
 
-   // Single shape parameters
-   AiParameterBool(Strings::read_object_attributes, false);
-   AiParameterBool(Strings::read_primitive_attributes, false);
-   AiParameterBool(Strings::read_point_attributes, false);
-   AiParameterBool(Strings::read_vertex_attributes, false);
-   AiParameterEnum(Strings::attributes_frame, AF_render, AttributeFrameNames);
-   AiParameterArray(Strings::attribute_prefices_to_remove, AiArray(0, 1, AI_TYPE_STRING));
-   AiParameterArray(Strings::compute_tangents, AiArray(0, 1, AI_TYPE_STRING));
    AiParameterStr(Strings::radius_name, Strings::_empty);
    AiParameterFlt(Strings::radius_min, 0.0f);
    AiParameterFlt(Strings::radius_max, 1000000.0f);
    AiParameterFlt(Strings::radius_scale, 1.0f);
+
    AiParameterFlt(Strings::width_min, 0.0f);
    AiParameterFlt(Strings::width_max, 1000000.0f);
    AiParameterFlt(Strings::width_scale, 1.0f);
+
    AiParameterInt(Strings::nurbs_sample_rate, 5);
 
    // Others
