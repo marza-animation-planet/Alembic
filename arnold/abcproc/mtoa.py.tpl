@@ -6,8 +6,7 @@ from maya import cmds
 import scriptedTranslatorUtils as stu
 
 Cycles = ["hold", "loop", "reverse", "bounce"]
-AttribFrames = ["render", "shutter", "shutter_open", "shutter_close"]
-Paddings = {}
+AttributesEvaluationTime = ["render", "shutter", "shutter_open", "shutter_close"]
 
 def IsShape():
    return True
@@ -19,284 +18,281 @@ def SupportVolumes():
    return False
 
 def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
-   
    global Cycles
-   global AttribFrames
-   global Paddings
-   
+   global AttributesEvaluationTime
+
    isInstance = (masterNodeNames is not None)
-   
+
    nodeName, arnoldNodeName = nodeNames
    masterNodeName, arnoldMasterNodeName = masterNodeNames if isInstance else ("", "")
-   
+
    deformationBlur = stu.GetDeformationBlur(nodeName)
    transformationBlur = stu.GetTransformationBlur(nodeName)
-   
+
    # EvaluateFrames returns adequatly modified render and sample frames
    renderFrame, sampleFrame = stu.EvaluateFrames(nodeName, "time", renderFrame)
-   
+
    # Support for volumes (box or ginstance nodes)
    # => just leave everything up to sciptedTranslator extension
    node = arnold.AiNodeLookUpByName(arnoldNodeName)
    if not node:
       return []
-   
+
+   setAttrs = []
+
    if arnold.AiNodeIs(node, "box"):
       return []
 
    elif arnold.AiNodeIs(node, "ginstance"):
       return []
    
-   elif not arnold.AiNodeIs(node, "procedural"):
+   elif not arnold.AiNodeIs(node, "abcproc"):
       return []
    
    if step == 0:
-      arnold.AiNodeSetStr(node, "dso", "abcproc")
-      
       fname = cmds.getAttr(nodeName+".filePath")
       if fname is None:
          fname = ""
-      data = "-filename %s" % fname
-      
+      arnold.AiNodeSetStr(node, "filename", fname)
+      setAttrs.append("filename")
+
       opath = cmds.getAttr(nodeName+".objectExpression")
       if opath:
-         data += " -objectpath %s" % opath
-      
-      data += " -fps %f -frame %f" % (stu.GetFPS(), renderFrame)
-      
+         arnold.AiNodeSetStr(node, "objectpath", opath)
+         setAttrs.append("objectpath")
+
+      arnold.AiNodeSetFlt(node, "fps", stu.GetFPS())
+      setAttrs.append("fps")
+
+      arnold.AiNodeSetFlt(node, "frame", renderFrame)
+      setAttrs.append("frame")
+
       val = stu.GetOverrideAttr(nodeName, "speed", None)
       if val is not None:
-         data += " -speed %f" % val
-      
+         arnold.AiNodeSetFlt(node, "speed", val)
+         setAttrs.append("speed")
+
       val = stu.GetOverrideAttr(nodeName, "offset", None)
       if val is not None:
-         data += " -offset %f" % val
-      
+         arnold.AiNodeSetFlt(node, "offset", val)
+         setAttrs.append("offset")
+
       val = stu.GetOverrideAttr(nodeName, "preserveStartFrame", None)
-      if val:
-         data += " -preservestartframe"
-      
+      if val is not None:
+         arnold.AiNodeSetBool(node, "preserve_start_frame", val)
+         setAttrs.append("preserve_start_frame")
+
       val = stu.GetOverrideAttr(nodeName, "startFrame", None)
       if val is not None:
-         data += " -startframe %f" % val
-      
+         arnold.AiNodeSetFlt(node, "start_frame", val)
+         setAttrs.append("start_frame")
+
       val = stu.GetOverrideAttr(nodeName, "endFrame", None)
       if val is not None:
-         data += " -endframe %f" % val
-      
+         arnold.AiNodeSetFlt(node, "end_frame", val)
+         setAttrs.append("end_frame")
+
       val = cmds.getAttr(nodeName+".cycleType")
       if val and val >= 0 and val < len(Cycles):
-         data += " -cycle %s" % Cycles[val]
-      
-      if not deformationBlur:
-         data += " -ignoredeformblur"
-      
-      if not transformationBlur:
-         data += " -ignoretransformblur"
-      
+         arnold.AiNodeSetInt(node, "cycle", val)
+         setAttrs.append("cycle")
+
+      arnold.AiNodeSetBool(node, "ignore_deform_blur", (True if not deformationBlur else False))
+      setAttrs.append("ignore_deform_blur")
+
+      arnold.AiNodeSetBool(node, "ignore_transform_blur", (True if not transformationBlur else False))
+      setAttrs.append("ignore_transform_blur")
+
       ignoreTransforms = cmds.getAttr(nodeName+".ignoreXforms")
-      if ignoreTransforms:
-         data += " -ignoretransforms"
-      
+      arnold.AiNodeSetBool(node, "ignore_transforms", (True if ignoreTransforms else False))
+      setAttrs.append("ignore_transforms")
+
       ignoreInstances = cmds.getAttr(nodeName+".ignoreInstances")
-      if ignoreInstances:
-         data += " -ignoreinstances"
-      
+      arnold.AiNodeSetBool(node, "ignore_instances", (True if ignoreInstances else False))
+      setAttrs.append("ignore_instances")
+
       ignoreVisibility = cmds.getAttr(nodeName+".ignoreVisibility")
-      if ignoreVisibility:
-         data += " -ignorevisibility"
-      
-      val = cmds.getAttr(nodeName+".mtoa_abc_outputReference")
-      if val:
-         data += " -outputReference"
-      
-      val = cmds.getAttr(nodeName+".mtoa_abc_referenceFilename")
-      if val:
-         data += " -referencefilename %s" % val
-      
-      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_computeTangents", None)
-      if val:
-         data += " -computetangents %s" % val
-      
-      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_radiusScale", None)
+      arnold.AiNodeSetBool(node, "ignore_visibility", (True if ignoreVisibility else False))
+      setAttrs.append("ignore_visibility")
+
+      val = stu.GetOverrideAttr(nodeName, "aiOutputReference", None)
       if val is not None:
-         data += " -radiusscale %f" % val
-      
-      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_radiusMin", None)
+         arnold.AiNodeSetBool(node, "output_reference", (True if val else False))
+         setAttrs.append("output_reference")
+
+      val = stu.GetOverrideAttr(nodeName, "aiReferenceSource", None)
       if val is not None:
-         data += " -radiusmin %f" % val
-      
-      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_radiusMax", None)
+         arnold.AiNodeSetInt(node, "reference_source", val)
+         setAttrs.append("reference_source")
+
+      val = stu.GetOverrideAttr(nodeName, "aiReferencePositionName", None)
       if val is not None:
-         data += " -radiusmax %f" % val
-      
-      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_nurbsSampleRate", None)
+         arnold.AiNodeSetStr(node, "reference_position_name", val)
+         setAttrs.append("reference_position_name")
+
+      val = stu.GetOverrideAttr(nodeName, "aiReferenceNormalName", None)
       if val is not None:
-         data += " -nurbssamplerate %d" % val
-      
-      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_overrideAttribs", None)
-      if val:
-         data += " -overrideattribs %s" % val
-      
-      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_removeAttribPrefices", None)
-      if val:
-         data += " -removeattribprefices %s" % val
-      
-      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_objectAttribs", None)
-      if val:
-         data += " -objectattribs"
-   
-      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_primitiveAttribs", None)
-      if val:
-         data += " -primitiveattribs"
-   
-      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_pointAttribs", None)
-      if val:
-         data += " -pointattribs"
-   
-      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_vertexAttribs", None)
-      if val:
-         data += " -vertexattribs"
-      
-      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_attribsFrame", None)
-      if val and val >= 0 and val < len(AttribFrames):
-         data += " -attribsframe %s" % AttribFrames[val]
-      
-      val = stu.GetOverrideAttr(nodeName, "mtoa_abc_samplesExpandIterations", None)
+         arnold.AiNodeSetStr(node, "reference_normal_name", val)
+         setAttrs.append("reference_normal_name")
+
+      val = stu.GetOverrideAttr(nodeName, "aiReferenceFilename", None)
       if val is not None:
-         data += " -samplesexpanditerations %d" % val
-         val = stu.GetOverrideAttr(nodeName, "mtoa_abc_optimizeSamples", None)
-         if val:
-            data += " -optimizesamples"
-      
-      if deformationBlur or transformationBlur:
-         relativeSamples = stu.GetOverrideAttr(nodeName, "mtoa_abc_relativeSamples", None)
-         if relativeSamples is None:
-            relativeSamples = False
+         arnold.AiNodeSetStr(node, "reference_filename", val)
+         setAttrs.append("reference_filename")
+
+      val = stu.GetOverrideAttr(nodeName, "aiReferenceFrame", None)
+      if val is not None:
+         arnold.AiNodeSetFlt(node, "reference_frame", val)
+         setAttrs.append("reference_frame")
+
+      val = stu.GetOverrideAttr(nodeName, "aiComputeTangentsForUVs", None)
+      if val is not None:
+         # TODO
+         pass
+
+      val = stu.GetOverrideAttr(nodeName, "aiRadiusName", None)
+      if val is not None:
+         arnold.AiNodeSetStr(node, "radius_name", val)
+         setAttrs.append("radius_name")
+
+      val = stu.GetOverrideAttr(nodeName, "aiRadiusScale", None)
+      if val is not None:
+         arnold.AiNodeSetFlt(node, "radius_scale", val)
+         setAttrs.append("radius_scale")
+
+      val = stu.GetOverrideAttr(nodeName, "aiRadiusMin", None)
+      if val is not None:
+         arnold.AiNodeSetFlt(node, "radius_min", val)
+         setAttrs.append("radius_min")
+
+      val = stu.GetOverrideAttr(nodeName, "aiRadiusMax", None)
+      if val is not None:
+         arnold.AiNodeSetFlt(node, "radius_max", val)
+         setAttrs.append("radius_max")
+
+      val = stu.GetOverrideAttr(nodeName, "aiIgnoreNurbs", None)
+      if val is not None:
+         arnold.AiNodeSetBool(node, "ignore_nurbs", val)
+         setAttrs.append("ignore_nurbs")
+
+      val = stu.GetOverrideAttr(nodeName, "aiNurbsSampleRate", None)
+      if val is not None:
+         arnold.AiNodeSetInt(node, "nurbs_sample_rate", val)
+         setAttrs.append("nurbs_sample_rate")
+
+      val = stu.GetOverrideAttr(nodeName, "aiWidthScale", None)
+      if val is not None:
+         arnold.AiNodeSetFlt(node, "width_scale", val)
+         setAttrs.append("width_scale")
+
+      val = stu.GetOverrideAttr(nodeName, "aiWidthMin", None)
+      if val is not None:
+         arnold.AiNodeSetFlt(node, "width_min", val)
+         setAttrs.append("width_min")
+
+      val = stu.GetOverrideAttr(nodeName, "aiWidthMax", None)
+      if val is not None:
+         arnold.AiNodeSetFlt(node, "width_max", val)
+         setAttrs.append("width_max")
+
+      val = stu.GetOverrideAttr(nodeName, "aiRemoveAttributePrefices", None)
+      if val is not None:
+         # TODO
+         pass
+
+      val = stu.GetOverrideAttr(nodeName, "aiForceConstantAttributes", None)
+      if val is not None:
+         # TODO
+         pass
+
+      val = stu.GetOverrideAttr(nodeName, "aiIgnoreAttributes", None)
+      if val is not None:
+         # TODO
+         pass
+
+      val = stu.GetOverrideAttr(nodeName, "aiAttributesEvaluationTime", None)
+      if val and val >= 0 and val < len(AttributesEvaluationTime):
+         arnold.AiNodeSetInt(node, "attributes_evaluation_time", val)
+         setAttrs.append("attributes_evaluation_time")
+
+      val = stu.GetOverrideAttr(nodeName, "aiExpandSamplesIterations", None)
+      if val is not None:
+         arnold.AiNodeSetInt(node, "expand_samples_iterations", val)
+         setAttrs.append("expand_samples_iterations")
          
-         if relativeSamples:
-            data += " -relativesamples"
-         
-         data += " -samples %f" % (sampleFrame if not relativeSamples else (sampleFrame - renderFrame))
-      
-      arnold.AiNodeSetStr(node, "data", data)
-      
-      # This is how abcproc DSO decides wether it should expand into more procedural or the final shape
-      singleShape = (cmds.getAttr(nodeName+".numShapes") == 1 and ignoreTransforms)
-      
-      if singleShape:
-         pad = 0.0
-         
-         if cmds.attributeQuery("aiDispPadding", node=nodeName, exists=1):
-            pad = cmds.getAttr(nodeName+".aiDispPadding")
-            Paddings[nodeName] = pad
-         
-         elif cmds.attributeQuery("mtoa_disp_padding", node=nodeName, exists=1):
-            pad = cmds.getAttr(nodeName+".mtoa_disp_padding")
-            Paddings[nodeName] = pad
-         
-         # Note: For instanced <<NodeName>> with time related attribute overrides, 'outBoxMin', 'outBoxMax'
-         #       attributes won't return the right values, maybe provide some additional attributes
-         #       on the <<NodeName>> node to compute an alternate bounding box (using a different set of
-         #       speed/offset/startFrame/endFrame/time/preserveStartFrame attributes) ?
-         
-         bmin = cmds.getAttr(nodeName+".outBoxMin")[0]
-         bmax = cmds.getAttr(nodeName+".outBoxMax")[0]
-         
-         arnold.AiNodeSetVec(node, "min", bmin[0]-pad, bmin[1]-pad, bmin[2]-pad)
-         arnold.AiNodeSetVec(node, "max", bmax[0]+pad, bmax[1]+pad, bmax[2]+pad)
-         
-         return ["dso", "data", "min", "max"]
-      
-      else:
-         
-         arnold.AiNodeSetBool(node, "load_at_init", True)
-         
-         return ["dso", "data", "load_at_init"]
-      
+         val = stu.GetOverrideAttr(nodeName, "aiOptimizeSamples", None)
+         if val is not None:
+            arnold.AiNodeSetBool(node, "optimize_samples", val)
+            setAttrs.append("optimize_samples")
+
+      # Leave that to MtoA?
+      #
+      # arnold.AiNodeSetFlt(node, "motion_start", sampleFrame - renderFrame)
+      # setAttrs.append("motion_start")
+
+      return setAttrs
+
    else:
-      
-      if not arnold.AiNodeGetBool(node, "load_at_init"):
-         
-         pad = Paddings.get(nodeName, 0.0)
-         
-         bmin = map(lambda x: x-pad, cmds.getAttr(nodeName+".outBoxMin")[0])
-         bmax = map(lambda x: x+pad, cmds.getAttr(nodeName+".outBoxMax")[0])
-         
-         curmin = arnold.AiNodeGetVec(node, "min")
-         curmax = arnold.AiNodeGetVec(node, "max")
-         
-         if bmin[0] < curmin.x:
-            curmin.x = bmin[0]
-         if bmin[1] < curmin.y:
-            curmin.y = bmin[1]
-         if bmin[2] < curmin.z:
-            curmin.z = bmin[2]
-         
-         if bmax[0] > curmax.x:
-            curmax.x = bmax[0]
-         if bmax[1] > curmax.y:
-            curmax.y = bmax[1]
-         if bmax[2] > curmax.z:
-            curmax.z = bmax[2]
-         
-         arnold.AiNodeSetVec(node, "min", curmin.x, curmin.y, curmin.z)
-         arnold.AiNodeSetVec(node, "max", curmax.x, curmax.y, curmax.z)
-      
-      if deformationBlur or transformationBlur:
-         relativeSamples = stu.GetOverrideAttr(nodeName, "mtoa_abc_relativeSamples", None)
-         if relativeSamples is None:
-            relativeSamples = False
-         
-         # Add new frame sample in data
-         data = arnold.AiNodeGetStr(node, "data")
-         
-         data += " %f" % (sampleFrame if not relativeSamples else (sampleFrame - renderFrame))
-         
-         arnold.AiNodeSetStr(node, "data", data)
-      
+      # For last sample only
+      #
+      # arnold.AiNodeSetFlt(node, "samples", count)
+      # arnold.AiNodeSetFlt(node, "motion_end", sampleFrame - renderFrame)
+
       return []
 
 
 def Cleanup(nodeNames, masterNodeNames):
-   global Paddings
-   
-   nodeName, _ = nodeNames
-   if nodeName in Paddings:
-      del(Paddings[nodeName])
+   pass
 
 
 def SetupAttrs():
    attrs = []
-   
+
    try:
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="velocity_name"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="acceleration_name"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="velocity_scale"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="force_velocity_blur"))
+
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="output_reference"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="reference_source"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="reference_position_name"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="reference_normal_name"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="reference_filename"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="reference_frame"))
+
+      # string[] -> single space separated list
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="remove_attribute_prefices"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="force_constant_attributes"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="ignore_attributes"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="attributes_evaluation_time"))
+
+      # string[] -> single space separated list
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="compute_tangents_for_uvs"))
+
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="width_scale"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="width_min"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="width_max"))
+
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="radius_name"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="radius_scale"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="radius_min"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="radius_max"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="ignore_nurbs"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="nurbs_sample_rate"))
+
       attrs.append(stu.AttrData(arnoldNode="box", arnoldAttr="step_size"))
-      
-      attrs.append(stu.AttrData(name="mtoa_abc_outputReference", shortName="outref", type=arnold.AI_TYPE_BOOLEAN, defaultValue=False))
-      attrs.append(stu.AttrData(name="mtoa_abc_referenceFilename", shortName="reffp", type=arnold.AI_TYPE_STRING, defaultValue=""))
-      
-      attrs.append(stu.AttrData(name="mtoa_abc_computeTangents", shortName="cmptan", type=arnold.AI_TYPE_STRING, defaultValue=""))
-      
-      attrs.append(stu.AttrData(name="mtoa_abc_radiusScale", shortName="radscl", type=arnold.AI_TYPE_FLOAT, defaultValue=1.0, min=0))
-      attrs.append(stu.AttrData(name="mtoa_abc_radiusMin", shortName="radmin", type=arnold.AI_TYPE_FLOAT, defaultValue=0.0, min=0))
-      attrs.append(stu.AttrData(name="mtoa_abc_radiusMax", shortName="radmax", type=arnold.AI_TYPE_FLOAT, defaultValue=1000000.0, min=0))
-      attrs.append(stu.AttrData(name="mtoa_abc_nurbsSampleRate", shortName="nurbssr", type=arnold.AI_TYPE_INT, defaultValue=5, min=1))
-      
-      attrs.append(stu.AttrData(name="mtoa_abc_overrideAttribs", shortname="ovatrs", type=arnold.AI_TYPE_STRING, defaultValue=""))
-      attrs.append(stu.AttrData(name="mtoa_abc_removeAttribPrefices", shortName="rematp", type=arnold.AI_TYPE_STRING, defaultValue=""))
-      attrs.append(stu.AttrData(name="mtoa_abc_objectAttribs", shortName="objatrs", type=arnold.AI_TYPE_BOOLEAN, defaultValue=False))
-      attrs.append(stu.AttrData(name="mtoa_abc_primitiveAttribs", shortName="pratrs", type=arnold.AI_TYPE_BOOLEAN, defaultValue=False))
-      attrs.append(stu.AttrData(name="mtoa_abc_pointAttribs", shortName="ptatrs", type=arnold.AI_TYPE_BOOLEAN, defaultValue=False))
-      attrs.append(stu.AttrData(name="mtoa_abc_vertexAttribs", shortName="vtxatrs", type=arnold.AI_TYPE_BOOLEAN, defaultValue=False))
-      attrs.append(stu.AttrData(name="mtoa_abc_attribsFrame", shortName="atrsfrm", type=arnold.AI_TYPE_ENUM, enums=["render", "shutter", "shutter_open", "shutter_close"], defaultValue=0))
-      
-      attrs.append(stu.AttrData(name="mtoa_abc_samplesExpandIterations", shortName="sampexpiter", type=arnold.AI_TYPE_INT, defaultValue=0, min=0, max=10))
-      attrs.append(stu.AttrData(name="mtoa_abc_optimizeSamples", shortName="optsamp", type=arnold.AI_TYPE_BOOLEAN, defaultValue=False))
-      
+      attrs.append(stu.AttrData(arnoldNode="box", arnoldAttr="volume_padding"))
+
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="nameprefix"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="expand_samples_iterations"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="optimize_samples"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="verbose"))
+
    except Exception, e:
       print("mtoa_<<NodeName>>.SetupAttrs: Failed\n%s" % e)
       attrs = []
-   
+
    return map(str, attrs)
 
 
@@ -304,50 +300,68 @@ def SetupAE(translator):
    import pymel.core as pm
    if not pm.pluginInfo("<<NodeName>>", query=1, loaded=1):
       return
-   
+
    try:
       import mtoa.ui.ae.templates as templates
-      
+
       class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
          def setup(self):
             self.commonShapeAttributes()
             self.addSeparator()
-            
+
             self.renderStatsAttributes()
             self.addSeparator()
-            
-            self.addControl("mtoa_abc_referenceFilename", label="Reference ABC File")
+
+            self.addControl("aiVelocityName", label="Velocity Name")
+            self.addControl("aiAccelerationName", label="Acceleration Name")
+            self.addControl("aiVelocityScale", label="Velocity Scale")
+            self.addControl("aiForceVelocityBlur", label="Force Velocity Blur")
             self.addSeparator()
-            
-            self.addControl("mtoa_abc_computeTangents", label="Compute Tangents")
+
+            self.addControl("aiOutputReference", label="Output Reference Attributes")
+            self.addControl("aiReferenceSource", label="Reference Source")
+            self.addControl("aiReferencePositionName", label="Reference Position Name")
+            self.addControl("aiReferenceNormalName", label="Reference Normal Name")
+            self.addControl("aiReferenceFilename", label="Reference ABC File")
+            self.addControl("aiReferenceFrame", label="Reference Frame")
             self.addSeparator()
-            
-            self.addControl("mtoa_abc_radiusScale", label="Radius Scale")
-            self.addControl("mtoa_abc_radiusMin", label="Min. Radius")
-            self.addControl("mtoa_abc_radiusMax", label="Max. Radius")
-            self.addControl("mtoa_abc_nurbsSampleRate", label="NURBS Sample Rate")
+
+            self.addControl("aiRemoveAttributePrefices", label="Remove Attribute Prefices")
+            self.addControl("aiForceConstantAttributes", label="Force Constant Attributes")
+            self.addControl("aiIgnoreAttributes", label="Ignore Attributes")
+            self.addControl("aiAttributesEvaluationTime", label="Attributes Evaluation TIme")
             self.addSeparator()
-            
-            self.addControl("mtoa_abc_overrideAttribs", label="Override Attributes")
-            self.addControl("mtoa_abc_removeAttribPrefices", label="Remove Attribute Prefices")
-            self.addControl("mtoa_abc_objectAttribs", label="Output Object Attributes")
-            self.addControl("mtoa_abc_primitiveAttribs", label="Output Primitive Attributes")
-            self.addControl("mtoa_abc_pointAttribs", label="Output Point Attributes")
-            self.addControl("mtoa_abc_vertexAttribs", label="Output Vertex Attributes")
-            self.addControl("mtoa_abc_attribsFrame", label="Attributes Frame")
+
+            self.addControl("aiComputeTangentsForUVs", label="Compute Tangents For UVs")
             self.addSeparator()
-            
-            self.addControl("mtoa_abc_samplesExpandIterations", label="Expand Samples Iterations")
-            self.addControl("mtoa_abc_optimizeSamples", label="Optimize Samples")
+
+            self.addControl("aiWidthScale", label="Width Scale")
+            self.addControl("aiWidthMin", label="Min. Width")
+            self.addControl("aiWidthMax", label="Max. Width")
             self.addSeparator()
-            
+
+            self.addControl("aiRadiusName", label="Radius Attribute Name")
+            self.addControl("aiRadiusScale", label="Radius Scale")
+            self.addControl("aiRadiusMin", label="Min. Radius")
+            self.addControl("aiRadiusMax", label="Max. Radius")
+            self.addControl("aiIgnoreNurbs", label="Ignore NURBS")
+            self.addControl("aiNurbsSampleRate", label="NURBS Sample Rate")
+            self.addSeparator()
+
             self.addControl("aiStepSize", label="Volume Step Size")
+            self.addControl("aiVolumePadding", label="Volume Padding")
             self.addSeparator()
-            
+
+            self.addControl("aiNameprefix", label="Name Prefix")
+            self.addControl("aiExpandSamplesIterations", label="Expand Samples Iterations")
+            self.addControl("aiOptimizeSamples", label="Optimize Samples")
+            self.addControl("aiVerbose", label="Verbose")
+            self.addSeparator()
+
             self.addControl("aiUserOptions", label="User Options")
             self.addSeparator()
-     
+
       templates.registerTranslatorUI(<<NodeName>>Template, "<<NodeName>>", translator)
-      
+
    except Exception, e:
       print("mtoa_<<NodeName>>.SetupAE: Failed\n%s" % e)
