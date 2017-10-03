@@ -9,6 +9,7 @@
 #endif
 
 #include "utils/Version.h"
+#include "utils/HashUtils.h"
 #include "translators/shape/ShapeTranslator.h"
 #include "extension/Extension.h"
 #include "AlembicSceneCache.h"
@@ -45,55 +46,20 @@ private:
    void ExportSubdivAttribs(AtNode *atNode);
    void ExportMeshAttribs(AtNode *atNode);
    void ExportShader(AtNode *atNode, bool update);
-   
-   bool IsSingleShape() const;
 
    double GetSampleFrame(unsigned int step);
    void GetFrames(double inRenderFrame, double inSampleFrame,
                   double &outRenderFrame, double &outSampleFrame);
    double GetFPS();
-   MString ToString(double val);
-   MString ToString(int val);
 
    bool HasParameter(const AtNodeEntry *anodeEntry, const char *param, AtNode *anode=NULL, const char *decl=NULL);
-   
-   void ReadAlembicAttributes(double time);
 
    MPlug FindMayaObjectPlug(const MString &attrName, MStatus* ReturnStatus=NULL) const;
 
 private:
 
    bool m_motionBlur;
-   std::string m_abcPath;
-   std::string m_objPath;
-   double m_renderTime;
-   AlembicScene *m_scene;
-   float m_radiusSclMinMax[3];
-   float m_widthSclMinMax[3];
-   std::string m_forceConstantAttributes;
-   double m_renderFrame;
-   std::string m_velocity;
-   float m_velocityScale;
-   std::string m_acceleration;
-   std::string m_radius;
-   float m_t0; // data 0 time
-   std::vector<float> m_p0; // positions data
-   std::vector<float> m_v0; // velocity data
-   std::vector<float> m_a0; // acceleration data
-   float m_t1; // data 1 time
-   std::vector<float> m_p1; // positions data
-   std::vector<float> m_v1; // velocity data
-   std::vector<float> m_a1; // acceleration data
-   Alembic::Abc::Box3d m_vb; // velocity expanded box
-   double m_sampleFrame;
-   double m_sampleTime;
-   // For either points or curves
-   Alembic::AbcGeom::IFloatGeomParam m_widths; // points/curves built-in width parameter
-   float m_maxWidth; 
-   float *m_widthAdjust;
-   bool m_forceVelocityBlur;
    std::set<unsigned int> m_exportedSteps;
-   std::vector<float> m_samples;
 };
 
 #endif

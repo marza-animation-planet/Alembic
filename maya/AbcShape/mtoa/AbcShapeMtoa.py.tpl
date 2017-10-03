@@ -10,6 +10,7 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       self.addSeparator()
 
       self.addControl("aiSssSetname", label="SSS Set Name")
+      # trace sets added in commonShapeAttributes
       self.addControl("aiStepSize", label="Volume Step Size")
       self.addControl("aiVolumePadding", label="Volume Padding")
       self.addControl("aiUserOptions", label="User Options")
