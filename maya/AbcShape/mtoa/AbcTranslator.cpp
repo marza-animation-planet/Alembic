@@ -23,58 +23,27 @@ void* CAbcTranslator::Create()
 
 void CAbcTranslator::NodeInitializer(CAbTranslator context)
 {
-   CExtensionAttrHelper helper(context.maya, "polymesh");
-   
+   CExtensionAttrHelper helper(context.maya, "abcproc");
+
    CShapeTranslator::MakeCommonAttributes(helper);
 
    CAttrData data;
-   
-   // reference
-   
-   data.defaultValue.BOOL() = false;
-   data.name = "mtoa_constant_abc_outputReference";
-   data.shortName = "outref";
-   helper.MakeInputBoolean(data);
-   
-   data.defaultValue.INT() = 0;
-   data.enums.clear();
-   data.enums.append("attributes_then_file");
-   data.enums.append("attributes");
-   data.enums.append("file");
-   data.enums.append("frame");
-   data.name = "mtoa_constant_abc_referenceSource";
-   data.shortName = "refsrc";
-   helper.MakeInputEnum(data);
-   
-   data.stringDefault = "";
-   data.name = "mtoa_constant_abc_referencePositionName";
-   data.shortName = "refpna";
-   helper.MakeInputString(data);
-   
-   data.stringDefault = "";
-   data.name = "mtoa_constant_abc_referenceNormalName";
-   data.shortName = "refnna";
-   helper.MakeInputString(data);
-   
-   data.stringDefault = "";
-   data.name = "mtoa_constant_abc_referenceFilename";
-   data.shortName = "reffp";
-   helper.MakeInputString(data);
-   
-   data.defaultValue.FLT() = 0.0f;
-   data.name = "mtoa_constant_abc_referenceFrame";
-   data.shortName = "reffrm";
-   data.hasMin = false;
-   data.hasSoftMin = false;
-   data.hasMax = false;
-   data.hasSoftMax = false;
-   helper.MakeInputFloat(data);
-   
+
    // velocity
-   
+
+   data.stringDefault = "";
+   data.name = "aiVelocityName";
+   data.shortName = "ai_velocity_name";
+   helper.MakeInputString(data);
+
+   data.stringDefault = "";
+   data.name = "aiAccelerationName";
+   data.shortName = "ai_acceleration_name";
+   helper.MakeInputString(data);
+
    data.defaultValue.FLT() = 1.0f;
-   data.name = "mtoa_constant_abc_velocityScale";
-   data.shortName = "velscl";
+   data.name = "aiVelocityScale";
+   data.shortName = "ai_velocity_scale";
    data.hasMin = false;
    data.hasSoftMin = true;
    data.softMin.FLT() = 0.0f;
@@ -82,129 +51,134 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.hasSoftMax = true;
    data.softMax.FLT() = 10.0f;
    helper.MakeInputFloat(data);
-   
-   data.stringDefault = "";
-   data.name = "mtoa_constant_abc_velocityName";
-   data.shortName = "velan";
-   helper.MakeInputString(data);
-   
-   data.stringDefault = "";
-   data.name = "mtoa_constant_abc_accelerationName";
-   data.shortName = "accan";
-   helper.MakeInputString(data);
-   
+
    data.defaultValue.BOOL() = false;
-   data.name = "mtoa_constant_abc_forceVelocityBlur";
-   data.shortName = "fvmb";
+   data.name = "aiForceVelocityBlur";
+   data.shortName = "ai_force_velocity_blur";
    helper.MakeInputBoolean(data);
-   
-   // bounding box
-   
+
+   // reference
+
+   data.defaultValue.BOOL() = false;
+   data.name = "aiOutputReference";
+   data.shortName = "ai_output_reference";
+   helper.MakeInputBoolean(data);
+
+   data.defaultValue.INT() = 0;
+   data.enums.clear();
+   data.enums.append("attributes_then_file");
+   data.enums.append("attributes");
+   data.enums.append("file");
+   data.enums.append("frame");
+   data.name = "aiReferenceSource";
+   data.shortName = "ai_reference_source";
+   helper.MakeInputEnum(data);
+
+   data.stringDefault = "";
+   data.name = "aiReferencePositionName";
+   data.shortName = "ai_reference_position_name";
+   helper.MakeInputString(data);
+
+   data.stringDefault = "";
+   data.name = "aiReferenceNormalName";
+   data.shortName = "ai_reference_normal_name";
+   helper.MakeInputString(data);
+
+   data.stringDefault = "";
+   data.name = "aiReferenceFilename";
+   data.shortName = "ai_reference_filename";
+   helper.MakeInputString(data);
+
    data.defaultValue.FLT() = 0.0f;
-   data.name = "mtoa_constant_abc_boundsPadding";
-   data.shortName = "bndpad";
+   data.name = "aiReferenceFrame";
+   data.shortName = "ai_reference_frame";
    data.hasMin = false;
-   data.hasSoftMin = true;
-   data.softMin.FLT() = 0.0f;
+   data.hasSoftMin = false;
    data.hasMax = false;
-   data.hasSoftMax = true;
-   data.softMax.FLT() = 100.0f;
+   data.hasSoftMax = false;
    helper.MakeInputFloat(data);
-   
-   data.defaultValue.BOOL() = false;
-   data.name = "mtoa_constant_abc_useOverrideBounds";
-   data.shortName = "uovbnd";
-   helper.MakeInputBoolean(data);
-   
+
+   // attributes
+
    data.stringDefault = "";
-   data.name = "mtoa_constant_abc_overrideBoundsMinName";
-   data.shortName = "ovbdmi";
+   data.name = "aiRemoveAttributePrefices";
+   data.shortName = "ai_remove_attribute_prefices";
    helper.MakeInputString(data);
-   
+
    data.stringDefault = "";
-   data.name = "mtoa_constant_abc_overrideBoundsMaxName";
-   data.shortName = "ovbdma";
+   data.name = "aiForceConstantAttributes";
+   data.shortName = "ai_force_constant_attributes";
    helper.MakeInputString(data);
-   
-   data.defaultValue.BOOL() = false;
-   data.name = "mtoa_constant_abc_computeVelocityExpandedBounds";
-   data.shortName = "cvebnd";
-   helper.MakeInputBoolean(data);
-   
-   data.defaultValue.BOOL() = false;
-   data.name = "mtoa_constant_abc_padBoundsWithPeakRadius";
-   data.shortName = "pkrpad";
-   helper.MakeInputBoolean(data);
-   
+
    data.stringDefault = "";
-   data.name = "mtoa_constant_abc_peakRadiusName";
-   data.shortName = "pkrdn";
+   data.name = "aiIgnoreAttributes";
+   data.shortName = "ai_ignore_attributes";
    helper.MakeInputString(data);
-   
-   data.defaultValue.BOOL() = false;
-   data.name = "mtoa_constant_abc_padBoundsWithPeakWidth";
-   data.shortName = "pkwpad";
-   helper.MakeInputBoolean(data);
-   
-   data.stringDefault = "";
-   data.name = "mtoa_constant_abc_peakWidthName";
-   data.shortName = "pkwdt";
-   helper.MakeInputString(data);
-   
+
+   data.defaultValue.INT() = 0;
+   data.enums.clear();
+   data.enums.append("render");
+   data.enums.append("shutter");
+   data.enums.append("shutter_open");
+   data.enums.append("shutter_close");
+   data.name = "aiAttributesEvaluationTime";
+   data.shortName = "ai_attributes_evaluation_time";
+   helper.MakeInputEnum(data);
+
    // mesh
-   
+
    data.stringDefault = "";
-   data.name = "mtoa_constant_abc_computeTangents";
-   data.shortName = "cmptan";
+   data.name = "aiComputeTangentsForUVs";
+   data.shortName = "ai_compute_tangents_for_uvs";
    helper.MakeInputString(data);
-   
+
    // particles
-   
+
    data.stringDefault = "";
-   data.name = "mtoa_constant_abc_radiusName";
-   data.shortName = "radnam";
+   data.name = "aiRadiusName";
+   data.shortName = "ai_radius_name";
    helper.MakeInputString(data);
-   
+
    data.defaultValue.FLT() = 1.0;
-   data.name = "mtoa_constant_abc_radiusScale";
-   data.shortName = "radscl";
+   data.name = "aiRadiusScale";
+   data.shortName = "ai_radius_scale";
    data.hasMin = true;
    data.min.FLT() = 0.0;
    data.hasSoftMin = false;
    data.hasMax = false;
    data.hasSoftMax = false;
    helper.MakeInputFloat(data);
-   
+
    data.defaultValue.FLT() = 0.0;
-   data.name = "mtoa_constant_abc_radiusMin";
-   data.shortName = "radmin";
+   data.name = "aiRadiusMin";
+   data.shortName = "ai_radius_min";
    data.hasMin = true;
    data.min.FLT() = 0.0;
    data.hasSoftMin = false;
    data.hasMax = false;
    data.hasSoftMax = false;
    helper.MakeInputFloat(data);
-   
+
    data.defaultValue.FLT() = 1000000.0;
-   data.name = "mtoa_constant_abc_radiusMax";
-   data.shortName = "radmax";
+   data.name = "aiRadiusMax";
+   data.shortName = "ai_radius_max";
    data.hasMin = true;
    data.min.FLT() = 0.0;
    data.hasSoftMin = false;
    data.hasMax = false;
    data.hasSoftMax = false;
    helper.MakeInputFloat(data);
-   
+
    // curves
-   
+
    data.defaultValue.BOOL() = true;
-   data.name = "mtoa_constant_abc_ignoreNurbs";
-   data.shortName = "ignnrb";
+   data.name = "aiIgnoreNurbs";
+   data.shortName = "ai_ignore_nurbs";
    helper.MakeInputBoolean(data);
-   
+
    data.defaultValue.INT() = 5;
-   data.name = "mtoa_constant_abc_nurbsSampleRate";
-   data.shortName = "nurbssr";
+   data.name = "aiNurbsSampleRate";
+   data.shortName = "ai_nurbs_sample_rate";
    data.hasMin = true;
    data.min.INT() = 1;
    data.hasSoftMin = false;
@@ -212,90 +186,42 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.hasSoftMax = true;
    data.softMax.INT() = 10;
    helper.MakeInputInt(data);
-   
+
    data.defaultValue.FLT() = 1.0;
-   data.name = "mtoa_constant_abc_widthScale";
-   data.shortName = "wdtscl";
+   data.name = "aiWidthScale";
+   data.shortName = "ai_width_scale";
    data.hasMin = true;
    data.min.FLT() = 0.0;
    data.hasSoftMin = false;
    data.hasMax = false;
    data.hasSoftMax = false;
    helper.MakeInputFloat(data);
-   
+
    data.defaultValue.FLT() = 0.0;
-   data.name = "mtoa_constant_abc_widthMin";
-   data.shortName = "wdtmin";
+   data.name = "aiWidthMin";
+   data.shortName = "ai_width_min";
    data.hasMin = true;
    data.min.FLT() = 0.0;
    data.hasSoftMin = false;
    data.hasMax = false;
    data.hasSoftMax = false;
    helper.MakeInputFloat(data);
-   
+
    data.defaultValue.FLT() = 1000000.0;
-   data.name = "mtoa_constant_abc_widthMax";
-   data.shortName = "wdtmax";
+   data.name = "aiWidthMax";
+   data.shortName = "ai_width_max";
    data.hasMin = true;
    data.min.FLT() = 0.0;
    data.hasSoftMin = false;
    data.hasMax = false;
    data.hasSoftMax = false;
    helper.MakeInputFloat(data);
-   
-   // attributes
-   
-   data.defaultValue.BOOL() = false;
-   data.name = "mtoa_constant_abc_objectAttribs";
-   data.shortName = "objatrs";
-   helper.MakeInputBoolean(data);
-   
-   data.defaultValue.BOOL() = false;
-   data.name = "mtoa_constant_abc_primitiveAttribs";
-   data.shortName = "pratrs";
-   helper.MakeInputBoolean(data);
-   
-   data.defaultValue.BOOL() = false;
-   data.name = "mtoa_constant_abc_pointAttribs";
-   data.shortName = "ptatrs";
-   helper.MakeInputBoolean(data);
-   
-   data.defaultValue.BOOL() = false;
-   data.name = "mtoa_constant_abc_vertexAttribs";
-   data.shortName = "vtxatrs";
-   helper.MakeInputBoolean(data);
-   
-   data.defaultValue.INT() = 0;
-   data.enums.clear();
-   data.enums.append("render");
-   data.enums.append("shutter");
-   data.enums.append("shutter_open");
-   data.enums.append("shutter_close");
-   data.name = "mtoa_constant_abc_attribsFrame";
-   data.shortName = "atrsfrm";
-   helper.MakeInputEnum(data);
-   
-   data.stringDefault = "";
-   data.name = "mtoa_constant_abc_promoteToObjectAttribs";
-   data.shortName = "probja";
-   helper.MakeInputString(data);
-   
-   data.stringDefault = "";
-   data.name = "mtoa_constant_abc_removeAttribPrefices";
-   data.shortName = "rematp";
-   helper.MakeInputString(data);
-   
-   // for multi mode only
-   data.stringDefault = "";
-   data.name = "mtoa_constant_abc_overrideAttribs";
-   data.shortName = "ovatrs";
-   helper.MakeInputString(data);
-   
+
    // samples expansion
-   
+
    data.defaultValue.INT() = 0;
-   data.name = "mtoa_constant_abc_samplesExpandIterations";
-   data.shortName = "sampexpiter";
+   data.name = "aiExpandSamplesIterations";
+   data.shortName = "ai_expand_samples_iterations";
    data.hasMin = true;
    data.min.INT() = 0;
    data.hasSoftMin = false;
@@ -303,14 +229,12 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.max.INT() = 10;
    data.hasSoftMax = false;
    helper.MakeInputInt(data);
-   
+
    data.defaultValue.BOOL() = false;
-   data.name = "mtoa_constant_abc_optimizeSamples";
-   data.shortName = "optsamp";
+   data.name = "aiOptimizeSamples";
+   data.shortName = "ai_optimize_samples";
    helper.MakeInputBoolean(data);
-   
-   // others
-   
+
    // volume
    data.defaultValue.FLT() = 0.0f;
    data.name = "aiStepSize";
@@ -322,24 +246,36 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    data.hasSoftMax = true;
    data.softMax.FLT() = 1.f;
    helper.MakeInputFloat(data);
-   
+
+   data.defaultValue.FLT() = 0.0f;
+   data.name = "aiVolumePadding";
+   data.shortName = "ai_volume_padding";
+   data.hasMin = true;
+   data.min.FLT() = 0.f;
+   data.hasSoftMin = false;
+   data.hasMax = false;
+   data.hasSoftMax = true;
+   data.softMax.FLT() = 1.f;
+   helper.MakeInputFloat(data);
+
+   // others
+
+   data.stringDefault = "";
+   data.name = "aiNameprefix";
+   data.shortName = "ai_nameprefix";
+   helper.MakeInputString(data);
+
    data.defaultValue.BOOL() = false;
-   data.name = "mtoa_constant_abc_verbose";
-   data.shortName = "vrbexp";
+   data.name = "aiVerbose";
+   data.shortName = "ai_verbose";
    helper.MakeInputBoolean(data);
 }
 
 CAbcTranslator::CAbcTranslator()
    : CShapeTranslator()
    , m_motionBlur(false)
-   , m_computeVelocityExpandedBounds(false)
-   , m_overrideBounds(false)
-   , m_boundsOverridden(false)
    , m_renderTime(0.0)
    , m_scene(0)
-   , m_padBoundsWithPeakRadius(false)
-   , m_padBoundsWithPeakWidth(false)
-   , m_peakPadding(0.0f)
    , m_renderFrame(0.0)
    , m_velocityScale(1.0f)
    , m_sampleFrame(0.0)
@@ -349,7 +285,7 @@ CAbcTranslator::CAbcTranslator()
    m_radiusSclMinMax[0] = 1.0f;
    m_radiusSclMinMax[1] = 0.0f;
    m_radiusSclMinMax[2] = 1000000.0f;
-   
+
    m_widthSclMinMax[0] = 1.0f;
    m_widthSclMinMax[1] = 0.0f;
    m_widthSclMinMax[2] = 1000000.0f;
@@ -360,63 +296,21 @@ CAbcTranslator::~CAbcTranslator()
    m_p0.clear();
    m_v0.clear();
    m_a0.clear();
-   
+
    m_p1.clear();
    m_v1.clear();
    m_a1.clear();
-   
+
    if (m_widths.valid())
    {
       m_widths.reset();
    }
-   
+
    if (m_scene)
    {
       AlembicSceneCache::Unref(m_scene);
    }
 }
-
-#ifdef OLD_API
-
-AtNode* CAbcTranslator::Init(CArnoldSession *session, MDagPath& dagPath, MString outputAttr)
-{
-   AtNode *rv = CShapeTranslator::Init(session, dagPath, outputAttr);
-   m_motionBlur = (IsMotionBlurEnabled(MTOA_MBLUR_DEFORM|MTOA_MBLUR_OBJECT) && IsLocalMotionBlurEnabled());
-   return rv;
-}
-
-AtNode* CAbcTranslator::Init(CArnoldSession* session, MObject& object, MString outputAttr)
-{
-   AtNode *rv = CDagTranslator::Init(session, object, outputAttr);
-   m_motionBlur = (IsMotionBlurEnabled(MTOA_MBLUR_DEFORM|MTOA_MBLUR_OBJECT) && IsLocalMotionBlurEnabled());
-   return rv;
-}
-
-void CAbcTranslator::Export(AtNode *atNode)
-{
-   ExportAbc(atNode, 0);
-}
-
-void CAbcTranslator::ExportMotion(AtNode *atNode, unsigned int step)
-{
-   ExportAbc(atNode, step);
-}
-
-void CAbcTranslator::Update(AtNode *atNode)
-{
-   ExportAbc(atNode, 0, true);
-}
-
-void CAbcTranslator::UpdateMotion(AtNode *atNode, unsigned int step)
-{
-   ExportAbc(atNode, step, true);
-}
-
-void CAbcTranslator::Delete()
-{
-}
-
-#else
 
 void CAbcTranslator::Init()
 {
@@ -439,8 +333,6 @@ void CAbcTranslator::RequestUpdate()
    SetUpdateMode(AI_RECREATE_NODE);
    CShapeTranslator::RequestUpdate();
 }
-
-#endif
 
 AtNode* CAbcTranslator::CreateArnoldNodes()
 {
@@ -493,14 +385,12 @@ MString CAbcTranslator::ToString(int val)
    return rv;
 }
 
-#ifndef OLD_API
 MPlug CAbcTranslator::FindMayaObjectPlug(const MString &attrName, MStatus* ReturnStatus) const
 {
    MObject obj = GetMayaObject();
    MFnDependencyNode node(obj);
    return node.findPlug(attrName, ReturnStatus);
 }
-#endif
 
 void CAbcTranslator::GetFrames(double inRenderFrame, double inSampleFrame,
                                double &outRenderFrame, double &outSampleFrame)
@@ -762,75 +652,6 @@ void CAbcTranslator::ExportMeshAttribs(AtNode *proc)
    }
 }
 
-#if MTOA_ARCH_VERSION_NUM == 1
-
-bool CAbcTranslator::IsRenderable(MFnDagNode &node) const
-{
-   MStatus status;
-
-   if (node.isIntermediateObject())
-   {
-      return false;
-   }
-
-   // Check standard visibility
-   MPlug visPlug = node.findPlug("visibility", &status);
-   if (status == MStatus::kSuccess && !visPlug.asBool())
-   {
-      return false;
-   }
-
-   // Check standard template
-   MPlug tplPlug = node.findPlug("template", &status);
-   if (status == MStatus::kSuccess && tplPlug.asBool())
-   {
-      return false;
-   }
-
-   // Check overrides
-   MPlug overPlug = node.findPlug("overrideEnabled", &status);
-   if (status == MStatus::kSuccess && overPlug.asBool())
-   {
-      // Visibility
-      MPlug overVisPlug = node.findPlug("overrideVisibility", &status);
-      if (status == MStatus::kSuccess && !overVisPlug.asBool())
-      {
-         return false;
-      }
-
-      // Template
-      MPlug overDispPlug = node.findPlug("overrideDisplayType", &status);
-      if (status == MStatus::kSuccess && overDispPlug.asInt() == 1)
-      {
-         return false;
-      }
-   }
-
-   return true;
-}
-
-bool CAbcTranslator::IsRenderable(MDagPath dagPath) const
-{
-   MStatus stat = MStatus::kSuccess;
-
-   while (stat == MStatus::kSuccess)
-   {
-      MFnDagNode node;
-      node.setObject(dagPath.node());
-
-      if (!IsRenderable(node))
-      {
-         return false;
-      }
-
-      stat = dagPath.pop();
-   }
-
-   return true;
-}
-
-#endif
-
 void CAbcTranslator::ExportVisibility(AtNode *proc)
 {
    ProcessRenderFlags(proc);
@@ -839,11 +660,7 @@ void CAbcTranslator::ExportVisibility(AtNode *proc)
 
    int visibility = AI_RAY_UNDEFINED;
 
-#if MTOA_ARCH_VERSION_NUM >= 2
    if (IsRenderable())
-#else
-   if (IsRenderable(m_dagPath))
-#endif
    {
       visibility = AI_RAY_ALL;
 
@@ -935,11 +752,7 @@ void CAbcTranslator::ExportShader(AtNode *proc, bool update)
       shadingEngine.setObject(shadingGroupPlug.node());
       
       // Surface shader
-#ifdef OLD_API
-      AtNode *shader = ExportNode(shadingGroupPlug);
-#else
       AtNode *shader = ExportConnectedNode(shadingGroupPlug);
-#endif
       
       if (shader != NULL)
       {
@@ -954,16 +767,8 @@ void CAbcTranslator::ExportShader(AtNode *proc, bool update)
    }
 
    MDagPath masterDag;
-#ifdef OLD_API
-   if (DoIsMasterInstance(m_dagPath, masterDag))
-   {
-      // DoIsMasterInstance doesn't set masterDag when it returns true
-      masterDag = m_dagPath;
-   }
-#else
    masterDag = (IsMasterInstance() ? m_dagPath : GetMasterInstance());
-#endif
-   
+
    shadingGroupPlug = GetNodeShadingGroup(masterDag.node(), (masterDag.isInstanced() ? masterDag.instanceNumber() : 0));
    if (!shadingGroupPlug.isNull())
    {
@@ -1035,11 +840,7 @@ void CAbcTranslator::ExportShader(AtNode *proc, bool update)
 
          if (HasParameter(nodeEntry, "disp_map", proc, "constant ARRAY NODE"))
          {
-#ifdef OLD_API
-            AtNode *dispImage = ExportNode(shaderConns[0]);
-#else
             AtNode *dispImage = ExportConnectedNode(shaderConns[0]);
-#endif
             AiNodeSetArray(proc, "disp_map", AiArrayConvert(1, 1, AI_TYPE_NODE, &dispImage));
          }
       }
@@ -2046,192 +1847,6 @@ void CAbcTranslator::ReadAlembicAttributes(double time)
    }
 }
 
-#if MTOA_ARCH_VERSION_NUM == 1
-
-void CAbcTranslator::ExportBounds(AtNode *proc, unsigned int step)
-{
-   MFnDagNode node(m_dagPath.node());
-   
-   bool singleShape = IsSingleShape();
-   bool transformBlur = IsMotionBlurEnabled(MTOA_MBLUR_OBJECT) && IsLocalMotionBlurEnabled();
-   bool deformBlur = IsMotionBlurEnabled(MTOA_MBLUR_DEFORM) && IsLocalMotionBlurEnabled();
-
-   MPoint bmin;
-   MPoint bmax;
-   
-   MPlug pbmin = node.findPlug("outBoxMin");
-   MPlug pbmax = node.findPlug("outBoxMax");
-   
-   MFnNumericData dbmin(pbmin.asMObject());
-   MFnNumericData dbmax(pbmax.asMObject());
-   
-   dbmin.getData(bmin.x, bmin.y, bmin.z);
-   dbmax.getData(bmax.x, bmax.y, bmax.z);
-   
-   bool supportBoundsOverrides = false;
-   MPlug pInFrame, pOutTime;
-         
-   pInFrame = FindMayaObjectPlug("inCustomFrame");
-   if (!pInFrame.isNull())
-   {
-      pInFrame.setDouble(m_sampleFrame);
-      pOutTime = FindMayaObjectPlug("outCustomTime");
-      if (!pOutTime.isNull())
-      {
-         m_sampleTime = pOutTime.asDouble();
-         supportBoundsOverrides = true;
-      }
-   }
-   else
-   {
-      pOutTime = FindMayaObjectPlug("outSampleTime");
-      if (!pOutTime.isNull())
-      {
-         m_sampleTime = pOutTime.asDouble();
-         supportBoundsOverrides = true;
-      }
-   }
-
-#ifdef OLD_API
-   if (step == 0)
-#else
-   if (!IsExportingMotion())
-#endif
-   {
-      m_peakPadding = 0.0f;
-      m_overrideBounds = false;
-      m_computeVelocityExpandedBounds = false;
-      m_padBoundsWithPeakWidth = false;
-      m_padBoundsWithPeakRadius = false;
-      m_boundsOverridden = false;
-      m_widths.reset();
-      m_widthAdjust = 0;
-      m_maxWidth = 0.0f;
-      
-      if (singleShape)
-      {
-         if (supportBoundsOverrides)
-         {
-            if (!pInFrame.isNull())
-            {
-               pInFrame.setDouble(m_renderFrame);
-               m_renderTime = pOutTime.asDouble();
-            }
-            else
-            {
-               // In this case, we should only get pOutTime if m_sampleFrame == m_renderFrame
-               // This only only match first sample time if motion blur is set to "Start On Frame"
-               m_renderTime = m_sampleTime;
-            }
-         
-            m_overrideBounds = FindMayaPlug("mtoa_constant_abc_useOverrideBounds").asBool();
-            m_computeVelocityExpandedBounds = (!m_overrideBounds && FindMayaPlug("mtoa_constant_abc_computeVelocityExpandedBounds").asBool());
-            m_padBoundsWithPeakRadius = FindMayaPlug("mtoa_constant_abc_padBoundsWithPeakRadius").asBool();
-            m_padBoundsWithPeakWidth = FindMayaPlug("mtoa_constant_abc_padBoundsWithPeakWidth").asBool();
-            
-            if (m_computeVelocityExpandedBounds && (!deformBlur || GetNumMotionSteps() == 1))
-            {
-               // don't need to compute velocity bounds expansion
-               MGlobal::displayInfo("[AbcShapeMota] No deformation blur, ignore 'computeVelocityExpandedBounds'. [" + m_dagPath.partialPathName() + "]");
-               m_computeVelocityExpandedBounds = false;
-            }
-            
-            if (m_overrideBounds || m_computeVelocityExpandedBounds || m_padBoundsWithPeakWidth || m_padBoundsWithPeakRadius)
-            {
-               char msg[1024];
-               sprintf(msg, "[AbcShapeMtoa] Sample bounds override attributes at frame %f (time = %f)", m_renderFrame, m_renderTime);
-               MGlobal::displayInfo(msg + MString(". [") + m_dagPath.partialPathName() + "]");
-               
-               ReadAlembicAttributes(m_renderTime);
-               
-               if (m_computeVelocityExpandedBounds)
-               {
-                  // deform blur is either on or a single step is exported for that shape
-                  ExpandBounds(m_sampleTime, m_t0, m_p0, m_v0, m_a0, m_velocityScale, m_vb);
-                  ExpandBounds(m_sampleTime, m_t1, m_p1, m_v1, m_a1, m_velocityScale, m_vb);
-               }
-               
-               if (m_widths.valid())
-               {
-                  // sample time is not necessary the render time, if deformation blur is disabled, use points/curves with at render time
-                  SampleWidths(m_widths, (deformBlur ? m_sampleTime : m_renderTime), m_maxWidth);
-               }
-            }
-         }
-         
-         AiNodeSetBool(proc, "load_at_init", false);
-         
-         if (m_boundsOverridden)
-         {
-            AiNodeSetVec(proc, "min", m_min.x, m_min.y, m_min.z);
-            AiNodeSetVec(proc, "max", m_max.x, m_max.y, m_max.z);
-         }
-         else
-         {
-            AiNodeSetVec(proc, "min", static_cast<float>(bmin.x), static_cast<float>(bmin.y), static_cast<float>(bmin.z));
-            AiNodeSetVec(proc, "max", static_cast<float>(bmax.x), static_cast<float>(bmax.y), static_cast<float>(bmax.z));
-         }
-      }
-      else
-      {
-         AiNodeSetBool(proc, "load_at_init", true);
-         AiNodeSetVec(proc, "min", 0.0f, 0.0f, 0.0f);
-         AiNodeSetVec(proc, "max", 0.0f, 0.0f, 0.0f);
-      }
-   }
-   else if (singleShape)
-   {
-      if (!m_boundsOverridden)
-      {
-         if (transformBlur || deformBlur)
-         {
-            if (m_computeVelocityExpandedBounds)
-            {
-               ExpandBounds(m_sampleTime, m_t0, m_p0, m_v0, m_a0, m_velocityScale, m_vb);
-               ExpandBounds(m_sampleTime, m_t1, m_p1, m_v1, m_a1, m_velocityScale, m_vb);
-            }
-            
-            if (m_widths.valid())
-            {
-               SampleWidths(m_widths, m_sampleTime, m_maxWidth);
-            }
-            
-            AtVector cmin = AiNodeGetVec(proc, "min");
-            AtVector cmax = AiNodeGetVec(proc, "max");
-            
-            // merge bmin, max in cmin, cmax
-            if (bmin.x < cmin.x)
-               cmin.x = static_cast<float>(bmin.x);
-            if (bmin.y < cmin.y)
-               cmin.y = static_cast<float>(bmin.y);
-            if (bmin.z < cmin.z)
-               cmin.z = static_cast<float>(bmin.z);
-            if (bmax.x > cmax.x)
-               cmax.x = static_cast<float>(bmax.x);
-            if (bmax.y > cmax.y)
-               cmax.y = static_cast<float>(bmax.y);
-            if (bmax.z > cmax.z)
-               cmax.z = static_cast<float>(bmax.z);
-            
-            AiNodeSetVec(proc, "min", cmin.x, cmin.y, cmin.z);
-            AiNodeSetVec(proc, "max", cmax.x, cmax.y, cmax.z);
-         }
-         else
-         {
-            // if boundsOverriden
-            float dframe = m_renderFrame - m_sampleFrame;
-            if (-0.001f < dframe && dframe < 0.001f)
-            {
-               AiNodeSetVec(proc, "min", static_cast<float>(bmin.x), static_cast<float>(bmin.y), static_cast<float>(bmin.z));
-               AiNodeSetVec(proc, "max", static_cast<float>(bmax.x), static_cast<float>(bmax.y), static_cast<float>(bmax.z));
-            }
-         }
-      }
-   }
-}
-
-#endif
-
 void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFrame, double sampleFrame)
 {
    bool transformBlur = IsMotionBlurEnabled(MTOA_MBLUR_OBJECT) && IsLocalMotionBlurEnabled();
@@ -2241,7 +1856,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
    bool ignoreInstances = FindMayaObjectPlug("ignoreInstances").asBool();
    bool ignoreVisibility = FindMayaObjectPlug("ignoreVisibility").asBool();
    
-   MPlug plug = FindMayaPlug("mtoa_constant_abc_relativeSamples");
+   MPlug plug = FindMayaPlug("relativeSamples");
    
    bool relativeSamples = (plug.isNull() ? true : plug.asBool());
    
@@ -2272,11 +1887,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
    
    // ---
 
-#ifdef OLD_API
-   if (step == 0)
-#else
    if (!IsExportingMotion())
-#endif
    {
       m_samples.clear();
       
@@ -2356,13 +1967,13 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_outputReference");
+      plug = FindMayaPlug("outputReference");
       if (!plug.isNull() && plug.asBool())
       {
          data += " -outputreference";
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_referenceSource");
+      plug = FindMayaPlug("referenceSource");
       if (!plug.isNull())
       {
          switch (plug.asInt())
@@ -2380,7 +1991,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_referenceFilename");
+      plug = FindMayaPlug("referenceFilename");
       if (!plug.isNull())
       {
          tmp = plug.asString();
@@ -2390,7 +2001,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_referencePositionName");
+      plug = FindMayaPlug("referencePositionName");
       if (!plug.isNull())
       {
          tmp = plug.asString();
@@ -2400,7 +2011,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_referenceNormalName");
+      plug = FindMayaPlug("referenceNormalName");
       if (!plug.isNull())
       {
          tmp = plug.asString();
@@ -2410,13 +2021,13 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_referenceFrame");
+      plug = FindMayaPlug("referenceFrame");
       if (!plug.isNull())
       {
          data += " -referenceframe " + ToString(plug.asFloat());
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_computeTangents");
+      plug = FindMayaPlug("computeTangents");
       if (!plug.isNull())
       {
          tmp = plug.asString();
@@ -2426,7 +2037,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_radiusName");
+      plug = FindMayaPlug("radiusName");
       if (!plug.isNull())
       {
          tmp = plug.asString();
@@ -2437,28 +2048,28 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_radiusScale");
+      plug = FindMayaPlug("radiusScale");
       if (!plug.isNull())
       {
          m_radiusSclMinMax[0] = plug.asFloat();
          data += " -radiusscale " + ToString(m_radiusSclMinMax[0]);
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_radiusMin");
+      plug = FindMayaPlug("radiusMin");
       if (!plug.isNull())
       {
          m_radiusSclMinMax[1] = plug.asFloat();
          data += " -radiusmin " + ToString(m_radiusSclMinMax[1]);
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_radiusMax");
+      plug = FindMayaPlug("radiusMax");
       if (!plug.isNull())
       {
          m_radiusSclMinMax[2] = plug.asFloat();
          data += " -radiusmax " + ToString(m_radiusSclMinMax[2]);
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_peakRadiusName");
+      plug = FindMayaPlug("peakRadiusName");
       if (!plug.isNull())
       {
          tmp = plug.asString();
@@ -2469,40 +2080,40 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_ignoreNurbs");
+      plug = FindMayaPlug("ignoreNurbs");
       if (!plug.isNull() && plug.asBool())
       {
          data += " -ignorenurbs";
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_nurbsSampleRate");
+      plug = FindMayaPlug("nurbsSampleRate");
       if (!plug.isNull())
       {
          data += " -nurbssamplerate " + ToString(plug.asInt());
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_widthScale");
+      plug = FindMayaPlug("widthScale");
       if (!plug.isNull())
       {
          m_widthSclMinMax[0] = plug.asFloat();
          data += " -widthscale " + ToString(m_widthSclMinMax[0]);
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_widthMin");
+      plug = FindMayaPlug("widthMin");
       if (!plug.isNull())
       {
          m_widthSclMinMax[1] = plug.asFloat();
          data += " -widthmin " + ToString(m_widthSclMinMax[1]);
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_widthMax");
+      plug = FindMayaPlug("widthMax");
       if (!plug.isNull())
       {
          m_widthSclMinMax[2] = plug.asFloat();
          data += " -widthmax " + ToString(m_widthSclMinMax[2]);
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_peakWidthName");
+      plug = FindMayaPlug("peakWidthName");
       if (!plug.isNull())
       {
          tmp = plug.asString();
@@ -2513,7 +2124,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_overrideBoundsMinName");
+      plug = FindMayaPlug("overrideBoundsMinName");
       if (!plug.isNull())
       {
          tmp = plug.asString();
@@ -2524,7 +2135,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_overrideBoundsMaxName");
+      plug = FindMayaPlug("overrideBoundsMaxName");
       if (!plug.isNull())
       {
          tmp = plug.asString();
@@ -2535,7 +2146,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_promoteToObjectAttribs");
+      plug = FindMayaPlug("promoteToObjectAttribs");
       if (!plug.isNull())
       {
          tmp = plug.asString();
@@ -2546,7 +2157,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_overrideAttribs");
+      plug = FindMayaPlug("overrideAttribs");
       if (!plug.isNull())
       {
          tmp = plug.asString();
@@ -2556,7 +2167,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_removeAttribPrefices");
+      plug = FindMayaPlug("removeAttribPrefices");
       if (!plug.isNull())
       {
          tmp = plug.asString();
@@ -2566,31 +2177,31 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_objectAttribs");
+      plug = FindMayaPlug("objectAttribs");
       if (!plug.isNull() && plug.asBool())
       {
          data += " -objectattribs";
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_primitiveAttribs");
+      plug = FindMayaPlug("primitiveAttribs");
       if (!plug.isNull() && plug.asBool())
       {
          data += " -primitiveattribs";
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_pointAttribs");
+      plug = FindMayaPlug("pointAttribs");
       if (!plug.isNull() && plug.asBool())
       {
          data += " -pointAttribs";
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_vertexAttribs");
+      plug = FindMayaPlug("vertexAttribs");
       if (!plug.isNull() && plug.asBool())
       {
          data += " -vertexattribs";
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_attribsFrame");
+      plug = FindMayaPlug("attribsFrame");
       if (!plug.isNull())
       {
          switch (plug.asInt())
@@ -2608,7 +2219,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_samplesExpandIterations");
+      plug = FindMayaPlug("samplesExpandIterations");
       if (!plug.isNull())
       {
          int expIter = plug.asInt();
@@ -2616,7 +2227,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          
          if (expIter > 0)
          {
-            plug = FindMayaPlug("mtoa_constant_abc_optimizeSamples");
+            plug = FindMayaPlug("optimizeSamples");
             if (!plug.isNull() && plug.asBool())
             {
                data += " -optimizesamples";
@@ -2624,14 +2235,14 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_velocityScale");
+      plug = FindMayaPlug("velocityScale");
       if (!plug.isNull())
       {
          m_velocityScale = plug.asFloat();
          data += " -velocityscale " + ToString(m_velocityScale);
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_velocityName");
+      plug = FindMayaPlug("velocityName");
       if (!plug.isNull())
       {
          tmp = plug.asString();
@@ -2642,14 +2253,14 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_forceVelocityBlur");
+      plug = FindMayaPlug("forceVelocityBlur");
       if (!plug.isNull())
       {
          m_forceVelocityBlur = plug.asBool();
          data += " -forcevelocityblur";
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_accelerationName");
+      plug = FindMayaPlug("accelerationName");
       if (!plug.isNull())
       {
          tmp = plug.asString();
@@ -2660,7 +2271,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          }
       }
       
-      plug = FindMayaPlug("mtoa_constant_abc_verbose");
+      plug = FindMayaPlug("verbose");
       if (!plug.isNull())
       {
          data += " -verbose";
@@ -2688,51 +2299,6 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
 
 double CAbcTranslator::GetSampleFrame(unsigned int step)
 {
-#ifdef OLD_API
-   MFnDependencyNode opts(m_session->GetArnoldRenderOptions());
-   
-   int steps = opts.findPlug("motion_steps").asInt();
-   
-   if (!IsMotionBlurEnabled() || !IsLocalMotionBlurEnabled() || steps <= 1)
-   {
-      return m_session->GetExportFrame();
-   }
-   else
-   {
-      int mbtype = opts.findPlug("range_type").asInt();
-      float start = m_session->GetExportFrame();
-      float end = start;
-      
-      if (mbtype == MTOA_MBLUR_TYPE_CUSTOM)
-      {
-         start += opts.findPlug("motion_start").asFloat();
-         end += opts.findPlug("motion_end").asFloat();
-      }
-      else
-      {
-         float frames = opts.findPlug("motion_frames").asFloat();
-         
-         if (mbtype == MTOA_MBLUR_TYPE_START)
-         {
-            end += frames;
-         }
-         else if (mbtype == MTOA_MBLUR_TYPE_END)
-         {
-            start -= frames;
-         }
-         else
-         {
-            float half_frames = 0.5f * frames;
-            start -= half_frames;
-            end += half_frames;
-         }
-      }
-      
-      float incr = (end - start) / (steps - 1);
-      
-      return start + step * incr;
-   }
-#else
    unsigned int count = 0;
    const double *frames = GetMotionFrames(count);
    if (step >= count)
@@ -2743,7 +2309,6 @@ double CAbcTranslator::GetSampleFrame(unsigned int step)
    {
       return frames[step];
    }
-#endif
 }
 
 void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
@@ -2754,45 +2319,22 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
    GetFrames(renderFrame, sampleFrame, renderFrame, sampleFrame);
 
    MDagPath masterDag;
-#ifdef OLD_API
-   if (DoIsMasterInstance(m_dagPath, masterDag))
-   {
-      // DoIsMasterInstance doesn't set masterDag when it returns true
-      masterDag = m_dagPath;
-   }
-#else
    masterDag = (IsMasterInstance() ? m_dagPath : GetMasterInstance());
-#endif
 
    ExportProc(proc, step, renderFrame, sampleFrame);
-#if MTOA_ARCH_VERSION_NUM == 1
-   ExportBounds(proc, step);
-#endif
-#ifdef OLD_API
-   ExportMatrix(proc, step);
-#else
    ExportMatrix(proc);
-#endif
 
-#ifdef OLD_API
-   if (step == 0)
-#else
    if (!IsExportingMotion())
-#endif
    {
       MPlug plug;
       const AtNodeEntry *entry = AiNodeGetNodeEntry(proc);
       
       m_exportedSteps.clear();
       
-#ifdef OLD_API
-      ExportShader(proc, update);
-#else
       if (RequiresShaderExport())
       {
          ExportShader(proc, update);
       }
-#endif
       ExportVisibility(proc);
       
       // For meshes
@@ -2957,7 +2499,7 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
          padding += AiNodeGetFlt(proc, "disp_padding");
       }
 
-      MPlug plug = FindMayaPlug("mtoa_constant_abc_boundsPadding");
+      MPlug plug = FindMayaPlug("boundsPadding");
       if (!plug.isNull())
       {
          padding += plug.asFloat();

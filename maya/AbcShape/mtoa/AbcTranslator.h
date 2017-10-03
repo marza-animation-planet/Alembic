@@ -20,10 +20,6 @@
 #include <algorithm>
 #include <set>
 
-#if MTOA_ARCH_VERSION_NUM == 1 && MTOA_MAJOR_VERSION_NUM <= 3
-#  define OLD_API
-#endif
-
 class CAbcTranslator : public CShapeTranslator
 {
 public:
@@ -34,19 +30,9 @@ public:
    virtual AtNode* CreateArnoldNodes();
    virtual void Export(AtNode* atNode);
    virtual bool RequiresMotionData();
-
-#ifdef OLD_API
-   virtual AtNode* Init(CArnoldSession* session, MDagPath &dagPath, MString outputAttr="");
-   virtual AtNode* Init(CArnoldSession* session, MObject &object, MString outputAttr="");
-   virtual void ExportMotion(AtNode* atNode, unsigned int step);
-   virtual void Update(AtNode *atNode);
-   virtual void UpdateMotion(AtNode* atNode, unsigned int step);
-   virtual void Delete();
-#else
    virtual void Init();
    virtual void ExportMotion(AtNode *atNode);
    virtual void RequestUpdate();
-#endif
 
    static void* Create();
    static void NodeInitializer(CAbTranslator context);
@@ -58,16 +44,9 @@ private:
    void ExportVisibility(AtNode *atNode);
    void ExportSubdivAttribs(AtNode *atNode);
    void ExportMeshAttribs(AtNode *atNode);
-#if MTOA_ARCH_VERSION_NUM == 1
-   void ExportBounds(AtNode *atNode, unsigned int step);
-#endif
    void ExportShader(AtNode *atNode, bool update);
    
    bool IsSingleShape() const;
-#if MTOA_ARCH_VERSION_NUM == 1
-   bool IsRenderable(MDagPath dagPath) const;
-   bool IsRenderable(MFnDagNode &node) const;
-#endif
 
    double GetSampleFrame(unsigned int step);
    void GetFrames(double inRenderFrame, double inSampleFrame,
@@ -80,32 +59,18 @@ private:
    
    void ReadAlembicAttributes(double time);
 
-#ifndef OLD_API
    MPlug FindMayaObjectPlug(const MString &attrName, MStatus* ReturnStatus=NULL) const;
-#endif
 
 private:
 
    bool m_motionBlur;
    std::string m_abcPath;
    std::string m_objPath;
-   bool m_computeVelocityExpandedBounds;
-   bool m_overrideBounds;
-   bool m_boundsOverridden;
    double m_renderTime;
-   std::string m_overrideBoundsMin;
-   std::string m_overrideBoundsMax;
-   AtVector m_min;
-   AtVector m_max;
    AlembicScene *m_scene;
-   bool m_padBoundsWithPeakRadius;
-   std::string m_peakRadius;
    float m_radiusSclMinMax[3];
-   bool m_padBoundsWithPeakWidth;
-   std::string m_peakWidth;
    float m_widthSclMinMax[3];
-   float m_peakPadding;
-   std::string m_promoteToObjAttr;
+   std::string m_forceConstantAttributes;
    double m_renderFrame;
    std::string m_velocity;
    float m_velocityScale;

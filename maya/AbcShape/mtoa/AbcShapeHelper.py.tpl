@@ -55,20 +55,6 @@ def AutoSetup(shapes=None, verbose=False):
             print("Could not read alembic file '%s' (%s)" % (abcpath, e))
             continue
       
-      # Check for attribute name overrides
-      promoteAttrs = []
-      names = {}
-      for bn in ("overrideBoundsMin", "overrideBoundsMax", "peakRadius", "peakWidth"):
-         on = cmds.getAttr(shape+".mtoa_constant_abc_%sName" % bn)
-         names[bn] = (bn if not on else on)
-      
-      # Reset attributes
-      cmds.setAttr(shape+".mtoa_constant_abc_useOverrideBounds", False)
-      cmds.setAttr(shape+".mtoa_constant_abc_padBoundsWithPeakRadius", False)
-      cmds.setAttr(shape+".mtoa_constant_abc_padBoundsWithPeakWidth", False)
-      cmds.setAttr(shape+".mtoa_constant_abc_promoteToObjectAttribs", "", type="string")
-      
-      
       def _recurseNodes(node):
          for name, child in node.children.iteritems():
             typ = child.type()
@@ -99,55 +85,20 @@ def AutoSetup(shapes=None, verbose=False):
                
                gprops = props.properties.get(".arbGeomParams", None)
                if gprops:
-                  if names["overrideBoundsMin"] in gprops.properties and names["overrideBoundsMax"] in gprops.properties:
-                     gsm = gprops.properties[names["overrideBoundsMin"]].iobject.getHeader().getMetaData().get("geoScope")
-                     gsM = gprops.properties[names["overrideBoundsMax"]].iobject.getHeader().getMetaData().get("geoScope")
-                     if gsm == gsM and gsm in ("con", "uni"):
-                        cmds.setAttr(shape+".mtoa_constant_abc_useOverrideBounds", True)
-                        if gsm == "uni":
-                           promoteAttrs.append(names["overrideBoundsMin"])
-                           promoteAttrs.append(names["overrideBoundsMax"])
-                  
-                  if names["peakRadius"] in gprops.properties:
-                     gs = gprops.properties[names["peakRadius"]].iobject.getHeader().getMetaData().get("geoScope")
-                     if gs in ("con", "uni"):
-                        cmds.setAttr(shape+".mtoa_constant_abc_padBoundsWithPeakRadius", True)
-                        if gs == "uni":
-                           promoteAttrs.append(names["peakRadius"])
-                  
-                  if names["peakWidth"] in gprops.properties:
-                     gs = gprops.properties[names["peakWidth"]].iobject.getHeader().getMetaData().get("geoScope")
-                     if gs in ("con", "uni"):
-                        cmds.setAttr(shape+".mtoa_constant_abc_padBoundsWithPeakWidth", True)
-                        if gs == "uni":
-                           promoteAttrs.append(names["peakWidth"])
-                  
                   hasPref = ("Pref" in gprops.properties)
                   hasNref = ("Nref" in gprops.properties)
                
                uprops = props.properties.get(".userProperties", None)
                if uprops:
-                  if names["overrideBoundsMin"] in uprops.properties and names["overrideBoundsMax"] in uprops.properties:
-                     cmds.setAttr(shape+".mtoa_constant_abc_useOverrideBounds", True)
-                  
-                  if names["peakRadius"] in uprops.properties:
-                     cmds.setAttr(shape+".mtoa_constant_abc_padBoundsWithPeakRadius", True)
-                  
-                  if names["peakWidth"] in uprops.properties:
-                     cmds.setAttr(shape+".mtoa_constant_abc_padBoundsWithPeakWidth", True)
-                  
                   if "hasReferenceObject" in uprops.properties and hasPref and hasNref:
                      p = uprops.properties["hasReferenceObject"]
                      if p.values[0]:
-                        cmds.setAttr(shape+".mtoa_constant_abc_outputReference", True)
-                        cmds.setAttr(shape+".mtoa_constant_abc_referenceSource", 1)
-                        cmds.setAttr(shape+".mtoa_constant_abc_referencePositionName", "Pref", type="string")
-                        cmds.setAttr(shape+".mtoa_constant_abc_referenceNormalName", "Nref", type="string")
+                        cmds.setAttr(shape+".aiOutputReference", True)
+                        cmds.setAttr(shape+".aiReferenceSource", 1)
+                        cmds.setAttr(shape+".aiReferencePositionName", "Pref", type="string")
+                        cmds.setAttr(shape+".aiReferenceNormalName", "Nref", type="string")
       
       _recurseNodes(a.top)
-      
-      if promoteAttrs:
-         cmds.setAttr(shape+".mtoa_constant_abc_promoteToObjectAttribs", " ".join(promoteAttrs), type="string")
    
    for _, a in archives.iteritems():
       a.close()

@@ -5,81 +5,65 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
    def setup(self):
       self.commonShapeAttributes()
       self.addSeparator()
-      
+
       self.renderStatsAttributes()
-      
       self.addSeparator()
-      
+
       self.addControl("aiSssSetname", label="SSS Set Name")
       self.addControl("aiStepSize", label="Volume Step Size")
+      self.addControl("aiVolumePadding", label="Volume Padding")
       self.addControl("aiUserOptions", label="User Options")
-      
-      self.beginLayout("Bounds", collapse=True)
-      self.addControl("mtoa_constant_abc_useOverrideBounds", label="Use Override Bounds", annotation="Use user defined bounds embedded in ABC file")
-      self.addControl("mtoa_constant_abc_overrideBoundsMinName", label="Override Bounds Min Name")
-      self.addControl("mtoa_constant_abc_overrideBoundsMaxName", label="Override Bounds Max Name")
-      self.addControl("mtoa_constant_abc_computeVelocityExpandedBounds", label="Compute Velocity Expanded Bounds")
-      self.addControl("mtoa_constant_abc_padBoundsWithPeakRadius", label="Pad With Peak Radius")
-      self.addControl("mtoa_constant_abc_peakRadiusName", label="Peak Radius Name")
-      self.addControl("mtoa_constant_abc_padBoundsWithPeakWidth", label="Pad With Peak Width")
-      self.addControl("mtoa_constant_abc_peakWidthName", label="Peak Width Name")
-      self.addControl("mtoa_constant_abc_boundsPadding", label="Bounds Padding")
-      self.endLayout()
-      
-      self.beginLayout("Attributes", collapse=True)
-      self.addControl("mtoa_constant_abc_objectAttribs", label="Output Object Attributes")
-      self.addControl("mtoa_constant_abc_primitiveAttribs", label="Output Primitive Attributes")
-      self.addControl("mtoa_constant_abc_pointAttribs", label="Output Point Attributes")
-      self.addControl("mtoa_constant_abc_vertexAttribs", label="Output Vertex Attributes")
-      self.addControl("mtoa_constant_abc_attribsFrame", label="Attributes Frame")
-      self.addControl("mtoa_constant_abc_promoteToObjectAttribs", label="Promote To Object Attributes")
-      self.addControl("mtoa_constant_abc_removeAttribPrefices", label="Remove Attribute Prefices")
-      self.addSeparator()
-      self.addControl("mtoa_constant_abc_overrideAttribs", label="Override Attributes")
-      self.endLayout()
-      
-      self.beginLayout("Reference Object", collapse=True)
-      self.addControl("mtoa_constant_abc_outputReference", label="Output Reference")
-      self.addControl("mtoa_constant_abc_referenceSource", label="Reference Source")
-      self.addControl("mtoa_constant_abc_referencePositionName", label="Reference Position Name")
-      self.addControl("mtoa_constant_abc_referenceNormalName", label="Reference Normal Name")
-      self.addControl("mtoa_constant_abc_referenceFilename", label="Reference ABC File")
-      self.addControl("mtoa_constant_abc_referenceFrame", label="Reference Frame")
-      self.endLayout()
-      
+
       self.beginLayout("Velocity", collapse=True)
-      self.addControl("mtoa_constant_abc_velocityScale", label="Velocity Scale")
-      self.addControl("mtoa_constant_abc_velocityName", label="Velocity Name")
-      self.addControl("mtoa_constant_abc_accelerationName", label="Acceleration Name")
-      self.addControl("mtoa_constant_abc_forceVelocityBlur", label="Force Velocity Blur")
+      self.addControl("aiVelocityName", label="Velocity Name")
+      self.addControl("aiAccelerationName", label="Acceleration Name")
+      self.addControl("aiVelocityScale", label="Velocity Scale")
+      self.addControl("aiForceVelocityBlur", label="Force Velocity Blur")
       self.endLayout()
-      
+
+      self.beginLayout("Reference Object", collapse=True)
+      self.addControl("aiOutputReference", label="Output Reference")
+      self.addControl("aiReferenceSource", label="Reference Source")
+      self.addControl("aiReferencePositionName", label="Reference Position Name")
+      self.addControl("aiReferenceNormalName", label="Reference Normal Name")
+      self.addControl("aiReferenceFilename", label="Reference ABC File")
+      self.addControl("aiReferenceFrame", label="Reference Frame")
+      self.endLayout()
+
+      self.beginLayout("Attributes", collapse=True)
+      self.addControl("aiRemoveAttributePrefices", label="Remove Attribute Prefices")
+      self.addControl("aiForceConstantAttributes", label="Force Constant Attributes")
+      self.addControl("aiIgnoreAttributes", label="Ignore Attributes")
+      self.addControl("aiAttributesEvaluationTime", label="Attributes Evaluation Time")
+      self.endLayout()
+
       self.beginLayout("Mesh", collapse=True)
-      self.addControl("mtoa_constant_abc_computeTangents", label="Compute Tangents")
+      self.addControl("aiComputeTangentsForUVs", label="Compute Tangents For UVs")
       self.endLayout()
-      
+
       self.beginLayout("Particles", collapse=True)
-      self.addControl("mtoa_constant_abc_radiusName", label="Radius Name")
-      self.addControl("mtoa_constant_abc_radiusScale", label="Radius Scale")
-      self.addControl("mtoa_constant_abc_radiusMin", label="Min. Radius")
-      self.addControl("mtoa_constant_abc_radiusMax", label="Max. Radius")
+      self.addControl("aiRadiusName", label="Radius Name")
+      self.addControl("aiRadiusScale", label="Radius Scale")
+      self.addControl("aiRadiusMin", label="Min. Radius")
+      self.addControl("aiRadiusMax", label="Max. Radius")
       self.endLayout()
-      
+
       self.beginLayout("Curves", collapse=True)
-      self.addControl("mtoa_constant_abc_ignoreNurbs", label="Ignore NURBS")
-      self.addControl("mtoa_constant_abc_nurbsSampleRate", label="NURBS Sample Rate")
-      self.addControl("mtoa_constant_abc_widthScale", label="Width Scale")
-      self.addControl("mtoa_constant_abc_widthMin", label="Min. Width")
-      self.addControl("mtoa_constant_abc_widthMax", label="Max. Width")
+      self.addControl("aiIgnoreNurbs", label="Ignore NURBS")
+      self.addControl("aiNurbsSampleRate", label="NURBS Sample Rate")
+      self.addControl("aiWidthScale", label="Width Scale")
+      self.addControl("aiWidthMin", label="Min. Width")
+      self.addControl("aiWidthMax", label="Max. Width")
       self.endLayout()
-      
-      self.beginLayout("Samples Expansion", collapse=True)
-      self.addControl("mtoa_constant_abc_samplesExpandIterations", label="Expand Samples Iterations")
-      self.addControl("mtoa_constant_abc_optimizeSamples", label="Optimize Samples")
+
+      self.beginLayout("Sampling", collapse=True)
+      self.addControl("aiExpandSamplesIterations", label="Expand Samples Iterations")
+      self.addControl("aiOptimizeSamples", label="Optimize Samples")
       self.endLayout()
-      
+
       self.beginLayout("Others", collapse=True)
-      self.addControl("mtoa_constant_abc_verbose", label="Verbose")
+      self.addControl("aiNameprefix", label="Arnold Names Prefix")
+      self.addControl("aiVerbose", label="Verbose")
       self.endLayout()
 
 templates.registerTranslatorUI(<<NodeName>>Template, "<<NodeName>>", "<<NodeName>>Mtoa")
