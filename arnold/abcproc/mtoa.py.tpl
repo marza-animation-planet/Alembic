@@ -48,10 +48,10 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
 
    elif arnold.AiNodeIs(node, "ginstance"):
       return []
-   
+
    elif not arnold.AiNodeIs(node, "abcproc"):
       return []
-   
+
    if step == 0:
       fname = cmds.getAttr(nodeName+".filePath")
       if fname is None:
@@ -234,14 +234,14 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
          arnold.AiNodeSetInt(node, "attributes_evaluation_time", val)
          setAttrs.append("attributes_evaluation_time")
 
-      arnold.AiNodeSetInt(node, "samples", 1)
+      arnold.AiNodeSetUInt(node, "samples", 1)
       setAttrs.append("samples")
 
       val = stu.GetOverrideAttr(nodeName, "aiExpandSamplesIterations", None)
       if val is not None:
-         arnold.AiNodeSetInt(node, "expand_samples_iterations", val)
+         arnold.AiNodeSetUInt(node, "expand_samples_iterations", val)
          setAttrs.append("expand_samples_iterations")
-         
+
          val = stu.GetOverrideAttr(nodeName, "aiOptimizeSamples", None)
          if val is not None:
             arnold.AiNodeSetBool(node, "optimize_samples", val)

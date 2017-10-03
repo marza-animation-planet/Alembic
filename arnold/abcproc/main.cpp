@@ -26,8 +26,8 @@ node_parameters
    AiParameterFlt(Strings::offset, 0.0f);
    AiParameterBool(Strings::preserve_start_frame, false);
 
-   AiParameterInt(Strings::samples, 1);
-   AiParameterInt(Strings::expand_samples_iterations, 0);
+   AiParameterUInt(Strings::samples, 1);
+   AiParameterUInt(Strings::expand_samples_iterations, 0);
    AiParameterBool(Strings::optimize_samples, false);
 
    AiParameterBool(Strings::ignore_deform_blur, false);
@@ -68,7 +68,7 @@ node_parameters
    AiParameterFlt(Strings::width_max, 1000000.0f);
    AiParameterFlt(Strings::width_scale, 1.0f);
 
-   AiParameterInt(Strings::nurbs_sample_rate, 5);
+   AiParameterUInt(Strings::nurbs_sample_rate, 5);
 
    // Others
    AiParameterBool(Strings::verbose, false);
@@ -90,17 +90,17 @@ procedural_num_nodes
 {
    AiMsgDebug("[abcproc] ProcNumNodes [thread %p]", AiThreadSelf());
    Dso *dso = (Dso*) user_ptr;
-   
+
    return int(dso->numShapes());
 }
 
 procedural_get_node
 {
    // This function won't get call for the same procedural node from different threads
-   
+
    AiMsgDebug("[abcproc] ProcGetNode [thread %p]", AiThreadSelf());
    Dso *dso = (Dso*) user_ptr;
-   
+
    if (i == 0)
    {
       // generate the shape(s)
@@ -109,24 +109,24 @@ procedural_get_node
          // only generates new procedural nodes (read transform and bound information)
          MakeProcedurals procNodes(dso);
          dso->scene()->visit(AlembicNode::VisitDepthFirst, procNodes);
-         
+
          if (procNodes.numNodes() != dso->numShapes())
          {
             AiMsgWarning("[abcproc] %lu procedural(s) generated (%lu expected)", procNodes.numNodes(), dso->numShapes());
          }
-         
+
          CollectWorldMatrices refMatrices(dso);
          if (dso->referenceScene() && !dso->ignoreTransforms())
          {
             dso->referenceScene()->visit(AlembicNode::VisitDepthFirst, refMatrices);
          }
-         
+
          for (size_t i=0; i<dso->numShapes(); ++i)
          {
             AtNode *node = procNodes.node(i);
             Alembic::Abc::M44d W;
             AtMatrix mtx;
-            
+
             if (node && refMatrices.getWorldMatrix(procNodes.path(i), W))
             {
                for (int r=0; r<4; ++r)
@@ -136,12 +136,12 @@ procedural_get_node
                      mtx[r][c] = W[r][c];
                   }
                }
-               
+
                // Store reference object world matrix to avoid having to re-compute it later
                AiNodeDeclare(node, "Mref", "constant MATRIX");
                AiNodeSetMatrix(node, "Mref", mtx);
             }
-            
+
             dso->setGeneratedNode(i, node);
          }
       }
@@ -149,67 +149,67 @@ procedural_get_node
       {
          AtNode *output = 0;
          std::string masterNodeName;
-         
+
          AbcProcGlobalLock::Acquire();
          bool isInstance = dso->isInstance(&masterNodeName);
          AbcProcGlobalLock::Release();
-         
+
          // Keep track of procedural node name
          const char *procName = AiNodeGetName(dso->procNode());
-         
+
          if (!isInstance)
          {
             MakeShape visitor(dso);
             // dso->scene()->visit(AlembicNode::VisitFilteredFlat, visitor);
             dso->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
-            
+
             output = visitor.node();
-            
+
             if (output)
             {
                dso->transferUserParams(output);
-               
+
                AbcProcGlobalLock::Acquire();
-               
+
                if (dso->isInstance(&masterNodeName))
                {
                   std::string name = AiNodeGetName(output);
-                  
+
                   AiMsgWarning("[abcproc] Master node '%s' created in another thread. Ignore %s node '%s'.",
                                masterNodeName.c_str(),
                                AiNodeEntryGetName(AiNodeGetNodeEntry(output)),
                                name.c_str());
-                  
+
                   // reset name to avoid clashes when creating instance
                   name += "_disabled";
                   AiNodeSetStr(output, Strings::name, dso->uniqueName(name).c_str());
                   AiNodeSetByte(output, Strings::visibility, 0);
                   AiNodeSetDisabled(output, true);
-                  
+
                   isInstance = true;
                }
                else
                {
                   dso->setMasterNodeName(AiNodeGetName(output));
                }
-               
+
                AbcProcGlobalLock::Release();
             }
          }
-         
+
          if (isInstance)
          {
             AtNode *master = AiNodeLookUpByName(masterNodeName.c_str());
-            
+
             if (master)
             {
                if (dso->verbose())
                {
                   AiMsgInfo("[abcproc] Create a new instance of \"%s\"", AiNodeGetName(master));
                }
-               
+
                AbcProcGlobalLock::Acquire();
-               
+
                // rename source procedural node if needed
                if (!strcmp(AiNodeGetName(dso->procNode()), procName))
                {
@@ -220,16 +220,16 @@ procedural_get_node
                }
                // use procedural name for newly generated instance
                output = AiNode(Strings::ginstance, procName, dso->procNode());
-               
+
                AbcProcGlobalLock::Release();
-               
+
                AiNodeSetBool(output, Strings::inherit_xform, false);
                AiNodeSetPtr(output, Strings::node, master);
-               
+
                // It seems that when ginstance node don't  inherit from the procedural
                //   attributes like standard shapes
                dso->transferInstanceParams(output);
-               
+
                dso->transferUserParams(output);
             }
             else
@@ -237,11 +237,11 @@ procedural_get_node
                AiMsgWarning("[abcproc] Master node '%s' not yet expanded. Ignore instance.", masterNodeName.c_str());
             }
          }
-         
+
          dso->setGeneratedNode(0, output);
       }
    }
-   
+
    return dso->generatedNode(i);
 }
 
@@ -279,11 +279,11 @@ static void __attribute__((destructor)) on_dlclose(void)
    // Hack around thread termination segfault
    // -> alembic procedural is unloaded before thread finishes
    //    resulting on HDF5 keys to leak
-   
+
    extern pthread_key_t H5TS_errstk_key_g;
    extern pthread_key_t H5TS_funcstk_key_g;
    extern pthread_key_t H5TS_cancel_key_g;
-   
+
    pthread_key_delete(H5TS_cancel_key_g);
    pthread_key_delete(H5TS_funcstk_key_g);
    pthread_key_delete(H5TS_errstk_key_g);

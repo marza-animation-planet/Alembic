@@ -13,7 +13,7 @@ const char* CycleTypeNames[] =
    "clip",
    NULL
 };
-   
+
 const char* AttributesEvaluationTimeNames[] =
 {
    "render",
@@ -110,7 +110,7 @@ std::string Dso::CommonParameters::shapeKey() const
    oss << " psf:" << (preserveStartFrame ? "1" : "0");
    // Sampling
    oss << " smp:" << samples;
-   oss << " esi:" << (expandSamplesIterations <= 0 ? 0 : expandSamplesIterations);
+   oss << " esi:" << expandSamplesIterations;
    oss << " osm:" << (optimizeSamples ? "1" : "0");
    // Reference
    if (outputReference)
@@ -259,9 +259,9 @@ Dso::Dso(AtNode *node)
 {
    mCommonParams.reset();
    mSingleParams.reset();
-   
+
    readParams();
-   
+
    AtNode *opts = AiUniverseGetOptions();
 
    // Set framerate if needed
@@ -275,14 +275,14 @@ Dso::Dso(AtNode *node)
             mCommonParams.fps = fps;
          }
       }
-      
+
       if (mCommonParams.fps <= 0.0)
       {
          AiMsgWarning("[abcproc] Defaulting 'fps' to 24");
          mCommonParams.fps = 24.0;
       }
    }
-   
+
    // Set global frame
    if (AiNodeLookUpUserParameter(opts, "frame") != 0)
    {
@@ -316,7 +316,7 @@ Dso::Dso(AtNode *node)
    bool useReferenceFile = mCommonParams.outputReference &&
                            (mCommonParams.referenceSource == RS_file ||
                             mCommonParams.referenceSource == RS_attributes_then_file);
-   
+
    normalizeFilePath(mCommonParams.filePath);
    if (useReferenceFile && mCommonParams.referenceFilePath.length() == 0)
    {
@@ -325,10 +325,10 @@ Dso::Dso(AtNode *node)
       mCommonParams.referenceFilePath = getReferencePath(mCommonParams.filePath);
    }
    normalizeFilePath(mCommonParams.referenceFilePath);
-   
+
    // mReverseWinding = AiNodeGetBool(opts, "CCW_points");
    mReverseWinding = true;
-   
+
    // Only acquire global lock when create new alembic scenes
    //
    // Alembic libs should be build with a threadsafe version of HDF5 that will handle
@@ -336,33 +336,33 @@ Dso::Dso(AtNode *node)
    // Same with Ogawa backend
    {
       AbcProcScopeLock _lock;
-      
+
       char id[64];
       sprintf(id, "%p", AiThreadSelf());
-      
+
       AlembicSceneFilter filter(mCommonParams.objectPath, "");
 
       AlembicSceneCache::SetConcurrency(size_t(AiNodeGetInt(opts, "threads")));
-      
+
       mScene = AlembicSceneCache::Ref(mCommonParams.filePath, id, filter, true);
-   
+
       if (useReferenceFile && mCommonParams.referenceFilePath.length() > 0)
       {
          mRefScene = AlembicSceneCache::Ref(mCommonParams.referenceFilePath, id, filter, true);
       }
    }
-   
+
    if (mScene)
    {
       // mScene->setFilter(mCommonParams.objectPath);
-      
+
       if (mCommonParams.startFrame > mCommonParams.endFrame)
       {
          if (mCommonParams.verbose)
          {
             AiMsgInfo("[abcproc] Get frame range from ABC file");
          }
-         
+
          GetTimeRange visitor;
          mScene->visit(AlembicNode::VisitDepthFirst, visitor);
          if (visitor.getRange(mCommonParams.startFrame, mCommonParams.endFrame))
@@ -375,17 +375,17 @@ Dso::Dso(AtNode *node)
             mCommonParams.startFrame = mCommonParams.frame;
             mCommonParams.endFrame = mCommonParams.frame;
          }
-         
+
          if (mCommonParams.verbose)
          {
             AiMsgInfo("[abcproc]   %f - %f", mCommonParams.startFrame, mCommonParams.endFrame);
          }
       }
-      
+
       bool exclude = false;
-      
+
       mRenderTime = computeTime(mCommonParams.frame, &exclude);
-      
+
       if (!exclude)
       {
          if (mCommonParams.verbose)
@@ -395,24 +395,24 @@ Dso::Dso(AtNode *node)
                       mCommonParams.startFrame / mCommonParams.fps,
                       mCommonParams.endFrame / mCommonParams.fps);
          }
-         
+
          CountShapes visitor(mRenderTime,
                              mCommonParams.ignoreTransforms,
                              mCommonParams.ignoreInstances,
                              mCommonParams.ignoreVisibility,
                              mCommonParams.ignoreNurbs);
-         
+
          mScene->visit(AlembicNode::VisitDepthFirst, visitor);
-         
+
          if (mCommonParams.verbose)
          {
             AiMsgInfo("[abcproc] %lu shape(s) in scene", visitor.numShapes());
          }
-         
+
          mMode = PM_multi;
          mNumShapes = visitor.numShapes();
          setGeneratedNodesCount(mNumShapes);
-         
+
          if (mNumShapes == 1 && mCommonParams.ignoreTransforms)
          {
             // output a single shape in object space
@@ -443,8 +443,8 @@ Dso::Dso(AtNode *node)
             }
             else
             {
-               double motionStep = (mMotionEnd - mMotionStart) / double(mCommonParams.samples - 1); 
-               for (int i=0; i<mCommonParams.samples; ++i)
+               double motionStep = (mMotionEnd - mMotionStart) / double(mCommonParams.samples - 1);
+               for (unsigned int i=0; i<mCommonParams.samples; ++i)
                {
                   double sampleFrame = mMotionStart +  i * motionStep;;
                   sampleFrames.push_back(sampleFrame);
@@ -460,10 +460,10 @@ Dso::Dso(AtNode *node)
          {
             std::vector<double> newSampleFrames;
 
-            for (int i=0; i<mCommonParams.expandSamplesIterations; ++i)
+            for (unsigned int i=0; i<mCommonParams.expandSamplesIterations; ++i)
             {
                newSampleFrames.push_back(expandedSampleFrames[0]);
-               
+
                for (size_t j=1; j<expandedSampleFrames.size(); ++j)
                {
                   double mid = 0.5 * (expandedSampleFrames[j-1] + expandedSampleFrames[j]);
@@ -486,18 +486,18 @@ Dso::Dso(AtNode *node)
          if (mCommonParams.optimizeSamples)
          {
             // Remove samples outside of camera shutter range
-            
+
             // With arnold 5, each shape node has 'motion_start' and 'motion_end'
             // attributes to specify frame relative sample ranges.
-            // Samples within that range are considered uniform and shared for 
+            // Samples within that range are considered uniform and shared for
             // both deformation and transformation
-            
+
             std::vector<double> newSampleFrames;
-            
+
             for (size_t i=0; i<expandedSampleFrames.size(); ++i)
             {
                double sampleFrame = expandedSampleFrames[i];
-               
+
                if (sampleFrame < shutterOpenFrame)
                {
                   continue;
@@ -518,12 +518,12 @@ Dso::Dso(AtNode *node)
                   newSampleFrames.push_back(sampleFrame);
                }
             }
-            
+
             if (newSampleFrames.size() > 0 && newSampleFrames.size() < expandedSampleFrames.size())
             {
                std::swap(expandedSampleFrames, newSampleFrames);
                // NOTE: if transform was already sampled on the procedural, any
-               //       modifications to motion_start and motion_end should influence them 
+               //       modifications to motion_start and motion_end should influence them
                mMotionStart = expandedSampleFrames.front();
                mMotionEnd = expandedSampleFrames.back();
             }
@@ -537,7 +537,7 @@ Dso::Dso(AtNode *node)
 
          // Compute shape key
          mShapeKey = shapeKey();
-         
+
          if (mCommonParams.verbose)
          {
             for (size_t i=0; i<mExpandedTimeSamples.size(); ++i)
@@ -545,12 +545,12 @@ Dso::Dso(AtNode *node)
                AiMsgInfo("[abcproc] Add motion sample time: %lf [frame=%lf]", mExpandedTimeSamples[i], expandedSampleFrames[i]);
             }
          }
-         
+
          if (mMode == PM_single)
          {
             // Read instance_num attribute
             mInstanceNum = 0;
-            
+
             const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mProcNode, Strings::instance_num);
             if (pe)
             {
@@ -569,7 +569,7 @@ Dso::Dso(AtNode *node)
                }
             }
          }
-         
+
          // Check if we should export a box for volume shading rather than a new procedural or shape
          const AtUserParamEntry *pe = AiNodeLookUpUserParameter(mProcNode, Strings::step_size);
          if (pe)
@@ -605,10 +605,10 @@ Dso::Dso(AtNode *node)
 Dso::~Dso()
 {
    AbcProcScopeLock _lock;
-   
+
    char id[64];
    sprintf(id, "%p", AiThreadSelf());
-   
+
    if (mScene)
    {
       AlembicSceneCache::Unref(mScene, id);
@@ -623,9 +623,9 @@ std::string Dso::getReferencePath(const std::string &basePath) const
 {
    std::string dotRefPath;
    std::string refPath;
-  
+
    size_t p0 = basePath.find_last_of("\\/");
-  
+
    size_t p1 = basePath.rfind('.');
    if (p1 == std::string::npos || (p0 != std::string::npos && p0 > p1))
    {
@@ -635,13 +635,13 @@ std::string Dso::getReferencePath(const std::string &basePath) const
    {
       dotRefPath = basePath.substr(0, p1) + ".ref";
    }
-   
+
    std::ifstream dotRefFile(dotRefPath.c_str());
-   
+
    if (dotRefFile.is_open())
    {
       std::getline(dotRefFile, refPath);
-      
+
       if (!dotRefFile.fail())
       {
          if (verbose())
@@ -654,7 +654,7 @@ std::string Dso::getReferencePath(const std::string &basePath) const
          refPath = "";
       }
    }
-   
+
    return refPath;
 }
 
@@ -681,7 +681,7 @@ double Dso::attributesTime(AttributesEvaluationTime aet) const
    double shutterOpenFrame = AiCameraGetShutterStart();
    double shutterCloseFrame = AiCameraGetShutterEnd();
    double shutterCenterFrame = 0.5 * (shutterOpenFrame + shutterCloseFrame);
-   
+
    switch (aet)
    {
    case AET_shutter:
@@ -706,10 +706,10 @@ std::string Dso::uniqueName(const std::string &baseName) const
    while (AiNodeLookUpByName(name.c_str()) != 0)
    {
       ++i;
-      
+
       std::ostringstream oss;
       oss << baseName << i;
-      
+
       name = oss.str();
    }
 
@@ -723,27 +723,27 @@ double Dso::computeTime(double frame, bool *exclude) const
    {
       *exclude = false;
    }
-   
+
    double extraOffset = 0.0;
-   
+
    if (mCommonParams.preserveStartFrame && fabs(mCommonParams.speed) > 0.0001)
    {
       extraOffset = (mCommonParams.startFrame * (mCommonParams.speed - 1.0) / mCommonParams.speed);
    }
-   
+
    double invFps = 1.0 / mCommonParams.fps;
-   
+
    double t = mCommonParams.speed * invFps * (frame - (mCommonParams.offset + extraOffset));
-   
+
    // Apply cycle type
-   
+
    double startTime = invFps * mCommonParams.startFrame;
    double endTime = invFps * mCommonParams.endFrame;
-   
+
    double playTime = endTime - startTime;
    double eps = 0.001;
    double t2 = t;
-   
+
    switch (mCommonParams.cycle)
    {
    case CT_loop:
@@ -752,7 +752,7 @@ double Dso::computeTime(double frame, bool *exclude) const
          double timeOffset = t - startTime;
          double playOffset = floor(timeOffset / playTime);
          double fraction = fabs(timeOffset / playTime - playOffset);
-         
+
          t2 = startTime + fraction * playTime;
       }
       break;
@@ -762,7 +762,7 @@ double Dso::computeTime(double frame, bool *exclude) const
          double timeOffset = t - startTime;
          double playOffset = floor(timeOffset / playTime);
          double fraction = fabs(timeOffset / playTime - playOffset);
-         
+
          t2 = endTime - fraction * playTime;
       }
       else if (t < (startTime + eps))
@@ -780,7 +780,7 @@ double Dso::computeTime(double frame, bool *exclude) const
          double timeOffset = t - startTime;
          double playOffset = floor(timeOffset / playTime);
          double fraction = fabs(timeOffset / playTime - playOffset);
-         
+
          if (int(playOffset) % 2 == 0)
          {
             t2 = startTime + fraction * playTime;
@@ -821,7 +821,7 @@ double Dso::computeTime(double frame, bool *exclude) const
       }
       break;
    }
-   
+
    return t2;
 }
 
@@ -829,27 +829,27 @@ bool Dso::cleanAttribName(std::string &name) const
 {
    size_t len = name.length();
    size_t llen = 0;
-   
+
    std::set<std::string>::const_iterator it = mCommonParams.removeAttributePrefices.begin();
-   
+
    while (it != mCommonParams.removeAttributePrefices.end())
    {
       size_t plen = it->length();
-      
+
       if (len > plen && plen > llen && !strncmp(name.c_str(), it->c_str(), plen))
       {
          llen = plen;
       }
-      
+
       ++it;
    }
-   
+
    if (llen > 0)
    {
       name = name.substr(llen);
       return true;
    }
-   
+
    return false;
 }
 
@@ -865,12 +865,12 @@ void Dso::normalizeFilePath(std::string &path) const
       p0 = p1 + 1;
       p1 = path.find('\\', p0);
    }
-   
+
    #ifdef _WIN32
-   
+
    // Convert to lower calse
    toLower(path);
-   
+
    // Add driver letter
    if (path.length() >= 1 && path[0] == '/')
    {
@@ -891,9 +891,9 @@ void Dso::normalizeFilePath(std::string &path) const
          // -> i.e: //10.10.121.1/ifs/mz_onyx/... should not be mapped
       }
    }
-   
+
    #else
-   
+
    // Remove driver letter
    if (path.length() >= 2 && path[1] == ':' &&
        ((path[0] >= 'a' && path[0] <= 'z') ||
@@ -901,7 +901,7 @@ void Dso::normalizeFilePath(std::string &path) const
    {
       path = path.substr(2);
    }
-   
+
    #endif
 }
 
@@ -909,13 +909,13 @@ void Dso::strip(std::string &s) const
 {
    size_t p0 = s.find_first_not_of(" \t\n\v");
    size_t p1 = s.find_last_not_of(" \t\n\v");
-   
+
    if (p0 == std::string::npos || p1 == std::string::npos)
    {
       s = "";
       return;
    }
-   
+
    s = s.substr(p0, p1-p0+1);
 }
 
@@ -958,8 +958,8 @@ void Dso::setSingleParams(AtNode *node, const std::string &objectPath) const
    //  Sampling
    AiNodeSetFlt(node, Strings::motion_start, mMotionStart - mGlobalFrame);
    AiNodeSetFlt(node, Strings::motion_end, mMotionEnd - mGlobalFrame);
-   AiNodeSetInt(node, Strings::samples, int(mExpandedTimeSamples.size()));
-   AiNodeSetInt(node, Strings::expand_samples_iterations, 0); // mCommonParams.expandSamplesIterations);
+   AiNodeSetUInt(node, Strings::samples, (unsigned int)mExpandedTimeSamples.size());
+   AiNodeSetUInt(node, Strings::expand_samples_iterations, 0); // mCommonParams.expandSamplesIterations);
    AiNodeSetBool(node, Strings::optimize_samples, false); // mCommonParams.optimizeSamples);
    //  Ignores
    AiNodeSetBool(node, Strings::ignore_deform_blur, mCommonParams.ignoreDeformBlur);
@@ -1016,7 +1016,7 @@ void Dso::setSingleParams(AtNode *node, const std::string &objectPath) const
    AiNodeSetFlt(node, Strings::width_min, mSingleParams.widthMin);
    AiNodeSetFlt(node, Strings::width_max, mSingleParams.widthMax);
    AiNodeSetFlt(node, Strings::width_scale, mSingleParams.widthScale);
-   AiNodeSetInt(node, Strings::nurbs_sample_rate, mSingleParams.nurbsSampleRate);
+   AiNodeSetUInt(node, Strings::nurbs_sample_rate, mSingleParams.nurbsSampleRate);
 }
 
 void Dso::readParams()
@@ -1026,7 +1026,7 @@ void Dso::readParams()
 
    // Drive for directory mapping
    str = AiNodeGetStr(mProcNode, Strings::rootdrive).c_str();
-   if (str.length() == 1 && 
+   if (str.length() == 1 &&
        ((str[0] >= 'a' && str[0] <= 'z') ||
         (str[0] >= 'A' && str[0] <= 'Z')))
    {
@@ -1051,8 +1051,8 @@ void Dso::readParams()
    mCommonParams.preserveStartFrame = AiNodeGetBool(mProcNode, Strings::preserve_start_frame);
    mCommonParams.cycle = (CycleType) AiNodeGetInt(mProcNode, Strings::cycle);
    //  Sampling
-   mCommonParams.samples = AiNodeGetInt(mProcNode, Strings::samples);
-   mCommonParams.expandSamplesIterations = AiNodeGetInt(mProcNode, Strings::expand_samples_iterations);
+   mCommonParams.samples = AiNodeGetUInt(mProcNode, Strings::samples);
+   mCommonParams.expandSamplesIterations = AiNodeGetUInt(mProcNode, Strings::expand_samples_iterations);
    mCommonParams.optimizeSamples = AiNodeGetBool(mProcNode, Strings::optimize_samples);
    //  Ignores
    mCommonParams.ignoreDeformBlur = (AiNodeGetBool(mProcNode, Strings::ignore_deform_blur) || mCommonParams.ignoreDeformBlur);
@@ -1130,7 +1130,7 @@ void Dso::readParams()
    mSingleParams.widthMin = AiNodeGetFlt(mProcNode, Strings::width_min);
    mSingleParams.widthMax = AiNodeGetFlt(mProcNode, Strings::width_max);
    mSingleParams.widthScale = AiNodeGetFlt(mProcNode, Strings::width_scale);
-   mSingleParams.nurbsSampleRate = AiNodeGetInt(mProcNode, Strings::nurbs_sample_rate);
+   mSingleParams.nurbsSampleRate = AiNodeGetUInt(mProcNode, Strings::nurbs_sample_rate);
 }
 
 void Dso::transferInstanceParams(AtNode *dst)
@@ -1149,9 +1149,9 @@ void Dso::transferInstanceParams(AtNode *dst)
    AiNodeSetFlt(dst, Strings::motion_start, AiNodeGetFlt(mProcNode, Strings::motion_start));
    AiNodeSetFlt(dst, Strings::motion_end, AiNodeGetFlt(mProcNode, Strings::motion_end));
    AiNodeSetInt(dst, Strings::transform_type, AiNodeGetInt(mProcNode, Strings::transform_type));
-     
+
    AtArray *ary;
-  
+
    ary = AiNodeGetArray(mProcNode, Strings::shader);
    if (ary)
    {
@@ -1191,16 +1191,16 @@ void Dso::transferUserParams(AtNode *dst)
    {
       AiMsgInfo("[abcproc] Copy user attributes...");
    }
-   
+
    std::set<std::string> fviattrs; // face varying attributes indices
    std::set<std::string> ncattrs; // non constant attributes
 
    AtUserParamIterator *pit = AiNodeGetUserParamIterator(mProcNode);
-  
+
    while (!AiUserParamIteratorFinished(pit))
    {
       const AtUserParamEntry *upe = AiUserParamIteratorGetNext(pit);
-      
+
       bool doDeclare = true;
       bool doCopy = true;
 
@@ -1233,26 +1233,26 @@ void Dso::transferUserParams(AtNode *dst)
             AiMsgInfo("[abcproc]   Process parameter \"%s\"", pname);
          }
       }
-      
+
       if (fviattrs.find(pname) != fviattrs.end())
       {
          if (verbose())
          {
             AiMsgInfo("[abcproc]     Face varying attribute indices attribute \"%s\", do not declare", pname);
          }
-         
+
          doDeclare = false;
-         
+
          // Check that value attribute was properly
          std::string vname(pname);
          // Strip 'idxs' suffix
          vname = vname.substr(0, vname.length()-4);
-         
+
          if (verbose())
          {
             AiMsgInfo("[abcproc]     Check if \"%s\" or \"%slist\" were exported", vname.c_str(), vname.c_str());
          }
-         
+
          if (ncattrs.find(vname) == ncattrs.end() && ncattrs.find(vname+"list") == ncattrs.end())
          {
             if (verbose())
@@ -1274,10 +1274,10 @@ void Dso::transferUserParams(AtNode *dst)
       }
 
       const AtParamEntry *pe = AiNodeEntryLookUpParameter(AiNodeGetNodeEntry(dst), pname);
-      
+
       int mptype = -1;
       std::string indexAttr;
-    
+
       if (pcat == AI_USERDEF_INDEXED)
       {
          // Note: what is the category of the index array for an indexed attribute?
@@ -1287,22 +1287,22 @@ void Dso::transferUserParams(AtNode *dst)
          {
            indexAttr = indexAttr.substr(0, indexAttr.length()-4);
          }
-         
+
          indexAttr += "idxs";
-         
+
          fviattrs.insert(indexAttr);
-         
+
          if (verbose())
          {
             AiMsgInfo("[abcproc]     Add index attribute name \"%s\"", indexAttr.c_str());
          }
       }
-      
+
       if (pe == NULL)
       {
          // No such built-in attribute on newly created node
          mptype = ptype;
-      
+
          if (AiNodeLookUpUserParameter(dst, pname) != 0)
          {
             // Already declared during expansion (most probably read from gto file)
@@ -1416,7 +1416,7 @@ void Dso::transferUserParams(AtNode *dst)
          {
             AiMsgInfo("[abcproc]     Parameter already exists on target node (%s)", AiNodeEntryGetName(AiNodeGetNodeEntry(dst)));
          }
-         
+
          mptype = AiParamGetType(pe);
          if (mptype != ptype)
          {
@@ -1451,14 +1451,14 @@ void Dso::transferUserParams(AtNode *dst)
             }
          }
       }
-    
+
       if (doCopy)
       {
          if (verbose())
          {
             AiMsgInfo("[abcproc]     Copy %s", pname);
          }
-         
+
          AtNode *link = AiNodeGetLink(mProcNode, pname);
          if (link != 0)
          {
@@ -1576,7 +1576,7 @@ void Dso::transferUserParams(AtNode *dst)
                default:
                   continue;
                }
-            
+
                AtArray *valCopy = AiArrayCopy(val);
                AiNodeSetArray(dst, pname, valCopy);
             }
@@ -1709,6 +1709,6 @@ void Dso::transferUserParams(AtNode *dst)
          }
       }
    }
-   
+
    AiUserParamIteratorDestroy(pit);
 }

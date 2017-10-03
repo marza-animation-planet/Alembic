@@ -49,168 +49,168 @@ extern const char* ReferenceSourceNames[];
 class Dso
 {
 public:
-   
+
    Dso(AtNode *node);
    ~Dso();
-   
+
    void readParams();
    void setSingleParams(AtNode *node, const std::string &objectPath) const;
-   
+
    void transferUserParams(AtNode *dst);
    void transferInstanceParams(AtNode *dst);
-   
-   
+
+
    inline AtNode* procNode() const
    {
       return mProcNode;
    }
-   
+
    inline AlembicScene* scene() const
    {
       return mScene;
    }
-   
+
    inline AlembicScene* referenceScene() const
    {
       return mRefScene;
    }
-   
+
    // Common setup
-   
+
    inline bool verbose() const
    {
       return mCommonParams.verbose;
    }
-   
+
    inline ProceduralMode mode() const
    {
       return mMode;
    }
-   
+
    inline const std::string& filePath() const
    {
       return mCommonParams.filePath;
    }
-   
+
    inline bool outputReference() const
    {
       return mCommonParams.outputReference;
    }
-   
+
    inline ReferenceSource referenceSource() const
    {
       return mCommonParams.referenceSource;
    }
-   
+
    inline const std::string& referenceFilePath() const
    {
       return mCommonParams.referenceFilePath;
    }
-   
+
    inline float referenceFrame() const
    {
       return mCommonParams.referenceFrame;
    }
-   
+
    inline const std::string& referencePositionName() const
    {
       return mCommonParams.referencePositionName;
    }
-   
+
    inline const std::string& referenceNormalName() const
    {
       return mCommonParams.referenceNormalName;
    }
-   
+
    inline const std::string& objectPath() const
    {
       return mCommonParams.objectPath;
    }
-   
+
    inline const std::string& namePrefix() const
    {
       return mCommonParams.namePrefix;
    }
-   
+
    inline bool ignoreVisibility() const
    {
       return mCommonParams.ignoreVisibility;
    }
-   
+
    inline bool ignoreInstances() const
    {
       return mCommonParams.ignoreInstances;
    }
-   
+
    inline bool ignoreMotionBlur() const
    {
       return (ignoreDeformBlur() && ignoreTransformBlur());
    }
-   
+
    inline bool ignoreDeformBlur() const
    {
       return mCommonParams.ignoreDeformBlur;
    }
-   
+
    inline bool ignoreTransformBlur() const
    {
       return mCommonParams.ignoreTransformBlur;
    }
-   
+
    inline bool ignoreTransforms() const
    {
       return mCommonParams.ignoreTransforms;
    }
-   
+
    inline double renderTime() const
    {
       return mRenderTime;
    }
-   
+
    double attributesTime(AttributesEvaluationTime aet) const;
-   
+
    inline double fps() const
    {
       return mCommonParams.fps;
    }
-   
+
    inline size_t numMotionSamples() const
    {
       return mExpandedTimeSamples.size();
    }
-   
+
    inline double motionSampleTime(size_t i) const
    {
       return mExpandedTimeSamples[i];
    }
-   
+
    inline const std::vector<double>& motionSampleTimes() const
    {
       return mExpandedTimeSamples;
    }
-   
+
    inline float velocityScale() const
    {
       return mCommonParams.velocityScale;
    }
-   
+
    inline const char* velocityName() const
    {
       return (mCommonParams.velocityName.length() > 0 ? mCommonParams.velocityName.c_str() : 0);
    }
-   
+
    inline const char* accelerationName() const
    {
       return (mCommonParams.accelerationName.length() > 0 ? mCommonParams.accelerationName.c_str() : 0);
    }
-   
+
    inline bool forceVelocityBlur() const
    {
       return mCommonParams.forceVelocityBlur;
    }
-   
+
    double computeTime(double frame, bool *exclude=0) const;
-   
+
    // Attributes
 
    inline AttributesEvaluationTime attributesEvaluationTime() const
@@ -250,9 +250,9 @@ public:
    {
       return (mSingleParams.computeTangentsForUVs.find(uvname) != mSingleParams.computeTangentsForUVs.end());
    }
-   
+
    // Points
-   
+
    inline const char* radiusName() const
    {
       return (mSingleParams.radiusName.length() > 0 ? mSingleParams.radiusName.c_str() : 0);
@@ -280,7 +280,7 @@ public:
       return mCommonParams.ignoreNurbs;
    }
 
-   inline int nurbsSampleRate() const
+   inline unsigned int nurbsSampleRate() const
    {
       return mSingleParams.nurbsSampleRate;
    }
@@ -301,38 +301,38 @@ public:
    }
 
    // Volume
-   
+
    inline bool isVolume() const
    {
       return (mStepSize > 0.0f);
    }
-   
+
    inline float volumeStepSize() const
    {
       return mStepSize;
    }
-   
+
    inline float volumePadding() const
    {
       return mVolumePadding;
    }
 
    // Instance tacking
-   
+
    inline void setMasterNodeName(const std::string &name)
    {
       msMasterNodes[mShapeKey] = name;
    }
-   
+
    inline const std::string& masterNodeName() const
    {
       return msMasterNodes[mShapeKey];
    }
-   
+
    inline bool isInstance(std::string *masterNodeName=0) const
    {
       std::map<std::string, std::string>::const_iterator it = msMasterNodes.find(mShapeKey);
-      
+
       if (it != msMasterNodes.end())
       {
          if (masterNodeName)
@@ -346,40 +346,40 @@ public:
          return false;
       }
    }
-   
+
    inline int instanceNumber() const
    {
       return mInstanceNum;
    }
-   
+
    // Node tracking
-   
+
    void setGeneratedNode(size_t idx, AtNode *node);
-   
+
    inline size_t numGeneratedNodes() const
    {
       return mGeneratedNodes.size();
    }
-   
+
    inline AtNode* generatedNode(size_t idx) const
    {
       return (idx < mGeneratedNodes.size() ? mGeneratedNodes[idx] : 0);
    }
 
 private:
-   
+
    std::string getReferencePath(const std::string &basePath) const;
-   
+
    void strip(std::string &s) const;
    void toLower(std::string &s) const;
    void normalizeFilePath(std::string &path) const;
-   
+
    void setGeneratedNodesCount(size_t n);
-   
+
    std::string shapeKey() const;
-   
+
 private:
-   
+
    struct CommonParameters
    {
       std::string filePath;
@@ -396,8 +396,8 @@ private:
       double offset;
       double fps;
 
-      int samples;
-      int expandSamplesIterations;
+      unsigned int samples;
+      unsigned int expandSamplesIterations;
       bool optimizeSamples;
 
       bool ignoreDeformBlur;
@@ -418,7 +418,7 @@ private:
       std::string referencePositionName;
       std::string referenceNormalName;
       float referenceFrame;
-      
+
       float velocityScale;
       std::string velocityName;
       std::string accelerationName;
@@ -432,7 +432,7 @@ private:
       void reset();
       std::string shapeKey() const;
    };
-   
+
    struct SingleParameters
    {
       // mesh
@@ -448,47 +448,47 @@ private:
       float widthMin;
       float widthMax;
       float widthScale;
-      int nurbsSampleRate;
+      unsigned int nurbsSampleRate;
 
       void reset();
       std::string shapeKey() const;
    };
-   
+
    // ---
-   
+
    AtNode *mProcNode;
-   
+
    ProceduralMode mMode;
-   
+
    CommonParameters mCommonParams;
    SingleParameters mSingleParams;
-   
+
    AlembicScene *mScene;
    AlembicScene *mRefScene;
-   
+
    // For simple unix/window directory mapping
    std::string mRootDrive;
-   
+
    double mRenderTime;
    std::vector<double> mTimeSamples;
    std::vector<double> mExpandedTimeSamples;
-   
+
    float mStepSize;
    float mVolumePadding;
-   
+
    size_t mNumShapes;
-   
+
    std::string mShapeKey;
    int mInstanceNum;
-   
+
    // in frames
    double mMotionStart;
    double mMotionEnd;
-   
+
    std::vector<AtNode*> mGeneratedNodes;
-   
+
    bool mReverseWinding;
-   
+
    double mGlobalFrame;
 
    static std::map<std::string, std::string> msMasterNodes;
