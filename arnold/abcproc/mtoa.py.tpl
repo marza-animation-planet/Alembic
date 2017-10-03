@@ -8,6 +8,9 @@ import scriptedTranslatorUtils as stu
 Cycles = ["hold", "loop", "reverse", "bounce"]
 AttributesEvaluationTime = ["render", "shutter", "shutter_open", "shutter_close"]
 
+def ArnoldType():
+   return "abcproc"
+
 def IsShape():
    return True
 
@@ -147,8 +150,12 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
 
       val = stu.GetOverrideAttr(nodeName, "aiComputeTangentsForUVs", None)
       if val is not None:
-         # TODO
-         pass
+         lst = filter(lambda y: len(y) > 0, map(lambda x: x.strip(), val.split(" ")))
+         ary = arnold.AiArrayAllocate(len(lst), 1, arnold.AI_TYPE_STRING)
+         for i in xrange(len(lst)):
+            arnold.AiArraySetStr(ary, i, lst[i])
+         arnold.AiNodeSetArray(node, "compute_tangents_for_uvs", ary)
+         setAttrs.append("compute_tangents_for_uvs")
 
       val = stu.GetOverrideAttr(nodeName, "aiRadiusName", None)
       if val is not None:
@@ -197,23 +204,38 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
 
       val = stu.GetOverrideAttr(nodeName, "aiRemoveAttributePrefices", None)
       if val is not None:
-         # TODO
-         pass
+         lst = filter(lambda y: len(y) > 0, map(lambda x: x.strip(), val.split(" ")))
+         ary = arnold.AiArrayAllocate(len(lst), 1, arnold.AI_TYPE_STRING)
+         for i in xrange(len(lst)):
+            arnold.AiArraySetStr(ary, i, lst[i])
+         arnold.AiNodeSetArray(node, "remove_attribute_prefices", ary)
+         setAttrs.append("remove_attribute_prefices")
 
       val = stu.GetOverrideAttr(nodeName, "aiForceConstantAttributes", None)
       if val is not None:
-         # TODO
-         pass
+         lst = filter(lambda y: len(y) > 0, map(lambda x: x.strip(), val.split(" ")))
+         ary = arnold.AiArrayAllocate(len(lst), 1, arnold.AI_TYPE_STRING)
+         for i in xrange(len(lst)):
+            arnold.AiArraySetStr(ary, i, lst[i])
+         arnold.AiNodeSetArray(node, "force_constant_attributes", ary)
+         setAttrs.append("force_constant_attributes")
 
       val = stu.GetOverrideAttr(nodeName, "aiIgnoreAttributes", None)
       if val is not None:
-         # TODO
-         pass
+         lst = filter(lambda y: len(y) > 0, map(lambda x: x.strip(), val.split(" ")))
+         ary = arnold.AiArrayAllocate(len(lst), 1, arnold.AI_TYPE_STRING)
+         for i in xrange(len(lst)):
+            arnold.AiArraySetStr(ary, i, lst[i])
+         arnold.AiNodeSetArray(node, "ignore_attributes", ary)
+         setAttrs.append("ignore_attributes")
 
       val = stu.GetOverrideAttr(nodeName, "aiAttributesEvaluationTime", None)
       if val and val >= 0 and val < len(AttributesEvaluationTime):
          arnold.AiNodeSetInt(node, "attributes_evaluation_time", val)
          setAttrs.append("attributes_evaluation_time")
+
+      arnold.AiNodeSetInt(node, "samples", 1)
+      setAttrs.append("samples")
 
       val = stu.GetOverrideAttr(nodeName, "aiExpandSamplesIterations", None)
       if val is not None:
@@ -225,20 +247,11 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
             arnold.AiNodeSetBool(node, "optimize_samples", val)
             setAttrs.append("optimize_samples")
 
-      # Leave that to MtoA?
-      #
-      # arnold.AiNodeSetFlt(node, "motion_start", sampleFrame - renderFrame)
-      # setAttrs.append("motion_start")
-
-      return setAttrs
-
    else:
-      # For last sample only
-      #
-      # arnold.AiNodeSetFlt(node, "samples", count)
-      # arnold.AiNodeSetFlt(node, "motion_end", sampleFrame - renderFrame)
+      AiNodeGetInt(node, "samples", step+1)
+      setAttrs.append("samples")
 
-      return []
+   return setAttrs
 
 
 def Cleanup(nodeNames, masterNodeNames):
@@ -261,14 +274,12 @@ def SetupAttrs():
       attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="reference_filename"))
       attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="reference_frame"))
 
-      # string[] -> single space separated list
-      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="remove_attribute_prefices"))
-      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="force_constant_attributes"))
-      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="ignore_attributes"))
+      attrs.append(stu.AttrData(name="aiRemoveAttributePrefices", shortName="ai_remove_attribute_prefices", type=arnold.AI_TYPE_STRING, defaultValue=""))
+      attrs.append(stu.AttrData(name="aiForceConstantAttributes", shortName="force_constant_attributes", type=arnold.AI_TYPE_STRING, defaultValue=""))
+      attrs.append(stu.AttrData(name="aiIgnoreAttributes", shortName="ignore_attributes", type=arnold.AI_TYPE_STRING, defaultValue=""))
       attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="attributes_evaluation_time"))
 
-      # string[] -> single space separated list
-      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="compute_tangents_for_uvs"))
+      attrs.append(stu.AttrData(name="aiComputeTangentsForUVs", shortName="ai_compute_tangents_for_uvs", type=arnold.AI_TYPE_STRING, defaultValue=""))
 
       attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="width_scale"))
       attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="width_min"))
