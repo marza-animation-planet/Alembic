@@ -75,6 +75,7 @@ node_parameters
    AiParameterStr(Strings::rootdrive, Strings::_empty);
 
    AiMetaDataSetBool(nentry, Strings::filename, Strings::filepath, true);
+   AiMetaDataSetBool(nentry, Strings::reference_filename, Strings::filepath, true);
 }
 
 procedural_init
