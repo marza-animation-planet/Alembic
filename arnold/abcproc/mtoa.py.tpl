@@ -295,9 +295,9 @@ def SetupAttrs():
       attrs.append(stu.AttrData(arnoldNode="box", arnoldAttr="step_size"))
       attrs.append(stu.AttrData(arnoldNode="box", arnoldAttr="volume_padding"))
 
-      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="nameprefix"))
       attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="expand_samples_iterations"))
       attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="optimize_samples"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="nameprefix"))
       attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="verbose"))
 
    except Exception, e:
@@ -323,6 +323,12 @@ def SetupAE(translator):
             self.renderStatsAttributes()
             self.addSeparator()
 
+            self.addControl("aiSssSetname", label="SSS Set Name")
+            self.addControl("aiStepSize", label="Volume Step Size")
+            self.addControl("aiVolumePadding", label="Volume Padding")
+            self.addControl("aiUserOptions", label="User Options")
+            self.addSeparator()
+
             self.addControl("aiVelocityName", label="Velocity Name")
             self.addControl("aiAccelerationName", label="Acceleration Name")
             self.addControl("aiVelocityScale", label="Velocity Scale")
@@ -346,11 +352,6 @@ def SetupAE(translator):
             self.addControl("aiComputeTangentsForUVs", label="Compute Tangents For UVs")
             self.addSeparator()
 
-            self.addControl("aiWidthScale", label="Width Scale")
-            self.addControl("aiWidthMin", label="Min. Width")
-            self.addControl("aiWidthMax", label="Max. Width")
-            self.addSeparator()
-
             self.addControl("aiRadiusName", label="Radius Attribute Name")
             self.addControl("aiRadiusScale", label="Radius Scale")
             self.addControl("aiRadiusMin", label="Min. Radius")
@@ -359,17 +360,17 @@ def SetupAE(translator):
             self.addControl("aiNurbsSampleRate", label="NURBS Sample Rate")
             self.addSeparator()
 
-            self.addControl("aiStepSize", label="Volume Step Size")
-            self.addControl("aiVolumePadding", label="Volume Padding")
+            self.addControl("aiWidthScale", label="Width Scale")
+            self.addControl("aiWidthMin", label="Min. Width")
+            self.addControl("aiWidthMax", label="Max. Width")
+            self.addSeparator()
+
+            self.addControl("aiExpandSamplesIterations", label="Expand Samples Iterations")
+            self.addControl("aiOptimizeSamples", label="Optimize Samples")
             self.addSeparator()
 
             self.addControl("aiNameprefix", label="Name Prefix")
-            self.addControl("aiExpandSamplesIterations", label="Expand Samples Iterations")
-            self.addControl("aiOptimizeSamples", label="Optimize Samples")
             self.addControl("aiVerbose", label="Verbose")
-            self.addSeparator()
-
-            self.addControl("aiUserOptions", label="User Options")
             self.addSeparator()
 
       templates.registerTranslatorUI(<<NodeName>>Template, "<<NodeName>>", translator)
