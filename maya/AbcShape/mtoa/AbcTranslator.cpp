@@ -824,21 +824,22 @@ static AtArray* ToArray(const std::string &s)
       if (p1 == std::string::npos)
       {
          name = s.substr(p0);
+         p0 = p1;
       }
       else if (p1 > p0)
       {
          name = s.substr(p0, p1 - p0);
+         p0 = p1 + 1;
       }
       else
       {
          name = "";
+         p0 = p1 + 1;
       }
       if (name.length() > 0)
       {
          names.push_back(name);
       }
-      // else: p1 == p0, eating whitespace
-      p0 = p1 + 1;
       p1 = s.find_first_of(" \t\n", p0);
    }
 
@@ -1006,7 +1007,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
       if (!plug.isNull())
       {
          tmp = plug.asString().asChar();
-         AiNodeSetArray(proc, "remove_attribue_prefices", ToArray(tmp));
+         AiNodeSetArray(proc, "remove_attribute_prefices", ToArray(tmp));
       }
 
       plug = FindMayaPlug("aiForceConstantAttributes");
