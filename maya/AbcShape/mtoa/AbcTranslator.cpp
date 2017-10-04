@@ -901,9 +901,9 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          AiNodeSetInt(proc, "cycle", FindMayaObjectPlug("cycleType").asInt());
          AiNodeSetBool(proc, "ignore_deform_blur", !deformBlur);
          AiNodeSetBool(proc, "ignore_transform_blur", !transformBlur);
-         AiNodeSetBool(proc, "ignore_transforms", !ignoreXforms);
-         AiNodeSetBool(proc, "ignore_instances", !ignoreInstances);
-         AiNodeSetBool(proc, "ignore_visibility", !ignoreVisibility);
+         AiNodeSetBool(proc, "ignore_transforms", ignoreXforms);
+         AiNodeSetBool(proc, "ignore_instances", ignoreInstances);
+         AiNodeSetBool(proc, "ignore_visibility", ignoreVisibility);
       }
 
       plug = FindMayaPlug("aiOutputReference");
