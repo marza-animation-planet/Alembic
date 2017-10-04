@@ -42,12 +42,11 @@ node_parameters
    AiParameterStr(Strings::acceleration_name, Strings::_empty);
    AiParameterBool(Strings::force_velocity_blur, false)
 
-   AiParameterBool(Strings::output_reference, false);
-   AiParameterEnum(Strings::reference_source, RS_attributes_then_file, ReferenceSourceNames);
+   AiParameterBool(Strings::ignore_reference, false);
+   AiParameterEnum(Strings::reference_source, RS_attributes, ReferenceSourceNames);
    AiParameterStr(Strings::reference_position_name, Strings::Pref);
    AiParameterStr(Strings::reference_normal_name, Strings::Nref);
-   AiParameterStr(Strings::reference_filename, Strings::_empty);
-   AiParameterFlt(Strings::reference_frame, -std::numeric_limits<float>::max());
+   AiParameterFlt(Strings::reference_frame, 0.0f);
 
    AiParameterEnum(Strings::attributes_evaluation_time, AET_render, AttributesEvaluationTimeNames);
    // Only applies to attributes read from the .abc files, not attributes already existing on arnold node
@@ -75,7 +74,6 @@ node_parameters
    AiParameterStr(Strings::rootdrive, Strings::_empty);
 
    AiMetaDataSetBool(nentry, Strings::filename, Strings::filepath, true);
-   AiMetaDataSetBool(nentry, Strings::reference_filename, Strings::filepath, true);
 }
 
 procedural_init
@@ -115,32 +113,11 @@ procedural_get_node
             AiMsgWarning("[abcproc] %lu procedural(s) generated (%lu expected)", procNodes.numNodes(), dso->numShapes());
          }
 
-         CollectWorldMatrices refMatrices(dso);
-         if (dso->referenceScene() && !dso->ignoreTransforms())
-         {
-            dso->referenceScene()->visit(AlembicNode::VisitDepthFirst, refMatrices);
-         }
-
          for (size_t i=0; i<dso->numShapes(); ++i)
          {
             AtNode *node = procNodes.node(i);
             Alembic::Abc::M44d W;
             AtMatrix mtx;
-
-            if (node && refMatrices.getWorldMatrix(procNodes.path(i), W))
-            {
-               for (int r=0; r<4; ++r)
-               {
-                  for (int c=0; c<4; ++c)
-                  {
-                     mtx[r][c] = W[r][c];
-                  }
-               }
-
-               // Store reference object world matrix to avoid having to re-compute it later
-               AiNodeDeclare(node, "Mref", "constant MATRIX");
-               AiNodeSetMatrix(node, "Mref", mtx);
-            }
 
             dso->setGeneratedNode(i, node);
          }

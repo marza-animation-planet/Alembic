@@ -32,11 +32,10 @@ namespace Strings
    AtString acceleration_name("acceleration_name");
    AtString force_velocity_blur("force_velocity_blur");
 
-   AtString output_reference("output_reference");
+   AtString ignore_reference("ignore_reference");
    AtString reference_source("reference_source");
    AtString reference_position_name("reference_position_name");
    AtString reference_normal_name("reference_normal_name");
-   AtString reference_filename("reference_filename");
    AtString reference_frame("reference_frame");
 
    AtString force_constant_attributes("force_constant_attributes");

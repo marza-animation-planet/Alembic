@@ -35,11 +35,10 @@ namespace Strings
    extern AtString acceleration_name;
    extern AtString force_velocity_blur;
    
-   extern AtString output_reference;
+   extern AtString ignore_reference;
    extern AtString reference_source;
    extern AtString reference_position_name;
    extern AtString reference_normal_name;
-   extern AtString reference_filename;
    extern AtString reference_frame;
 
    extern AtString force_constant_attributes;

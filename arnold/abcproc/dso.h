@@ -26,9 +26,7 @@ enum AttributesEvaluationTime
 
 enum ReferenceSource
 {
-   RS_attributes_then_file = 0,
-   RS_attributes,
-   RS_file,
+   RS_attributes = 0,
    RS_frame,
    RS_MAX
 };
@@ -70,11 +68,6 @@ public:
       return mScene;
    }
 
-   inline AlembicScene* referenceScene() const
-   {
-      return mRefScene;
-   }
-
    // Common setup
 
    inline bool verbose() const
@@ -92,19 +85,14 @@ public:
       return mCommonParams.filePath;
    }
 
-   inline bool outputReference() const
+   inline bool ignoreReference() const
    {
-      return mCommonParams.outputReference;
+      return mCommonParams.ignoreReference;
    }
 
    inline ReferenceSource referenceSource() const
    {
       return mCommonParams.referenceSource;
-   }
-
-   inline const std::string& referenceFilePath() const
-   {
-      return mCommonParams.referenceFilePath;
    }
 
    inline float referenceFrame() const
@@ -368,8 +356,6 @@ public:
 
 private:
 
-   std::string getReferencePath(const std::string &basePath) const;
-
    void strip(std::string &s) const;
    void toLower(std::string &s) const;
    void normalizeFilePath(std::string &path) const;
@@ -383,7 +369,6 @@ private:
    struct CommonParameters
    {
       std::string filePath;
-      std::string referenceFilePath;
       std::string namePrefix;
       std::string objectPath;
 
@@ -409,11 +394,7 @@ private:
 
       bool verbose;
 
-      bool outputReference;
-      // When a reference file is not provided, we must generate reference from
-      //   current file by either:
-      // - using a user defined attribute
-      // - use another frame/sample (provided that point count matches)
+      bool ignoreReference;
       ReferenceSource referenceSource;
       std::string referencePositionName;
       std::string referenceNormalName;
@@ -464,7 +445,6 @@ private:
    SingleParameters mSingleParams;
 
    AlembicScene *mScene;
-   AlembicScene *mRefScene;
 
    // For simple unix/window directory mapping
    std::string mRootDrive;

@@ -93,8 +93,7 @@ void MakeShape::collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
       std::set<std::string> ignorePointNames;
       std::set<std::string> ignoreVertexNames;
       
-      if (!mDso->outputReference() || (mDso->referenceSource() != RS_attributes &&
-                                       mDso->referenceSource() != RS_attributes_then_file))
+      if (mDso->ignoreReference() || mDso->referenceSource() != RS_attributes)
       {
          // force ignoring reference attributes, those will be set from a difference frame or file
          ignorePointNames.insert(mDso->referencePositionName());
@@ -1447,7 +1446,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
    
    // Output reference (Pref)
    
-   if (mDso->outputReference())
+   if (!mDso->ignoreReference())
    {
       if (mDso->verbose())
       {
@@ -1660,7 +1659,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
    
    // Output referece
    
-   if (mDso->outputReference())
+   if (!mDso->ignoreReference())
    {
       if (mDso->verbose())
       {
@@ -2437,7 +2436,7 @@ bool MakeShape::getReferenceCurves(AlembicCurves &node,
    bool hasPref = false;
    const std::string &PrefName = mDso->referencePositionName();
    
-   if (refSrc == RS_attributes || refSrc == RS_attributes_then_file)
+   if (refSrc == RS_attributes)
    {
       UserAttributes::iterator uait;
       
@@ -2465,28 +2464,6 @@ bool MakeShape::getReferenceCurves(AlembicCurves &node,
    else if (refSrc == RS_frame)
    {
       refCurves = &node;
-   }
-   else
-   {
-      AlembicScene *refScene = mDso->referenceScene();
-      
-      if (!refScene)
-      {
-         refCurves = 0;
-      }
-      else
-      {
-         AlembicNode *refNode = refScene->find(node.path());
-         
-         if (refNode)
-         {
-            refCurves = dynamic_cast<AlembicCurves*>(refNode);
-         }
-         else
-         {
-            refCurves = 0;
-         }
-      }
    }
    
    return hasPref;
@@ -4003,7 +3980,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
    
    // Reference positions
    
-   if (mDso->outputReference())
+   if (!mDso->ignoreReference())
    {
       if (mDso->verbose())
       {

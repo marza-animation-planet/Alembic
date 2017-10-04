@@ -118,10 +118,10 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
       arnold.AiNodeSetBool(node, "ignore_visibility", (True if ignoreVisibility else False))
       setAttrs.append("ignore_visibility")
 
-      val = stu.GetOverrideAttr(nodeName, "aiOutputReference", None)
-      if val is not None:
-         arnold.AiNodeSetBool(node, "output_reference", (True if val else False))
-         setAttrs.append("output_reference")
+      # val = stu.GetOverrideAttr(nodeName, "aiOutputReference", None)
+      # if val is not None:
+      #    arnold.AiNodeSetBool(node, "output_reference", (True if val else False))
+      #    setAttrs.append("output_reference")
 
       val = stu.GetOverrideAttr(nodeName, "aiReferenceSource", None)
       if val is not None:
@@ -267,11 +267,10 @@ def SetupAttrs():
       attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="velocity_scale"))
       attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="force_velocity_blur"))
 
-      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="output_reference"))
+      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="ignore_reference"))
       attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="reference_source"))
       attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="reference_position_name"))
       attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="reference_normal_name"))
-      attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="reference_filename"))
       attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="reference_frame"))
 
       attrs.append(stu.AttrData(name="aiRemoveAttributePrefices", shortName="ai_remove_attribute_prefices", type=arnold.AI_TYPE_STRING, defaultValue=""))
@@ -335,11 +334,10 @@ def SetupAE(translator):
             self.addControl("aiForceVelocityBlur", label="Force Velocity Blur")
             self.addSeparator()
 
-            self.addControl("aiOutputReference", label="Output Reference Attributes")
+            self.addControl("aiIgnoreReference", label="Ignore Reference")
             self.addControl("aiReferenceSource", label="Reference Source")
             self.addControl("aiReferencePositionName", label="Reference Position Name")
             self.addControl("aiReferenceNormalName", label="Reference Normal Name")
-            self.addControl("aiReferenceFilename", label="Reference ABC File")
             self.addControl("aiReferenceFrame", label="Reference Frame")
             self.addSeparator()
 

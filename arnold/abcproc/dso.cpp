@@ -25,9 +25,7 @@ const char* AttributesEvaluationTimeNames[] =
 
 const char* ReferenceSourceNames[] =
 {
-   "attributes_then_file",
    "attributes",
-   "file",
    "frame",
    NULL
 };
@@ -60,16 +58,15 @@ void Dso::CommonParameters::reset()
    ignoreInstances = false;
    ignoreNurbs = false;
 
-   outputReference = false;
-   referenceSource = RS_attributes_then_file;
-   referenceFilePath = "";
+   ignoreReference = false;
+   referenceSource = RS_attributes;
    referencePositionName = "Pref";
    referenceNormalName = "Nref";
-   referenceFrame = -std::numeric_limits<float>::max();
+   referenceFrame = 0.0f;
 
-   velocityScale = 1.0f;
    velocityName = "";
    accelerationName = "";
+   velocityScale = 1.0f;
    forceVelocityBlur = false;
 
    removeAttributePrefices.clear();
@@ -113,30 +110,17 @@ std::string Dso::CommonParameters::shapeKey() const
    oss << " esi:" << expandSamplesIterations;
    oss << " osm:" << (optimizeSamples ? "1" : "0");
    // Reference
-   if (outputReference)
+   if (!ignoreReference)
    {
       oss << " rfs:" << ReferenceSourceNames[referenceSource];
-      if (referenceSource == RS_attributes || referenceSource == RS_attributes_then_file)
+      if (referenceSource == RS_attributes)
       {
-         if (referencePositionName.length() > 0)
-         {
-            oss << " rfpn:" << referencePositionName;
-         }
-         if (referenceNormalName.length() > 0)
-         {
-            oss << " rfnn:" << referenceNormalName;
-         }
+         oss << " rfpn:" << referencePositionName;
+         oss << " rfnn:" << referenceNormalName;
       }
-      if (referenceSource == RS_frame)
+      else if (referenceSource == RS_frame)
       {
          oss << " rff:" << referenceFrame;
-      }
-      if (referenceSource == RS_file || referenceSource == RS_attributes_then_file)
-      {
-         if (referenceFilePath.length() > 0)
-         {
-            oss << " rffn:" << referenceFilePath;
-         }
       }
    }
    // Attributes
@@ -244,7 +228,6 @@ Dso::Dso(AtNode *node)
    : mProcNode(node)
    , mMode(PM_undefined)
    , mScene(0)
-   , mRefScene(0)
    , mRootDrive("")
    , mRenderTime(0.0)
    , mStepSize(-1.0f)
@@ -312,20 +295,6 @@ Dso::Dso(AtNode *node)
       AiMsgWarning("[abcproc] No current camera in scene, use motion_start and motion_end time for shutter open and close time.");
    }
 
-   // Check frame and get from options node if needed? ('frame' user attribute)
-   bool useReferenceFile = mCommonParams.outputReference &&
-                           (mCommonParams.referenceSource == RS_file ||
-                            mCommonParams.referenceSource == RS_attributes_then_file);
-
-   normalizeFilePath(mCommonParams.filePath);
-   if (useReferenceFile && mCommonParams.referenceFilePath.length() == 0)
-   {
-      // look if we have a .ref file alongside the abc file path
-      // this file if it exists, should contain the path to the 'reference' alembic file
-      mCommonParams.referenceFilePath = getReferencePath(mCommonParams.filePath);
-   }
-   normalizeFilePath(mCommonParams.referenceFilePath);
-
    // mReverseWinding = AiNodeGetBool(opts, "CCW_points");
    mReverseWinding = true;
 
@@ -345,11 +314,6 @@ Dso::Dso(AtNode *node)
       AlembicSceneCache::SetConcurrency(size_t(AiNodeGetInt(opts, "threads")));
 
       mScene = AlembicSceneCache::Ref(mCommonParams.filePath, id, filter, true);
-
-      if (useReferenceFile && mCommonParams.referenceFilePath.length() > 0)
-      {
-         mRefScene = AlembicSceneCache::Ref(mCommonParams.referenceFilePath, id, filter, true);
-      }
    }
 
    if (mScene)
@@ -613,49 +577,6 @@ Dso::~Dso()
    {
       AlembicSceneCache::Unref(mScene, id);
    }
-   if (mRefScene)
-   {
-      AlembicSceneCache::Unref(mRefScene, id);
-   }
-}
-
-std::string Dso::getReferencePath(const std::string &basePath) const
-{
-   std::string dotRefPath;
-   std::string refPath;
-
-   size_t p0 = basePath.find_last_of("\\/");
-
-   size_t p1 = basePath.rfind('.');
-   if (p1 == std::string::npos || (p0 != std::string::npos && p0 > p1))
-   {
-      dotRefPath = basePath + ".ref";
-   }
-   else
-   {
-      dotRefPath = basePath.substr(0, p1) + ".ref";
-   }
-
-   std::ifstream dotRefFile(dotRefPath.c_str());
-
-   if (dotRefFile.is_open())
-   {
-      std::getline(dotRefFile, refPath);
-
-      if (!dotRefFile.fail())
-      {
-         if (verbose())
-         {
-            AiMsgInfo("[abcproc] Got reference path from .ref file: %s", refPath.c_str());
-         }
-      }
-      else
-      {
-         refPath = "";
-      }
-   }
-
-   return refPath;
 }
 
 std::string Dso::shapeKey() const
@@ -969,8 +890,7 @@ void Dso::setSingleParams(AtNode *node, const std::string &objectPath) const
    AiNodeSetBool(node, Strings::ignore_transforms, true);
    AiNodeSetBool(node, Strings::ignore_nurbs, mCommonParams.ignoreNurbs);
    //  Reference data
-   AiNodeSetBool(node, Strings::output_reference, mCommonParams.outputReference);
-   AiNodeSetStr(node, Strings::reference_filename, mCommonParams.referenceFilePath.c_str());
+   AiNodeSetBool(node, Strings::ignore_reference, mCommonParams.ignoreReference);
    AiNodeSetInt(node, Strings::reference_source, (int)mCommonParams.referenceSource);
    AiNodeSetFlt(node, Strings::reference_frame, mCommonParams.referenceFrame);
    AiNodeSetStr(node, Strings::reference_position_name, mCommonParams.referencePositionName.c_str());
@@ -1070,20 +990,11 @@ void Dso::readParams()
    mCommonParams.ignoreTransforms = AiNodeGetBool(mProcNode, Strings::ignore_transforms);
    mCommonParams.ignoreNurbs = AiNodeGetBool(mProcNode, Strings::ignore_nurbs);
    //  Reference data
-   mCommonParams.outputReference = AiNodeGetBool(mProcNode, Strings::output_reference);
-   mCommonParams.referenceFilePath = AiNodeGetStr(mProcNode, Strings::reference_filename).c_str();
+   mCommonParams.ignoreReference = AiNodeGetBool(mProcNode, Strings::ignore_reference);
    mCommonParams.referenceSource = (ReferenceSource) AiNodeGetInt(mProcNode, Strings::reference_source);
    mCommonParams.referenceFrame = AiNodeGetFlt(mProcNode, Strings::reference_frame);
    mCommonParams.referencePositionName = AiNodeGetStr(mProcNode, Strings::reference_position_name).c_str();
-   if (mCommonParams.referencePositionName.length() == 0)
-   {
-      mCommonParams.referencePositionName = "Pref";
-   }
    mCommonParams.referenceNormalName = AiNodeGetStr(mProcNode, Strings::reference_normal_name).c_str();
-   if (mCommonParams.referenceNormalName.length() == 0)
-   {
-      mCommonParams.referenceNormalName = "Nref";
-   }
    //  Velocity data
    mCommonParams.velocityName = AiNodeGetStr(mProcNode, Strings::velocity_name).c_str();
    mCommonParams.accelerationName = AiNodeGetStr(mProcNode, Strings::acceleration_name).c_str();

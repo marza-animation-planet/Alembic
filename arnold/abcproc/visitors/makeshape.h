@@ -1475,7 +1475,7 @@ bool MakeShape::getReferenceMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSc
    ReferenceSource refSrc = mDso->referenceSource();
    bool hasPref = false;
    
-   if (refSrc == RS_attributes || refSrc == RS_attributes_then_file)
+   if (refSrc == RS_attributes)
    {
       UserAttributes::iterator uait = info.pointAttrs.find(mDso->referencePositionName());
       
@@ -1500,31 +1500,7 @@ bool MakeShape::getReferenceMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSc
    }
    else if (refSrc == RS_frame)
    {
-      // use a difference sample from current alembic file
       refMesh = &node;
-   }
-   else
-   {
-      // refSrc == RS_file || refSrc == RS_attributes_then_file
-      AlembicScene *refScene = mDso->referenceScene();
-      
-      if (!refScene)
-      {
-         refMesh = 0;
-      }
-      else
-      {
-         AlembicNode *refNode = refScene->find(node.path());
-         
-         if (refNode)
-         {
-            refMesh = dynamic_cast<AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> >*>(refNode);
-         }
-         else
-         {
-            refMesh = 0;
-         }
-      }
    }
    
    return hasPref;
