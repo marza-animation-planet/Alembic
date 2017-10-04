@@ -60,33 +60,26 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    // reference
 
    data.defaultValue.BOOL() = false;
-   data.name = "aiOutputReference";
-   data.shortName = "ai_output_reference";
+   data.name = "aiIgnoreReference";
+   data.shortName = "ai_ignore_reference";
    helper.MakeInputBoolean(data);
 
    data.defaultValue.INT() = 0;
    data.enums.clear();
-   data.enums.append("attributes_then_file");
    data.enums.append("attributes");
-   data.enums.append("file");
    data.enums.append("frame");
    data.name = "aiReferenceSource";
    data.shortName = "ai_reference_source";
    helper.MakeInputEnum(data);
 
-   data.stringDefault = "";
+   data.stringDefault = "Pref";
    data.name = "aiReferencePositionName";
    data.shortName = "ai_reference_position_name";
    helper.MakeInputString(data);
 
-   data.stringDefault = "";
+   data.stringDefault = "Nref";
    data.name = "aiReferenceNormalName";
    data.shortName = "ai_reference_normal_name";
-   helper.MakeInputString(data);
-
-   data.stringDefault = "";
-   data.name = "aiReferenceFilename";
-   data.shortName = "ai_reference_filename";
    helper.MakeInputString(data);
 
    data.defaultValue.FLT() = 0.0f;
@@ -906,22 +899,16 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
          AiNodeSetBool(proc, "ignore_visibility", ignoreVisibility);
       }
 
-      plug = FindMayaPlug("aiOutputReference");
+      plug = FindMayaPlug("aiIgnoreReference");
       if (!plug.isNull())
       {
-         AiNodeSetBool(proc, "output_reference", plug.asBool());
+         AiNodeSetBool(proc, "ignore_reference", plug.asBool());
       }
 
       plug = FindMayaPlug("aiReferenceSource");
       if (!plug.isNull())
       {
          AiNodeSetInt(proc, "reference_source", plug.asInt());
-      }
-
-      plug = FindMayaPlug("aiReferenceFilename");
-      if (!plug.isNull())
-      {
-         AiNodeSetStr(proc, "reference_filename", plug.asString().asChar());
       }
 
       plug = FindMayaPlug("aiReferencePositionName");

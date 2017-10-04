@@ -23,11 +23,10 @@ class <<NodeName>>Template(templates.ShapeTranslatorTemplate):
       self.endLayout()
 
       self.beginLayout("Reference Object", collapse=True)
-      self.addControl("aiOutputReference", label="Output Reference")
+      self.addControl("aiIgnoreReference", label="Ignore Reference")
       self.addControl("aiReferenceSource", label="Reference Source")
       self.addControl("aiReferencePositionName", label="Reference Position Name")
       self.addControl("aiReferenceNormalName", label="Reference Normal Name")
-      self.addControl("aiReferenceFilename", label="Reference ABC File")
       self.addControl("aiReferenceFrame", label="Reference Frame")
       self.endLayout()
 
