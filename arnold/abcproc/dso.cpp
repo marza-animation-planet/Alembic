@@ -981,28 +981,36 @@ void Dso::setSingleParams(AtNode *node, const std::string &objectPath) const
    AiNodeSetFlt(node, Strings::velocity_scale, mCommonParams.velocityScale);
    AiNodeSetBool(node, Strings::force_velocity_blur, mCommonParams.forceVelocityBlur);
    //  Others
-   count = mCommonParams.forceConstantAttributes.size();
-   array = AiArray(count, 1, AI_TYPE_STRING);
-   it = mCommonParams.forceConstantAttributes.begin();
-   for (size_t i=0; i<count; ++i, ++it)
-   {
-      AiArraySetStr(array, i, it->c_str());
-   }
-   AiNodeSetArray(node, Strings::force_constant_attributes, array);
    count = mCommonParams.removeAttributePrefices.size();
-   array = AiArray(count, 1, AI_TYPE_STRING);
+   array = AiArrayAllocate(count, 1, AI_TYPE_STRING);
    it = mCommonParams.removeAttributePrefices.begin();
    for (size_t i=0; i<count; ++i, ++it)
    {
       AiArraySetStr(array, i, it->c_str());
    }
    AiNodeSetArray(node, Strings::remove_attribute_prefices, array);
+   count = mCommonParams.forceConstantAttributes.size();
+   array = AiArrayAllocate(count, 1, AI_TYPE_STRING);
+   it = mCommonParams.forceConstantAttributes.begin();
+   for (size_t i=0; i<count; ++i, ++it)
+   {
+      AiArraySetStr(array, i, it->c_str());
+   }
+   AiNodeSetArray(node, Strings::force_constant_attributes, array);
+   count = mCommonParams.ignoreAttributes.size();
+   array = AiArrayAllocate(count, 1, AI_TYPE_STRING);
+   it = mCommonParams.ignoreAttributes.begin();
+   for (size_t i=0; i<count; ++i, ++it)
+   {
+      AiArraySetStr(array, i, it->c_str());
+   }
+   AiNodeSetArray(node, Strings::ignore_attributes, array);
    AiNodeSetInt(node, Strings::attributes_evaluation_time, (int)mCommonParams.attributesEvaluationTime);
    AiNodeSetBool(node, Strings::verbose, mCommonParams.verbose);
 
    // Single shape mode parameters
    count = mSingleParams.computeTangentsForUVs.size();
-   array = AiArray(count, 1, AI_TYPE_STRING);
+   array = AiArrayAllocate(count, 1, AI_TYPE_STRING);
    it = mSingleParams.computeTangentsForUVs.begin();
    for (size_t i=0; i<count; ++i, ++it)
    {

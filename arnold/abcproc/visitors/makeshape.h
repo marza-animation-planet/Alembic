@@ -1007,7 +1007,7 @@ bool MakeShape::computeMeshTangentSpace(AlembicNodeT<Alembic::Abc::ISchemaObject
    
    if (!N)
    {
-      N = computeMeshSmoothNormals(info, (const float*) P0->getData(), (const float*) P1->getData(), b);
+      N = computeMeshSmoothNormals(info, (const float*) P0->getData(), (P1 ? (const float*) P1->getData() : 0), b);
       if (!N)
       {
          return false;
@@ -1015,6 +1015,10 @@ bool MakeShape::computeMeshTangentSpace(AlembicNodeT<Alembic::Abc::ISchemaObject
    }
    
    // Build tangents and bitangent
+   if (mDso->verbose())
+   {
+      AiMsgInfo("[abcproc] Compute tangents and bitangents");
+   }
    
    T = (float*) AiMalloc(bytesize);
    memset(T, 0, bytesize);
