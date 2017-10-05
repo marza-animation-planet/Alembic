@@ -130,12 +130,12 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
 
       val = stu.GetOverrideAttr(nodeName, "aiVelocityScale", None)
       if val is not None:
-         arnold.AiNodeSetStr(node, "velocity_scale", val)
+         arnold.AiNodeSetFlt(node, "velocity_scale", val)
          setAttrs.append("velocity_scale")
 
       val = stu.GetOverrideAttr(nodeName, "aiForceVelocityBlur", None)
       if val is not None:
-         arnold.AiNodeSetStr(node, "force_velocity_blur", val)
+         arnold.AiNodeSetBool(node, "force_velocity_blur", val)
          setAttrs.append("force_velocity_blur")
 
       val = stu.GetOverrideAttr(nodeName, "aiIgnoreReference", None)
@@ -343,50 +343,57 @@ def SetupAE(translator):
             self.addControl("aiStepSize", label="Volume Step Size")
             self.addControl("aiVolumePadding", label="Volume Padding")
             self.addControl("aiUserOptions", label="User Options")
-            self.addSeparator()
 
+            self.beginLayout("Velocity", collapse=True)
             self.addControl("aiVelocityName", label="Velocity Name")
             self.addControl("aiAccelerationName", label="Acceleration Name")
             self.addControl("aiVelocityScale", label="Velocity Scale")
             self.addControl("aiForceVelocityBlur", label="Force Velocity Blur")
-            self.addSeparator()
+            self.endLayout()
 
+            self.beginLayout("Reference Object", collapse=True)
             self.addControl("aiIgnoreReference", label="Ignore Reference")
             self.addControl("aiReferenceSource", label="Reference Source")
             self.addControl("aiReferencePositionName", label="Reference Position Name")
             self.addControl("aiReferenceNormalName", label="Reference Normal Name")
             self.addControl("aiReferenceFrame", label="Reference Frame")
-            self.addSeparator()
+            self.endLayout()
 
+            self.beginLayout("Attributes", collapse=True)
             self.addControl("aiRemoveAttributePrefices", label="Remove Attribute Prefices")
             self.addControl("aiForceConstantAttributes", label="Force Constant Attributes")
             self.addControl("aiIgnoreAttributes", label="Ignore Attributes")
             self.addControl("aiAttributesEvaluationTime", label="Attributes Evaluation TIme")
-            self.addSeparator()
+            self.endLayout()
 
+            self.beginLayout("Mesh", collapse=True)
             self.addControl("aiComputeTangentsForUVs", label="Compute Tangents For UVs")
-            self.addSeparator()
+            self.endLayout()
 
+            self.beginLayout("Particles", collapse=True)
             self.addControl("aiRadiusName", label="Radius Attribute Name")
             self.addControl("aiRadiusScale", label="Radius Scale")
             self.addControl("aiRadiusMin", label="Min. Radius")
             self.addControl("aiRadiusMax", label="Max. Radius")
+            self.endLayout()
+
+            self.beginLayout("Curves", collapse=True)
             self.addControl("aiIgnoreNurbs", label="Ignore NURBS")
             self.addControl("aiNurbsSampleRate", label="NURBS Sample Rate")
-            self.addSeparator()
-
             self.addControl("aiWidthScale", label="Width Scale")
             self.addControl("aiWidthMin", label="Min. Width")
             self.addControl("aiWidthMax", label="Max. Width")
-            self.addSeparator()
+            self.endLayout()
 
+            self.beginLayout("Sampling", collapse=True)
             self.addControl("aiExpandSamplesIterations", label="Expand Samples Iterations")
             self.addControl("aiOptimizeSamples", label="Optimize Samples")
-            self.addSeparator()
+            self.endLayout()
 
+            self.beginLayout("Others", collapse=True)
             self.addControl("aiNameprefix", label="Name Prefix")
             self.addControl("aiVerbose", label="Verbose")
-            self.addSeparator()
+            self.endLayout()
 
       templates.registerTranslatorUI(<<NodeName>>Template, "<<NodeName>>", translator)
 
