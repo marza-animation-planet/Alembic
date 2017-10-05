@@ -355,7 +355,10 @@ VR::VRayPluginParameter* FloatListParam::clone()
 AlembicLoaderParams::Cache::Cache()
    : filename("")
    , objectPath("")
-   , referenceFilename("")
+   // , referenceFilename("")
+   , ignoreReference(0)
+   , referenceSource(RS_attributes)
+   , referenceFrame(0.0f)
    , startFrame(0.0f)
    , endFrame(0.0f)
    , speed(1.0f)
@@ -425,7 +428,7 @@ AlembicLoaderParams::Cache::Cache()
    , psizeMin(0.0f)
    , psizeMax(1e+30f)
    , time(0.0f)
-   , useReferenceObject(0)
+   // , useReferenceObject(0)
 {
 }
 
@@ -433,7 +436,10 @@ void AlembicLoaderParams::Cache::setupCache(VR::VRayParameterList *paramList)
 {
    paramList->setParamCache("filename", &filename);
    paramList->setParamCache("objectPath", &objectPath);
-   paramList->setParamCache("referenceFilename", &referenceFilename);
+   // paramList->setParamCache("referenceFilename", &referenceFilename);
+   paramList->setParamCache("ignoreReference", &ignoreReference);
+   paramList->setParamCache("referenceSource", &referenceSource);
+   paramList->setParamCache("referenceFrame", &referenceFrame);
    paramList->setParamCache("startFrame", &startFrame);
    paramList->setParamCache("endFrame", &endFrame);
    paramList->setParamCache("speed", &speed);
@@ -447,25 +453,25 @@ void AlembicLoaderParams::Cache::setupCache(VR::VRayParameterList *paramList)
    paramList->setParamCache("ignoreTransformBlur", &ignoreTransformBlur);
    paramList->setParamCache("ignoreDeformBlur", &ignoreDeformBlur);
    paramList->setParamCache("verbose", &verbose);
-   
+
    paramList->setParamCache("subdiv_enable", &subdivEnable);
    paramList->setParamCache("subdiv_uvs", &subdivUVs);
    paramList->setParamCache("preserve_map_borders", &preserveMapBorders);
    paramList->setParamCache("static_subdiv", &staticSubdiv);
    paramList->setParamCache("classic_catmark", &classicCatmark);
-   
+
    paramList->setParamCache("osd_subdiv_enable", &osdSubdivEnable);
    paramList->setParamCache("osd_subdiv_level", &osdSubdivLevel);
    paramList->setParamCache("osd_subdiv_type", &osdSubdivType);
    paramList->setParamCache("osd_subdiv_uvs", &osdSubdivUVs);
    paramList->setParamCache("osd_preserve_map_borders", &osdPreserveMapBorders);
    paramList->setParamCache("osd_preserve_geometry_borders", &osdPreserveGeometryBorders);
-   
+
    paramList->setParamCache("use_globals", &useGlobals);
    paramList->setParamCache("view_dep", &viewDep);
    paramList->setParamCache("edge_length", &edgeLength);
    paramList->setParamCache("max_subdivs", &maxSubdivs);
-   
+
    paramList->setParamCache("displacement_type", &displacementType);
    paramList->setParamCache("displacement_tex_color", &displacementTexColor);
    paramList->setParamCache("displacement_tex_float", &displacementTexFloat);
@@ -488,7 +494,7 @@ void AlembicLoaderParams::Cache::setupCache(VR::VRayParameterList *paramList)
    paramList->setParamCache("tight_bounds", &tightBounds);
    paramList->setParamCache("filter_texture", &filterTexture);
    paramList->setParamCache("filter_blur", &filterBlur);
-   
+
    paramList->setParamCache("particle_type", &particleType);
    paramList->setParamCache("particle_attribs", &particleAttribs);
    paramList->setParamCache("sprite_size_x", &spriteSizeX);
@@ -504,14 +510,14 @@ void AlembicLoaderParams::Cache::setupCache(VR::VRayParameterList *paramList)
    paramList->setParamCache("line_width", &lineWidth);
    paramList->setParamCache("tail_length", &tailLength);
    paramList->setParamCache("sort_ids", &sortIDs);
-   
+
    paramList->setParamCache("psize_scale", &psizeScale);
    paramList->setParamCache("psize_min", &psizeMin);
    paramList->setParamCache("psize_max", &psizeMax);
-   
+
    paramList->setParamCache("time", &time);
-   
-   paramList->setParamCache("useReferenceObject", &useReferenceObject);
+
+   // paramList->setParamCache("useReferenceObject", &useReferenceObject);
 }
 
 AlembicLoaderParams::AlembicLoaderParams()
@@ -527,18 +533,21 @@ AlembicLoaderParams::AlembicLoaderParams()
    addParamFloat("fps", 24.0f, -1, "Animation frame rate");
    addParamInt("cycle", 0, -1, "Cycle mode", "enum=(0:hold;1:loop;2:reverse;3:bounce)");
    addParamBool("preserveStartFrame", false, -1, "Keep startFrame invariant when speed changes");
-   addParamBool("useReferenceObject", false, -1, "Generate texture reference object");
-   addParamString("referenceFilename", "", -1, "Alembic reference file path");
+   // addParamBool("useReferenceObject", false, -1, "Generate texture reference object");
+   // addParamString("referenceFilename", "", -1, "Alembic reference file path");
+   addParamBool("ignoreReference", false, -1, "Don't generate texture reference object");
+   addParamInt("referenceSource", 0, -1, "Texture reference object source", "enum=(0:attributes;1:frame)");
+   addParamFloat("referenceFrame", 0.0f, -1, "Cache frame to use as texture reference object");
    addParamBool("ignoreVisibility", false, -1, "Treat all contained objects as visible");
    addParamBool("ignoreTransforms", false, -1, "Ignore transformations");
    addParamBool("ignoreInstances", false, -1, "Ignore object instances");
    addParamBool("ignoreDeformBlur", false, -1, "Ignore deformation blur");
    addParamBool("ignoreTransformBlur", false, -1, "Ignore transformation blur");
    addParamBool("verbose", false, -1, "Verbose ouput");
-  
+
    // Should have attributes to control how much of the remaining attributes are transfered to generated
    //   shapes when expanding to multiple shapes with transforms
-   
+
    // V-Ray mesh attributes
    //
    // Subdivision
@@ -588,7 +597,7 @@ AlembicLoaderParams::AlembicLoaderParams()
    addParamBool("tight_bounds", false, -1, "Compute tighter bounds for displaced triangles (faster render, slower initializaion)");
    addParamBool("filter_texture", false, -1, "Filter the texture for 2D displacement");
    addParamFloat("filter_blur", 0.001, -1, "1.0 to average the whole texture.");
-   
+
    // maya:vrayUserAttributes, maya:vrayObjectID -> transfered to V-Ray node
    //
    // On GeomStaticMesh too
@@ -603,7 +612,7 @@ AlembicLoaderParams::AlembicLoaderParams()
    //   edge_creases_sharpness
    //   vertex_creases_vertices
    //   vertex_creases_sharpness
-   
+
    // V-Ray particle attributes
    //
    addParamInt("particle_type", 6, -1, "Invalid values will default to points (6)", "enum=(3:multipoints;4:multistreaks;6:points;7:spheres;8:sprites;9:streaks)");
@@ -621,7 +630,7 @@ AlembicLoaderParams::AlembicLoaderParams()
    addParamFloat("line_width", 1.0f, -1, "The width of streak particles, in pixels.");
    addParamFloat("tail_length", 1.0f, -1, "The length of streak particles, in world units, the actual length depends on the particle velocity as well.");
    addParamBool("sort_ids", 0, -1, "Sort particle ids.");
-   
+
    addParamFloat("psize_scale", 1.0f, -1, "Particle size scale");
    addParamFloat("psize_min", 0.0f, -1, "Minimum particle size");
    addParamFloat("psize_max", 1e+30f, -1, "Maximum particle size");

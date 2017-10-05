@@ -16,23 +16,23 @@ typedef std::map<std::string, AttrRange> StringUserAttrs;
 static bool ParseAttrName(const std::string &s, std::string &name)
 {
    size_t p = s.find('=');
-   
+
    if (p != std::string::npos)
    {
       name = s.substr(0, p);
-      
+
       p = name.find_first_not_of(" \t");
       if (p != std::string::npos && p > 0)
       {
          name = name.substr(p);
       }
-      
+
       p = name.find_last_not_of(" \t");
       if (p != std::string::npos && (p + 1) < name.length())
       {
          name = name.substr(0, p);
       }
-      
+
       if (name.length() > 0)
       {
          return true;
@@ -52,28 +52,28 @@ static void ParseStringUserAttrs(const std::string &s, StringUserAttrs &attrs)
 {
    std::string tmp;
    std::string name;
-   
+
    attrs.clear();
-   
+
    size_t p0 = 0;
    size_t p1 = s.find(';', p0);
-   
+
    while (p1 != std::string::npos)
    {
       tmp = s.substr(p0, p1-p0);
-      
+
       if (ParseAttrName(tmp, name))
       {
          AttrRange range = {p0, p1 - 1};
          attrs[name] = range;
       }
-      
+
       p0 = p1 + 1;
       p1 = s.find(';', p0);
    }
-   
+
    tmp = s.substr(p0);
-   
+
    if (ParseAttrName(tmp, name))
    {
       AttrRange range = {p0, s.length() - 1};
@@ -90,7 +90,7 @@ AlembicGeometrySource::GeomInfo::GeomInfo()
    , source(0)
    , instance(0)
    , updatedFrameGeometry(false)
-   , invalidFrame(true)      
+   , invalidFrame(true)
    , ignore(true)
    , userAttr("")
    , matrices(0)
@@ -132,44 +132,44 @@ void AlembicGeometrySource::GeomInfo::clear()
       delete[] matrices;
       matrices = 0;
    }
-   
+
    if (toPointIndex)
    {
       delete[] toPointIndex;
       toPointIndex = 0;
    }
-   
+
    if (toVertexIndex)
    {
       delete[] toVertexIndex;
       toVertexIndex = 0;
    }
-   
+
    if (toFaceIndex)
    {
       delete[] toFaceIndex;
       toFaceIndex = 0;
    }
-   
+
    for (size_t i=0; i<smoothNormals.size(); ++i)
    {
       free(smoothNormals[i]);
    }
    smoothNormals.clear();
-   
+
    numPoints = 0;
    numTriangles = 0;
    numFaces = 0;
    numFaceVertices = 0;
    numMatrices = 0;
    userAttr = "";
-   
+
    if (particleOrder)
    {
       delete[] particleOrder;
       particleOrder = 0;
    }
-   
+
    for (std::map<std::string, VR::DefFloatListParam*>::iterator it=floatParams.begin(); it!=floatParams.end(); ++it)
    {
       if (attachedParams.find(it->second) == attachedParams.end())
@@ -177,7 +177,7 @@ void AlembicGeometrySource::GeomInfo::clear()
          delete it->second;
       }
    }
-   
+
    for (std::map<std::string, VR::DefColorListParam*>::iterator it=colorParams.begin(); it!=colorParams.end(); ++it)
    {
       if (attachedParams.find(it->second) == attachedParams.end())
@@ -185,15 +185,15 @@ void AlembicGeometrySource::GeomInfo::clear()
          delete it->second;
       }
    }
-   
+
    floatParams.clear();
    colorParams.clear();
    attachedParams.clear();
-   
+
    // Don't touch other V-Ray objects
    // - Parameters should all be store in factory
    // - Plugins are tracked by the plugin manager
-   
+
    resetFlags();
 }
 
@@ -210,14 +210,14 @@ struct CompareOp
       : _ids(ids)
    {
    }
-   
+
    inline bool operator()(Alembic::Util::uint64_t i0, Alembic::Util::uint64_t i1) const
    {
       return (_ids[i0] < _ids[i1]);
    }
-   
+
    private:
-      
+
       const Alembic::Util::uint64_t *_ids;
 };
 
@@ -228,28 +228,28 @@ void AlembicGeometrySource::GeomInfo::sortParticles(size_t count, const Alembic:
       delete[] particleOrder;
       particleOrder = 0;
    }
-   
+
    if (count == 0 || !ids)
    {
       return;
    }
-   
+
    particleOrder = new Alembic::Util::uint64_t[count];
-   
+
    for (size_t i=0; i<count; ++i)
    {
       particleOrder[i] = i;
    }
-   
+
    if (!sortIDs)
    {
       return;
    }
-   
+
    CompareOp comp(ids);
-   
+
    std::sort(particleOrder, particleOrder+count, comp);
-   
+
    // As we want to remap the destination index rather than the source one, reverse the mapping
    //  i.e.:
    //   out[particleOrder[i]] = in[j]
@@ -257,16 +257,16 @@ void AlembicGeometrySource::GeomInfo::sortParticles(size_t count, const Alembic:
    //   out[i] = in[particleOrder[j]]
    //
    // This is because the source may be splitted into separate arrays
-   
+
    Alembic::Util::uint64_t *inv = new Alembic::Util::uint64_t[count];
-   
+
    for (size_t i=0; i<count; ++i)
    {
       inv[particleOrder[i]] = i;
    }
-   
+
    delete[] particleOrder;
-   
+
    particleOrder = inv;
 }
 
@@ -279,7 +279,7 @@ std::string AlembicGeometrySource::GeomInfo::remapParamName(const std::string &n
 bool AlembicGeometrySource::GeomInfo::isValidParamName(const std::string &name) const
 {
    static std::set<std::string> sValidNames;
-   
+
    if (sValidNames.size() == 0)
    {
       sValidNames.insert("colors");
@@ -302,14 +302,14 @@ bool AlembicGeometrySource::GeomInfo::isValidParamName(const std::string &name) 
       sValidNames.insert("sprite_scale_y");
       sValidNames.insert("sprite_rotate");
    }
-   
+
    return (sValidNames.find(name) != sValidNames.end());
 }
 
 bool AlembicGeometrySource::GeomInfo::isFloatParam(const std::string &name) const
 {
    static std::set<std::string> sValidNames;
-   
+
    if (sValidNames.size() == 0)
    {
       sValidNames.insert("age_pp");
@@ -325,14 +325,14 @@ bool AlembicGeometrySource::GeomInfo::isFloatParam(const std::string &name) cons
       sValidNames.insert("sprite_scale_y");
       sValidNames.insert("sprite_rotate");
    }
-   
+
    return (sValidNames.find(name) != sValidNames.end());
 }
 
 bool AlembicGeometrySource::GeomInfo::isColorParam(const std::string &name) const
 {
    static std::set<std::string> sValidNames;
-   
+
    if (sValidNames.size() == 0)
    {
       sValidNames.insert("colors");
@@ -343,7 +343,7 @@ bool AlembicGeometrySource::GeomInfo::isColorParam(const std::string &name) cons
       sValidNames.insert("user_color_pp_4");
       sValidNames.insert("user_color_pp_5");
    }
-   
+
    return (sValidNames.find(name) != sValidNames.end());
 }
 
@@ -353,7 +353,7 @@ void AlembicGeometrySource::GeomInfo::attachParams(Factory *f, bool verbose)
    {
       return;
    }
-   
+
    for (std::map<std::string, VR::DefFloatListParam*>::iterator it=floatParams.begin(); it!=floatParams.end(); ++it)
    {
       if (attachedParams.find(it->second) == attachedParams.end())
@@ -362,7 +362,7 @@ void AlembicGeometrySource::GeomInfo::attachParams(Factory *f, bool verbose)
          {
             f->saveInFactory(it->second);
             attachedParams.insert(it->second);
-            
+
             if (verbose)
             {
                std::cout << "[AlembicLoader] AlembicGeometrySource::GeomInfo::attachParams: Float parameter \"" << it->first << "\" attached" << std::endl;
@@ -370,7 +370,7 @@ void AlembicGeometrySource::GeomInfo::attachParams(Factory *f, bool verbose)
          }
       }
    }
-   
+
    for (std::map<std::string, VR::DefColorListParam*>::iterator it=colorParams.begin(); it!=colorParams.end(); ++it)
    {
       if (attachedParams.find(it->second) == attachedParams.end())
@@ -379,7 +379,7 @@ void AlembicGeometrySource::GeomInfo::attachParams(Factory *f, bool verbose)
          {
             f->saveInFactory(it->second);
             attachedParams.insert(it->second);
-            
+
             if (verbose)
             {
                std::cout << "[AlembicLoader] AlembicGeometrySource::GeomInfo::attachParams: Color parameter \"" << it->first << "\" attached" << std::endl;
@@ -397,75 +397,85 @@ AlembicGeometrySource::AlembicGeometrySource(VR::VRayRenderer *vray,
    : mParams(params)
    , mPluginMgr(0)
    , mScene(0)
-   , mRefScene(0)
+   // , mRefScene(0)
    , mRenderTime(0)
    , mRenderFrame(0)
+   , mReferenceTime(0)
    , mLoader(loader)
 {
    TRACEM(AlembicGeometrySource, AlembicGeometrySource);
-   
+
    VR::VRayPluginRendererInterface *pluginRenderer = (VR::VRayPluginRendererInterface*) GET_INTERFACE(vray, EXT_PLUGIN_RENDERER);
-   
+
    if (pluginRenderer)
    {
       mPluginMgr = pluginRenderer->getPluginManager();
-      
+
       std::string path = (params->filename.empty() ? "" : params->filename.ptr());
-      std::string refPath = (params->referenceFilename.empty() ? "" : params->referenceFilename.ptr());
-      std::string objPath = (params->objectPath.empty() ? "" : params->objectPath.ptr());   
-      
+      // std::string refPath = (params->referenceFilename.empty() ? "" : params->referenceFilename.ptr());
+      std::string objPath = (params->objectPath.empty() ? "" : params->objectPath.ptr());
+
       if (path.length() > 0)
       {
          const VR::VRaySequenceData &seq = vray->getSequenceData();
-         
+
          int threadIndex = seq.threadManager->getThreadIndex();
-         
+
          char tmp[64];
          sprintf(tmp, "%d", threadIndex);
          mSceneID = tmp;
-         
+
          AlembicSceneFilter filter(objPath, "");
-         
+
          // Allow for directory mappings here
 
          AlembicSceneCache::SetConcurrency(size_t(VR::getNumProcessors()));
-         
+
          mScene = AlembicSceneCache::Ref(path, mSceneID, filter, true);
-         
+
          if (mScene)
          {
-            if (params->useReferenceObject)
+            // if (params->useReferenceObject)
+            if (!params->ignoreReference)
             {
-               CollectWorldMatrices WM(this);
-               
-               if (refPath.length() > 0)
+               if (params->referenceSource == AlembicLoaderParams::RS_frame)
                {
-                  mRefScene = AlembicSceneCache::Ref(refPath, mSceneID, filter, true);
-                  
-                  if (mRefScene)
-                  {
-                     mRefScene->visit(AlembicNode::VisitDepthFirst, WM);
-                     mRefMatrices = WM.getWorldMatrices();
-                  }
-               }
-               
-               if (!mRefScene)
-               {
-                  if (params->verbose)
-                  {
-                     std::cout << "[AlembicLoader] AlembicGeometrySource::AlembicGeometrySource: Use same scene as reference" << std::endl;
-                  }
-                  
-                  mRefScene = mScene;
-                  
-                  // Will collect world matrices from first sample
-                  mRefScene->visit(AlembicNode::VisitDepthFirst, WM);
+                  mReferenceTime = adjustFrame(params->referenceFrame) / mParams->fps;
+
+                  CollectWorldMatrices WM(this, mReferenceTime);
+
+                  // if (refPath.length() > 0)
+                  // {
+                  //    mRefScene = AlembicSceneCache::Ref(refPath, mSceneID, filter, true);
+                  //    if (mRefScene)
+                  //    {
+                  //       mRefScene->visit(AlembicNode::VisitDepthFirst, WM);
+                  //       mRefMatrices = WM.getWorldMatrices();
+                  //    }
+                  // }
+
+                  // if (!mRefScene)
+                  // {
+                  //    if (params->verbose)
+                  //    {
+                  //       std::cout << "[AlembicLoader] AlembicGeometrySource::AlembicGeometrySource: Use same scene as reference" << std::endl;
+                  //    }
+                  //    mRefScene = mScene;
+                  //    // Will collect world matrices from first sample
+                  //    mRefScene->visit(AlembicNode::VisitDepthFirst, WM);
+                  //    mRefMatrices = WM.getWorldMatrices();
+                  // }
+                  mScene->visit(AlembicNode::VisitDepthFirst, WM);
                   mRefMatrices = WM.getWorldMatrices();
                }
+               else
+               {
+                  // mRefMatrices?
+               }
             }
-            
+
             BuildPlugins bldplg(this, vray);
-            
+
             mScene->visit(AlembicNode::VisitDepthFirst, bldplg);
          }
       }
@@ -483,22 +493,22 @@ void AlembicGeometrySource::dumpVRScene(const char *path)
 AlembicGeometrySource::~AlembicGeometrySource()
 {
    TRACEM(AlembicGeometrySource, ~AlembicGeometrySource);
-   
-   if (mRefScene)
-   {
-      if (mRefScene != mScene)
-      {
-         AlembicSceneCache::Unref(mRefScene, mSceneID);
-      }
-      mRefScene = 0;
-   }
-   
+
+   // if (mRefScene)
+   // {
+   //    if (mRefScene != mScene)
+   //    {
+   //       AlembicSceneCache::Unref(mRefScene, mSceneID);
+   //    }
+   //    mRefScene = 0;
+   // }
+
    if (mScene)
    {
       AlembicSceneCache::Unref(mScene, mSceneID);
       mScene = 0;
    }
-      
+
    if (mPluginMgr)
    {
       for (int i=0; i<mCreatedPlugins.count(); ++i)
@@ -508,23 +518,23 @@ AlembicGeometrySource::~AlembicGeometrySource()
             mPluginMgr->deletePlugin(mCreatedPlugins[i]);
          }
       }
-      
+
       mCreatedPlugins.freeMem();
    }
-   
+
    mFactory.clear();
-   
+
    mGeoms.clear();
-   
+
    mPluginMgr = 0;
 }
 
 VR::VRayPlugin* AlembicGeometrySource::createPlugin(const tchar *pluginType)
 {
    TRACEM_MSG(AlembicGeometrySource, createPlugin, pluginType);
-   
+
    VR::VRayPlugin *rv = 0;
-  
+
    if (mPluginMgr)
    {
       rv = (VR::VRayPlugin*) mPluginMgr->newPlugin(pluginType, NULL);
@@ -533,7 +543,7 @@ VR::VRayPlugin* AlembicGeometrySource::createPlugin(const tchar *pluginType)
          mCreatedPlugins += rv;
       }
    }
-   
+
    return rv;
 }
 
@@ -546,7 +556,7 @@ void AlembicGeometrySource::deletePlugin(VR::VRayPlugin *plugin)
          if (mCreatedPlugins[i] == plugin)
          {
             mPluginMgr->deletePlugin(plugin);
-            
+
             mCreatedPlugins[i] = 0;
          }
       }
@@ -561,20 +571,20 @@ bool AlembicGeometrySource::isValid() const
 AlembicGeometrySource::GeomInfo* AlembicGeometrySource::addInfo(const std::string &path, VR::VRayPlugin *geom, VR::VRayPlugin *mod)
 {
    TRACEM_MSG(AlembicGeometrySource, addInfo, path);
-   
+
    std::map<std::string, GeomInfo>::iterator it = mGeoms.find(path);
    if (it != mGeoms.end())
    {
       return 0;
    }
-   
+
    GeomInfo &info = mGeoms[path];
-   
+
    info.geometry = geom;
    info.modifier = mod;
    info.out = (mod ? mod : geom);
    info.source = static_cast<VR::StaticGeomSourceInterface*>(GET_INTERFACE(info.out, EXT_STATIC_GEOM_SOURCE));
-   
+
    return &info;
 }
 
@@ -604,18 +614,18 @@ double AlembicGeometrySource::adjustFrame(double inFrame) const
 {
    double invFps = 1.0 / mParams->fps;
    double extraOffset = 0.0;
-   
+
    if (mParams->preserveStartFrame)
    {
       extraOffset = mParams->startFrame * (mParams->speed - 1.0);
    }
-   
+
    double outTime = invFps * (mParams->speed  * (inFrame - mParams->offset) - extraOffset);
    double startTime = invFps * mParams->startFrame;
    double endTime = invFps * mParams->endFrame;
    double playTime = endTime - startTime;
    double eps = 0.001;
-   
+
    if (mParams->cycle == AlembicLoaderParams::CT_hold)
    {
       outTime = std::max(startTime, std::min(outTime, endTime));
@@ -625,7 +635,7 @@ double AlembicGeometrySource::adjustFrame(double inFrame) const
       double normalizedTime = (outTime - startTime) / playTime;
       double playRepeat = floor(normalizedTime);
       double fraction = fabs(normalizedTime - playRepeat);
-      
+
       if (mParams->cycle == AlembicLoaderParams::CT_reverse)
       {
          if (outTime > (startTime + eps) && outTime < (endTime - eps))
@@ -656,56 +666,56 @@ double AlembicGeometrySource::adjustFrame(double inFrame) const
          }
       }
    }
-   
+
    #ifdef _DEBUG
    std::cout << "[AlembicLoader] adjustFrame: " << inFrame << " -> " << (mParams->fps * outTime);
    std::cout << " (offset = " << mParams->offset << ", speed = " << mParams->speed << ", range = [";
    std::cout << mParams->startFrame << ", " << mParams->endFrame << "])" << std::endl;
    #endif
-   
+
    return outTime * mParams->fps;
-} 
+}
 
 void AlembicGeometrySource::beginFrame(VR::VRayRenderer *vray)
 {
    TRACEM(AlembicGeometrySource, beginFrame);
-   
+
    if (mScene)
    {
       const VR::VRayFrameData &frameData = vray->getFrameData();
       const VR::VRaySequenceData &seqData = vray->getSequenceData();
-      
+
       bool ignoreMotionBlur = (mParams->ignoreDeformBlur && (mParams->ignoreTransforms || mParams->ignoreTransformBlur));
-      
+
       mRenderFrame = vray->getTimeInFrames(frameData.t);
       mRenderTime = adjustFrame(mRenderFrame) / mParams->fps;
-      
+
       mSampleTimes.clear();
       mSampleFrames.clear();
-      
-      // moblur.intervalCenter : frame relative value 
+
+      // moblur.intervalCenter : frame relative value
       // moblur.duration       : in frames
       // Examples:
       //   for start on frame, 1 frame long: duration = 1, intervalCenter = 0.5
-      
+
       int mbsamples = determineMotionBlurSamples(seqData, 0);
       bool velocityBlur = isVelocityChannelPresent(seqData);
-      
+
       if (velocityBlur && mbsamples <= 1)
       {
          // Note: This should never happen as far as I understand it, but just in case
          mbsamples = 2;
       }
-      
+
       // for velocity channel, need to output 2 samples no matter what!
       // if ignoreMotionBlur is set, output twice the same sample
       // => the frame being rendered as V-Ray doesn't allow you to change
-      
+
       if (velocityBlur || (seqData.params.moblur.on && mbsamples > 1 && !ignoreMotionBlur))
       {
          double t = frameData.frameStart;
          double step = (frameData.frameEnd - frameData.frameStart) / double(mbsamples - 1);
-         
+
          while (t <= frameData.frameEnd)
          {
             double f = ignoreMotionBlur ? mRenderFrame : vray->getTimeInFrames(t);
@@ -719,14 +729,14 @@ void AlembicGeometrySource::beginFrame(VR::VRayRenderer *vray)
          mSampleTimes.push_back(mRenderTime);
          mSampleFrames.push_back(mRenderFrame);
       }
-      
+
       for (std::map<std::string, GeomInfo>::iterator it=mGeoms.begin(); it!=mGeoms.end(); ++it)
       {
          it->second.resetFlags();
       }
-      
+
       UpdateGeometry updateGeometry(this);
-      
+
       mScene->visit(AlembicNode::VisitDepthFirst, updateGeometry);
    }
 }
@@ -742,43 +752,43 @@ void AlembicGeometrySource::instanciateGeometry(VR::MaterialInterface *mtl,
                                                 int primaryVisibility)
 {
    TRACEM(AlembicGeometrySource, instanciateGeometry);
-   
+
    // UpdateGeometry was called, what are the geometry to be instanced?
    // We have a scene filter set
    // Even with that, depending on frame, geometry might visible or not
    // Do not instanciate geom for invisible bits!
    // UpdateGeometry should tag GeomInfo
    // source will always be there as we keep the plugins around until the end
-   
+
    std::string baseAttrStr = (userAttr ? userAttr : "");
    const char *sep = "";
-   
+
    StringUserAttrs baseAttrs;
    StringUserAttrs::iterator attrIt;
-   
+
    ParseStringUserAttrs(baseAttrStr, baseAttrs);
-   
+
    for (std::map<std::string, GeomInfo>::iterator it=mGeoms.begin(); it!=mGeoms.end(); ++it)
    {
       GeomInfo &info = it->second;
-      
+
       if (info.source && !info.ignore)
       {
          StringUserAttrs geomAttrs;
-         
+
          ParseStringUserAttrs(info.userAttr, geomAttrs);
-         
+
          std::string userAttrStr;
-         
+
          sep = "";
-         
+
          for (attrIt=geomAttrs.begin(); attrIt!=geomAttrs.end(); ++attrIt)
          {
             userAttrStr += sep;
             userAttrStr += info.userAttr.substr(attrIt->second.start, attrIt->second.end - attrIt->second.start + 1);
             sep = ";";
          }
-         
+
          for (attrIt=baseAttrs.begin(); attrIt!=baseAttrs.end(); ++attrIt)
          {
             if (geomAttrs.find(attrIt->first) != geomAttrs.end())
@@ -789,7 +799,7 @@ void AlembicGeometrySource::instanciateGeometry(VR::MaterialInterface *mtl,
             userAttrStr += baseAttrStr.substr(attrIt->second.start, attrIt->second.end - attrIt->second.start + 1);
             sep = ";";
          }
-         
+
          info.instance = info.source->newInstance(mtl, bsdf, renderID, volume, lightList, baseTM, objectID, userAttrStr.c_str(), primaryVisibility);
       }
    }
@@ -804,7 +814,7 @@ bool AlembicGeometrySource::compileMatrices(AlembicGeometrySource::GeomInfo &inf
    else
    {
       bool allocated = false;
-      
+
       if (tmCount == 0)
       {
          tm = info.matrices;
@@ -819,12 +829,12 @@ bool AlembicGeometrySource::compileMatrices(AlembicGeometrySource::GeomInfo &inf
       {
          VR::TraceTransform *_tm = new VR::TraceTransform[info.numMatrices];
          allocated = true;
-         
+
          for (int i=0; i<info.numMatrices; ++i)
          {
             _tm[i] = tm[0] * info.matrices[i];
          }
-         
+
          tm = _tm;
          tmCount = info.numMatrices;
          times = sampleFrames();
@@ -833,12 +843,12 @@ bool AlembicGeometrySource::compileMatrices(AlembicGeometrySource::GeomInfo &inf
       {
          VR::TraceTransform *_tm = new VR::TraceTransform[tmCount];
          allocated = true;
-         
+
          for (int i=0; i<tmCount; ++i)
          {
             _tm[i] = tm[i] * info.matrices[0];
          }
-         
+
          tm = _tm;
          // tmCount and times unchanged
       }
@@ -853,10 +863,10 @@ bool AlembicGeometrySource::compileMatrices(AlembicGeometrySource::GeomInfo &inf
       else
       {
          // info.numMatrices == tmCount > 1
-         
+
          VR::TraceTransform *_tm = new VR::TraceTransform[info.numMatrices];
          allocated = true;
-         
+
          for (int i=0; i<info.numMatrices; ++i)
          {
             if (fabs(times[i] - sampleFrame(i)) > 0.001f)
@@ -870,12 +880,12 @@ bool AlembicGeometrySource::compileMatrices(AlembicGeometrySource::GeomInfo &inf
                _tm[i] = tm[i] * info.matrices[i];
             }
          }
-         
+
          tm = _tm;
          tmCount = info.numMatrices;
          times = sampleFrames();
       }
-      
+
       return allocated;
    }
 }
@@ -883,24 +893,24 @@ bool AlembicGeometrySource::compileMatrices(AlembicGeometrySource::GeomInfo &inf
 void AlembicGeometrySource::compileGeometry(VR::VRayRenderer *vray, VR::TraceTransform *tm, double *times, int tmCount)
 {
    TRACEM(AlembicGeometrySource, instanciateGeometry);
-   
+
    for (std::map<std::string, GeomInfo>::iterator it=mGeoms.begin(); it!=mGeoms.end(); ++it)
    {
       GeomInfo &info = it->second;
-      
+
       if (!info.instance)
       {
          continue;
       }
-      
+
       VR::TraceTransform *_tm = tm;
       int _tmCount = tmCount;
       double *_times = times;
-      
+
       bool allocated = compileMatrices(info, _tm, _times, _tmCount);
-      
+
       info.instance->compileGeometry(vray, _tm, _times, _tmCount);
-      
+
       if (allocated)
       {
          delete[] _tm;
@@ -916,16 +926,16 @@ void AlembicGeometrySource::updateMaterial(VR::MaterialInterface *mtl,
                                            int objectID)
 {
    TRACEM(AlembicGeometrySource, updateMaterial);
-   
+
    for (std::map<std::string, GeomInfo>::iterator it=mGeoms.begin(); it!=mGeoms.end(); ++it)
    {
       GeomInfo &info = it->second;
-      
+
       if (!info.instance)
       {
          continue;
       }
-      
+
       info.instance->updateMaterial(mtl, bsdf, renderID, volume, lightList, objectID);
    }
 }
@@ -933,16 +943,16 @@ void AlembicGeometrySource::updateMaterial(VR::MaterialInterface *mtl,
 void AlembicGeometrySource::clearGeometry(VR::VRayRenderer *vray)
 {
    TRACEM(AlembicGeometrySource, clearGeometry);
-   
+
    for (std::map<std::string, GeomInfo>::iterator it=mGeoms.begin(); it!=mGeoms.end(); ++it)
    {
       GeomInfo &info = it->second;
-      
+
       if (!info.instance)
       {
          continue;
       }
-      
+
       info.instance->clearGeometry(vray);
    }
 }
@@ -950,11 +960,11 @@ void AlembicGeometrySource::clearGeometry(VR::VRayRenderer *vray)
 void AlembicGeometrySource::destroyGeometryInstance()
 {
    TRACEM(AlembicGeometrySource, destroyGeometryInstance);
-   
+
    for (std::map<std::string, GeomInfo>::iterator it=mGeoms.begin(); it!=mGeoms.end(); ++it)
    {
       GeomInfo &info = it->second;
-      
+
       if (info.source && info.instance)
       {
          info.source->deleteInstance(info.instance);
@@ -966,12 +976,12 @@ void AlembicGeometrySource::destroyGeometryInstance()
 void AlembicGeometrySource::endFrame(VR::VRayRenderer *vray)
 {
    TRACEM(AlembicGeometrySource, endFrame);
-   
+
    for (std::map<std::string, GeomInfo>::iterator it=mGeoms.begin(); it!=mGeoms.end(); ++it)
    {
       it->second.clear();
    }
-   
+
    mSampleTimes.clear();
    mSampleFrames.clear();
 }
@@ -979,13 +989,13 @@ void AlembicGeometrySource::endFrame(VR::VRayRenderer *vray)
 VR::VRayShadeData* AlembicGeometrySource::getShadeData(const VR::VRayContext *rc)
 {
    TRACEM(AlembicGeometrySource, getShadeData);
-   
+
    return 0;
 }
 
 VR::VRayShadeInstance* AlembicGeometrySource::getShadeInstance(const VR::VRayContext *rc)
 {
    TRACEM(AlembicGeometrySource, getShadeInstance);
-   
+
    return 0;
 }

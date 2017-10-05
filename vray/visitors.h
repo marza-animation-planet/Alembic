@@ -8,12 +8,12 @@
 class BaseVisitor
 {
 public:
-   
+
    BaseVisitor(AlembicGeometrySource *geosrc);
    virtual ~BaseVisitor();
-   
+
    bool getVisibility(Alembic::Abc::ICompoundProperty props, double t);
-   
+
    template <class T>
    bool isVisible(AlembicNodeT<T> &node)
    {
@@ -26,7 +26,7 @@ public:
          return getVisibility(node.object().getProperties(), mGeoSrc->renderTime());
       }
    }
-   
+
    inline bool isVisible(AlembicNode *node)
    {
       if (mGeoSrc->params()->ignoreVisibility)
@@ -38,9 +38,9 @@ public:
          return getVisibility(node->object().getProperties(), mGeoSrc->renderTime());
       }
    }
-   
+
 protected:
-   
+
    AlembicGeometrySource *mGeoSrc;
 };
 
@@ -49,11 +49,11 @@ protected:
 class BuildPlugins : public BaseVisitor
 {
 public:
-   
+
    BuildPlugins(AlembicGeometrySource *geosrc,
                 VR::VRayRenderer *vray);
    virtual ~BuildPlugins();
-   
+
    AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicSubD &node, AlembicNode *instance=0);
@@ -61,11 +61,11 @@ public:
    AlembicNode::VisitReturn enter(AlembicCurves &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicNuPatch &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0);
-      
+
    void leave(AlembicNode &node, AlembicNode *instance=0);
 
 protected:
-   
+
    VR::VRayRenderer *mVRay;
 };
 
@@ -74,9 +74,9 @@ protected:
 class CollectWorldMatrices : public BaseVisitor
 {
 public:
-   
-   CollectWorldMatrices(AlembicGeometrySource *geosrc);
-   
+
+   CollectWorldMatrices(AlembicGeometrySource *geosrc, double time);
+
    AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicSubD &node, AlembicNode *instance=0);
@@ -84,15 +84,15 @@ public:
    AlembicNode::VisitReturn enter(AlembicCurves &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicNuPatch &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0);
-   
+
    void leave(AlembicXform &node, AlembicNode *instance=0);
    void leave(AlembicNode &node, AlembicNode *instance=0);
-   
+
    inline const std::map<std::string, Alembic::Abc::M44d>& getWorldMatrices() const
    {
       return mMatrices;
    }
-   
+
    inline bool getWorldMatrix(const std::string &objectPath, Alembic::Abc::M44d &W) const
    {
       std::map<std::string, Alembic::Abc::M44d>::const_iterator it = mMatrices.find(objectPath);
@@ -106,32 +106,33 @@ public:
          return false;
       }
    }
-   
+
 private:
-   
+
    template <class T>
    AlembicNode::VisitReturn shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance=0);
-   
+
 private:
-   
+
    std::vector<Alembic::Abc::M44d> mMatrixStack;
    std::map<std::string, Alembic::Abc::M44d> mMatrices;
+   Alembic::AbcCoreAbstract::chrono_t mTime;
 };
 
 template <class T>
 AlembicNode::VisitReturn CollectWorldMatrices::shapeEnter(AlembicNodeT<T> &node, AlembicNode *instance)
 {
    Alembic::Abc::M44d W;
-   
+
    if (mMatrixStack.size() > 0)
    {
       W = mMatrixStack.back();
    }
-   
+
    std::string path = (instance ? instance->path() : node.path());
-   
+
    mMatrices[path] = W;
-   
+
    return AlembicNode::ContinueVisit;
 }
 
@@ -140,10 +141,10 @@ AlembicNode::VisitReturn CollectWorldMatrices::shapeEnter(AlembicNodeT<T> &node,
 class UpdateGeometry : public BaseVisitor
 {
 public:
-   
+
    UpdateGeometry(AlembicGeometrySource *geosrc);
    virtual ~UpdateGeometry();
-   
+
    AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicSubD &node, AlembicNode *instance=0);
@@ -151,13 +152,13 @@ public:
    AlembicNode::VisitReturn enter(AlembicCurves &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicNuPatch &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0);
-   
-   void leave(AlembicXform &node, AlembicNode *instance=0);   
+
+   void leave(AlembicXform &node, AlembicNode *instance=0);
    void leave(AlembicNode &node, AlembicNode *instance=0);
-   
-   
+
+
 public:
-   
+
    struct UserAttrsSet
    {
       UserAttributes object;
@@ -166,15 +167,15 @@ public:
       UserAttributes vertex;
       std::map<std::string, Alembic::AbcGeom::IV2fGeomParam> uvs;
    };
-   
+
    template <class IObject>
    void cleanupReferenceObject(AlembicNodeT<IObject> &node);
-   
+
    void cleanupReferenceObject(const std::string &key,
                                AlembicGeometrySource::GeomInfo* &info);
-   
+
    typedef bool (*CollectFilter)(const Alembic::AbcCoreAbstract::PropertyHeader &header);
-   
+
    void collectUserAttributes(Alembic::Abc::ICompoundProperty userProps,
                               Alembic::Abc::ICompoundProperty geomParams,
                               double t,
@@ -186,49 +187,50 @@ public:
                               bool vertex,
                               bool uvs,
                               CollectFilter filter=0);
-   
+
    template <class MeshSchema>
    bool readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
                      AlembicGeometrySource::GeomInfo *info,
                      const UserAttrsSet &attrs,
                      bool computeNormals,
-                     AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > *refNode,
-                     AlembicGeometrySource::GeomInfo *refInfo,
-                     const UserAttrsSet *refAttrs);
-   
+                     // AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > *refNode,
+                     AlembicGeometrySource::GeomInfo *refInfo); // ,
+                     // const UserAttrsSet *refAttrs);
+
    template <class MeshSchema>
    inline bool readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
                             AlembicGeometrySource::GeomInfo *info,
                             bool computeNormals)
    {
       UserAttrsSet attrs;
-      return readBaseMesh(node, info, attrs, computeNormals, 0, 0, 0);
+      return readBaseMesh(node, info, attrs, computeNormals, 0, 0); // , 0);
    }
-   
+
    float* computeMeshSmoothNormals(AlembicGeometrySource::GeomInfo *info,
                                    const float *P0,
                                    const float *P1,
                                    float blend);
-   
+
    bool readMeshNormals(AlembicMesh &mesh,
-                        AlembicGeometrySource::GeomInfo *info);
-   
+                        AlembicGeometrySource::GeomInfo *info,
+                        size_t ntimes=0, double *times=0, double *frames=0);
+
    template <class MeshSchema>
    void setMeshNormals(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
                        AlembicGeometrySource::GeomInfo *info,
                        const UserAttribute *Nattr);
-   
+
    template <class MeshSchema>
    void setMeshSmoothNormals(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
                              AlembicGeometrySource::GeomInfo *info);
-   
+
    template <class MeshSchema>
    size_t readMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
                       AlembicGeometrySource::GeomInfo *info,
                       const UserAttrsSet &attrs,
                       bool primaryOnly=false,
                       AlembicGeometrySource::GeomInfo *refInfo=0);
-   
+
    template <class MeshSchema>
    inline size_t readMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
                              AlembicGeometrySource::GeomInfo *info)
@@ -236,46 +238,46 @@ public:
       UserAttrsSet attrs;
       return readMeshUVs(node, info, attrs, false, 0);
    }
-   
-   template <class IObject>
-   AlembicNodeT<IObject>* getReferenceNode(AlembicNodeT<IObject> &node,
-                                           const UserAttrsSet &attrs);
-   
+
+   // template <class IObject>
+   // AlembicNodeT<IObject>* getReferenceNode(AlembicNodeT<IObject> &node,
+   //                                         const UserAttrsSet &attrs);
+
    bool hasReferencePositions(AlembicGeometrySource::GeomInfo *info,
                               const UserAttrsSet *attrs,
                               UserAttributes::const_iterator *outIt=0);
-   
+
    bool hasReferenceNormals(AlembicGeometrySource::GeomInfo *info,
                             const UserAttrsSet *attrs,
                             UserAttributes::const_iterator *outIt=0);
-   
+
 protected:
-   
+
    std::vector<std::vector<Alembic::Abc::M44d> > mMatrixSamplesStack;
 };
 
-template <class IObject>
-AlembicNodeT<IObject>* UpdateGeometry::getReferenceNode(AlembicNodeT<IObject> &node,
-                                                        const UserAttrsSet &attrs)
-{
-   if (attrs.point.find("Pref") != attrs.point.end())
-   {
-      // if 'Pref' point attribute is defined, always use node
-      return &node;
-   }
-   else
-   {
-      return dynamic_cast<AlembicNodeT<IObject>*>(mGeoSrc->referenceScene()->find(node.path()));
-   }
-}
+// template <class IObject>
+// AlembicNodeT<IObject>* UpdateGeometry::getReferenceNode(AlembicNodeT<IObject> &node,
+//                                                         const UserAttrsSet &attrs)
+// {
+//    if (attrs.point.find("Pref") != attrs.point.end())
+//    {
+//       // if 'Pref' point attribute is defined, always use node
+//       return &node;
+//    }
+//    else
+//    {
+//       return dynamic_cast<AlembicNodeT<IObject>*>(mGeoSrc->referenceScene()->find(node.path()));
+//    }
+// }
 
 template <class IObject>
 void UpdateGeometry::cleanupReferenceObject(AlembicNodeT<IObject> &node)
 {
    std::string key = node.path() + "@reference";
-   
+
    AlembicGeometrySource::GeomInfo *info = mGeoSrc->getInfo(key);
-   
+
    cleanupReferenceObject(key, info);
 }
 
@@ -284,12 +286,12 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
                                   AlembicGeometrySource::GeomInfo *info,
                                   const UserAttrsSet &attrs,
                                   bool computeNormals,
-                                  AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > *refNode,
-                                  AlembicGeometrySource::GeomInfo *refInfo,
-                                  const UserAttrsSet *refAttrs)
+                                  // AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > *refNode,
+                                  AlembicGeometrySource::GeomInfo *refInfo) // ,
+                                  // const UserAttrsSet *refAttrs)
 {
    MeshSchema &schema = node.typedObject().getSchema();
-   
+
    bool isConst = (info->constPositions != 0);
    bool varyingTopology = schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology;
    bool singleSample = (mGeoSrc->params()->ignoreDeformBlur || varyingTopology);
@@ -302,26 +304,26 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
    double f = 0.0;
    double b = 0.0;
    bool rv = true;
-   
+
    if (mGeoSrc->params()->verbose && varyingTopology)
    {
       std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Topology varying mesh" << std::endl;
    }
-   
+
    // Sample mesh schema
-   
+
    TimeSampleList<MeshSchema> &meshSamples = node.samples().schemaSamples;
    typename TimeSampleList<MeshSchema>::ConstIterator samp0, samp1; // for animated mesh
    typename MeshSchema::Sample theSample; // for constant mesh
-   
+
    // Build topology
    Alembic::Abc::Int32ArraySamplePtr FC;
    Alembic::Abc::Int32ArraySamplePtr FI;
-   
+
    if (isConst)
    {
       theSample = schema.getValue();
-      
+
       FC = theSample.getFaceCounts();
       FI = theSample.getFaceIndices();
    }
@@ -333,42 +335,42 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
          t = times[i];
          node.sampleSchema(t, t, i > 0);
       }
-      
+
       if (meshSamples.size() == 0)
       {
          return false;
       }
-      
+
       meshSamples.getSamples(renderTime, samp0, samp1, b);
-      
+
       FC = samp0->data().getFaceCounts();
       FI = samp0->data().getFaceIndices();
-      
+
       if (mGeoSrc->params()->verbose)
       {
          std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Use topology at t=" << samp0->time() << std::endl;
       }
    }
-   
+
    if (!FC->valid() || !FI->valid())
    {
       std::cerr << "[AlembicLoader] UpdateGeometry::readBaseMesh: Invalid topology data" << std::endl;
       return false;
    }
-   
+
    if (mGeoSrc->params()->verbose)
    {
       std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: " << FC->size() << " face(s), " << FI->size() << " vertice(s)" << std::endl;
    }
-      
+
    // Compute number of triangles
-   
+
    info->numTriangles = 0;
-   
+
    for (size_t i=0; i<FC->size(); ++i)
    {
       unsigned int nv = FC->get()[i];
-      
+
       if (nv > 3)
       {
          info->numTriangles += nv - 2;
@@ -378,12 +380,12 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
          info->numTriangles += (nv == 3 ? 1 : 0);
       }
    }
-   
+
    info->faces->setCount(info->numTriangles * 3, renderFrame);
-   
+
    info->numFaces = FC->size();
    info->numFaceVertices = FI->size();
-   
+
    if (refInfo)
    {
       refInfo->numTriangles = info->numTriangles;
@@ -391,39 +393,39 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
       refInfo->numFaces = info->numFaces;
       refInfo->numFaceVertices = info->numFaceVertices;
    }
-   
+
    if (mGeoSrc->params()->verbose)
    {
       std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: " << info->numTriangles << " triangle(s)" << std::endl;
    }
-   
+
    // Alembic to V-Ray indices mappings
    info->toVertexIndex = new unsigned int[info->numTriangles * 3];
    info->toPointIndex = new unsigned int[info->numTriangles * 3];
    info->toFaceIndex = new unsigned int[info->numTriangles * 3];
-   
+
    int edgeVisMask = 0;
    int edgeVisMaskIdx = 0;
    int edgeVisCnt = (info->numTriangles / 10) + ((info->numTriangles % 10) > 0 ? 1 : 0);
-   
+
    if (mGeoSrc->params()->verbose)
    {
       std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: " << edgeVisCnt << " edge visibility flag(s)" << std::endl;
    }
-   
+
    info->edgeVisibility->setCount(edgeVisCnt, renderFrame);
-      
+
    if (refInfo)
    {
       refInfo->toVertexIndex = new unsigned int[refInfo->numTriangles * 3];
       refInfo->toPointIndex = new unsigned int[refInfo->numTriangles * 3];
       refInfo->toFaceIndex = new unsigned int[refInfo->numTriangles * 3];
-      
+
       refInfo->edgeVisibility->setCount(edgeVisCnt, renderFrame);
    }
-   
+
    edgeVisCnt = 0;
-   
+
    // i: face index
    // j: index in FI array
    // k: index in info->faces array
@@ -431,22 +433,22 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
    {
       // Alembic winding order is clockwise, V-Ray expects counter-clockwise
       unsigned int nv = FC->get()[i];
-      
+
       if (nv >= 3)
       {
          // First vertex in CCW order
          unsigned int j0 = j + nv - 1;
          unsigned int i0 = FI->get()[j0];
-         
+
          // For each triangle (simple faning)
          for (unsigned int l=nv-2; l>=1; --l)
          {
             unsigned int j1 = j + l;
             unsigned int i1 = FI->get()[j1];
-            
+
             unsigned int j2 = j + l - 1;
             unsigned int i2 = FI->get()[j2];
-            
+
             info->faces->setInt(i0, k, renderFrame);
             info->toFaceIndex[k] = i;
             info->toPointIndex[k] = i0;
@@ -459,7 +461,7 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
                refInfo->toVertexIndex[k] = j0;
             }
             ++k;
-            
+
             info->faces->setInt(i1, k, renderFrame);
             info->toFaceIndex[k] = i;
             info->toPointIndex[k] = i1;
@@ -472,7 +474,7 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
                refInfo->toVertexIndex[k] = j1;
             }
             ++k;
-            
+
             info->faces->setInt(i2, k, renderFrame);
             info->toFaceIndex[k] = i;
             info->toPointIndex[k] = i2;
@@ -485,13 +487,13 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
                refInfo->toVertexIndex[k] = j2;
             }
             ++k;
-            
+
             // first edge of first triangle ( l == nv-2 ) always visible: 100 (0x4)
             // first edge of any other triangle always invisible
             // second edge of any triangle always visible: 010 (0x2)
             // last edge of last triangle ( l == 1 ) always visible: 001 (0x1)
             edgeVisMask = (edgeVisMask << 3) | 0x02 | (l == nv-2 ? 0x04 : 0x00) | (l == 1 ? 0x01 : 0x00);
-            
+
             if (++edgeVisCnt >= 10)
             {
                info->edgeVisibility->setInt(edgeVisMask, edgeVisMaskIdx, renderFrame);
@@ -499,17 +501,17 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
                {
                   refInfo->edgeVisibility->setInt(edgeVisMask, edgeVisMaskIdx, renderFrame);
                }
-               
+
                edgeVisMaskIdx++;
                edgeVisMask = 0;
                edgeVisCnt = 0;
             }
          }
       }
-      
+
       j += nv;
    }
-   
+
    // Set last edge visibility mask
    if (edgeVisCnt > 0)
    {
@@ -518,41 +520,41 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
       {
          refInfo->edgeVisibility->setInt(edgeVisMask, edgeVisMaskIdx, renderFrame);
       }
-      
+
       edgeVisMaskIdx++;
    }
-   
+
    // Read positions (and interpolate/extrapolate as needed)
    if (isConst)
    {
       Alembic::Abc::P3fArraySamplePtr P = theSample.getPositions();
-      
+
       info->constPositions->setCount(P->size(), renderFrame);
-      
+
       VR::VectorList vl = info->constPositions->getVectorList(renderFrame);
-      
+
       info->numPoints = P->size();
-      
+
       if (mGeoSrc->params()->verbose)
       {
          std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: " << info->numPoints << " point(s)" << std::endl;
       }
-      
+
       const float *Pref = (const float*) P->getData();
-      
+
       const float *cPref = Pref;
       for (size_t i=0; i<P->size(); ++i, cPref+=3)
       {
          vl[i].set(cPref[0], cPref[1], cPref[2]);
       }
-      
+
       if (computeNormals)
       {
          if (mGeoSrc->params()->verbose)
          {
             std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Compute smooth normals for reference object" << std::endl;
          }
-         
+
          info->smoothNormals.push_back(computeMeshSmoothNormals(info, Pref, 0, 0.0f));
       }
    }
@@ -567,32 +569,32 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
          frames = mGeoSrc->sampleFrames();
          ntimes = mGeoSrc->numTimeSamples();
       }
-      
+
       info->positions->clear();
-      
+
       if (meshSamples.size() == 1 && !varyingTopology)
       {
          Alembic::Abc::P3fArraySamplePtr P = samp0->data().getPositions();
-         
+
          info->numPoints = P->size();
-         
+
          if (mGeoSrc->params()->verbose)
          {
             std::cout << "[AlembicLoader] " << info->numPoints << " point(s)" << std::endl;
          }
-         
+
          for (size_t i=0; i<ntimes; ++i)
          {
             VR::Table<VR::Vector> &vl = info->positions->at(frames[i]);
             vl.setCount(P->size(), true);
-            
+
             for (size_t j=0; j<P->size(); ++j)
             {
                Alembic::Abc::V3f p = P->get()[j];
-               
+
                vl[j].set(p.x, p.y, p.z);
             }
-            
+
             if (computeNormals)
             {
                info->smoothNormals.push_back(computeMeshSmoothNormals(info, (const float*) P->getData(), 0, 0.0f));
@@ -604,20 +606,20 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
          if (varyingTopology)
          {
             //meshSamples.getSamples(renderTime, samp0, samp1, b);
-            
+
             Alembic::Abc::P3fArraySamplePtr P = samp0->data().getPositions();
-            
+
             info->numPoints = P->size();
-            
+
             if (mGeoSrc->params()->verbose)
             {
                std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: " << info->numPoints << " point(s)" << std::endl;
             }
-            
+
             // Get velocity
             // Note: should also allow double type values...
             const float *vel = 0;
-            
+
             if (samp0->data().getVelocities())
             {
                vel = (const float*) samp0->data().getVelocities()->getData();
@@ -625,14 +627,14 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
             else
             {
                UserAttributes::const_iterator it = attrs.point.find("velocity");
-               
+
                if (it == attrs.point.end() ||
                    it->second.dataCount != info->numPoints ||
                    it->second.dataType != Float_Type ||
                    it->second.dataDim != 3)
                {
                   it = attrs.point.find("v");
-                  if (it != attrs.point.end() && 
+                  if (it != attrs.point.end() &&
                       (it->second.dataCount != info->numPoints ||
                        it->second.dataType != Float_Type ||
                        it->second.dataDim != 3))
@@ -640,13 +642,13 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
                      it = attrs.point.end();
                   }
                }
-               
+
                if (it != attrs.point.end())
                {
                   vel = (const float*) it->second.data;
                }
             }
-            
+
             if (mGeoSrc->params()->verbose)
             {
                if (vel)
@@ -654,13 +656,13 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
                   std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Use per-point velocity" << std::endl;
                }
             }
-            
+
             // Get acceleration
             const float *acc = 0;
             if (vel)
             {
                UserAttributes::const_iterator it = attrs.point.find("acceleration");
-               
+
                if (it == attrs.point.end() ||
                    it->second.dataCount != info->numPoints ||
                    it->second.dataType != Float_Type ||
@@ -682,13 +684,13 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
                      }
                   }
                }
-               
+
                if (it != attrs.point.end())
                {
                   acc = (const float*) it->second.data;
                }
             }
-            
+
             if (mGeoSrc->params()->verbose)
             {
                if (acc)
@@ -696,26 +698,26 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
                   std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Use per-point acceleration" << std::endl;
                }
             }
-            
+
             if (!vel)
             {
                if (mGeoSrc->params()->verbose && !mGeoSrc->params()->ignoreDeformBlur)
                {
                   std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: No velocities found for topology varying mesh. Motion blur disabled." << std::endl;
                }
-               
+
                for (size_t i=0; i<ntimes; ++i)
                {
                   VR::Table<VR::Vector> &vl = info->positions->at(frames[i]);
                   vl.setCount(P->size(), true);
-                  
+
                   for (size_t j=0; j<P->size(); ++j)
                   {
                      Alembic::Abc::V3f p = P->get()[j];
-                     
+
                      vl[j].set(p.x, p.y, p.z);
                   }
-                  
+
                   if (computeNormals)
                   {
                      info->smoothNormals.push_back(computeMeshSmoothNormals(info, (const float*) P->getData(), 0, 0.0f));
@@ -725,117 +727,117 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
             else
             {
                float *Pm = (float*) malloc(3 * P->size() * sizeof(float));
-               
+
                for (size_t i=0; i<ntimes; ++i)
                {
                   if (mGeoSrc->params()->verbose)
                   {
                      std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Processing positions at t=" << times[i] << "..." << std::endl;
                   }
-                  
+
                   double dt = times[i] - renderTime;
-                  
+
                   VR::Table<VR::Vector> &vl = info->positions->at(frames[i]);
                   vl.setCount(P->size(), true);
-                  
+
                   float *cPm = Pm;
-                  
+
                   if (acc)
                   {
                      const float *vvel = vel;
                      const float *vacc = acc;
-                     
+
                      for (size_t k=0; k<P->size(); ++k, vvel+=3, vacc+=3, cPm+=3)
                      {
                         Alembic::Abc::V3f p = P->get()[k];
-                        
+
                         cPm[0] = p.x + dt * (vvel[0] + 0.5 * dt * vacc[0]);
                         cPm[1] = p.y + dt * (vvel[1] + 0.5 * dt * vacc[1]);
                         cPm[2] = p.z + dt * (vvel[2] + 0.5 * dt * vacc[2]);
-                        
+
                         vl[k].set(cPm[0], cPm[1], cPm[2]);
                      }
                   }
                   else
                   {
                      const float *vvel = vel;
-                     
+
                      for (size_t k=0; k<P->size(); ++k, vvel+=3, cPm+=3)
                      {
                         Alembic::Abc::V3f p = P->get()[k];
-                        
+
                         cPm[0] = p.x + dt * vvel[0];
                         cPm[1] = p.y + dt * vvel[1];
                         cPm[2] = p.z + dt * vvel[2];
-                        
+
                         vl[k].set(cPm[0], cPm[1], cPm[2]);
                      }
                   }
-                  
+
                   if (computeNormals)
                   {
                      info->smoothNormals.push_back(computeMeshSmoothNormals(info, Pm, 0, 0.0f));
                   }
                }
-               
+
                free(Pm);
             }
          }
          else
          {
             info->numPoints = 0;
-            
+
             for (size_t i=0; i<ntimes; ++i)
             {
                if (mGeoSrc->params()->verbose)
                {
                   std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Processing positions at t=" << times[i] << "..." << std::endl;
                }
-               
+
                t = times[i];
-               
+
                meshSamples.getSamples(t, samp0, samp1, b);
-               
+
                Alembic::Abc::P3fArraySamplePtr P0 = samp0->data().getPositions();
-               
+
                if (info->numPoints > 0 && P0->size() != info->numPoints)
                {
                   std::cerr << "[AlembicLoader] UpdateGeometry::readBaseMesh: Changing position count amongst samples" << std::endl;
                   rv = false;
                   break;
                }
-               
+
                if (mGeoSrc->params()->verbose && info->numPoints <= 0)
                {
                   std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: " << P0->size() << " point(s)" << std::endl;
                }
-               
+
                info->numPoints = P0->size();
-               
+
                VR::Table<VR::Vector> &vl = info->positions->at(frames[i]);
                vl.setCount(info->numPoints, true);
-               
+
                if (b > 0.0)
                {
                   if (mGeoSrc->params()->verbose)
                   {
                      std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Interpolate positions at t0=" << samp0->time() << ", t1=" << samp1->time() << ", blend=" << b << std::endl;
                   }
-                  
+
                   Alembic::Abc::P3fArraySamplePtr P1 = samp1->data().getPositions();
-                  
+
                   double a = 1.0 - b;
-                  
+
                   for (size_t k=0; k<P0->size(); ++k)
                   {
                      Alembic::Abc::V3f p0 = P0->get()[k];
                      Alembic::Abc::V3f p1 = P1->get()[k];
-                     
+
                      vl[k].set(a * p0.x + b * p1.x,
                                a * p0.y + b * p1.y,
                                a * p0.z + b * p1.z);
                   }
-                  
+
                   if (computeNormals)
                   {
                      info->smoothNormals.push_back(computeMeshSmoothNormals(info, (const float*) P0->getData(), (const float*) P1->getData(), b));
@@ -847,14 +849,14 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
                   {
                      std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Read positions at t=" << samp0->time() << std::endl;
                   }
-                  
+
                   for (size_t k=0; k<P0->size(); ++k)
                   {
                      Alembic::Abc::V3f p = P0->get()[k];
-                     
+
                      vl[k].set(p.x, p.y, p.z);
                   }
-                  
+
                   if (computeNormals)
                   {
                      info->smoothNormals.push_back(computeMeshSmoothNormals(info, (const float*) P0->getData(), 0, 0.0f));
@@ -864,64 +866,74 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
          }
       }
    }
-   
+
    // Read reference positions
    if (refInfo)
    {
       refInfo->numPoints = info->numPoints;
-      
+
       UserAttributes::const_iterator PrefIt;
       typename MeshSchema::Sample refSample;
       Alembic::Abc::P3fArraySamplePtr Psamp;
       const float *Pref = 0;
-      
-      if (hasReferencePositions(refInfo, refAttrs, &PrefIt))
+      bool useAttrs = (mGeoSrc->params()->referenceSource == AlembicLoaderParams::RS_attributes);
+
+      if (useAttrs && hasReferencePositions(refInfo, &attrs, &PrefIt))
       {
          if (mGeoSrc->params()->verbose)
          {
             std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Construct reference positions from 'Pref' attribute" << std::endl;
          }
-         
+
          const UserAttribute &ua = PrefIt->second;
-         
+
          Pref = (const float*) ua.data;
-         
+
          // Force computation of normals from Pref
          computeNormals = true;
       }
       else
       {
-         MeshSchema &refSchema = refNode->typedObject().getSchema();
-         
-         refSample = refSchema.getValue();
-         
+         //MeshSchema &refSchema = refNode->typedObject().getSchema();
+
+         //refSample = refSchema.getValue();
+         if (!useAttrs)
+         {
+            refSample = schema.getValue(Alembic::Abc::ISampleSelector(mGeoSrc->referenceTime()));
+         }
+         else
+         {
+            refSample = schema.getValue();
+         }
+
          Psamp = refSample.getPositions();
-         
+
          if (Psamp->size() != info->numPoints)
          {
             if (mGeoSrc->params()->verbose)
             {
                std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: Construct reference position from existing sample" << std::endl;
             }
-            
+
             Pref = (const float*) Psamp->getData();
          }
       }
-      
+
       if (Pref)
       {
          const float *cP = Pref;
-         
+
          refInfo->constPositions->setCount(refInfo->numPoints, renderFrame);
-         
+
          VR::VectorList vl = refInfo->constPositions->getVectorList(renderFrame);
-         
+
          for (size_t i=0; i<refInfo->numPoints; ++i, cP+=3)
          {
             vl[i].set(cP[0], cP[1], cP[2]);
          }
-         
-         if (computeNormals && !hasReferenceNormals(refInfo, refAttrs))
+
+         // if (computeNormals && !hasReferenceNormals(refInfo, refAttrs))
+         if (computeNormals && (!useAttrs || !hasReferenceNormals(refInfo, &attrs)))
          {
             refInfo->smoothNormals.push_back(computeMeshSmoothNormals(refInfo, Pref, 0, 0.0f));
          }
@@ -929,14 +941,14 @@ bool UpdateGeometry::readBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshS
       else
       {
          std::cout << "[AlembicLoader] UpdateGeometry::readBaseMesh: No valid reference positions found." << std::endl;
-         
+
          cleanupReferenceObject(node);
          refInfo = 0;
-         refNode = 0;
-         refAttrs = 0;
+         // refNode = 0;
+         // refAttrs = 0;
       }
    }
-   
+
    return rv;
 }
 
@@ -949,27 +961,27 @@ void UpdateGeometry::setMeshNormals(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
    {
       return;
    }
-   
+
    if (mGeoSrc->params()->verbose)
    {
       std::cout << "[AlembicLoader] UpdateGeometry::setMeshNormals: Set reference object normals from attribute" << std::endl;
    }
-   
+
    double renderFrame = mGeoSrc->renderFrame();
-   
+
    const float *N = (const float*) Nattr->data;
-         
+
    info->constNormals->setCount(Nattr->dataCount, renderFrame);
    VR::VectorList nl = info->constNormals->getVectorList(renderFrame);
-   
+
    info->constFaceNormals->setCount(info->numTriangles * 3, renderFrame);
    VR::IntList il = info->constFaceNormals->getIntList(renderFrame);
-   
+
    for (size_t i=0, j=0; i<Nattr->dataCount; ++i, j+=3)
    {
       nl[i].set(N[j], N[j+1], N[j+2]);
    }
-   
+
    if (Nattr->indices)
    {
       for (size_t i=0, k=0; i<info->numTriangles; ++i)
@@ -997,24 +1009,24 @@ void UpdateGeometry::setMeshSmoothNormals(AlembicNodeT<Alembic::Abc::ISchemaObje
                                           AlembicGeometrySource::GeomInfo *info)
 {
    double renderFrame = mGeoSrc->renderFrame();
-   
+
    if (info->constNormals)
    {
       if (info->smoothNormals.size() == 1)
       {
          info->constNormals->setCount(info->numPoints, renderFrame);
          VR::VectorList nl = info->constNormals->getVectorList(renderFrame);
-         
+
          info->constFaceNormals->setCount(3 * info->numTriangles, renderFrame);
          VR::IntList il = info->constFaceNormals->getIntList(renderFrame);
-         
+
          const float *N = info->smoothNormals[0];
-         
+
          for (unsigned int i=0, j=0; i<info->numPoints; ++i, j+=3)
          {
             nl[i].set(N[j], N[j+1], N[j+2]);
          }
-         
+
          for (unsigned int i=0, k=0; i<info->numTriangles; ++i)
          {
             for (unsigned int j=0; j<3; ++j, ++k)
@@ -1026,7 +1038,7 @@ void UpdateGeometry::setMeshSmoothNormals(AlembicNodeT<Alembic::Abc::ISchemaObje
       else
       {
          std::cout << "[AlembicLoader] UpdateGeometry::setMeshSmoothNormals: Computed smooth normal samples and schema samples do no match, ignoring them" << std::endl;
-         
+
          info->constNormals->setCount(0, renderFrame);
          info->constFaceNormals->setCount(0, renderFrame);
       }
@@ -1035,33 +1047,33 @@ void UpdateGeometry::setMeshSmoothNormals(AlembicNodeT<Alembic::Abc::ISchemaObje
    {
       info->normals->clear();
       info->faceNormals->clear();
-      
+
       MeshSchema &schema = node.typedObject().getSchema();
-      
+
       bool varyingTopology = schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology;
       bool singleSample = (mGeoSrc->params()->ignoreDeformBlur || varyingTopology);
       double renderTime = mGeoSrc->renderTime();
       double *times = (singleSample ? &renderTime : mGeoSrc->sampleTimes());
       double *frames = (singleSample ? &renderFrame : mGeoSrc->sampleFrames());
       size_t ntimes = (singleSample ? 1 : mGeoSrc->numTimeSamples());
-      
+
       if (info->smoothNormals.size() == ntimes)
       {
          for (size_t i=0; i<ntimes; ++i)
          {
             const float *N = info->smoothNormals[i];
-            
+
             VR::Table<VR::Vector> &nl = info->normals->at(frames[i]);
             nl.setCount(info->numPoints, true);
-            
+
             VR::Table<int> &il = info->faceNormals->at(frames[i]);
             il.setCount(3 * info->numTriangles, true);
-            
+
             for (unsigned int j=0, k=0; j<info->numPoints; ++j, k+=3)
             {
                nl[j].set(N[k], N[k+1], N[k+2]);
             }
-            
+
             for (unsigned int j=0, l=0; j<info->numTriangles; ++j)
             {
                for (unsigned int k=0; k<3; ++k, ++l)
@@ -1087,29 +1099,29 @@ size_t UpdateGeometry::readMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<Mesh
                                    AlembicGeometrySource::GeomInfo *refInfo)
 {
    size_t numUVSets = 0;
-   
+
    MeshSchema &schema = node.typedObject().getSchema();
-   
+
    double renderTime = mGeoSrc->renderTime();
    double renderFrame = mGeoSrc->renderFrame();
-   
+
    std::set<std::string> uvNames;
    UserAttribute uv;
-   
+
    Alembic::AbcGeom::IV2fGeomParam uvParam = schema.getUVsParam();
-   
+
    if (uvParam.valid())
    {
       char tmp[128];
       int isuffix = 1;
-      
+
       std::string name = Alembic::AbcGeom::GetSourceName(uvParam.getMetaData());
-      
+
       if (name.length() == 0)
       {
          name = "map1";
       }
-      
+
       // Make sure we have a 'valid' name for master uv set (i.e. non conflicting with any other user attribute)
       while (uvNames.find(name) != uvNames.end() ||
              attrs.object.find(name) != attrs.object.end() ||
@@ -1121,9 +1133,9 @@ size_t UpdateGeometry::readMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<Mesh
          sprintf(tmp, "map%d", isuffix);
          name = tmp;
       }
-      
+
       InitUserAttribute(uv);
-      
+
       if (ReadUserAttribute(uv, uvParam.getParent(), uvParam.getHeader(), renderTime, true, false, mGeoSrc->params()->verbose))
       {
          if (SetUserAttribute(info, name.c_str(), uv, renderFrame, mGeoSrc->params()->verbose))
@@ -1131,43 +1143,43 @@ size_t UpdateGeometry::readMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<Mesh
             int count = info->channelNames->getCount(renderFrame);
             info->channelNames->setCount(count + 1, renderFrame);
             info->channelNames->setString(name.c_str(), count, renderFrame);
-            
+
             if (mGeoSrc->params()->verbose)
             {
                std::cout << "[AlembicLoader] UpdateGeometry::readMeshUVs: Added UV set \"" << name << "\"" << std::endl;
             }
-            
+
             if (refInfo && SetUserAttribute(refInfo, name.c_str(), uv, renderFrame, mGeoSrc->params()->verbose))
             {
                int count = refInfo->channelNames->getCount(renderFrame);
                refInfo->channelNames->setCount(count + 1, renderFrame);
                refInfo->channelNames->setString(name.c_str(), count, renderFrame);
-               
+
                if (mGeoSrc->params()->verbose)
                {
                   std::cout << "[AlembicLoader] UpdateGeometry::readMeshUVs: Added reference UV set \"" << name << "\"" << std::endl;
                }
             }
-            
+
             uvNames.insert(name);
-            
+
             ++numUVSets;
          }
       }
-      
+
       DestroyUserAttribute(uv);
    }
-   
+
    if (!primaryOnly)
    {
       std::map<std::string, Alembic::AbcGeom::IV2fGeomParam>::const_iterator uvit = attrs.uvs.begin();
-      
+
       while (uvit != attrs.uvs.end())
       {
          if (uvNames.find(uvit->first) == uvNames.end())
          {
             InitUserAttribute(uv);
-         
+
             if (ReadUserAttribute(uv, uvit->second.getParent(), uvit->second.getHeader(), renderTime, true, false, mGeoSrc->params()->verbose))
             {
                if (SetUserAttribute(info, uvit->first.c_str(), uv, renderFrame, mGeoSrc->params()->verbose))
@@ -1175,37 +1187,37 @@ size_t UpdateGeometry::readMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<Mesh
                   int count = info->channelNames->getCount(renderFrame);
                   info->channelNames->setCount(count + 1, renderFrame);
                   info->channelNames->setString(uvit->first.c_str(), count, renderFrame);
-                  
+
                   if (mGeoSrc->params()->verbose)
                   {
                      std::cout << "[AlembicLoader] UpdateGeometry::readMeshUVs: Added UV set \"" << uvit->first << "\"" << std::endl;
                   }
-                  
+
                   if (refInfo && SetUserAttribute(refInfo, uvit->first.c_str(), uv, renderFrame, mGeoSrc->params()->verbose))
                   {
                      int count = refInfo->channelNames->getCount(renderFrame);
                      refInfo->channelNames->setCount(count + 1, renderFrame);
                      refInfo->channelNames->setString(uvit->first.c_str(), count, renderFrame);
-                     
+
                      if (mGeoSrc->params()->verbose)
                      {
                         std::cout << "[AlembicLoader] UpdateGeometry::readMeshUVs: Added reference UV set \"" << uvit->first << "\"" << std::endl;
                      }
                   }
-                  
+
                   uvNames.insert(uvit->first);
-                  
+
                   ++numUVSets;
                }
             }
-         
+
             DestroyUserAttribute(uv);
          }
-      
+
          ++uvit;
       }
    }
-   
+
    return numUVSets;
 }
 
