@@ -118,6 +118,26 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
       arnold.AiNodeSetBool(node, "ignore_visibility", (True if ignoreVisibility else False))
       setAttrs.append("ignore_visibility")
 
+      val = stu.GetOverrideAttr(nodeName, "aiVelocityName", None)
+      if val is not None:
+         arnold.AiNodeSetStr(node, "velocity_name", val)
+         setAttrs.append("velocity_name")
+
+      val = stu.GetOverrideAttr(nodeName, "aiAccelerationName", None)
+      if val is not None:
+         arnold.AiNodeSetStr(node, "acceleration_name", val)
+         setAttrs.append("acceleration_name")
+
+      val = stu.GetOverrideAttr(nodeName, "aiVelocityScale", None)
+      if val is not None:
+         arnold.AiNodeSetStr(node, "velocity_scale", val)
+         setAttrs.append("velocity_scale")
+
+      val = stu.GetOverrideAttr(nodeName, "aiForceVelocityBlur", None)
+      if val is not None:
+         arnold.AiNodeSetStr(node, "force_velocity_blur", val)
+         setAttrs.append("force_velocity_blur")
+
       val = stu.GetOverrideAttr(nodeName, "aiIgnoreReference", None)
       if val is not None:
          arnold.AiNodeSetBool(node, "ignore_reference", (True if val else False))
@@ -271,8 +291,8 @@ def SetupAttrs():
       attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="reference_frame"))
 
       attrs.append(stu.AttrData(name="aiRemoveAttributePrefices", shortName="ai_remove_attribute_prefices", type=arnold.AI_TYPE_STRING, defaultValue=""))
-      attrs.append(stu.AttrData(name="aiForceConstantAttributes", shortName="force_constant_attributes", type=arnold.AI_TYPE_STRING, defaultValue=""))
-      attrs.append(stu.AttrData(name="aiIgnoreAttributes", shortName="ignore_attributes", type=arnold.AI_TYPE_STRING, defaultValue=""))
+      attrs.append(stu.AttrData(name="aiForceConstantAttributes", shortName="ai_force_constant_attributes", type=arnold.AI_TYPE_STRING, defaultValue=""))
+      attrs.append(stu.AttrData(name="aiIgnoreAttributes", shortName="ai_ignore_attributes", type=arnold.AI_TYPE_STRING, defaultValue=""))
       attrs.append(stu.AttrData(arnoldNode="abcproc", arnoldAttr="attributes_evaluation_time"))
 
       attrs.append(stu.AttrData(name="aiComputeTangentsForUVs", shortName="ai_compute_tangents_for_uvs", type=arnold.AI_TYPE_STRING, defaultValue=""))
