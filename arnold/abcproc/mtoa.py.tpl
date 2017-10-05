@@ -118,10 +118,10 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
       arnold.AiNodeSetBool(node, "ignore_visibility", (True if ignoreVisibility else False))
       setAttrs.append("ignore_visibility")
 
-      # val = stu.GetOverrideAttr(nodeName, "aiOutputReference", None)
-      # if val is not None:
-      #    arnold.AiNodeSetBool(node, "output_reference", (True if val else False))
-      #    setAttrs.append("output_reference")
+      val = stu.GetOverrideAttr(nodeName, "aiIgnoreReference", None)
+      if val is not None:
+         arnold.AiNodeSetBool(node, "ignore_reference", (True if val else False))
+         setAttrs.append("ignore_reference")
 
       val = stu.GetOverrideAttr(nodeName, "aiReferenceSource", None)
       if val is not None:
@@ -137,11 +137,6 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
       if val is not None:
          arnold.AiNodeSetStr(node, "reference_normal_name", val)
          setAttrs.append("reference_normal_name")
-
-      val = stu.GetOverrideAttr(nodeName, "aiReferenceFilename", None)
-      if val is not None:
-         arnold.AiNodeSetStr(node, "reference_filename", val)
-         setAttrs.append("reference_filename")
 
       val = stu.GetOverrideAttr(nodeName, "aiReferenceFrame", None)
       if val is not None:
@@ -242,13 +237,15 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
          arnold.AiNodeSetUInt(node, "expand_samples_iterations", val)
          setAttrs.append("expand_samples_iterations")
 
-         val = stu.GetOverrideAttr(nodeName, "aiOptimizeSamples", None)
-         if val is not None:
-            arnold.AiNodeSetBool(node, "optimize_samples", val)
-            setAttrs.append("optimize_samples")
+      val = stu.GetOverrideAttr(nodeName, "aiOptimizeSamples", None)
+      if val is not None:
+         arnold.AiNodeSetBool(node, "optimize_samples", val)
+         setAttrs.append("optimize_samples")
 
    else:
-      AiNodeGetInt(node, "samples", step+1)
+      samples = arnold.AiNodeGetUInt(node, "samples")
+      if samples < step + 1:
+         arnold.AiNodeSetUInt(node, "samples", step+1)
       setAttrs.append("samples")
 
    return setAttrs
