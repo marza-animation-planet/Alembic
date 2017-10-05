@@ -199,7 +199,7 @@ def Export(renderFrame, step, sampleFrame, nodeNames, masterNodeNames):
 
       val = stu.GetOverrideAttr(nodeName, "aiNurbsSampleRate", None)
       if val is not None:
-         arnold.AiNodeSetInt(node, "nurbs_sample_rate", val)
+         arnold.AiNodeSetUInt(node, "nurbs_sample_rate", val)
          setAttrs.append("nurbs_sample_rate")
 
       val = stu.GetOverrideAttr(nodeName, "aiWidthScale", None)
