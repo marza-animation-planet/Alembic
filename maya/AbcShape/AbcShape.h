@@ -23,17 +23,17 @@ struct AnimatedFloatParam : VR::VRayPluginParameter,
                             VR::MyInterpolatingInterface
 {
    typedef std::map<double, float> Map;
-   
+
    AnimatedFloatParam(const tchar *paramName, bool ownName=false);
    AnimatedFloatParam(const AnimatedFloatParam &other);
    virtual ~AnimatedFloatParam();
-   
+
    // From PluginBase
    virtual PluginInterface* newInterface(InterfaceID id);
-   
+
    // From PluginInterface
    virtual PluginBase* getPlugin(void);
-   
+
    // From VRayPluginParameter
    virtual const tchar* getName(void);
    virtual VR::VRayParameterType getType(int index, double time=0.0);
@@ -47,22 +47,22 @@ struct AnimatedFloatParam : VR::VRayPluginParameter,
    virtual void setInt(int value, int index=0, double time=0.0);
    virtual void setFloat(float value, int index=0, double time=0.0);
    virtual void setDouble(double value, int index=0, double time=0.0);
-   
+
    // From VRayCloneableParamInterface
    virtual VR::VRayPluginParameter* clone();
-   
+
    // From MyInterpolatingInterface
    virtual int getNumKeyFrames(void);
    virtual double getKeyFrameTime(int index);
    virtual int isIncremental(void);
-   
+
    // Class specific
    void clear();
    void setValue(float, double time);
    float getValue(double time);
-   
+
 protected:
-   
+
    bool mOwnName;
    const tchar *mName;
    Map mTimedValues;
@@ -74,9 +74,9 @@ protected:
 class AbcShape : public MPxSurfaceShape
 {
 public:
-    
+
     static const MTypeId ID;
-    
+
     static MObject aFilePath;
     static MObject aObjectExpression;
     static MObject aDisplayMode;
@@ -102,7 +102,7 @@ public:
     static MObject aOutSampleTime;
     static MObject aInCustomFrame;
     static MObject aOutCustomTime;
-    
+
 #ifdef ABCSHAPE_VRAY_SUPPORT
     // V-Ray specific attributes
     static MObject aOutApiType;
@@ -112,10 +112,13 @@ public:
     static MObject aVRayGeomStepBegin;
     static MObject aVRayGeomForceNextStep;
     static MObject aVRayGeomStep;
-    
+
     static MObject aVRayAbcVerbose;
-    static MObject aVRayAbcUseReferenceObject;
-    static MObject aVRayAbcReferenceFilename;
+    // static MObject aVRayAbcUseReferenceObject;
+    // static MObject aVRayAbcReferenceFilename;
+    static MObject aVRayAbcIgnoreReference;
+    static MObject aVRayAbcReferenceSource;
+    static MObject aVRayAbcReferenceFrame;
     static MObject aVRayAbcParticleType;
     static MObject aVRayAbcParticleAttribs;
     static MObject aVRayAbcSpriteSizeX;
@@ -135,11 +138,11 @@ public:
     static MObject aVRayAbcPsizeMin;
     static MObject aVRayAbcPsizeMax;
 #endif
-    
+
     static void* creator();
-    
+
     static MStatus initialize();
-    
+
     enum CycleType
     {
         CT_hold = 0,
@@ -148,7 +151,7 @@ public:
         CT_bounce,
         CT_clip
     };
-    
+
     enum DisplayMode
     {
         DM_box = 0,
@@ -156,21 +159,21 @@ public:
         DM_points,
         DM_geometry
     };
-    
+
 public:
-    
+
     friend class AbcShapeOverride;
-    
+
     AbcShape();
     virtual ~AbcShape();
-    
+
     virtual void postConstructor();
-    
+
     virtual MStatus compute(const MPlug &, MDataBlock &);
-    
+
     virtual bool isBounded() const;
     virtual MBoundingBox boundingBox() const;
-    
+
     virtual bool getInternalValueInContext(const MPlug &plug,
                                            MDataHandle &handle,
                                            MDGContext &ctx);
@@ -178,7 +181,7 @@ public:
                                            const MDataHandle &handle,
                                            MDGContext &ctx);
     virtual void copyInternalData(MPxNode *source);
-    
+
     inline AlembicScene* scene() { return mScene; }
     inline const AlembicScene* scene() const { return mScene; }
     inline const SceneGeometryData* sceneGeometry() const { return &mGeometry; }
@@ -193,29 +196,29 @@ public:
     inline unsigned int numShapes() const { return mNumShapes; }
     inline bool isAnimated() const { return mAnimated; }
     inline bool isClipped() const { return mClipped; }
-    
+
     bool ignoreCulling() const;
-    
+
     static void AssignDefaultShader(MObject &obj);
-    
+
 private:
-    
+
     double getFPS() const;
     double computeAdjustedTime(double inputTime, double speed, double timeOffset) const;
     double computeRetime(double inputTime, double firstTime, double lastTime, CycleType cycleType, bool *clipped=0) const;
     double getSampleTime(bool useCustomTime, bool *clipped=0) const;
-    
+
     void printInfo(bool detailed=false) const;
     void printSceneBounds() const;
-    
+
     void syncInternals();
     void syncInternals(MDataBlock &block);
-    
+
     void updateObjects();
     void updateRange();
     void updateWorld();
     void updateGeometry();
-    
+
     enum UpdateLevel
     {
         UL_none = 0,
@@ -224,9 +227,9 @@ private:
         UL_range,
         UL_objects
     };
-    
+
 private:
-    
+
     MString mFilePath;
     MString mObjectExpression;
     MTime mTime;
@@ -256,11 +259,14 @@ private:
     std::vector<std::string> mUvSetNames;
     bool mClipped;
     double mInCustomFrame;
-    
+
 #ifdef ABCSHAPE_VRAY_SUPPORT
     VR::DefStringParam mVRFilename;
-    VR::DefBoolParam mVRUseReferenceObject;
-    VR::DefStringParam mVRReferenceFilename;
+    // VR::DefBoolParam mVRUseReferenceObject;
+    // VR::DefStringParam mVRReferenceFilename;
+    VR::DefBoolParam mVRIgnoreReference;
+    VR::DefIntParam mVRReferenceSource;
+    VR::DefFloatParam mVRReferenceFrame;
     VR::DefStringParam mVRObjectPath;
     VR::DefBoolParam mVRIgnoreTransforms;
     VR::DefBoolParam mVRIgnoreInstances;
@@ -275,20 +281,20 @@ private:
     VR::DefFloatParam mVRFps;
     VR::DefIntParam mVRCycle;
     VR::DefBoolParam mVRVerbose;
-    
+
     // Subdivision attributes
     VR::DefBoolParam mVRSubdivEnable;
     VR::DefBoolParam mVRSubdivUVs;
     VR::DefIntParam mVRPreserveMapBorders;
     VR::DefBoolParam mVRStaticSubdiv;
     VR::DefBoolParam mVRClassicCatmark;
-    
+
     // Subdivision Quality settings
     VR::DefBoolParam mVRUseGlobals;
     VR::DefBoolParam mVRViewDep;
     VR::DefFloatParam mVREdgeLength;
     VR::DefIntParam mVRMaxSubdivs;
-    
+
     // OpenSubdiv attributes
     VR::DefBoolParam mVROSDSubdivEnable;
     VR::DefIntParam mVROSDSubdivLevel;
@@ -296,7 +302,7 @@ private:
     VR::DefBoolParam mVROSDSubdivUVs;
     VR::DefIntParam mVROSDPreserveMapBorders;
     VR::DefBoolParam mVROSDPreserveGeometryBorders;
-    
+
     // Displacement attributes
     VR::DefIntParam mVRDisplacementType;
     VR::DefFloatParam mVRDisplacementAmount;
@@ -318,7 +324,7 @@ private:
     VR::DefBoolParam mVRTightBounds;
     VR::DefBoolParam mVRFilterTexture;
     VR::DefFloatParam mVRFilterBlur;
-    
+
     VR::DefIntParam mVRParticleType;
     VR::DefStringParam mVRParticleAttribs;
     VR::DefFloatParam mVRSpriteSizeX;
@@ -350,7 +356,7 @@ private:
 class AbcShapeVRayInfo : public MPxCommand
 {
 public:
-   
+
     AbcShapeVRayInfo();
     ~AbcShapeVRayInfo();
 
@@ -364,27 +370,27 @@ public:
     static void fillMultiUVs(const MDagPath &path);
     static void trackPath(const MDagPath &path);
     static void initDispSets();
-     
+
     typedef std::set<std::string> NameSet;
-    
+
     struct DispShapes
     {
         NameSet asFloat;
         NameSet asColor;
     };
-    
+
     struct DispSet
     {
         MObject set;
         MObject shader;
     };
-    
+
     typedef std::map<std::string, int> MultiUv;
-    
+
     typedef std::map<std::string, DispShapes> DispTexMap;
     typedef std::map<std::string, DispSet> DispSetMap;
     typedef std::map<std::string, MultiUv> MultiUvMap;
-     
+
     static DispTexMap DispTexs;
     static DispSetMap DispSets;
     static MultiUvMap MultiUVs;
@@ -396,11 +402,11 @@ public:
 class AbcShapeUI : public MPxSurfaceShapeUI
 {
 public:
-    
+
     static void *creator();
-    
+
 public:
-    
+
     enum DrawToken
     {
         kDrawBox = 0,
@@ -408,30 +414,30 @@ public:
         kDrawGeometry,
         kDrawGeometryAndWireframe
     };
-    
+
     AbcShapeUI();
     virtual ~AbcShapeUI();
-    
+
     virtual void getDrawRequests(const MDrawInfo &info,
                                  bool objectAndActiveOnly,
                                  MDrawRequestQueue &queue);
-    
+
     virtual void draw(const MDrawRequest &request, M3dView &view) const;
-    
+
     virtual bool select(MSelectInfo &selectInfo,
                         MSelectionList &selectionList,
                         MPointArray &worldSpaceSelectPts) const;
-    
+
     // Compute frustum from maya view projection and modelview matrices
     bool computeFrustum(M3dView &view, Frustum &frustum) const;
-    
+
     // Compute frustum straight from OpenGL projection and modelview matrices
     bool computeFrustum(Frustum &frustum) const;
-    
+
     void getWorldMatrix(M3dView &view, Alembic::Abc::M44d &worldMatrix) const;
 
 private:
-    
+
     void drawBox(AbcShape *shape, const MDrawRequest &request, M3dView &view) const;
     void drawPoints(AbcShape *shape, const MDrawRequest &request, M3dView &view) const;
     void drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dView &view) const;
