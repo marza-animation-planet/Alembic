@@ -267,9 +267,9 @@ Dso::Dso(AtNode *node)
    }
 
    // Set global frame
-   if (AiNodeLookUpUserParameter(opts, "frame") != 0)
+   if (AiNodeLookUpUserParameter(opts, Strings::frame) != 0)
    {
-      mGlobalFrame = AiNodeGetFlt(opts, "frame");
+      mGlobalFrame = AiNodeGetFlt(opts, Strings::frame);
    }
    else
    {
@@ -390,29 +390,22 @@ Dso::Dso(AtNode *node)
          // Compute samples frame times
          std::vector<double> sampleFrames;
 
-         mTimeSamples.clear();
-         mExpandedTimeSamples.clear();
-
          if (ignoreMotionBlur() || (mMode == PM_single && ignoreDeformBlur()))
          {
             sampleFrames.push_back(mCommonParams.frame);
-            mTimeSamples.push_back(mRenderTime);
          }
          else
          {
             if (mCommonParams.samples <= 1)
             {
                sampleFrames.push_back(mCommonParams.frame);
-               mTimeSamples.push_back(mRenderTime);
             }
             else
             {
                double motionStep = (mMotionEnd - mMotionStart) / double(mCommonParams.samples - 1);
                for (unsigned int i=0; i<mCommonParams.samples; ++i)
                {
-                  double sampleFrame = mMotionStart +  i * motionStep;;
-                  sampleFrames.push_back(sampleFrame);
-                  mTimeSamples.push_back(computeTime(sampleFrame));
+                  sampleFrames.push_back(mMotionStart +  i * motionStep);
                }
             }
          }
@@ -420,7 +413,7 @@ Dso::Dso(AtNode *node)
          std::vector<double> expandedSampleFrames = sampleFrames;
 
          // Expand samples
-         if (mTimeSamples.size() > 1 && mCommonParams.expandSamplesIterations > 0)
+         if (sampleFrames.size() > 1 && mCommonParams.expandSamplesIterations > 0)
          {
             std::vector<double> newSampleFrames;
 
@@ -470,6 +463,7 @@ Dso::Dso(AtNode *node)
                {
                   if (newSampleFrames.size() > 0 && newSampleFrames.back() < shutterCloseFrame)
                   {
+                     // Add an additional time sample after last one to fully cover the shutter range
                      newSampleFrames.push_back(sampleFrame);
                   }
                }
@@ -477,6 +471,7 @@ Dso::Dso(AtNode *node)
                {
                   if (newSampleFrames.size() == 0 && i > 0 && sampleFrame > shutterOpenFrame)
                   {
+                     // Add an additional time sample before first one to fully cover the shutter range
                      newSampleFrames.push_back(expandedSampleFrames[i-1]);
                   }
                   newSampleFrames.push_back(sampleFrame);
@@ -494,9 +489,10 @@ Dso::Dso(AtNode *node)
          }
 
          // Convert expanded samples frames to time (in seconds)
+         mTimeSamples.clear();
          for (size_t i=0; i<expandedSampleFrames.size(); ++i)
          {
-            mExpandedTimeSamples.push_back(computeTime(expandedSampleFrames[i]));
+            mTimeSamples.push_back(computeTime(expandedSampleFrames[i]));
          }
 
          // Compute shape key
@@ -504,9 +500,9 @@ Dso::Dso(AtNode *node)
 
          if (mCommonParams.verbose)
          {
-            for (size_t i=0; i<mExpandedTimeSamples.size(); ++i)
+            for (size_t i=0; i<mTimeSamples.size(); ++i)
             {
-               AiMsgInfo("[abcproc] Add motion sample time: %lf [frame=%lf]", mExpandedTimeSamples[i], expandedSampleFrames[i]);
+               AiMsgInfo("[abcproc] Add motion sample time: %lf [frame=%lf]", mTimeSamples[i], expandedSampleFrames[i]);
             }
          }
 
@@ -879,9 +875,9 @@ void Dso::setSingleParams(AtNode *node, const std::string &objectPath) const
    //  Sampling
    AiNodeSetFlt(node, Strings::motion_start, mMotionStart - mGlobalFrame);
    AiNodeSetFlt(node, Strings::motion_end, mMotionEnd - mGlobalFrame);
-   AiNodeSetUInt(node, Strings::samples, (unsigned int)mExpandedTimeSamples.size());
-   AiNodeSetUInt(node, Strings::expand_samples_iterations, 0); // mCommonParams.expandSamplesIterations);
-   AiNodeSetBool(node, Strings::optimize_samples, false); // mCommonParams.optimizeSamples);
+   AiNodeSetUInt(node, Strings::samples, (unsigned int)mTimeSamples.size());
+   AiNodeSetUInt(node, Strings::expand_samples_iterations, 0);
+   AiNodeSetBool(node, Strings::optimize_samples, false);
    //  Ignores
    AiNodeSetBool(node, Strings::ignore_deform_blur, mCommonParams.ignoreDeformBlur);
    AiNodeSetBool(node, Strings::ignore_transform_blur, mCommonParams.ignoreTransformBlur);
@@ -1052,6 +1048,12 @@ void Dso::readParams()
    mSingleParams.nurbsSampleRate = AiNodeGetUInt(mProcNode, Strings::nurbs_sample_rate);
 }
 
+void Dso::transferShapeParams(AtNode *dst)
+{
+   AiNodeSetFlt(dst, Strings::motion_start, mMotionStart - mGlobalFrame);
+   AiNodeSetFlt(dst, Strings::motion_end, mMotionEnd - mGlobalFrame);
+}
+
 void Dso::transferInstanceParams(AtNode *dst)
 {
    AiNodeSetInt(dst, Strings::id, AiNodeGetInt(mProcNode, Strings::id));
@@ -1065,8 +1067,8 @@ void Dso::transferInstanceParams(AtNode *dst)
    AiNodeSetFlt(dst, Strings::ray_bias, AiNodeGetFlt(mProcNode, Strings::ray_bias));
    AiNodeSetByte(dst, Strings::visibility, AiNodeGetByte(mProcNode, Strings::visibility));
    AiNodeSetByte(dst, Strings::sidedness, AiNodeGetByte(mProcNode, Strings::sidedness));
-   AiNodeSetFlt(dst, Strings::motion_start, AiNodeGetFlt(mProcNode, Strings::motion_start));
-   AiNodeSetFlt(dst, Strings::motion_end, AiNodeGetFlt(mProcNode, Strings::motion_end));
+   AiNodeSetFlt(dst, Strings::motion_start, mMotionStart - mGlobalFrame);
+   AiNodeSetFlt(dst, Strings::motion_end, mMotionEnd - mGlobalFrame);
    AiNodeSetInt(dst, Strings::transform_type, AiNodeGetInt(mProcNode, Strings::transform_type));
 
    AtArray *ary;

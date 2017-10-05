@@ -144,6 +144,8 @@ procedural_get_node
 
             if (output)
             {
+               dso->transferShapeParams(output);
+
                dso->transferUserParams(output);
 
                AbcProcGlobalLock::Acquire();
@@ -275,16 +277,16 @@ static void __attribute__((destructor)) on_dlclose(void)
 
 node_loader
 {
-  if (i > 0)
-  {
-    return false;
-  }
+   if (i > 0)
+   {
+      return false;
+   }
 
-  node->methods = AbcProcMtd;
-  node->output_type = AI_TYPE_NONE;
-  node->name = "abcproc";
-  node->node_type = AI_NODE_SHAPE_PROCEDURAL;
-  strcpy(node->version, AI_VERSION);
+   node->methods = AbcProcMtd;
+   node->output_type = AI_TYPE_NONE;
+   node->name = "abcproc";
+   node->node_type = AI_NODE_SHAPE_PROCEDURAL;
+   strcpy(node->version, AI_VERSION);
 
-  return true;
+   return true;
 }

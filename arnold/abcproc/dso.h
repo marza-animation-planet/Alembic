@@ -55,6 +55,7 @@ public:
    void setSingleParams(AtNode *node, const std::string &objectPath) const;
 
    void transferUserParams(AtNode *dst);
+   void transferShapeParams(AtNode *dst);
    void transferInstanceParams(AtNode *dst);
 
 
@@ -164,17 +165,17 @@ public:
 
    inline size_t numMotionSamples() const
    {
-      return mExpandedTimeSamples.size();
+      return mTimeSamples.size();
    }
 
    inline double motionSampleTime(size_t i) const
    {
-      return mExpandedTimeSamples[i];
+      return mTimeSamples[i];
    }
 
    inline const std::vector<double>& motionSampleTimes() const
    {
-      return mExpandedTimeSamples;
+      return mTimeSamples;
    }
 
    inline float velocityScale() const
@@ -451,7 +452,6 @@ private:
 
    double mRenderTime;
    std::vector<double> mTimeSamples;
-   std::vector<double> mExpandedTimeSamples;
 
    float mStepSize;
    float mVolumePadding;
