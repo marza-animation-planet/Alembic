@@ -371,7 +371,7 @@ def SetupAE(translator):
             self.endLayout()
 
             self.beginLayout("Particles", collapse=True)
-            self.addControl("aiRadiusName", label="Radius Attribute Name")
+            self.addControl("aiRadiusName", label="Radius Name")
             self.addControl("aiRadiusScale", label="Radius Scale")
             self.addControl("aiRadiusMin", label="Min. Radius")
             self.addControl("aiRadiusMax", label="Max. Radius")
@@ -391,7 +391,7 @@ def SetupAE(translator):
             self.endLayout()
 
             self.beginLayout("Others", collapse=True)
-            self.addControl("aiNameprefix", label="Name Prefix")
+            self.addControl("aiNameprefix", label="Arnold Names Prefix")
             self.addControl("aiVerbose", label="Verbose")
             self.endLayout()
 
