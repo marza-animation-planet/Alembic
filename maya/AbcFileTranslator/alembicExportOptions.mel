@@ -107,6 +107,7 @@ global proc int alembicExportOptions(string $parent,
          // parse option string and set UI
          string $optlist[];
          int $n = tokenize($initialSettings, ";", $optlist);
+         string $options = "";
          
          string $frt = "Time Slider";
          float $sf = 1;
@@ -129,6 +130,20 @@ global proc int alembicExportOptions(string $parent,
             {
                $val += "=";
                $val += $keyval[$j];
+            }
+            
+            if (size(match($key+"=", $options)) > 0)
+            {
+               // options already processed
+               continue;
+            }
+            else
+            {
+               if (size($options) > 0)
+               {
+                  $options += ";";
+               }
+               $options += $optlist[$i];
             }
             
             if ($key == "v")
@@ -301,6 +316,9 @@ global proc int alembicExportOptions(string $parent,
                textFieldGrp -e -tx $val optUAPref;
             }
          }
+
+         // at this point, $options is a 'clean' version of $initialSettings
+         $initialSettings = $options;
 
          // for some reasons this is failing
          optionMenuGrp -e -v $frt optRange;
@@ -538,6 +556,11 @@ global proc int alembicExportOptions(string $parent,
             }
             else
             {
+               if (size(match($key+"=", $impOpts)) > 0)
+               {
+                  // Import option is already set
+                  continue;
+               }
                if (size($impOpts) > 0)
                {
                   $impOpts += ";";

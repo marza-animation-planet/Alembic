@@ -12,7 +12,7 @@ struct ParamBase : VR::VRayPluginParameter
    virtual ~ParamBase();
 
    virtual const tchar* getName(void);
-   
+
 protected:
 
    bool mOwnName;
@@ -26,12 +26,12 @@ struct ListParamBase : ParamBase
    ListParamBase(const tchar *paramName, bool ownName=false);
    ListParamBase(const ListParamBase &other);
    virtual ~ListParamBase();
-   
+
    virtual VR::ListHandle openList(int i);
    virtual void closeList(VR::ListHandle list);
-   
+
 protected:
-   
+
    int mListLevel;
 };
 
@@ -41,27 +41,27 @@ template <typename T, int S=100>
 class CopyableTable : public VR::Table<T, S>
 {
 public:
-   
+
    CopyableTable(int incStep=S)
       : VR::Table<T, S>(incStep)
    {
    }
-   
+
    CopyableTable(int size, const T &initVal, int incStep=S)
       : VR::Table<T, S>(size, initVal, incStep)
    {
    }
-   
+
    CopyableTable(const CopyableTable &rhs)
       : VR::Table<T, S>(rhs.incStep)
    {
       operator=(rhs);
    }
-   
+
    virtual ~CopyableTable()
    {
    }
-   
+
    CopyableTable<T, S>& operator=(const CopyableTable<T, S> &rhs)
    {
       if (this != &rhs)
@@ -70,15 +70,15 @@ public:
          {
             delete[] this->elements;
          }
-         
+
          this->numElements = rhs.numElements;
          this->maxElements = this->numElements;
          this->incStep = rhs.incStep;
-         
+
          if (this->numElements > 0)
          {
             this->elements = new T[this->numElements];
-            
+
             for (int i=0; i<this->numElements; ++i)
             {
                this->elements[i] = rhs.elements[i];
@@ -89,7 +89,7 @@ public:
             this->elements = 0;
          }
       }
-      
+
       return *this;
    }
 };
@@ -101,7 +101,7 @@ struct ListParamT : ListParamBase, VR::VRaySettableParamInterface, VR::VRayClone
    //typedef typename VR::Table<T> Table;
    typedef VR::PtrArray<T> List;
    typedef std::map<double, Table> Map;
-   
+
    ListParamT(const tchar *paramName, bool ownName=false)
       : ListParamBase(paramName, ownName)
    {
@@ -112,12 +112,12 @@ struct ListParamT : ListParamBase, VR::VRaySettableParamInterface, VR::VRayClone
       , mTimedValues(other.mTimedValues)
    {
    }
-   
+
    virtual ~ListParamT()
    {
       clear();
    }
-   
+
    // New
    void operator+=(const T &i)
    {
@@ -128,31 +128,31 @@ struct ListParamT : ListParamBase, VR::VRaySettableParamInterface, VR::VRayClone
    {
       return mTimedValues[0.0][i];
    }
-   
+
    const T& operator[](int i) const
    {
       return mTimedValues[0.0][i];
    }
-   
+
    void clear()
    {
       for (typename Map::iterator it = mTimedValues.begin(); it != mTimedValues.end(); ++it)
       {
          it->second.freeMem();
       }
-      
+
       mTimedValues.clear();
    }
-   
+
    Table& at(double time)
    {
       return mTimedValues[time];
    }
-   
+
    void setValue(const T &value, int index, double time)
    {
       Table &values = mTimedValues[time];
-      
+
       if (index >= 0 && index < values.count())
       {
          values[index] = value;
@@ -162,21 +162,21 @@ struct ListParamT : ListParamBase, VR::VRaySettableParamInterface, VR::VRayClone
          values += value;
       }
    }
-   
+
    void setValueList(const List &lst, double time)
    {
       Table &values = mTimedValues[time];
-      
+
       // Create an exact copy
-      
+
       if (values.elements)
       {
          delete[] values.elements;
       }
-      
+
       values.numElements = lst.count();
       values.maxElements = values.numElements;
-      
+
       if (values.numElements > 0)
       {
          values.elements = new T[values.numElements];
@@ -190,14 +190,14 @@ struct ListParamT : ListParamBase, VR::VRaySettableParamInterface, VR::VRayClone
          values.elements = 0;
       }
    }
-   
+
    T getValue(int index, double time)
    {
       typename Map::iterator it = mTimedValues.find(time);
-      
+
       if (it != mTimedValues.end())
       {
-         return it->second[index]; 
+         return it->second[index];
       }
       else
       {
@@ -205,11 +205,11 @@ struct ListParamT : ListParamBase, VR::VRaySettableParamInterface, VR::VRayClone
          return tmp;
       }
    }
-   
+
    List getValueList(double time)
    {
       typename Map::iterator it = mTimedValues.find(time);
-      
+
       if (it != mTimedValues.end())
       {
          return List(&(it->second[0]), it->second.count());
@@ -219,7 +219,7 @@ struct ListParamT : ListParamBase, VR::VRaySettableParamInterface, VR::VRayClone
          return List();
       }
    }
-   
+
    // From PluginInterface
    virtual PluginInterface* newInterface(InterfaceID id)
    {
@@ -235,20 +235,20 @@ struct ListParamT : ListParamBase, VR::VRaySettableParamInterface, VR::VRayClone
          return ListParamBase::newInterface(id);
       }
    }
-   
+
    // From MyInterpolatingInterface
    virtual int getNumKeyFrames(void)
    {
       return int(mTimedValues.size());
    }
-   
+
    virtual double getKeyFrameTime(int index)
    {
       typename Map::iterator it = mTimedValues.begin();
       for (int i=0; i<index; ++i, ++it);
       return (it == mTimedValues.end() ? -1.0 : it->first);
    }
-   
+
    virtual int isIncremental(void)
    {
       return false;
@@ -259,15 +259,15 @@ struct ListParamT : ListParamBase, VR::VRaySettableParamInterface, VR::VRayClone
    {
       mTimedValues[time].setCount(count, true);
    }
-   
+
    virtual void reserve(int count, double time=0.0)
    {
       Table &values = mTimedValues[time];
-      
+
       values.setCount(count, true);
       values.clear();
    }
-   
+
    // From VRayPluginParameter
    virtual int getCount(double time)
    {
@@ -281,9 +281,9 @@ struct ListParamT : ListParamBase, VR::VRaySettableParamInterface, VR::VRayClone
          return -1;
       }
    }
-   
+
 protected:
-   
+
    Map mTimedValues;
 };
 
@@ -294,10 +294,10 @@ struct VectorListParam : ListParamT<VR::Vector>
    VectorListParam(const tchar *paramName, bool ownName=false);
    VectorListParam(const VectorListParam &rhs);
    virtual ~VectorListParam();
-   
+
    // From PluginInterface
    virtual PluginBase* getPlugin(void);
-   
+
    // From VRayPluginParameter
    virtual VR::VRayParameterType getType(int index, double time=0.0);
    virtual VR::Vector getVector(int index=0, double time=0.0);
@@ -318,10 +318,10 @@ struct ColorListParam : ListParamT<VR::Color>
    ColorListParam(const tchar *paramName, bool ownName=false);
    ColorListParam(const ColorListParam &rhs);
    virtual ~ColorListParam();
-   
+
    // From PluginInterface
    virtual PluginBase* getPlugin(void);
-   
+
    // From VRayPluginParameter
    virtual VR::VRayParameterType getType(int index, double time=0.0);
    virtual VR::Color getColor(int index=0, double time=0.0);
@@ -344,10 +344,10 @@ struct IntListParam : ListParamT<int>
    IntListParam(const tchar *paramName, bool ownName=false);
    IntListParam(const IntListParam &rhs);
    virtual ~IntListParam();
-   
+
    // From PluginInterface
    virtual PluginBase* getPlugin(void);
-   
+
    // From VRayPluginParameter
    virtual VR::VRayParameterType getType(int index, double time=0.0);
    virtual int getBool(int index=0, double time=0.0);
@@ -374,10 +374,10 @@ struct FloatListParam : ListParamT<float>
    FloatListParam(const tchar *paramName, bool ownName=false);
    FloatListParam(const FloatListParam &rhs);
    virtual ~FloatListParam();
-   
+
    // From PluginInterface
    virtual PluginBase* getPlugin(void);
-   
+
    // From VRayPluginParameter
    virtual VR::VRayParameterType getType(int index, double time=0.0);
    virtual int getBool(int index=0, double time=0.0);
@@ -408,11 +408,20 @@ struct AlembicLoaderParams : VR::VRayParameterListDesc
       CT_reverse,
       CT_bounce
    };
-   
+
+   enum ReferenceSource
+   {
+      RS_attributes = 0,
+      RS_frame
+   };
+
    struct Cache
    {
       VR::CharString filename;
-      VR::CharString referenceFilename;
+      // VR::CharString referenceFilename;
+      int ignoreReference;
+      int referenceSource;
+      float referenceFrame;
       VR::CharString objectPath;
       float startFrame;
       float endFrame;
@@ -427,25 +436,25 @@ struct AlembicLoaderParams : VR::VRayParameterListDesc
       int ignoreTransformBlur;
       int ignoreDeformBlur;
       int verbose;
-      
+
       int subdivEnable;
       int subdivUVs;
       int preserveMapBorders;
       int staticSubdiv;
       int classicCatmark;
-      
+
       int osdSubdivEnable;
       int osdSubdivLevel;
       int osdSubdivType;
       int osdSubdivUVs;
       int osdPreserveMapBorders;
       int osdPreserveGeometryBorders;
-      
+
       int useGlobals;
       int viewDep;
       float edgeLength;
       int maxSubdivs;
-      
+
       int displacementType;
       VR::TextureInterface *displacementTexColor;
       VR::TextureFloatInterface *displacementTexFloat;
@@ -468,7 +477,7 @@ struct AlembicLoaderParams : VR::VRayParameterListDesc
       int tightBounds;
       int filterTexture;
       float filterBlur;
-      
+
       int particleType;
       VR::CharString particleAttribs;
       float spriteSizeX;
@@ -484,19 +493,19 @@ struct AlembicLoaderParams : VR::VRayParameterListDesc
       float lineWidth;
       float tailLength;
       int sortIDs;
-      
+
       float psizeScale;
       float psizeMin;
       float psizeMax;
-      
+
       float time;
-      
-      int useReferenceObject;
-      
+
+      // int useReferenceObject;
+
       Cache();
       void setupCache(VR::VRayParameterList *paramList);
    };
-   
+
    AlembicLoaderParams();
    virtual ~AlembicLoaderParams();
 };

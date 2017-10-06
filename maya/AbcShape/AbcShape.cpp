@@ -48,7 +48,7 @@ static MObject GetShadingGroup(const MDagPath &path)
 {
    MPlugArray conns;
    MFnDagNode dagNode(path);
-   
+
    MPlug plug = dagNode.findPlug("instObjGroups");
 
    plug.elementByLogicalIndex(path.instanceNumber()).connectedTo(conns, false, true);
@@ -56,13 +56,13 @@ static MObject GetShadingGroup(const MDagPath &path)
    for (unsigned int k=0; k<conns.length(); ++k)
    {
       MObject oNode = conns[k].node();
-      
+
       if (oNode.apiType() == MFn::kShadingEngine)
       {
          return oNode;
       }
    }
-   
+
    return MObject::kNullObj;
 }
 
@@ -74,32 +74,32 @@ void* AbcShapeVRayInfo::create()
 MSyntax AbcShapeVRayInfo::createSyntax()
 {
    MSyntax syntax;
-   
+
    syntax.addFlag("-i", "-init", MSyntax::kNoArg);
    syntax.addFlag("-r", "-reset", MSyntax::kNoArg);
-   
+
    // Motion blur steps
    syntax.addFlag("-mb", "-motionBegin", MSyntax::kNoArg);
    syntax.addFlag("-ms", "-motionStep", MSyntax::kNoArg);
-   
+
    // Displacement informations
    syntax.addFlag("-ad", "-assigneddisp", MSyntax::kString);
    syntax.addFlag("-dl", "-displist", MSyntax::kNoArg);
    syntax.addFlag("-d", "-disp", MSyntax::kString);
    syntax.addFlag("-f", "-float", MSyntax::kNoArg);
    syntax.addFlag("-c", "-color", MSyntax::kNoArg);
-   
+
    // Multi-uv informations
    syntax.addFlag("-mul", "-multiuvlist", MSyntax::kNoArg);
    syntax.addFlag("-muv", "-multiuv", MSyntax::kString);
    syntax.addFlag("-usl", "-uvswitchlist", MSyntax::kNoArg);
    syntax.addFlag("-uvi", "-uvindex", MSyntax::kString);
-   
+
    syntax.setMinObjects(0);
    syntax.setMaxObjects(0);
    syntax.enableQuery(false);
    syntax.enableEdit(false);
-   
+
    return syntax;
 }
 
@@ -108,56 +108,56 @@ bool AbcShapeVRayInfo::getAssignedDisplacement(const MDagPath &inPath, MFnDepend
    set.setObject(MObject::kNullObj);
    shader.setObject(MObject::kNullObj);
    stdShader.setObject(MObject::kNullObj);
-   
+
    // Lookup for maya standard displacement
-   
+
    MPlugArray conns;
-   
+
    MObject oSG = GetShadingGroup(inPath);
-   
+
    if (oSG != MObject::kNullObj)
    {
       MFnDependencyNode nSG(oSG);
-      
+
       // MGlobal::displayInfo("[AbcShape] " + inPath.fullPathName() + " : shagine engine " + nSG.name());
-      
+
       MPlug pDisp = nSG.findPlug("displacementShader");
-      
+
       if (!pDisp.isNull() && pDisp.connectedTo(conns, true, false) && conns.length() == 1)
       {
          MObject oDisp = conns[0].node();
          MFnDependencyNode nDisp(oDisp);
-         
+
          // MGlobal::displayInfo("[AbcShape] " + inPath.fullPathName() + " : displacement shader " + nDisp.name() + " (" + nDisp.typeName() + ")");
-         
+
          if (nDisp.typeName() == "displacementShader")
          {
             // MGlobal::displayInfo("[AbcShape] " + inPath.fullPathName() + " : shagine engine " + nSG.name());
-            
+
             // V-Ray only looks for 'displacement' input
             pDisp = nDisp.findPlug("displacement");
-            
+
             if (!pDisp.isNull() && pDisp.connectedTo(conns, true, false) && conns.length() == 1)
             {
                oDisp = conns[0].node();
                stdShader.setObject(oDisp);
-               
+
                // MGlobal::displayInfo("[AbcShape] " + inPath.fullPathName() + " : displacement texture " + stdShader.name());
             }
          }
       }
    }
-   
+
    // Now lookup in VRayDisplacement sets
-      
+
    DispSetMap::const_iterator it;
-   
+
    MDagPath path = inPath;
-     
+
    while (path.length() > 0)
    {
       it = DispSets.find(path.fullPathName().asChar());
-      
+
       if (it != DispSets.end())
       {
          set.setObject(it->second.set);
@@ -169,21 +169,21 @@ bool AbcShapeVRayInfo::getAssignedDisplacement(const MDagPath &inPath, MFnDepend
          path.pop();
       }
    }
-   
+
    return (!stdShader.object().isNull());
 }
 
 static void ToVRayName(std::string &n, const char *suffix=0)
 {
    size_t p;
-   
+
    p = n.find(':');
    while (p != std::string::npos)
    {
       n.replace(p, 1, "__");
       p = n.find(':', p + 2);
    }
-   
+
    if (suffix)
    {
       n += suffix;
@@ -199,52 +199,52 @@ void AbcShapeVRayInfo::trackPath(const MDagPath &path)
 void AbcShapeVRayInfo::fillMultiUVs(const MDagPath &path)
 {
    std::string key = path.partialPathName().asChar();
-   
+
    ToVRayName(key, "@node");
-   
+
    MFnDagNode dag(path);
-   
+
    MPlug pUvSet = dag.findPlug("uvSet");
    MObject oUvSetName = dag.attribute("uvSetName");
    MPlugArray conns;
    MPlugArray conns2;
-   
+
    for (unsigned int i=0; i<pUvSet.numElements(); ++i)
    {
       MPlug pElem = pUvSet.elementByPhysicalIndex(i);
-      
+
       int idx = pElem.logicalIndex();
-      
+
       MPlug pUvSetName = pElem.child(oUvSetName);
-      
+
       if (pUvSetName.connectedTo(conns, false, true) && conns.length() > 0)
       {
          for (unsigned int j=0; j<conns.length(); ++j)
          {
             MObject obj = conns[j].node();
-            
+
             if (obj.hasFn(MFn::kUvChooser))
             {
                MultiUv &muv = MultiUVs[key];
-               
+
                MFnDependencyNode uvc(obj);
-               
+
                MPlug pOutUv = uvc.findPlug("outUv");
-               
+
                if (pOutUv.connectedTo(conns2, false, true) && conns2.length() > 0)
                {
                   for (unsigned int k=0; k<conns2.length(); ++k)
                   {
                      MObject obj2 = conns2[k].node();
-                     
+
                      MFnDependencyNode shd(obj2);
-                     
+
                      std::string vrn = shd.name().asChar();
-                     
+
                      ToVRayName(vrn, "@uvIndexSwitch");
-                     
+
                      muv[vrn] = idx;
-                     
+
                      #ifdef _DEBUG
                      std::cout << "Add multi uv info: " << key << " - " << vrn << " - " << idx << std::endl;
                      #endif
@@ -259,53 +259,53 @@ void AbcShapeVRayInfo::fillMultiUVs(const MDagPath &path)
 void AbcShapeVRayInfo::initDispSets()
 {
    DispSets.clear();
-      
+
    MItDependencyNodes nodeIt(MFn::kSet);
-   
+
    while (!nodeIt.isDone())
    {
       MObject obj = nodeIt.thisNode();
-      
+
       MFnSet dispSet(obj);
-      
+
       if (dispSet.typeName() == "VRayDisplacement")
       {
          MPlug pDisp = dispSet.findPlug("displacement");
-            
+
          if (!pDisp.isNull())
          {
             MPlugArray srcs;
-            
+
             pDisp.connectedTo(srcs, true, false);
-            
+
             MObject shdObj = MObject::kNullObj;
-            
+
             if (srcs.length() > 0)
             {
                shdObj = srcs[0].node();
             }
-            
+
             MSelectionList members;
             MDagPath memberPath;
-            
+
             dispSet.getMembers(members, false);
-            
+
             for (unsigned int i=0; i<members.length(); ++i)
             {
                if (members.getDagPath(i, memberPath) == MS::kSuccess)
                {
                   DispSet &ds = DispSets[memberPath.fullPathName().asChar()];
-                  
+
                   ds.set = obj;
                   ds.shader = shdObj;
-                  
+
                   // Fully expand children too?
                   // beware then that deeper level assignment takes precedence
                }
             }
          }
       }
-      
+
       nodeIt.next();
    }
 }
@@ -314,7 +314,7 @@ AbcShapeVRayInfo::AbcShapeVRayInfo()
    : MPxCommand()
 {
 }
-   
+
 AbcShapeVRayInfo::~AbcShapeVRayInfo()
 {
 }
@@ -323,7 +323,7 @@ bool AbcShapeVRayInfo::hasSyntax() const
 {
    return true;
 }
-   
+
 bool AbcShapeVRayInfo::isUndoable() const
 {
    return false;
@@ -332,14 +332,14 @@ bool AbcShapeVRayInfo::isUndoable() const
 MStatus AbcShapeVRayInfo::doIt(const MArgList& args)
 {
    MStatus status;
-   
+
    MArgParser argData(syntax(), args, &status);
-   
+
    if (argData.isFlagSet("init"))
    {
       AllShapes.clear();
       initDispSets();
-      
+
       return MS::kSuccess;
    }
    else if (argData.isFlagSet("reset"))
@@ -347,35 +347,35 @@ MStatus AbcShapeVRayInfo::doIt(const MArgList& args)
       DispTexs.clear();
       MultiUVs.clear();
       // Keep AllShapes filled as motionBegin/motionEnd are called after reset
-      
+
       return MS::kSuccess;
    }
    else if (argData.isFlagSet("motionBegin"))
    {
       MStatus stat;
-      
+
       MTime t = MAnimControl::currentTime();
-      
+
       for (unsigned int i=0; i<AllShapes.length(); ++i)
       {
          MFnDagNode node(AllShapes[i], &stat);
          if (stat == MS::kSuccess)
          {
             node.findPlug("vrayGeomStepBegin").asInt();
-            
+
             MPlug pForceStep = node.findPlug("vrayGeomForceNextStep");
             pForceStep.setBool(!pForceStep.asBool());
          }
       }
-      
+
       return MS::kSuccess;
    }
    else if (argData.isFlagSet("motionStep"))
    {
       MStatus stat;
-      
+
       MTime t = MAnimControl::currentTime();
-      
+
       for (unsigned int i=0; i<AllShapes.length(); ++i)
       {
          MFnDagNode node(AllShapes[i], &stat);
@@ -384,7 +384,7 @@ MStatus AbcShapeVRayInfo::doIt(const MArgList& args)
             node.findPlug("vrayGeomStep").asInt();
          }
       }
-      
+
       return MS::kSuccess;
    }
    else
@@ -395,18 +395,18 @@ MStatus AbcShapeVRayInfo::doIt(const MArgList& args)
          MStringArray rv;
          MString val;
          MDagPath path;
-         
+
          status = argData.getFlagArgument("assigneddisp", 0, val);
          if (status != MS::kSuccess)
          {
             MGlobal::displayError("Invalid valud for -assigneddisp flag (" + val + ")");
             return status;
          }
-         
+
          if (sl.add(val) == MS::kSuccess && sl.getDagPath(0, path) == MS::kSuccess)
          {
             MFnDependencyNode set, shd, stdshd;
-            
+
             if (getAssignedDisplacement(path, set, shd, stdshd))
             {
                rv.append(set.name().asChar());
@@ -414,21 +414,21 @@ MStatus AbcShapeVRayInfo::doIt(const MArgList& args)
                rv.append(stdshd.name().asChar());
             }
          }
-         
+
          setResult(rv);
          return MS::kSuccess;
       }
       else if (argData.isFlagSet("displist"))
       {
          MStringArray names;
-         
+
          for (DispTexMap::iterator it = DispTexs.begin(); it != DispTexs.end(); ++it)
          {
             names.append(it->first.c_str());
          }
-         
+
          setResult(names);
-         
+
          return MS::kSuccess;
       }
       else if (argData.isFlagSet("disp"))
@@ -441,22 +441,22 @@ MStatus AbcShapeVRayInfo::doIt(const MArgList& args)
          else
          {
             MString val;
-            
+
             status = argData.getFlagArgument("disp", 0, val);
             if (status != MS::kSuccess)
             {
                MGlobal::displayError("Invalid value for -disp flag (" + val + ")");
                return status;
             }
-            
+
             DispTexMap::iterator it = DispTexs.find(val.asChar());
-            
+
             MStringArray names;
-            
+
             if (it != DispTexs.end())
             {
                DispShapes &dispShapes = it->second;
-               
+
                if (argData.isFlagSet("color"))
                {
                   if (argData.isFlagSet("float"))
@@ -464,7 +464,7 @@ MStatus AbcShapeVRayInfo::doIt(const MArgList& args)
                      MGlobal::displayError("-float/-color cannot be used at the same time");
                      return MS::kFailure;
                   }
-                  
+
                   for (NameSet::iterator nit = dispShapes.asColor.begin(); nit != dispShapes.asColor.end(); ++nit)
                   {
                      names.append(nit->c_str());
@@ -478,66 +478,66 @@ MStatus AbcShapeVRayInfo::doIt(const MArgList& args)
                   }
                }
             }
-            
+
             setResult(names);
-            
+
             return MS::kSuccess;
          }
       }
       else if (argData.isFlagSet("multiuvlist"))
       {
          MStringArray names;
-         
+
          for (MultiUvMap::iterator it = MultiUVs.begin(); it != MultiUVs.end(); ++it)
          {
             names.append(it->first.c_str());
          }
-         
+
          setResult(names);
-         
+
          return MS::kSuccess;
       }
       else if (argData.isFlagSet("multiuv"))
       {
          MString val;
-         
+
          status = argData.getFlagArgument("multiuv", 0, val);
          if (status != MS::kSuccess)
          {
             MGlobal::displayError("Invalid value for -multiuv flag (" + val + ")");
             return status;
          }
-         
+
          MultiUvMap::iterator it = MultiUVs.find(val.asChar());
-            
+
          if (it != MultiUVs.end())
          {
             MultiUv &multiUv = it->second;
-               
+
             if (argData.isFlagSet("uvswitchlist"))
             {
                MStringArray names;
-               
+
                for (std::map<std::string, int>::iterator it2 = multiUv.begin(); it2 != multiUv.end(); ++it2)
                {
                   names.append(it2->first.c_str());
                }
-               
+
                setResult(names);
             }
             else if (argData.isFlagSet("uvindex"))
             {
                MString val2;
-               
+
                status = argData.getFlagArgument("uvindex", 0, val2);
                if (status != MS::kSuccess)
                {
                    MGlobal::displayError("Invalid value for -uvindex flag (" + val2 + ")");
                   return status;
                }
-               
+
                std::map<std::string, int>::iterator it2 = multiUv.find(val2.asChar());
-               
+
                if (it2 != multiUv.end())
                {
                   setResult(it2->second);
@@ -553,7 +553,7 @@ MStatus AbcShapeVRayInfo::doIt(const MArgList& args)
                return MS::kFailure;
             }
          }
-         
+
          return MS::kSuccess;
       }
       else
@@ -682,7 +682,7 @@ void AnimatedFloatParam::setDouble(double value, int index, double time)
 // From VRayCloneableParamInterface
 VR::VRayPluginParameter* AnimatedFloatParam::clone()
 {
-   return new AnimatedFloatParam(*this); 
+   return new AnimatedFloatParam(*this);
 }
 
 // From MyInterpolatingInterface
@@ -717,7 +717,7 @@ void AnimatedFloatParam::setValue(float value, double time)
 float AnimatedFloatParam::getValue(double time)
 {
    Map::iterator it = mTimedValues.find(time);
-   
+
    if (it != mTimedValues.end())
    {
       return it->second;
@@ -772,8 +772,11 @@ MObject AbcShape::aVRayGeomStepBegin;
 MObject AbcShape::aVRayGeomForceNextStep;
 MObject AbcShape::aVRayGeomStep;
 MObject AbcShape::aVRayAbcVerbose;
-MObject AbcShape::aVRayAbcUseReferenceObject;
-MObject AbcShape::aVRayAbcReferenceFilename;
+// MObject AbcShape::aVRayAbcUseReferenceObject;
+// MObject AbcShape::aVRayAbcReferenceFilename;
+MObject AbcShape::aVRayAbcIgnoreReference;
+MObject AbcShape::aVRayAbcReferenceSource;
+MObject AbcShape::aVRayAbcReferenceFrame;
 MObject AbcShape::aVRayAbcParticleType;
 MObject AbcShape::aVRayAbcParticleAttribs;
 MObject AbcShape::aVRayAbcSpriteSizeX;
@@ -806,7 +809,7 @@ MStatus AbcShape::initialize()
    MFnEnumAttribute eAttr;
    MFnUnitAttribute uAttr;
    MFnNumericAttribute nAttr;
-   
+
    MFnStringData filePathDefault;
    MObject filePathDefaultObject = filePathDefault.create("");
    aFilePath = tAttr.create("filePath", "fp", MFnData::kString, filePathDefaultObject, &stat);
@@ -815,13 +818,13 @@ MStatus AbcShape::initialize()
    tAttr.setUsedAsFilename(true);
    stat = addAttribute(aFilePath);
    MCHECKERROR(stat, "Could not add 'filePath' attribute");
-   
+
    aObjectExpression = tAttr.create("objectExpression", "oe", MFnData::kString, MObject::kNullObj, &stat);
    MCHECKERROR(stat, "Could not create 'objectExpression' attribute");
    tAttr.setInternal(true);
    stat = addAttribute(aObjectExpression);
    MCHECKERROR(stat, "Could not add 'objectExpression' attribute");
-   
+
    aDisplayMode = eAttr.create("displayMode", "dm");
    MCHECKERROR(stat, "Could not create 'displayMode' attribute");
    eAttr.addField("Box", DM_box);
@@ -831,14 +834,14 @@ MStatus AbcShape::initialize()
    eAttr.setInternal(true);
    stat = addAttribute(aDisplayMode);
    MCHECKERROR(stat, "Could not add 'displayMode' attribute");
-   
+
    aTime = uAttr.create("time", "tm", MFnUnitAttribute::kTime, 0.0);
    MCHECKERROR(stat, "Could not create 'time' attribute");
    uAttr.setStorable(true);
    uAttr.setInternal(true);
    stat = addAttribute(aTime);
    MCHECKERROR(stat, "Could not add 'time' attribute");
-   
+
    aSpeed = nAttr.create("speed", "sp", MFnNumericData::kDouble, 1.0, &stat);
    MCHECKERROR(stat, "Could not create 'speed' attribute");
    nAttr.setWritable(true);
@@ -847,7 +850,7 @@ MStatus AbcShape::initialize()
    nAttr.setInternal(true);
    stat = addAttribute(aSpeed);
    MCHECKERROR(stat, "Could not add 'speed' attribute");
-   
+
    aPreserveStartFrame = nAttr.create("preserveStartFrame", "psf", MFnNumericData::kBoolean, 0, &stat);
    MCHECKERROR(stat, "Could not create 'preserveStartFrame' attribute");
    nAttr.setWritable(true);
@@ -879,7 +882,7 @@ MStatus AbcShape::initialize()
    eAttr.setInternal(true);
    stat = addAttribute(aCycleType);
    MCHECKERROR(stat, "Could not add 'cycleType' attribute");
-   
+
    aStartFrame = nAttr.create("startFrame", "sf", MFnNumericData::kDouble, 1.0, &stat);
    MCHECKERROR(stat, "Could not create 'startFrame' attribute");
    nAttr.setWritable(true);
@@ -895,7 +898,7 @@ MStatus AbcShape::initialize()
    nAttr.setInternal(true);
    stat = addAttribute(aEndFrame);
    MCHECKERROR(stat, "Could not add 'endFrame' attribute");
-   
+
    aIgnoreXforms = nAttr.create("ignoreXforms", "ixf", MFnNumericData::kBoolean, 0, &stat);
    MCHECKERROR(stat, "Could not create 'ignoreXforms' attribute")
    nAttr.setWritable(true);
@@ -903,7 +906,7 @@ MStatus AbcShape::initialize()
    nAttr.setInternal(true);
    stat = addAttribute(aIgnoreXforms);
    MCHECKERROR(stat, "Could not add 'ignoreXforms' attribute");
-   
+
    aIgnoreInstances = nAttr.create("ignoreInstances", "iin", MFnNumericData::kBoolean, 0, &stat);
    MCHECKERROR(stat, "Could not create 'ignoreInstances' attribute")
    nAttr.setWritable(true);
@@ -911,7 +914,7 @@ MStatus AbcShape::initialize()
    nAttr.setInternal(true);
    stat = addAttribute(aIgnoreInstances);
    MCHECKERROR(stat, "Could not add 'ignoreInstances' attribute");
-   
+
    aIgnoreVisibility = nAttr.create("ignoreVisibility", "ivi", MFnNumericData::kBoolean, 0, &stat);
    MCHECKERROR(stat, "Could not create 'ignoreVisibility' attribute")
    nAttr.setWritable(true);
@@ -919,13 +922,13 @@ MStatus AbcShape::initialize()
    nAttr.setInternal(true);
    stat = addAttribute(aIgnoreVisibility);
    MCHECKERROR(stat, "Could not add 'ignoreVisibility' attribute");
-   
+
    aNumShapes = nAttr.create("numShapes", "nsh", MFnNumericData::kLong, 0, &stat);
    nAttr.setWritable(false);
    nAttr.setStorable(false);
    stat = addAttribute(aNumShapes);
    MCHECKERROR(stat, "Could not add 'numShapes' attribute");
-   
+
    aPointWidth = nAttr.create("pointWidth", "ptw", MFnNumericData::kFloat, 0.0, &stat);
    MCHECKERROR(stat, "Could not create 'pointWidth' attribute");
    nAttr.setWritable(true);
@@ -934,7 +937,7 @@ MStatus AbcShape::initialize()
    nAttr.setInternal(true);
    stat = addAttribute(aPointWidth);
    MCHECKERROR(stat, "Could not add 'pointWidth' attribute");
-   
+
    aLineWidth = nAttr.create("lineWidth", "lnw", MFnNumericData::kFloat, 0.0, &stat);
    MCHECKERROR(stat, "Could not create 'lineWidth' attribute");
    nAttr.setWritable(true);
@@ -943,7 +946,7 @@ MStatus AbcShape::initialize()
    nAttr.setInternal(true);
    stat = addAttribute(aLineWidth);
    MCHECKERROR(stat, "Could not add 'lineWidth' attribute");
-   
+
    aDrawTransformBounds = nAttr.create("drawTransformBounds", "dtb", MFnNumericData::kBoolean, 0, &stat);
    MCHECKERROR(stat, "Could not create 'drawTransformBounds' attribute");
    nAttr.setWritable(true);
@@ -952,7 +955,7 @@ MStatus AbcShape::initialize()
    nAttr.setInternal(true);
    stat = addAttribute(aDrawTransformBounds);
    MCHECKERROR(stat, "Could not add 'drawTransformBounds' attribute");
-   
+
    aDrawLocators = nAttr.create("drawLocators", "dl", MFnNumericData::kBoolean, 0, &stat);
    MCHECKERROR(stat, "Could not create 'drawLocators' attribute");
    nAttr.setWritable(true);
@@ -961,21 +964,21 @@ MStatus AbcShape::initialize()
    nAttr.setInternal(true);
    stat = addAttribute(aDrawLocators);
    MCHECKERROR(stat, "Could not add 'drawLocators' attribute");
-   
+
    aOutBoxMin = nAttr.create("outBoxMin", "obmin", MFnNumericData::k3Double, 0.0, &stat);
    MCHECKERROR(stat, "Could not create 'outBoxMin' attribute");
    nAttr.setWritable(false);
    nAttr.setStorable(false);
    stat = addAttribute(aOutBoxMin);
    MCHECKERROR(stat, "Could not add 'outBoxMin' attribute");
-   
+
    aOutBoxMax = nAttr.create("outBoxMax", "obmax", MFnNumericData::k3Double, 0.0, &stat);
    MCHECKERROR(stat, "Could not create 'outBoxMax' attribute");
    nAttr.setWritable(false);
    nAttr.setStorable(false);
    stat = addAttribute(aOutBoxMax);
    MCHECKERROR(stat, "Could not add 'outBoxMax' attribute");
-   
+
    aAnimated = nAttr.create("animated", "anm", MFnNumericData::kBoolean, 0, &stat);
    MCHECKERROR(stat, "Could not create 'animated' attribute");
    nAttr.setWritable(true);
@@ -983,7 +986,7 @@ MStatus AbcShape::initialize()
    nAttr.setHidden(true);
    stat = addAttribute(aAnimated);
    MCHECKERROR(stat, "Could not add 'animated' attribute");
-   
+
    aUvSetCount = nAttr.create("uvSetCount", "uvct", MFnNumericData::kLong, 0, &stat);
    MCHECKERROR(stat, "Could not create 'uvSetCount' attribute");
    nAttr.setWritable(true);
@@ -991,14 +994,14 @@ MStatus AbcShape::initialize()
    nAttr.setHidden(true);
    stat = addAttribute(aUvSetCount);
    MCHECKERROR(stat, "Could not add 'uvSetCount' attribute");
-   
+
    aOutSampleTime = nAttr.create("outSampleTime", "osmpt", MFnNumericData::kDouble, 0.0, &stat);
    MCHECKERROR(stat, "Could not create 'outSampleTime' attribute");
    nAttr.setWritable(false);
    nAttr.setStorable(false);
    stat = addAttribute(aOutSampleTime);
    MCHECKERROR(stat, "Could not add 'outSampleTime' attribute");
-   
+
    aInCustomFrame = nAttr.create("inCustomFrame", "incf", MFnNumericData::kDouble, 0.0, &stat);
    MCHECKERROR(stat, "Could not create 'inCustomFrame' attribute");
    nAttr.setWritable(true);
@@ -1007,7 +1010,7 @@ MStatus AbcShape::initialize()
    nAttr.setInternal(true);
    stat = addAttribute(aInCustomFrame);
    MCHECKERROR(stat, "Could not add 'inCustomFrame' attribute");
-   
+
    aOutCustomTime = nAttr.create("outCustomTime", "ouct", MFnNumericData::kDouble, 0.0, &stat);
    MCHECKERROR(stat, "Could not create 'outCustomTime' attribute");
    nAttr.setWritable(false);
@@ -1015,7 +1018,7 @@ MStatus AbcShape::initialize()
    nAttr.setHidden(true);
    stat = addAttribute(aOutCustomTime);
    MCHECKERROR(stat, "Could not add 'outCustomTime' attribute");
-   
+
 #ifdef ABCSHAPE_VRAY_SUPPORT
    MFnStringData outApiTypeDefault;
    MObject outApiTypeDefaultObject = outApiTypeDefault.create("VRayGeometry");
@@ -1026,7 +1029,7 @@ MStatus AbcShape::initialize()
    tAttr.setHidden(true);
    stat = addAttribute(aOutApiType);
    MCHECKERROR(stat, "Could not add 'outApiType' attribute");
-   
+
    MFnStringData outApiClassificationDefault;
    MObject outApiClassificationDefaultObject = outApiClassificationDefault.create("geometry");
    aOutApiClassification = tAttr.create("outApiClassification", "oac", MFnData::kString, outApiClassificationDefaultObject, &stat);
@@ -1036,7 +1039,7 @@ MStatus AbcShape::initialize()
    tAttr.setHidden(true);
    stat = addAttribute(aOutApiClassification);
    MCHECKERROR(stat, "Could not add 'outApiClassification' attribute");
-   
+
    aVRayGeomInfo = nAttr.createAddr("vrayGeomInfo", "vgi", &stat);
    MCHECKERROR(stat, "Could not create 'vrayGeomInfo' attribute");;
    nAttr.setKeyable(false);
@@ -1046,7 +1049,7 @@ MStatus AbcShape::initialize()
    nAttr.setHidden(true);
    stat = addAttribute(aVRayGeomInfo);
    MCHECKERROR(stat, "Could not add 'vrayGeomInfo' attribute");;
-   
+
    aVRayGeomResult = nAttr.create("vrayGeomResult", "vgr", MFnNumericData::kInt, 0, &stat);
    MCHECKERROR(stat, "Could not create 'vrayGeomResult' attribute");
    nAttr.setKeyable(false);
@@ -1056,7 +1059,7 @@ MStatus AbcShape::initialize()
    nAttr.setHidden(true);
    stat = addAttribute(aVRayGeomResult);
    MCHECKERROR(stat, "Could not add 'vrayGeomResult' attribute");
-   
+
    aVRayGeomStepBegin = nAttr.create("vrayGeomStepBegin", "vgsb", MFnNumericData::kInt, 0, &stat);
    MCHECKERROR(stat, "Could not create 'vrayGeomStepBegin' attribute");
    nAttr.setKeyable(false);
@@ -1066,7 +1069,7 @@ MStatus AbcShape::initialize()
    nAttr.setHidden(true);
    stat = addAttribute(aVRayGeomStepBegin);
    MCHECKERROR(stat, "Could not add 'vrayGeomStepBegin' attribute");
-   
+
    aVRayGeomForceNextStep = nAttr.create("vrayGeomForceNextStep", "vgfn", MFnNumericData::kBoolean, 0, &stat);
    MCHECKERROR(stat, "Could not create 'vrayGeomForceNextStep' attribute");
    nAttr.setKeyable(false);
@@ -1076,7 +1079,7 @@ MStatus AbcShape::initialize()
    nAttr.setHidden(true);
    stat = addAttribute(aVRayGeomForceNextStep);
    MCHECKERROR(stat, "Could not add 'vrayGeomForceNextStep' attribute");
-   
+
    aVRayGeomStep = nAttr.create("vrayGeomStep", "vgs", MFnNumericData::kInt, 0, &stat);
    MCHECKERROR(stat, "Could not create 'vrayGeomStep' attribute");
    nAttr.setKeyable(false);
@@ -1086,28 +1089,48 @@ MStatus AbcShape::initialize()
    nAttr.setHidden(true);
    stat = addAttribute(aVRayGeomStep);
    MCHECKERROR(stat, "Could not add 'vrayGeomStep' attribute");
-   
+
    aVRayAbcVerbose = nAttr.create("vrayAbcVerbose", "vaverb", MFnNumericData::kBoolean, 0, &stat);
    MCHECKERROR(stat, "Could not create 'vrayAbcVerbose' attribute");
    nAttr.setKeyable(false);
    stat = addAttribute(aVRayAbcVerbose);
    MCHECKERROR(stat, "Could not add 'vrayAbcVerbose' attribute");
-   
-   aVRayAbcUseReferenceObject = nAttr.create("vrayAbcUseReferenceObject", "vauref", MFnNumericData::kBoolean, 0, &stat);
-   MCHECKERROR(stat, "Could not create 'vrayAbcUseReferenceObject' attribute");
+
+   // aVRayAbcUseReferenceObject = nAttr.create("vrayAbcUseReferenceObject", "vauref", MFnNumericData::kBoolean, 0, &stat);
+   // MCHECKERROR(stat, "Could not create 'vrayAbcUseReferenceObject' attribute");
+   // nAttr.setKeyable(false);
+   // stat = addAttribute(aVRayAbcUseReferenceObject);
+   // MCHECKERROR(stat, "Could not add 'vrayAbcUseReferenceObject' attribute");
+
+   // MFnStringData refFileDef;
+   // MObject refFileDefObj = refFileDef.create("");
+   // aVRayAbcReferenceFilename = tAttr.create("vrayAbcReferenceFilename", "vareff", MFnData::kString, refFileDefObj, &stat);
+   // MCHECKERROR(stat, "Could not create 'vrayAbcReferenceFilename' attribute");
+   // tAttr.setKeyable(false);
+   // tAttr.setUsedAsFilename(true);
+   // stat = addAttribute(aVRayAbcReferenceFilename);
+   // MCHECKERROR(stat, "Could not add 'vrayAbcReferenceFilename' attribute");
+
+   aVRayAbcIgnoreReference = nAttr.create("vrayAbcIgnoreReference", "vairef", MFnNumericData::kBoolean, 0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcIgnoreReference' attribute");
    nAttr.setKeyable(false);
-   stat = addAttribute(aVRayAbcUseReferenceObject);
-   MCHECKERROR(stat, "Could not add 'vrayAbcUseReferenceObject' attribute");
-   
-   MFnStringData refFileDef;
-   MObject refFileDefObj = refFileDef.create("");
-   aVRayAbcReferenceFilename = tAttr.create("vrayAbcReferenceFilename", "vareff", MFnData::kString, refFileDefObj, &stat);
-   MCHECKERROR(stat, "Could not create 'vrayAbcReferenceFilename' attribute");
-   tAttr.setKeyable(false);
-   tAttr.setUsedAsFilename(true);
-   stat = addAttribute(aVRayAbcReferenceFilename);
-   MCHECKERROR(stat, "Could not add 'vrayAbcReferenceFilename' attribute");
-   
+   stat = addAttribute(aVRayAbcIgnoreReference);
+   MCHECKERROR(stat, "Could not add 'vrayAbcIgnoreReference' attribute");
+
+   aVRayAbcReferenceSource = eAttr.create("vrayAbcReferenceSource", "varefs", 0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcReferenceSource' attribute");
+   eAttr.addField("attributes", 0);
+   eAttr.addField("frame", 1);
+   eAttr.setKeyable(false);
+   stat = addAttribute(aVRayAbcReferenceSource);
+   MCHECKERROR(stat, "Could not add 'vrayAbcReferenceSource' attribute");
+
+   aVRayAbcReferenceFrame = nAttr.create("vrayAbcReferenceFrame", "vareff", MFnNumericData::kFloat, 0.0, &stat);
+   MCHECKERROR(stat, "Could not create 'vrayAbcReferenceFrame' attribute");
+   nAttr.setKeyable(false);
+   stat = addAttribute(aVRayAbcReferenceFrame);
+   MCHECKERROR(stat, "Could not add 'vrayAbcReferenceFrame' attribute");
+
    aVRayAbcParticleType = eAttr.create("vrayAbcParticleType", "vapart", 6, &stat);
    MCHECKERROR(stat, "Could not create 'vrayAbcParticleType' attribute");
    eAttr.addField("multipoints", 3);
@@ -1119,7 +1142,7 @@ MStatus AbcShape::initialize()
    eAttr.setKeyable(false);
    stat = addAttribute(aVRayAbcParticleType);
    MCHECKERROR(stat, "Could not add 'vrayAbcParticleType' attribute");
-   
+
    MFnStringData partAttrDef;
    MObject partAttrDefObj = partAttrDef.create("");
    aVRayAbcParticleAttribs = tAttr.create("vrayAbcParticleAttribs", "vapara", MFnData::kString, partAttrDefObj, &stat);
@@ -1127,42 +1150,42 @@ MStatus AbcShape::initialize()
    tAttr.setKeyable(false);
    stat = addAttribute(aVRayAbcParticleAttribs);
    MCHECKERROR(stat, "Could not add 'vrayAbcParticleAttribs' attribute");
-   
+
    aVRayAbcRadius = nAttr.create("vrayAbcRadius", "varad", MFnNumericData::kFloat, 1.0, &stat);
    MCHECKERROR(stat, "Could not create 'vrayAbcRadius' attribute");
    stat = addAttribute(aVRayAbcRadius);
    MCHECKERROR(stat, "Could not add 'vrayAbcRadius' attribute");
-   
+
    aVRayAbcPointSize = nAttr.create("vrayAbcPointSize", "vaptsz", MFnNumericData::kFloat, 1.0, &stat);
    MCHECKERROR(stat, "Could not create 'vrayAbcPointSize' attribute");
    stat = addAttribute(aVRayAbcPointSize);
    MCHECKERROR(stat, "Could not add 'vrayAbcPointSize' attribute");
-   
+
    // aVRayAbcPointRadii = nAttr.create("vrayAbcPointRadii", "vaptra", MFnNumericData::kBoolean, 0, &stat);
    // MCHECKERROR(stat, "Could not create 'vrayAbcPointRadii' attribute");
    // stat = addAttribute(aVRayAbcPointRadii);
    // MCHECKERROR(stat, "Could not add 'vrayAbcPointRadii' attribute");
-   
+
    // aVRayAbcPointWorldSize = nAttr.create("vrayAbcPointWorldSize", "vaptws", MFnNumericData::kBoolean, 0, &stat);
    // MCHECKERROR(stat, "Could not create 'vrayAbcPointWorldSize' attribute");
    // stat = addAttribute(aVRayAbcPointWorldSize);
    // MCHECKERROR(stat, "Could not add 'vrayAbcPointWorldSize' attribute");
-   
+
    aVRayAbcSpriteSizeX = nAttr.create("vrayAbcSpriteSizeX", "vaspsx", MFnNumericData::kFloat, 1.0, &stat);
    MCHECKERROR(stat, "Could not create 'vrayAbcSpriteSizeX' attribute");
    stat = addAttribute(aVRayAbcSpriteSizeX);
    MCHECKERROR(stat, "Could not add 'vrayAbcSpriteSizeX' attribute");
-   
+
    aVRayAbcSpriteSizeY = nAttr.create("vrayAbcSpriteSizeY", "vaspsy", MFnNumericData::kFloat, 1.0, &stat);
    MCHECKERROR(stat, "Could not create 'vrayAbcSpriteSizeY' attribute");
    stat = addAttribute(aVRayAbcSpriteSizeY);
    MCHECKERROR(stat, "Could not add 'vrayAbcSpriteSizeY' attribute");
-   
+
    aVRayAbcSpriteTwist = nAttr.create("vrayAbcSpriteTwist", "vasptw", MFnNumericData::kFloat, 0.0, &stat);
    MCHECKERROR(stat, "Could not create 'vrayAbcSpriteTwist' attribute");
    stat = addAttribute(aVRayAbcSpriteTwist);
    MCHECKERROR(stat, "Could not add 'vrayAbcSpriteTwist' attribute");
-   
+
    // aVRayAbcSpriteOrientation = eAttr.create("vrayAbcSpriteOrientation", "vaspor", 0, &stat);
    // MCHECKERROR(stat, "Could not create 'vrayAbcSpriteOrientation' attribute");
    // eAttr.addField("Towards camera center", 0);
@@ -1170,48 +1193,48 @@ MStatus AbcShape::initialize()
    // eAttr.setKeyable(false)
    // stat = addAttribute(aVRayAbcSpriteOrientation);
    // MCHECKERROR(stat, "Could not add 'vrayAbcSpriteOrientation' attribute");
-   
+
    aVRayAbcMultiCount = nAttr.create("vrayAbcMultiCount", "vamuco", MFnNumericData::kInt, 1, &stat);
    MCHECKERROR(stat, "Could not create 'vrayAbcMultiCount' attribute");
    stat = addAttribute(aVRayAbcMultiCount);
    MCHECKERROR(stat, "Could not add 'vrayAbcMultiCount' attribute");
-   
+
    aVRayAbcMultiRadius = nAttr.create("vrayAbcMultiRadius", "vamura", MFnNumericData::kFloat, 0.0, &stat);
    MCHECKERROR(stat, "Could not create 'vrayAbcMultiRadius' attribute");
    stat = addAttribute(aVRayAbcMultiRadius);
    MCHECKERROR(stat, "Could not add 'vrayAbcMultiRadius' attribute");
-   
+
    aVRayAbcLineWidth = nAttr.create("vrayAbcLineWidth", "valnwi", MFnNumericData::kFloat, 1.0, &stat);
    MCHECKERROR(stat, "Could not create 'vrayAbcLineWidth' attribute");
    stat = addAttribute(aVRayAbcLineWidth);
    MCHECKERROR(stat, "Could not add 'vrayAbcLineWidth' attribute");
-   
+
    aVRayAbcTailLength = nAttr.create("vrayAbcTailLength", "vatlle", MFnNumericData::kFloat, 1.0, &stat);
    MCHECKERROR(stat, "Could not create 'vrayAbcTailLength' attribute");
    stat = addAttribute(aVRayAbcTailLength);
    MCHECKERROR(stat, "Could not add 'vrayAbcTailLength' attribute");
-   
+
    aVRayAbcSortIDs = nAttr.create("vrayAbcSortIDs", "vasids", MFnNumericData::kBoolean, 0, &stat);
    MCHECKERROR(stat, "Could not create 'vrayAbcSortIDs' attribute");
    nAttr.setKeyable(false);
    stat = addAttribute(aVRayAbcSortIDs);
    MCHECKERROR(stat, "Could not add 'vrayAbcSortIDs' attribute");
-   
+
    aVRayAbcPsizeScale = nAttr.create("vrayAbcPsizeScale", "vapss", MFnNumericData::kFloat, 1.0, &stat);
    MCHECKERROR(stat, "Could not create 'vrayAbcPsizeScale' attribute");
    stat = addAttribute(aVRayAbcPsizeScale);
    MCHECKERROR(stat, "Could not add 'vrayAbcPsizeScale' attribute");
-   
+
    aVRayAbcPsizeMin = nAttr.create("vrayAbcPsizeMin", "vapmi", MFnNumericData::kFloat, 0.0, &stat);
    MCHECKERROR(stat, "Could not create 'vrayAbcPsizeMin' attribute");
    stat = addAttribute(aVRayAbcPsizeMin);
    MCHECKERROR(stat, "Could not add 'vrayAbcPsizeMin' attribute");
-   
+
    aVRayAbcPsizeMax = nAttr.create("vrayAbcPsizeMax", "vapma", MFnNumericData::kFloat, 1000000.0, &stat);
    MCHECKERROR(stat, "Could not create 'vrayAbcPsizeMax' attribute");
    stat = addAttribute(aVRayAbcPsizeMax);
    MCHECKERROR(stat, "Could not add 'vrayAbcPsizeMax' attribute");
-   
+
    attributeAffects(aVRayGeomInfo, aVRayGeomResult);
    attributeAffects(aFilePath, aVRayGeomResult);
    attributeAffects(aObjectExpression, aVRayGeomResult);
@@ -1222,10 +1245,13 @@ MStatus AbcShape::initialize()
    attributeAffects(aOffset, aVRayGeomResult);
    attributeAffects(aPreserveStartFrame, aVRayGeomResult);
    attributeAffects(aCycleType, aVRayGeomResult);
-   
+
    attributeAffects(aVRayAbcVerbose, aVRayGeomResult);
-   attributeAffects(aVRayAbcUseReferenceObject, aVRayGeomResult);
-   attributeAffects(aVRayAbcReferenceFilename, aVRayGeomResult);
+   // attributeAffects(aVRayAbcUseReferenceObject, aVRayGeomResult);
+   // attributeAffects(aVRayAbcReferenceFilename, aVRayGeomResult);
+   attributeAffects(aVRayAbcIgnoreReference, aVRayGeomResult);
+   attributeAffects(aVRayAbcReferenceSource, aVRayGeomResult);
+   attributeAffects(aVRayAbcReferenceFrame, aVRayGeomResult);
    attributeAffects(aVRayAbcParticleType, aVRayGeomResult);
    attributeAffects(aVRayAbcParticleAttribs, aVRayGeomResult);
    attributeAffects(aVRayAbcPointSize, aVRayGeomResult);
@@ -1240,25 +1266,25 @@ MStatus AbcShape::initialize()
    attributeAffects(aVRayAbcPsizeScale, aVRayGeomResult);
    attributeAffects(aVRayAbcPsizeMin, aVRayGeomResult);
    attributeAffects(aVRayAbcPsizeMax, aVRayGeomResult);
-   
+
    attributeAffects(aTime, aVRayGeomStepBegin);
-   
+
    attributeAffects(aVRayGeomForceNextStep, aVRayGeomStep);
    attributeAffects(aTime, aVRayGeomStep);
-   
+
 #endif
 
    attributeAffects(aFilePath, aNumShapes);
    attributeAffects(aObjectExpression, aNumShapes);
    attributeAffects(aIgnoreInstances, aNumShapes);
    attributeAffects(aIgnoreVisibility, aNumShapes);
-   
+
    attributeAffects(aFilePath, aAnimated);
    attributeAffects(aObjectExpression, aAnimated);
    attributeAffects(aIgnoreInstances, aAnimated);
    attributeAffects(aIgnoreXforms, aAnimated);
    attributeAffects(aIgnoreVisibility, aAnimated);
-   
+
    attributeAffects(aFilePath, aOutBoxMin);
    attributeAffects(aObjectExpression, aOutBoxMin);
    attributeAffects(aDisplayMode, aOutBoxMin);
@@ -1272,7 +1298,7 @@ MStatus AbcShape::initialize()
    attributeAffects(aIgnoreXforms, aOutBoxMin);
    attributeAffects(aIgnoreInstances, aOutBoxMin);
    attributeAffects(aIgnoreVisibility, aOutBoxMin);
-   
+
    attributeAffects(aFilePath, aOutBoxMax);
    attributeAffects(aObjectExpression, aOutBoxMax);
    attributeAffects(aDisplayMode, aOutBoxMax);
@@ -1286,7 +1312,7 @@ MStatus AbcShape::initialize()
    attributeAffects(aIgnoreXforms, aOutBoxMax);
    attributeAffects(aIgnoreInstances, aOutBoxMax);
    attributeAffects(aIgnoreVisibility, aOutBoxMax);
-   
+
    attributeAffects(aFilePath, aUvSetCount);
    attributeAffects(aObjectExpression, aUvSetCount);
    attributeAffects(aCycleType, aUvSetCount);
@@ -1299,7 +1325,7 @@ MStatus AbcShape::initialize()
    attributeAffects(aIgnoreXforms, aUvSetCount);
    attributeAffects(aIgnoreInstances, aUvSetCount);
    attributeAffects(aIgnoreVisibility, aUvSetCount);
-   
+
    attributeAffects(aCycleType, aOutSampleTime);
    attributeAffects(aTime, aOutSampleTime);
    attributeAffects(aSpeed, aOutSampleTime);
@@ -1307,7 +1333,7 @@ MStatus AbcShape::initialize()
    attributeAffects(aPreserveStartFrame, aOutSampleTime);
    attributeAffects(aStartFrame, aOutSampleTime);
    attributeAffects(aEndFrame, aOutSampleTime);
-   
+
    attributeAffects(aInCustomFrame, aOutCustomTime);
    attributeAffects(aCycleType, aOutCustomTime);
    attributeAffects(aSpeed, aOutCustomTime);
@@ -1315,40 +1341,40 @@ MStatus AbcShape::initialize()
    attributeAffects(aPreserveStartFrame, aOutCustomTime);
    attributeAffects(aStartFrame, aOutCustomTime);
    attributeAffects(aEndFrame, aOutCustomTime);
-   
+
    return MS::kSuccess;
 }
 
 void AbcShape::AssignDefaultShader(MObject &obj)
 {
    static MObject sDefaultShader = MObject::kNullObj;
-   
+
    if (sDefaultShader.isNull())
    {
       MSelectionList sl;
-      
+
       sl.add("initialShadingGroup");
-      
+
       sl.getDependNode(0, sDefaultShader);
    }
-   
+
    if (!obj.isNull() && !sDefaultShader.isNull())
    {
       MFnDependencyNode fn(sDefaultShader);
-      
+
       MPlug dst = fn.findPlug("dagSetMembers");
-      
+
       fn.setObject(obj);
-      
+
       MPlug src = fn.findPlug("instObjGroups");
-      
+
       MDGModifier dgMod;
       MIntArray indices;
-      
+
       dst.getExistingArrayAttributeIndices(indices);
-      
+
       unsigned int dstIdx = (indices.length() > 0 ? indices[indices.length()-1] + 1 : 0);
-      
+
       dgMod.connect(src.elementByLogicalIndex(0), dst.elementByLogicalIndex(dstIdx));
       dgMod.doIt();
    }
@@ -1379,8 +1405,11 @@ AbcShape::AbcShape()
    , mInCustomFrame(0.0)
 #ifdef ABCSHAPE_VRAY_SUPPORT
    , mVRFilename("filename", "")
-   , mVRUseReferenceObject("useReferenceObject", false)
-   , mVRReferenceFilename("referenceFilename", "")
+   // , mVRUseReferenceObject("useReferenceObject", false)
+   // , mVRReferenceFilename("referenceFilename", "")
+   , mVRIgnoreReference("ignoreReference", false)
+   , mVRReferenceSource("referenceSource", 0)
+   , mVRReferenceFrame("referenceFrame", 0.0)
    , mVRObjectPath("objectPath", "/")
    , mVRIgnoreTransforms("ignoreTransforms", false)
    , mVRIgnoreInstances("ignoreInstances", false)
@@ -1463,13 +1492,13 @@ AbcShape::~AbcShape()
    #ifdef _DEBUG
    std::cout << "[" << PREFIX_NAME("AbcShape") << "] Destructor called" << std::endl;
    #endif
-   
+
    if (mScene && !AlembicSceneCache::Unref(mScene))
    {
       #ifdef _DEBUG
       std::cout << "[" << PREFIX_NAME("AbcShape") << "] Force delete scene" << std::endl;
       #endif
-      
+
       delete mScene;
    }
 }
@@ -1477,10 +1506,10 @@ AbcShape::~AbcShape()
 void AbcShape::postConstructor()
 {
    setRenderable(true);
-   
+
    MObject self = thisMObject();
    MFnDependencyNode fn(self);
-   
+
    aUvSet = fn.attribute("uvSet");
    aUvSetName = fn.attribute("uvSetName");
 }
@@ -1504,9 +1533,9 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
    if (plug.attribute() == aOutBoxMin || plug.attribute() == aOutBoxMax)
    {
       syncInternals(block);
-      
+
       Alembic::Abc::V3d out(0, 0, 0);
-      
+
       if (!mClipped && mScene)
       {
          if (plug.attribute() == aOutBoxMin)
@@ -1518,25 +1547,25 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
             out = mScene->selfBounds().max;
          }
       }
-      
+
       MDataHandle hOut = block.outputValue(plug.attribute());
-      
+
       hOut.set3Double(out.x, out.y, out.z);
-      
+
       block.setClean(plug);
-      
+
       return MS::kSuccess;
    }
    else if (plug.attribute() == aOutSampleTime)
    {
       syncInternals(block);
-      
+
       MDataHandle hOut = block.outputValue(plug.attribute());
-      
+
       hOut.setDouble(mSampleTime);
-      
+
       block.setClean(plug);
-      
+
       return MS::kSuccess;
    }
    else if (plug.attribute() == aOutCustomTime)
@@ -1548,57 +1577,57 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
       block.inputValue(aEndFrame).asDouble();
       block.inputValue(aCycleType).asShort();
       block.inputValue(aPreserveStartFrame).asBool();
-      
+
       MDataHandle hOut = block.outputValue(plug.attribute());
-      
+
       hOut.setDouble(getSampleTime(true));
-      
+
       block.setClean(plug);
-      
+
       return MS::kSuccess;
    }
    else if (plug.attribute() == aNumShapes)
    {
       syncInternals(block);
-      
+
       MDataHandle hOut = block.outputValue(plug.attribute());
-      
+
       hOut.setInt(mNumShapes);
-      
+
       block.setClean(plug);
-      
+
       return MS::kSuccess;
    }
    else if (plug.attribute() == aAnimated)
    {
       syncInternals(block);
-      
+
       MDataHandle hOut = block.outputValue(plug.attribute());
-      
+
       hOut.setBool(mAnimated);
-      
+
       block.setClean(plug);
-      
+
       return MS::kSuccess;
    }
    else if (plug.attribute() == aUvSetCount)
    {
       syncInternals(block);
-      
+
       MDataHandle hOut = block.outputValue(plug.attribute());
-      
+
       hOut.setInt(mUvSetNames.size());
-      
+
       block.setClean(plug);
-      
+
       return MS::kSuccess;
    }
    else if (plug.attribute() == aUvSetName)
    {
       MDataHandle hOut = block.outputValue(plug);
-      
+
       unsigned int i = plug.parent().logicalIndex();
-      
+
       if (i < mUvSetNames.size())
       {
          hOut.setString(mUvSetNames[i].c_str());
@@ -1607,9 +1636,9 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
       {
          hOut.setString("");
       }
-      
+
       block.setClean(plug);
-      
+
       return MS::kSuccess;
    }
 #ifdef ABCSHAPE_VRAY_SUPPORT
@@ -1617,70 +1646,70 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
    {
       MDataHandle hTime = block.inputValue(aTime);
       MDataHandle hOut = block.outputValue(aVRayGeomStepBegin);
-      
+
       MTime t = hTime.asTime();
-      
+
       mVRTime.clear();
-      
+
       hOut.setInt(1);
       block.setClean(plug);
-      
+
       return MS::kSuccess;
    }
    else if (plug.attribute() == aVRayGeomStep)
    {
       MDataHandle hTime = block.inputValue(aTime);
       MDataHandle hOut = block.outputValue(aVRayGeomStep);
-      
+
       MTime t = hTime.asTime();
-      
+
       mVRTime.setFloat(t.as(MTime::kSeconds), 0, t.as(MTime::uiUnit()));
-      
+
       hOut.setInt(1);
       block.setClean(plug);
-      
+
       return MS::kSuccess;
    }
    else if (plug.attribute() == aVRayGeomResult)
    {
       syncInternals(block);
-      
+
       MDataHandle hIn = block.inputValue(aVRayGeomInfo);
       MDataHandle hOut = block.outputValue(aVRayGeomResult);
-      
+
       VR::VRayGeomInfo *geomInfo = 0;
-      
+
       if (!mClipped)
       {
          void *ptr = hIn.asAddr();
-         
+
          geomInfo = reinterpret_cast<VR::VRayGeomInfo*>(ptr);
       }
-      
+
       if (geomInfo)
       {
          PluginManager *plugman = geomInfo->getPluginManager();
-         
+
          if (plugman)
          {
             PluginDesc *plugdesc = plugman->getPluginDesc("AlembicLoader");
-            
+
             if (plugdesc)
             {
                bool existing = false;
-               
+
                MObject self = thisMObject();
                MFnDependencyNode thisNode(self);
-               
+
                MDagPath thisPath;
                MDagPath::getAPathTo(self, thisPath);
-               
+
                #ifdef _DEBUG
                std::cout << "Export to V-Ray: \"" << thisNode.name().asChar() << "\" - \"" << thisPath.fullPathName().asChar() << "\"" << std::endl;
                #endif
-               
+
                VR::VRayPlugin *abc = geomInfo->newPlugin("AlembicLoader", existing);
-               
+
                if (abc && !existing)
                {
                   mVRFilename.setString(mFilePath.asChar(), 0, 0.0);
@@ -1696,13 +1725,13 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   mVRCycle.setInt(int(mCycleType), 0, 0.0);
                   mVRFps.setFloat(float(getFPS()), 0, 0.0);
                   mVRTime.clear();
-                  
+
                   MPlug pMotionBlur = thisNode.findPlug("motionBlur");
                   if (!pMotionBlur.isNull())
                   {
                      bool singleShape = (mNumShapes == 1 && mIgnoreTransforms);
                      bool motionBlur = pMotionBlur.asBool();
-                     
+
                      mVRIgnoreTransformBlur.setBool((singleShape || !motionBlur), 0, 0.0);
                      mVRIgnoreDeformBlur.setBool(!motionBlur, 0, 0.0);
                   }
@@ -1711,7 +1740,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                      mVRIgnoreTransformBlur.setBool(false, 0, 0.0);
                      mVRIgnoreDeformBlur.setBool(false, 0, 0.0);
                   }
-                  
+
                   // MPlug pRefFile = thisNode.findPlug("referenceFilename");
                   // if (!pRefFile.isNull())
                   // {
@@ -1721,12 +1750,22 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   // {
                   //    mVRReferenceFilename.setString("", 0, 0.0);
                   // }
-                  MDataHandle hUseReferenceObject = block.inputValue(aVRayAbcUseReferenceObject);
-                  mVRUseReferenceObject.setBool(hUseReferenceObject.asBool(), 0, 0.0);
-                  
-                  MDataHandle hReferenceFilename = block.inputValue(aVRayAbcReferenceFilename);
-                  mVRReferenceFilename.setString(hReferenceFilename.asString().asChar(), 0, 0.0);
-                  
+
+                  // MDataHandle hUseReferenceObject = block.inputValue(aVRayAbcUseReferenceObject);
+                  // mVRUseReferenceObject.setBool(hUseReferenceObject.asBool(), 0, 0.0);
+                  //
+                  // MDataHandle hReferenceFilename = block.inputValue(aVRayAbcReferenceFilename);
+                  // mVRReferenceFilename.setString(hReferenceFilename.asString().asChar(), 0, 0.0);
+
+                  MDataHandle hIgnoreReference = block.inputValue(aVRayAbcIgnoreReference);
+                  mVRIgnoreReference.setBool(hIgnoreReference.asBool(), 0, 0.0);
+
+                  MDataHandle hReferenceSource = block.inputValue(aVRayAbcReferenceSource);
+                  mVRReferenceSource.setInt(hReferenceSource.asInt(), 0, 0.0);
+
+                  MDataHandle hReferenceFrame = block.inputValue(aVRayAbcReferenceFrame);
+                  mVRReferenceFrame.setFloat(hReferenceFrame.asFloat(), 0, 0.0);
+
                   // MPlug pVerbose = thisNode.findPlug("verbose");
                   // if (!pVerbose.isNull())
                   // {
@@ -1738,19 +1777,19 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   // }
                   MDataHandle hVerbose = block.inputValue(aVRayAbcVerbose);
                   mVRVerbose.setBool(hVerbose.asBool(), 0, 0.0);
-                  
+
                   // Subdivision / Displacement
-                  
+
                   MObject subdivAttrObject = MObject::kNullObj;
                   MObject dispAttrObject = MObject::kNullObj;
                   MObject osdAttrObject = MObject::kNullObj;
                   MObject subdqAttrObject = MObject::kNullObj;
-                  
+
                   bool displaced = true;
                   bool subdivided = false;
                   bool subdquality = false;
                   bool osd = false;
-                  
+
                   MPlug pDispNone = thisNode.findPlug("vrayDisplacementNone");
                   if (!pDispNone.isNull())
                   {
@@ -1763,45 +1802,45 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                         dispAttrObject = thisMObject();
                      }
                   }
-                  
+
                   MPlug pSubdivEnable = thisNode.findPlug("vraySubdivEnable");
                   if (!pSubdivEnable.isNull() && pSubdivEnable.asBool())
                   {
                      subdivAttrObject = thisMObject();
                      subdivided = true;
                   }
-                  
+
                   MPlug pOSDEnable = thisNode.findPlug("vrayOsdSubdivEnable");
                   if (!pOSDEnable.isNull() && pOSDEnable.asBool())
                   {
                      osdAttrObject = thisMObject();
                      osd = true;
                   }
-                  
+
                   MPlug pOverrideGlobals = thisNode.findPlug("vrayOverrideGlobalSubQual");
                   if (!pOverrideGlobals.isNull() && pOverrideGlobals.asBool())
                   {
                      subdquality = true;
                      subdqAttrObject = thisMObject();
                   }
-                  
+
                   MFnDependencyNode dispSetFn, dispShaderFn, stdDispShaderFn;
                   bool hasDispAssigned = AbcShapeVRayInfo::getAssignedDisplacement(thisPath, dispSetFn, dispShaderFn, stdDispShaderFn);
-                  
+
                   if (hasDispAssigned)
                   {
                      // MGlobal::displayInfo("[AbcShape] VRayDisplacement: " + MString(dispSetName.c_str()));
                      // MGlobal::displayInfo("[AbcShape] VRayDisplacement shader: " + MString(dispShaderName.c_str()));
                      // MGlobal::displayInfo("[AbcShape] shadingEngine displacement shader: " + MString(stdDispShaderName.c_str()));
-                     
+
                      // hasDispAssigned will return true if standard displacement was found or object is in a VRayDisplacement set
                      // Note the displacement shader on the VRayDisplacement set may not be set, and this is accepted because we
                      //   may also wan't to pull subdivision related attributes from this set
-                     // 
+                     //
                      bool hasSet = !dispSetFn.object().isNull();
                      bool hasShader = !dispShaderFn.object().isNull();
                      bool hasStdShader = !stdDispShaderFn.object().isNull();
-                     
+
                      if (hasSet)
                      {
                         if (displaced)
@@ -1823,7 +1862,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                               }
                            }
                         }
-                        
+
                         MPlug pSubdivEnable = dispSetFn.findPlug("vraySubdivEnable");
                         if (!pSubdivEnable.isNull())
                         {
@@ -1836,7 +1875,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                               }
                            }
                         }
-                        
+
                         MPlug pOSDEnable = dispSetFn.findPlug("vrayOsdSubdivEnable");
                         if (!pOSDEnable.isNull())
                         {
@@ -1849,7 +1888,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                               }
                            }
                         }
-                        
+
                         MPlug pOverrideGlobals = dispSetFn.findPlug("vrayOverrideGlobalSubQual");
                         if (!pOverrideGlobals.isNull())
                         {
@@ -1863,7 +1902,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                            }
                         }
                      }
-                     
+
                      if (!hasStdShader && !hasShader)
                      {
                         displaced = false;
@@ -1878,10 +1917,10 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                      // No displacement shader assigned at all
                      displaced = false;
                   }
-                  
+
                   mVRSubdivEnable.setBool(subdivided, 0, 0.0);
                   abc->setParameter(&mVRSubdivEnable);
-                  
+
                   if (subdivided && subdivAttrObject != MObject::kNullObj)
                   {
                      // Subdivision
@@ -1891,32 +1930,32 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                      // vraySubdivUVs: bool, 1
                      // vrayStaticSubdiv: bool, 0
                      // vrayClassicalCatmark: bool, 0
-                     
+
                      MFnDependencyNode nodeFn(subdivAttrObject);
-                     
+
                      MPlug pAttr = nodeFn.findPlug("vraySubdivUVs");
                      mVRSubdivUVs.setInt(pAttr.asInt(), 0, 0.0);
                      abc->setParameter(&mVRSubdivUVs);
-                     
+
                      if (pAttr.asBool())
                      {
                         pAttr = nodeFn.findPlug("vrayPreserveMapBorders");
                         mVRPreserveMapBorders.setInt(pAttr.asInt(), 0, 0.0);
                         abc->setParameter(&mVRPreserveMapBorders);
                      }
-                     
+
                      pAttr = nodeFn.findPlug("vrayStaticSubdiv");
                      mVRStaticSubdiv.setInt(pAttr.asInt(), 0, 0.0);
                      abc->setParameter(&mVRStaticSubdiv);
-                     
+
                      pAttr = nodeFn.findPlug("vrayClassicalCatmark");
                      mVRClassicCatmark.setInt(pAttr.asInt(), 0, 0.0);
                      abc->setParameter(&mVRClassicCatmark);
                   }
-                  
+
                   mVRUseGlobals.setBool((subdquality ? false : true), 0, 0.0);
                   abc->setParameter(&mVRUseGlobals);
-                  
+
                   if (subdquality && subdqAttrObject != MObject::kNullObj)
                   {
                      // Subdivision quality attributes
@@ -1925,25 +1964,25 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                      // vrayViewDep: bool, true
                      // vrayEdgeLength: float, 4.0
                      // vrayMaxSubdivs: int, 4
-                     
+
                      MFnDependencyNode nodeFn(subdqAttrObject);
-                                          
+
                      MPlug pAttr = nodeFn.findPlug("vrayViewDep");
                      mVRViewDep.setBool(pAttr.asBool(), 0, 0.0);
                      abc->setParameter(&mVRViewDep);
-                     
+
                      pAttr = nodeFn.findPlug("vrayEdgeLength");
                      mVREdgeLength.setFloat(pAttr.asFloat(), 0, 0.0);
                      abc->setParameter(&mVREdgeLength);
-                     
+
                      pAttr = nodeFn.findPlug("vrayMaxSubdivs");
                      mVRMaxSubdivs.setInt(pAttr.asInt(), 0, 0.0);
                      abc->setParameter(&mVRMaxSubdivs);
                   }
-                  
+
                   mVROSDSubdivEnable.setBool(osd, 0, 0.0);
                   abc->setParameter(&mVROSDSubdivEnable);
-                  
+
                   if (osd && osdAttrObject != MObject::kNullObj)
                   {
                      // OpenSubdiv attributes
@@ -1954,44 +1993,44 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                      // vrayOsdPreserveMapBorders: enum, 1, (None:0, Internal:1, All:2)
                      // vrayOsdSubdivUVs: bool, 1
                      // vrayOsdPreserveGeomBorders: bool, 0
-                     
+
                      MFnDependencyNode nodeFn(osdAttrObject);
-                     
+
                      MPlug pAttr = nodeFn.findPlug("vrayOsdSubdivDepth");
                      mVROSDSubdivLevel.setInt(pAttr.asInt(), 0, 0.0);
                      abc->setParameter(&mVROSDSubdivLevel);
-                     
+
                      pAttr = nodeFn.findPlug("vrayOsdSubdivType");
                      mVROSDSubdivType.setInt(pAttr.asInt(), 0, 0.0);
                      abc->setParameter(&mVROSDSubdivType);
-                     
+
                      pAttr = nodeFn.findPlug("vrayOsdSubdivUVs");
                      mVROSDSubdivUVs.setBool(pAttr.asBool(), 0, 0.0);
                      abc->setParameter(&mVROSDSubdivUVs);
-                     
+
                      if (pAttr.asBool())
                      {
                         pAttr = nodeFn.findPlug("vrayOsdPreserveMapBorders");
                         mVROSDPreserveMapBorders.setInt(pAttr.asInt(), 0, 0.0);
                         abc->setParameter(&mVROSDPreserveMapBorders);
                      }
-                     
+
                      pAttr = nodeFn.findPlug("vrayOsdPreserveGeomBorders");
                      mVROSDPreserveGeometryBorders.setBool(pAttr.asBool(), 0, 0.0);
                      abc->setParameter(&mVROSDPreserveGeometryBorders);
                   }
-                  
+
                   mVRDisplacementType.setInt((displaced ? 1 : 0), 0, 0.0);
                   abc->setParameter(&mVRDisplacementType);
-                  
+
                   if (displaced)
                   {
                      bool colorDisp = false;
-                     
+
                      if (dispAttrObject != MObject::kNullObj)
                      {
                         // Displacement attributes
-                        // 
+                        //
                         // vrayDisplacementNone: bool, 1
                         // vrayDisplacementStatic: bool, 0
                         // vrayDisplacementType: enum, 1, (2D Displacement:0, Normal Displacement:1, Vector displacement:2, Vector displacement (absolute):3, Vector displacement (object):4)
@@ -2009,19 +2048,19 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                         // vrayDisplacementUseBounds: enum, 0, (Automatic:0, Explicit:1)
                         // vrayDisplacementMinValue: float3, 0,0,0 (color)
                         // vrayDisplacementMaxValue: float3, 1,1,1 (color)
-                        
+
                         MFnDependencyNode nodeFn(dispAttrObject);
-                        
+
                         bool displace2d = false;
-                        
+
                         MPlug pAttr = nodeFn.findPlug("vrayDisplacementType");
                         if (pAttr.asInt() >= 2)
                         {
                            colorDisp = true;
-                           
+
                            mVRVectorDisplacement.setInt(pAttr.asInt() - 1, 0, 0.0);
                            abc->setParameter(&mVRVectorDisplacement);
-                           
+
                            // if (pAttr.asInt() == 4)
                            // {
                            //    mVRObjectSpaceDisplacement .setBool(true, 0, 0.0);
@@ -2032,26 +2071,26 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                         {
                            displace2d = (pAttr.asInt() == 0);
                         }
-                        
+
                         pAttr = nodeFn.findPlug("vrayDisplacementStatic");
                         mVRStaticDisplacement.setBool(pAttr.asBool(), 0, 0.0);
                         abc->setParameter(&mVRStaticDisplacement);
-                        
+
                         pAttr = nodeFn.findPlug("vrayDisplacementAmount");
                         mVRDisplacementAmount.setFloat(pAttr.asFloat(), 0, 0.0);
                         abc->setParameter(&mVRDisplacementAmount);
-                        
+
                         pAttr = nodeFn.findPlug("vrayDisplacementShift");
                         mVRDisplacementShift.setFloat(pAttr.asFloat(), 0, 0.0);
                         abc->setParameter(&mVRDisplacementShift);
-                        
+
                         pAttr = nodeFn.findPlug("vrayDisplacementKeepContinuity");
                         mVRKeepContinuity.setBool(pAttr.asBool(), 0, 0.0);
                         abc->setParameter(&mVRKeepContinuity);
-                        
+
                         mVRDisplace2d.setBool(displace2d, 0, 0.0);
                         abc->setParameter(&mVRDisplace2d);
-                        
+
                         pAttr = nodeFn.findPlug("vrayEnableWaterLevel");
                         if (pAttr.asBool())
                         {
@@ -2059,15 +2098,15 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                            mVRWaterLevel.setFloat(pAttr.asFloat(), 0, 0.0);
                            abc->setParameter(&mVRWaterLevel);
                         }
-                        
+
                         pAttr = nodeFn.findPlug("vrayDisplacementCacheNormals");
                         mVRCacheNormals.setBool(pAttr.asBool(), 0, 0.0);
                         abc->setParameter(&mVRCacheNormals);
-                        
+
                         pAttr = nodeFn.findPlug("vrayDisplacementUseBounds");
                         mVRUseBounds.setBool(pAttr.asInt() == 1, 0, 0.0);
                         abc->setParameter(&mVRUseBounds);
-                        
+
                         if (pAttr.asInt() == 1)
                         {
                            pAttr = nodeFn.findPlug("vrayDisplacementMinValue");
@@ -2075,32 +2114,32 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                                                           pAttr.child(1).asFloat(),
                                                           pAttr.child(2).asFloat()), 0, 0.0);
                            abc->setParameter(&mVRMinBound);
-                           
+
                            pAttr = nodeFn.findPlug("vrayDisplacementMaxValue");
                            mVRMaxBound.setColor(VR::Color(pAttr.child(0).asFloat(),
                                                           pAttr.child(1).asFloat(),
                                                           pAttr.child(2).asFloat()), 0, 0.0);
                            abc->setParameter(&mVRMaxBound);
                         }
-                        
+
                         if (displace2d)
                         {
                            pAttr = nodeFn.findPlug("vray2dDisplacementResolution");
                            mVRResolution.setInt(pAttr.asInt(), 0, 0.0);
                            abc->setParameter(&mVRResolution);
-                           
+
                            pAttr = nodeFn.findPlug("vray2dDisplacementPrecision");
                            mVRPrecision.setInt(pAttr.asInt(), 0, 0.0);
                            abc->setParameter(&mVRPrecision);
-                           
+
                            pAttr = nodeFn.findPlug("vray2dDisplacementTightBounds");
                            mVRTightBounds.setBool(pAttr.asBool(), 0, 0.0);
                            abc->setParameter(&mVRTightBounds);
-                           
+
                            pAttr = nodeFn.findPlug("vray2dDisplacementFilterTexture");
                            mVRFilterTexture.setBool(pAttr.asBool(), 0, 0.0);
                            abc->setParameter(&mVRFilterTexture);
-                           
+
                            if (pAttr.asBool())
                            {
                               pAttr = nodeFn.findPlug("vray2dDisplacementFilterBlur");
@@ -2109,10 +2148,10 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                            }
                         }
                      }
-                     
+
                      // Track shader to be exported
                      AbcShapeVRayInfo::DispShapes &dispShapes = AbcShapeVRayInfo::DispTexs[dispShaderFn.name().asChar()];
-                        
+
                      if (colorDisp)
                      {
                         dispShapes.asColor.insert(abc->getPluginName());
@@ -2122,73 +2161,73 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                         dispShapes.asFloat.insert(abc->getPluginName());
                      }
                   }
-                  
+
                   // particle attributes
                   MDataHandle hParticleType = block.inputValue(aVRayAbcParticleType);
                   mVRParticleType.setInt(hParticleType.asInt(), 0, 0.0);
-                  
+
                   MDataHandle hParticleAttribs = block.inputValue(aVRayAbcParticleAttribs);
                   mVRParticleAttribs.setString(hParticleAttribs.asString().asChar(), 0, 0.0);
-                  
+
                   MDataHandle hRadius = block.inputValue(aVRayAbcRadius);
                   mVRRadius.setFloat(hRadius.asFloat(), 0, 0.0);
-                  
+
                   MPlug pPointRadii = thisNode.findPlug("vrayPointSizeRadius");
                   bool point_radii = (!pPointRadii.isNull() && pPointRadii.asBool());
                   mVRPointRadii.setBool(point_radii, 0, 0.0);
-                  
+
                   MDataHandle hPointSize = block.inputValue(aVRayAbcPointSize);
                   mVRPointSize.setFloat((point_radii ? hRadius.asFloat() : hPointSize.asFloat()), 0, 0.0);
-                  
+
                   MPlug pPointSizePP = thisNode.findPlug("vrayPointSizePP");
                   if (!pPointSizePP.isNull() && pPointSizePP.asBool())
                   {
                      // forces 'point_radii' to true
                      mVRPointRadii.setBool(1, 0, 0.0);
                   }
-                  
+
                   MPlug pPointSizeWorld = thisNode.findPlug("vrayPointSizeWorld");
                   mVRPointWorldSize.setBool((!pPointSizeWorld.isNull() && pPointSizeWorld.asBool()), 0, 0.0);
-                  
+
                   MDataHandle hSpriteSizeX = block.inputValue(aVRayAbcSpriteSizeX);
                   mVRSpriteSizeX.setFloat(hSpriteSizeX.asFloat(), 0, 0.0);
-                  
+
                   MDataHandle hSpriteSizeY = block.inputValue(aVRayAbcSpriteSizeY);
                   mVRSpriteSizeX.setFloat(hSpriteSizeY.asFloat(), 0, 0.0);
-                  
+
                   MDataHandle hSpriteTwist = block.inputValue(aVRayAbcSpriteTwist);
                   mVRSpriteTwist.setFloat(hSpriteTwist.asFloat(), 0, 0.0);
-                  
+
                   MPlug pSpriteOrient = thisNode.findPlug("vraySpriteOrient");
                   mVRSpriteOrientation.setInt((pSpriteOrient.isNull() ? 0 : pSpriteOrient.asInt()), 0, 0.0);
-                  
+
                   MDataHandle hMultiCount = block.inputValue(aVRayAbcMultiCount);
                   mVRMultiCount.setInt(hMultiCount.asInt(), 0, 0.0);
-                  
+
                   MDataHandle hMultiRadius = block.inputValue(aVRayAbcMultiRadius);
                   mVRMultiRadius.setFloat(hMultiRadius.asFloat(), 0, 0.0);
-                  
+
                   MDataHandle hLineWidth = block.inputValue(aVRayAbcLineWidth);
                   mVRLineWidth.setFloat(hLineWidth.asFloat(), 0, 0.0);
-                  
+
                   MDataHandle hTailLength = block.inputValue(aVRayAbcTailLength);
                   mVRTailLength.setFloat(hTailLength.asFloat(), 0, 0.0);
-                  
+
                   MDataHandle hSortIDs = block.inputValue(aVRayAbcSortIDs);
                   mVRSortIDs.setBool(hSortIDs.asBool(), 0, 0.0);
-                  
+
                   MDataHandle hPsizeScale = block.inputValue(aVRayAbcPsizeScale);
                   mVRPsizeScale.setFloat(hPsizeScale.asFloat(), 0, 0.0);
-                  
+
                   MDataHandle hPsizeMin = block.inputValue(aVRayAbcPsizeMin);
                   mVRPsizeMin.setFloat(hPsizeMin.asFloat(), 0, 0.0);
-                  
+
                   MDataHandle hPsizeMax = block.inputValue(aVRayAbcPsizeMax);
                   mVRPsizeMax.setFloat(hPsizeMax.asFloat(), 0, 0.0);
-                  
+
                   AbcShapeVRayInfo::trackPath(thisPath);
                   AbcShapeVRayInfo::fillMultiUVs(thisPath);
-                  
+
                   abc->setParameter(&mVRFilename);
                   abc->setParameter(&mVRObjectPath);
                   abc->setParameter(&mVRSpeed);
@@ -2204,8 +2243,11 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   abc->setParameter(&mVRFps);
                   abc->setParameter(&mVRIgnoreTransformBlur);
                   abc->setParameter(&mVRIgnoreDeformBlur);
-                  abc->setParameter(&mVRUseReferenceObject);
-                  abc->setParameter(&mVRReferenceFilename);
+                  // abc->setParameter(&mVRUseReferenceObject);
+                  // abc->setParameter(&mVRReferenceFilename);
+                  abc->setParameter(&mVRIgnoreReference);
+                  abc->setParameter(&mVRReferenceSource);
+                  abc->setParameter(&mVRReferenceFrame);
                   abc->setParameter(&mVRVerbose);
                   abc->setParameter(&mVRParticleType);
                   abc->setParameter(&mVRParticleAttribs);
@@ -2225,7 +2267,7 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
                   abc->setParameter(&mVRPsizeScale);
                   abc->setParameter(&mVRPsizeMin);
                   abc->setParameter(&mVRPsizeMax);
-                  
+
                   hOut.setInt(1);
                }
                else
@@ -2247,9 +2289,9 @@ MStatus AbcShape::compute(const MPlug &plug, MDataBlock &block)
       {
          hOut.setInt(0);
       }
-      
+
       block.setClean(plug);
-      
+
       return MS::kSuccess;
    }
 #endif
@@ -2273,7 +2315,7 @@ void AbcShape::syncInternals()
 void AbcShape::syncInternals(MDataBlock &block)
 {
    // forces pending evaluations on input plugs
-   
+
    block.inputValue(aFilePath).asString();
    block.inputValue(aObjectExpression).asString();
    block.inputValue(aTime).asTime();
@@ -2287,7 +2329,7 @@ void AbcShape::syncInternals(MDataBlock &block)
    block.inputValue(aIgnoreVisibility).asBool();
    block.inputValue(aDisplayMode).asShort();
    block.inputValue(aPreserveStartFrame).asBool();
-   
+
    switch (mUpdateLevel)
    {
    case UL_objects:
@@ -2305,30 +2347,30 @@ void AbcShape::syncInternals(MDataBlock &block)
    default:
       break;
    }
-   
+
    mUpdateLevel = UL_none;
 }
 
 MBoundingBox AbcShape::boundingBox() const
 {
    MBoundingBox bbox;
-   
+
    AbcShape *this2 = const_cast<AbcShape*>(this);
-      
+
    this2->syncInternals();
-   
+
    if (!mClipped && mScene)
    {
       // Use self bounds here as those are taking ignore transform/instance flag into account
       Alembic::Abc::Box3d bounds = mScene->selfBounds();
-      
+
       if (!bounds.isEmpty() && !bounds.isInfinite())
       {
          bbox.expand(MPoint(bounds.min.x, bounds.min.y, bounds.min.z));
          bbox.expand(MPoint(bounds.max.x, bounds.max.y, bounds.max.z));
       }
    }
-   
+
    return bbox;
 }
 
@@ -2336,7 +2378,7 @@ double AbcShape::getFPS() const
 {
    float fps = 24.0f;
    MTime::Unit unit = MTime::uiUnit();
-   
+
    if (unit!=MTime::kInvalid)
    {
       MTime time(1.0, MTime::kSeconds);
@@ -2356,7 +2398,7 @@ double AbcShape::computeAdjustedTime(const double inputTime, const double speed,
    #ifdef _DEBUG
    std::cout << "[" << PREFIX_NAME("AbcShape") << "] Adjust time: " << (inputTime * getFPS()) << " -> " << ((inputTime - timeOffset) * speed * getFPS()) << std::endl;
    #endif
-   
+
    return (inputTime - timeOffset) * speed;
 }
 
@@ -2369,7 +2411,7 @@ double AbcShape::computeRetime(const double inputTime,
    const double playTime = lastTime - firstTime;
    static const double eps = 0.001;
    double retime = inputTime;
-   
+
    if (clipped)
    {
       *clipped = false;
@@ -2458,7 +2500,7 @@ double AbcShape::computeRetime(const double inputTime,
    #ifdef _DEBUG
    std::cout << "[" << PREFIX_NAME("AbcShape") << "] Retime: " << (inputTime * getFPS()) << " -> " << (retime * getFPS()) << std::endl;
    #endif
-   
+
    return retime;
 }
 
@@ -2480,24 +2522,24 @@ void AbcShape::updateObjects()
    #ifdef _DEBUG
    std::cout << "[" << PREFIX_NAME("AbcShape") << "] Update objects: \"" << mFilePath.asChar() << "\" | \"" << mObjectExpression.asChar() << "\"" << std::endl;
    #endif
-   
+
    mGeometry.clear();
    mAnimated = false;
    mNumShapes = 0;
-   
+
    if (!mClipped)
    {
       mSceneFilter.set(mObjectExpression.asChar(), "");
-      
+
       AlembicScene *scene = AlembicSceneCache::Ref(mFilePath.asChar(), mSceneFilter);
-      
+
       if (mScene && !AlembicSceneCache::Unref(mScene))
       {
          delete mScene;
       }
-      
+
       mScene = scene;
-      
+
       if (mScene)
       {
          updateRange();
@@ -2510,43 +2552,43 @@ void AbcShape::updateRange()
    #ifdef _DEBUG
    std::cout << "[" << PREFIX_NAME("AbcShape") << "] Update range" << std::endl;
    #endif
-   
+
    mAnimated = false;
-   
+
    GetFrameRange visitor(mIgnoreTransforms, mIgnoreInstances, mIgnoreVisibility);
    mScene->visit(AlembicNode::VisitDepthFirst, visitor);
-   
+
    double start, end;
-   
+
    if (visitor.getFrameRange(start, end))
    {
       double fps = getFPS();
       start *= fps;
       end *= fps;
-      
+
       mAnimated = (fabs(end - start) > 0.0001);
-      
+
       if (fabs(mStartFrame - start) > 0.0001 ||
           fabs(mEndFrame - end) > 0.0001)
       {
          #ifdef _DEBUG
          std::cout << "[" << PREFIX_NAME("AbcShape") << "] Frame range: " << start << " - " << end << std::endl;
          #endif
-         
+
          mStartFrame = start;
          mEndFrame = end;
          mSampleTime = getSampleTime(false);
-         
+
          // This will force instant refresh of AE values
          // but won't trigger any update as mStartFrame and mEndFrame are unchanged
          MPlug plug(thisMObject(), aStartFrame);
          plug.setDouble(mStartFrame);
-         
+
          plug.setAttribute(aEndFrame);
          plug.setDouble(mEndFrame);
       }
    }
-   
+
    updateWorld();
 }
 
@@ -2555,38 +2597,38 @@ void AbcShape::updateWorld()
    #ifdef _DEBUG
    std::cout << "[" << PREFIX_NAME("AbcShape") << "] Update world" << std::endl;
    #endif
-   
+
    WorldUpdate visitor(mSampleTime, mIgnoreTransforms, mIgnoreInstances, mIgnoreVisibility);
    mScene->visit(AlembicNode::VisitDepthFirst, visitor);
-   
+
    // only get number of visible shapes
    mNumShapes = visitor.numShapes(true);
-   
+
    MObject self = thisMObject();
-   
+
    // Reset existing UV set names
    MPlug pUvSet(self, aUvSet);
-   
+
    if (visitor.numShapes(false) == 1)
    {
       mUvSetNames = visitor.uvSetNames();
-      
+
       MPlug pUvSetName(self, aUvSetName);
-      
+
       // UV set index == logical index
-      
+
       for (size_t i=0; i<mUvSetNames.size(); ++i)
       {
          bool found = false;
-         
+
          for (unsigned int j=0; j<pUvSet.numElements(); ++j)
          {
             MPlug pElem = pUvSet.elementByPhysicalIndex(j);
-            
+
             if (pElem.logicalIndex() == i)
             {
                pElem = pElem.child(aUvSetName);
-               
+
                if (pElem.asString() != mUvSetNames[i].c_str())
                {
                   pElem.setString(mUvSetNames[i].c_str());
@@ -2595,7 +2637,7 @@ void AbcShape::updateWorld()
                break;
             }
          }
-         
+
          if (!found)
          {
             pUvSetName.selectAncestorLogicalIndex(i, aUvSet);
@@ -2607,33 +2649,33 @@ void AbcShape::updateWorld()
    {
       mUvSetNames.clear();
    }
-   
+
    for (size_t i=0; i<pUvSet.numElements(); ++i)
    {
       MPlug pElem = pUvSet.elementByPhysicalIndex(i);
-      
+
       if (pElem.logicalIndex() >= mUvSetNames.size())
       {
          pElem = pElem.child(aUvSetName);
-         
+
          if (pElem.asString() != "")
          {
             pElem.child(aUvSetName).setString("");
          }
       }
    }
-   
+
    #ifdef _DEBUG
    std::cout << "[" << PREFIX_NAME("AbcShape") << "] " << mNumShapes << " shape(s) in scene" << std::endl;
    #endif
-   
+
    mScene->updateChildBounds();
    mScene->setSelfBounds(visitor.bounds());
-   
+
    #ifdef _DEBUG
    std::cout << "[" << PREFIX_NAME("AbcShape") << "] Scene bounds: " << visitor.bounds().min << " - " << visitor.bounds().max << std::endl;
    #endif
-   
+
    if (mDisplayMode >= DM_points)
    {
       updateGeometry();
@@ -2645,7 +2687,7 @@ void AbcShape::updateGeometry()
    #ifdef _DEBUG
    std::cout << "[" << PREFIX_NAME("AbcShape") << "] Update geometry" << std::endl;
    #endif
-   
+
    SampleGeometry visitor(mSampleTime, &mGeometry);
    mScene->visit(AlembicNode::VisitDepthFirst, visitor);
 }
@@ -2657,7 +2699,7 @@ void AbcShape::printInfo(bool detailed) const
       PrintInfo pinf(mIgnoreTransforms, mIgnoreInstances, mIgnoreVisibility);
       mScene->visit(AlembicNode::VisitDepthFirst, pinf);
    }
-   
+
    printSceneBounds();
 }
 
@@ -2767,37 +2809,37 @@ bool AbcShape::getInternalValueInContext(const MPlug &plug, MDataHandle &handle,
 bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &handle, MDGContext &ctx)
 {
    bool sampleTimeUpdate = false;
-   
+
    if (plug == aFilePath)
    {
       // Note: path seems to already be directory mapped when we reach here (consequence of setUsedAsFilename(true) when the attribute is created)
       //       don't need to use MFileObject to get the resolved path
       MString filePath = handle.asString();
-      
+
       if (filePath != mFilePath)
       {
          mFilePath = filePath;
          mUpdateLevel = UL_objects;
       }
-      
+
       return true;
    }
    else if (plug == aObjectExpression)
    {
       MString objectExpression = handle.asString();
-      
+
       if (objectExpression != mObjectExpression)
       {
          mObjectExpression = objectExpression;
          mUpdateLevel = UL_objects;
       }
-      
+
       return true;
    }
    else if (plug == aIgnoreXforms)
    {
       bool ignoreTransforms = handle.asBool();
-      
+
       if (ignoreTransforms != mIgnoreTransforms)
       {
          mIgnoreTransforms = ignoreTransforms;
@@ -2806,13 +2848,13 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
             mUpdateLevel = std::max<int>(mUpdateLevel, UL_range);
          }
       }
-      
+
       return true;
    }
    else if (plug == aIgnoreInstances)
    {
       bool ignoreInstances = handle.asBool();
-      
+
       if (ignoreInstances != mIgnoreInstances)
       {
          mIgnoreInstances = ignoreInstances;
@@ -2821,13 +2863,13 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
             mUpdateLevel = std::max<int>(mUpdateLevel, UL_range);
          }
       }
-      
+
       return true;
    }
    else if (plug == aIgnoreVisibility)
    {
       bool ignoreVisibility = handle.asBool();
-      
+
       if (ignoreVisibility != mIgnoreVisibility)
       {
          mIgnoreVisibility = ignoreVisibility;
@@ -2836,31 +2878,31 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
             mUpdateLevel = std::max<int>(mUpdateLevel, UL_range);
          }
       }
-      
+
       return true;
    }
    else if (plug == aDisplayMode)
    {
       DisplayMode dm = (DisplayMode) handle.asShort();
-      
+
       if (dm != mDisplayMode)
       {
          bool updateGeo = (mDisplayMode <= DM_boxes && dm >= DM_points);
-         
+
          mDisplayMode = dm;
-         
+
          if (updateGeo && mScene)
          {
             mUpdateLevel = std::max<int>(mUpdateLevel, UL_geometry);
          }
       }
-      
+
       return true;
    }
    else if (plug == aTime)
    {
       MTime t = handle.asTime();
-      
+
       if (fabs(t.as(MTime::kSeconds) - mTime.as(MTime::kSeconds)) > 0.0001)
       {
          mTime = t;
@@ -2870,7 +2912,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
    else if (plug == aSpeed)
    {
       double speed = handle.asDouble();
-      
+
       if (fabs(speed - mSpeed) > 0.0001)
       {
          mSpeed = speed;
@@ -2880,7 +2922,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
    else if (plug == aPreserveStartFrame)
    {
       bool psf = handle.asBool();
-      
+
       if (psf != mPreserveStartFrame)
       {
          mPreserveStartFrame = psf;
@@ -2890,7 +2932,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
    else if (plug == aOffset)
    {
       double offset = handle.asDouble();
-      
+
       if (fabs(offset - mOffset) > 0.0001)
       {
          mOffset = offset;
@@ -2900,7 +2942,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
    else if (plug == aCycleType)
    {
       CycleType c = (CycleType) handle.asShort();
-      
+
       if (c != mCycleType)
       {
          mCycleType = c;
@@ -2910,7 +2952,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
    else if (plug == aStartFrame)
    {
       double sf = handle.asDouble();
-      
+
       if (fabs(sf - mStartFrame) > 0.0001)
       {
          mStartFrame = sf;
@@ -2920,7 +2962,7 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
    else if (plug == aEndFrame)
    {
       double ef = handle.asDouble();
-      
+
       if (fabs(ef - mEndFrame) > 0.0001)
       {
          mEndFrame = ef;
@@ -2956,17 +2998,17 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
    {
       return MPxSurfaceShape::setInternalValueInContext(plug, handle, ctx);
    }
-   
+
    if (sampleTimeUpdate)
    {
       bool clipped = false;
-      
+
       double sampleTime = getSampleTime(false, &clipped);
-      
+
       if (clipped != mClipped)
       {
          mClipped = clipped;
-         
+
          if (mScene)
          {
             mUpdateLevel = UL_objects;
@@ -2975,14 +3017,14 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
       else if (!clipped && fabs(mSampleTime - sampleTime) > 0.0001)
       {
          mSampleTime = sampleTime;
-         
+
          if (mScene)
          {
             mUpdateLevel = std::max<int>(mUpdateLevel, UL_world);
          }
       }
    }
-   
+
    return true;
 }
 
@@ -2991,7 +3033,7 @@ void AbcShape::copyInternalData(MPxNode *source)
    if (source && source->typeId() == ID)
    {
       AbcShape *node = (AbcShape*)source;
-      
+
       mFilePath = node->mFilePath;
       mObjectExpression = node->mObjectExpression;
       mTime = node->mTime;
@@ -3014,7 +3056,7 @@ void AbcShape::copyInternalData(MPxNode *source)
       mUvSetNames = node->mUvSetNames;
       mClipped = node->mClipped;
       mInCustomFrame = node->mInCustomFrame;
-    
+
       if (mScene && !AlembicSceneCache::Unref(mScene))
       {
          delete mScene;
@@ -3025,7 +3067,7 @@ void AbcShape::copyInternalData(MPxNode *source)
       mGeometry.clear();
       mUpdateLevel = UL_objects;
    }
-   
+
 }
 
 // ---
@@ -3050,17 +3092,17 @@ void AbcShapeUI::getDrawRequests(const MDrawInfo &info,
 {
    MDrawData data;
    getDrawData(0, data);
-   
+
    M3dView::DisplayStyle appearance = info.displayStyle();
 
    M3dView::DisplayStatus displayStatus = info.displayStatus();
-   
+
    MDagPath path = info.multiPath();
-   
+
    M3dView view = info.view();
-   
+
    MColor color;
-   
+
    switch (displayStatus)
    {
    case M3dView::kLive:
@@ -3084,35 +3126,35 @@ void AbcShapeUI::getDrawRequests(const MDrawInfo &info,
    default:
       color = MHWRender::MGeometryUtilities::wireframeColor(path);
    }
-   
+
    switch (appearance)
    {
    case M3dView::kBoundingBox:
       {
          MDrawRequest request = info.getPrototype(*this);
-         
+
          request.setDrawData(data);
          request.setToken(kDrawBox);
          request.setColor(color);
-         
+
          queue.add(request);
       }
       break;
    case M3dView::kPoints:
       {
          MDrawRequest request = info.getPrototype(*this);
-         
+
          request.setDrawData(data);
          request.setToken(kDrawPoints);
          request.setColor(color);
-         
+
          queue.add(request);
       }
       break;
    default:
       {
          bool drawWireframe = false;
-         
+
          if (appearance == M3dView::kWireFrame ||
              view.wireframeOnShaded() ||
              displayStatus == M3dView::kActive ||
@@ -3120,24 +3162,24 @@ void AbcShapeUI::getDrawRequests(const MDrawInfo &info,
              displayStatus == M3dView::kLead)
          {
             MDrawRequest request = info.getPrototype(*this);
-            
+
             request.setDrawData(data);
             request.setToken(appearance != M3dView::kWireFrame ? kDrawGeometryAndWireframe : kDrawGeometry);
             request.setDisplayStyle(M3dView::kWireFrame);
             request.setColor(color);
-            
+
             queue.add(request);
-            
+
             drawWireframe = true;
          }
-         
+
          if (appearance != M3dView::kWireFrame)
          {
             MDrawRequest request = info.getPrototype(*this);
-            
+
             request.setDrawData(data);
             request.setToken(drawWireframe ? kDrawGeometryAndWireframe : kDrawGeometry);
-            
+
             // Only set material info if necessary
             AbcShape *shape = (AbcShape*) surfaceShape();
             if (shape && shape->displayMode() == AbcShape::DM_geometry)
@@ -3156,7 +3198,7 @@ void AbcShapeUI::getDrawRequests(const MDrawInfo &info,
             {
                request.setColor(color);
             }
-            
+
             queue.add(request);
          }
       }
@@ -3170,7 +3212,7 @@ void AbcShapeUI::draw(const MDrawRequest &request, M3dView &view) const
    {
       return;
    }
-   
+
    switch (request.token())
    {
    case kDrawBox:
@@ -3203,12 +3245,12 @@ void AbcShapeUI::draw(const MDrawRequest &request, M3dView &view) const
 bool AbcShapeUI::computeFrustum(M3dView &view, Frustum &frustum) const
 {
    MMatrix projMatrix, modelViewMatrix;
-   
+
    view.projectionMatrix(projMatrix);
    view.modelViewMatrix(modelViewMatrix);
-   
+
    MMatrix tmp = (modelViewMatrix * projMatrix).inverse();
-   
+
    if (tmp.isSingular())
    {
       return false;
@@ -3216,11 +3258,11 @@ bool AbcShapeUI::computeFrustum(M3dView &view, Frustum &frustum) const
    else
    {
       M44d projViewInv;
-      
+
       tmp.get(projViewInv.x);
-      
+
       frustum.setup(projViewInv);
-      
+
       return true;
    }
 }
@@ -3230,12 +3272,12 @@ bool AbcShapeUI::computeFrustum(Frustum &frustum) const
    // using GL matrix
    M44d projMatrix;
    M44d modelViewMatrix;
-   
+
    glGetDoublev(GL_PROJECTION_MATRIX, &(projMatrix.x[0][0]));
    glGetDoublev(GL_MODELVIEW_MATRIX, &(modelViewMatrix.x[0][0]));
-   
+
    M44d projViewInv = modelViewMatrix * projMatrix;
-   
+
    try
    {
       projViewInv.invert(true);
@@ -3251,7 +3293,7 @@ bool AbcShapeUI::computeFrustum(Frustum &frustum) const
 void AbcShapeUI::getWorldMatrix(M3dView &view, Alembic::Abc::M44d &worldMatrix) const
 {
    MMatrix modelViewMatrix;
-   
+
    view.modelViewMatrix(modelViewMatrix);
    modelViewMatrix.get(worldMatrix.x);
 }
@@ -3265,31 +3307,31 @@ bool AbcShapeUI::select(MSelectInfo &selectInfo,
    {
       return false;
    }
-   
+
    AbcShape *shape = (AbcShape*) surfaceShape();
    if (!shape)
    {
       return false;
    }
-   
+
    M3dView::DisplayStyle style = selectInfo.displayStyle();
-   
+
    DrawToken target = (style == M3dView::kBoundingBox ? kDrawBox : (style == M3dView::kPoints ? kDrawPoints : kDrawGeometry));
-   
+
    M3dView view = selectInfo.view();
-   
+
    Frustum frustum;
-   
+
    // As we use same name for all shapes, without hierarchy, don't really need a big buffer
    GLuint *buffer = new GLuint[16];
-   
+
    view.beginSelect(buffer, 16);
    view.pushName(0);
-   view.loadName(1); // Use same name for all 
-   
+   view.loadName(1); // Use same name for all
+
    glPushAttrib(GL_COLOR_BUFFER_BIT | GL_LIGHTING_BIT | GL_LINE_BIT | GL_POINT_BIT);
    glDisable(GL_LIGHTING);
-   
+
    if (shape->displayMode() == AbcShape::DM_box)
    {
       if (target == kDrawPoints)
@@ -3307,7 +3349,7 @@ bool AbcShapeUI::select(MSelectInfo &selectInfo,
                         shape->ignoreTransforms(),
                         shape->ignoreInstances(),
                         shape->ignoreVisibility());
-      
+
       // Use matrices staight from OpenGL as those will include the picking matrix so
       //   that more geometry can get culled
       if (computeFrustum(frustum))
@@ -3319,32 +3361,32 @@ bool AbcShapeUI::select(MSelectInfo &selectInfo,
          M44d glModelViewMatrix;
          MMatrix mayaProjMatrix;
          MMatrix mayaModelViewMatrix;
-         
+
          glGetDoublev(GL_PROJECTION_MATRIX, &(glProjMatrix.x[0][0]));
          glGetDoublev(GL_MODELVIEW_MATRIX, &(glModelViewMatrix.x[0][0]));
-         
+
          M44d glProjView = glModelViewMatrix * glProjMatrix;
-         
+
          view.projectionMatrix(mayaProjMatrix);
          view.modelViewMatrix(mayaModelViewMatrix);
-   
+
          MMatrix tmp = (mayaModelViewMatrix * mayaProjMatrix);
          M44d mayaProjView;
          tmp.get(mayaProjView.x);
-         
+
          std::cout << "Proj/View from GL:" << std::endl;
          std::cout << glProjView << std::endl;
-         
+
          std::cout << "Proj/View from Maya:" << std::endl;
          std::cout << mayaProjView << std::endl;
          #endif
          #endif
-         
+
          visitor.doCull(frustum);
       }
       visitor.setLineWidth(shape->lineWidth());
       visitor.setPointWidth(shape->pointWidth());
-      
+
       if (target == kDrawBox)
       {
          visitor.drawBounds(true);
@@ -3369,21 +3411,21 @@ bool AbcShapeUI::select(MSelectInfo &selectInfo,
             visitor.drawWireframe(true);
          }
       }
-      
+
       shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
    }
-   
+
    glPopAttrib();
-   
+
    view.popName();
-   
+
    int hitCount = view.endSelect();
-   
+
    if (hitCount > 0)
    {
       unsigned int izdepth = 0xFFFFFFFF;
       GLuint *curHit = buffer;
-      
+
       for (int i=hitCount; i>0; --i)
       {
          if (curHit[0] > 0 && izdepth > curHit[1])
@@ -3392,7 +3434,7 @@ bool AbcShapeUI::select(MSelectInfo &selectInfo,
          }
          curHit += curHit[0] + 3;
       }
-      
+
       MDagPath path = selectInfo.multiPath();
       while (path.pop() == MStatus::kSuccess)
       {
@@ -3401,53 +3443,53 @@ bool AbcShapeUI::select(MSelectInfo &selectInfo,
             break;
          }
       }
-      
+
       MSelectionList selectionItem;
       selectionItem.add(path);
-      
+
       MPoint worldSpacePoint;
       // compute hit point
       {
          float zdepth = float(izdepth) / 0xFFFFFFFF;
-         
+
          MDagPath cameraPath;
          view.getCamera(cameraPath);
-         
+
          MFnCamera camera(cameraPath);
-         
+
          if (!camera.isOrtho())
          {
             // z is normalized but non linear
             double nearp = camera.nearClippingPlane();
             double farp = camera.farClippingPlane();
-            
+
             zdepth *= (nearp / (farp - zdepth * (farp - nearp)));
          }
-         
+
          MPoint O;
          MVector D;
-         
+
          selectInfo.getLocalRay(O, D);
          O = O * selectInfo.multiPath().inclusiveMatrix();
-         
+
          short x, y;
          view.worldToView(O, x, y);
-         
+
          MPoint Pn, Pf;
          view.viewToWorld(x, y, Pn, Pf);
-         
+
          worldSpacePoint = Pn + zdepth * (Pf - Pn);
       }
-      
+
       selectInfo.addSelection(selectionItem,
                               worldSpacePoint,
                               selectionList,
                               worldSpaceSelectPts,
                               mask,
                               false);
-      
+
       delete[] buffer;
-      
+
       return true;
    }
    else
@@ -3459,11 +3501,11 @@ bool AbcShapeUI::select(MSelectInfo &selectInfo,
 void AbcShapeUI::drawBox(AbcShape *shape, const MDrawRequest &, M3dView &view) const
 {
    view.beginGL();
-   
+
    glPushAttrib(GL_COLOR_BUFFER_BIT | GL_LIGHTING_BIT | GL_LINE_BIT);
-   
+
    glDisable(GL_LIGHTING);
-   
+
    if (shape->displayMode() == AbcShape::DM_box)
    {
       DrawBox(shape->scene()->selfBounds(), false, shape->lineWidth());
@@ -3471,7 +3513,7 @@ void AbcShapeUI::drawBox(AbcShape *shape, const MDrawRequest &, M3dView &view) c
    else
    {
       Frustum frustum;
-      
+
       DrawScene visitor(NULL, shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
       visitor.drawAsPoints(false);
       visitor.drawLocators(shape->drawLocators());
@@ -3485,23 +3527,23 @@ void AbcShapeUI::drawBox(AbcShape *shape, const MDrawRequest &, M3dView &view) c
          getWorldMatrix(view, worldMatrix);
          visitor.drawTransformBounds(true, worldMatrix);
       }
-      
+
       shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
    }
-   
+
    glPopAttrib();
-   
+
    view.endGL();
 }
 
 void AbcShapeUI::drawPoints(AbcShape *shape, const MDrawRequest &, M3dView &view) const
 {
    view.beginGL();
-   
+
    glPushAttrib(GL_COLOR_BUFFER_BIT | GL_LIGHTING_BIT | GL_POINT_BIT);
-   
+
    glDisable(GL_LIGHTING);
-   
+
    if (shape->displayMode() == AbcShape::DM_box)
    {
       DrawBox(shape->scene()->selfBounds(), true, shape->pointWidth());
@@ -3509,9 +3551,9 @@ void AbcShapeUI::drawPoints(AbcShape *shape, const MDrawRequest &, M3dView &view
    else
    {
       Frustum frustum;
-   
+
       DrawScene visitor(shape->sceneGeometry(), shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
-      
+
       visitor.drawBounds(shape->displayMode() == AbcShape::DM_boxes);
       visitor.drawAsPoints(true);
       visitor.setLineWidth(shape->lineWidth());
@@ -3527,27 +3569,27 @@ void AbcShapeUI::drawPoints(AbcShape *shape, const MDrawRequest &, M3dView &view
          getWorldMatrix(view, worldMatrix);
          visitor.drawTransformBounds(true, worldMatrix);
       }
-      
+
       shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
    }
-      
+
    glPopAttrib();
-      
+
    view.endGL();
 }
 
 void AbcShapeUI::drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dView &view) const
 {
    Frustum frustum;
-   
+
    view.beginGL();
-   
+
    bool wireframeOnShaded = (request.token() == kDrawGeometryAndWireframe);
    bool wireframe = (request.displayStyle() == M3dView::kWireFrame);
    //bool flat = (request.displayStyle() == M3dView::kFlatShaded);
-   
+
    glPushAttrib(GL_COLOR_BUFFER_BIT | GL_LIGHTING_BIT | GL_LINE_BIT | GL_POLYGON_BIT);
-   
+
    if (wireframe)
    {
       glDisable(GL_LIGHTING);
@@ -3556,20 +3598,20 @@ void AbcShapeUI::drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dV
    else
    {
       glEnable(GL_POLYGON_OFFSET_FILL);
-      
+
       //glShadeModel(flat ? GL_FLAT : GL_SMOOTH);
       // Note: as we only store 1 smooth normal per point in mesh, flat shaded will look strange: ignore it
       glShadeModel(GL_SMOOTH);
-      
+
       //glEnable(GL_CULL_FACE);
       //glCullFace(GL_BACK);
-      
+
       glEnable(GL_COLOR_MATERIAL);
       glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-      
+
       MMaterial material = request.material();
       material.setMaterial(request.multiPath(), request.isTransparent());
-      
+
       //bool useTextures = (material.materialIsTextured() && !view.useDefaultMaterial());
       //if (useTextures)
       //{
@@ -3577,12 +3619,12 @@ void AbcShapeUI::drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dV
       //  material.applyTexture(view, data);
       //  // ... and set mesh UVs
       //}
-      
+
       MColor defaultDiffuse;
       material.getDiffuse(defaultDiffuse);
       glColor3f(defaultDiffuse.r, defaultDiffuse.g, defaultDiffuse.b);
    }
-   
+
    DrawScene visitor(shape->sceneGeometry(), shape->ignoreTransforms(), shape->ignoreInstances(), shape->ignoreVisibility());
    visitor.drawWireframe(wireframe);
    visitor.setLineWidth(shape->lineWidth());
@@ -3591,7 +3633,7 @@ void AbcShapeUI::drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dV
    {
       visitor.doCull(frustum);
    }
-   
+
    // only draw transform bounds and locators once
    if (!wireframeOnShaded || wireframe)
    {
@@ -3603,10 +3645,10 @@ void AbcShapeUI::drawGeometry(AbcShape *shape, const MDrawRequest &request, M3dV
          visitor.drawTransformBounds(true, worldMatrix);
       }
    }
-   
+
    shape->scene()->visit(AlembicNode::VisitDepthFirst, visitor);
-   
+
    glPopAttrib();
-   
+
    view.endGL();
 }

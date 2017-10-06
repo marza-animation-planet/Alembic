@@ -109,7 +109,9 @@ def RequireAlembic(static=True, withPython=False, withGL=False, linkCore=True, l
       
       defs = []
       incdirs = ["lib"]
-      libdirs = [excons.OutputBaseDirectory() + "/lib"]
+      libdir = excons.OutputBaseDirectory() + "/lib"
+      libprefix = ("lib" if (sys.platform != "win32" or static) else "")
+      libext = (".lib" if sys.platform == "win32" else (".a" if static else excons.SharedLibraryLinkExt()))
       libs = []
       
       if sys.platform == "win32":
@@ -131,24 +133,13 @@ def RequireAlembic(static=True, withPython=False, withGL=False, linkCore=True, l
       
       env.Append(CPPPATH=incdirs)
       
-      if libdirs:
-         env.Append(LIBPATH=libdirs)
+      env.Append(LIBPATH=[libdir])
       
       if withGL and linkGL:
-         if sys.platform == "win32" and static:
-            libname = "libAlembicAbcOpenGL"
-         else:
-            libname = "AlembicAbcOpenGL"
-         excons.Link(env, libname, static=static, force=True, silent=True)
-         #env.Append(LIBS=["AlembicAbcOpenGL"])
+         excons.Link(env, libdir + "/" + libprefix + "AlembicAbcOpenGL" + libext, static=static, force=True, silent=True)
       
       if linkCore:
-         #env.Append(LIBS=["Alembic"])
-         if sys.platform == "win32" and static:
-            libname = "libAlembic"
-         else:
-            libname = "Alembic"
-         excons.Link(env, libname, static=static, force=True, silent=True)
+         excons.Link(env, libdir + "/" + libprefix + "Alembic" + libext, static=static, force=True, silent=True)
       
       reqs = []
       
@@ -359,8 +350,9 @@ if nameprefix:
 
 if withArnold:
    A, M, m, p = arnold.Version(asString=False)
-   if A < 4 or (A == 4 and (M < 2 or (M == 2 and m < 3))):
-      print("Arnold procedural requires arnold 4.2.3.0 or above.")
+   #if A < 4 or (A == 4 and (M < 2 or (M == 2 and m < 3))):
+   if A < 5 or (A == 5 and M == 0 and m < 1):
+      print("Arnold procedural requires arnold 5.0.1.0 or above.")
       sys.exit(1)
 
    prjs.append({"name": "%sAlembicArnoldProcedural" % nameprefix,
@@ -384,7 +376,7 @@ if withArnold:
                 "rpaths": ["../../lib"],
                 "bldprefix": "arnold-%s" % arnold.Version(),
                 "incdirs": ["arnold/abcproc"],
-                "srcs": glob.glob("arnold/abcproc/*.cpp"),
+                "srcs": glob.glob("arnold/abcproc/*.cpp") + glob.glob("arnold/abcproc/visitors/*.cpp"),
                 "custom": [arnold.Require, RequireAlembicHelper(static=link_static)]})
 
 if withVray:
@@ -502,14 +494,10 @@ if withMaya:
       # So far MtoA 2.>=0 supported only
       if A >= 2:
          AbcShapeMtoaAE = "maya/AbcShape/mtoa/%sMtoa.py" % AbcShapeName
-         AbcShapeHelper = "maya/AbcShape/mtoa/%sHelper.py" % AbcShapeName
          
          if not os.path.exists(AbcShapeMtoaAE) or os.stat(AbcShapeMtoaAE).st_mtime < os.stat("maya/AbcShape/mtoa/AbcShapeMtoa.py.tpl").st_mtime:
             replace_in_file("maya/AbcShape/mtoa/AbcShapeMtoa.py.tpl", AbcShapeMtoaAE, "<<NodeName>>", AbcShapeName)
          
-         if not os.path.exists(AbcShapeHelper) or os.stat(AbcShapeHelper).st_mtime < os.stat("maya/AbcShape/mtoa/AbcShapeHelper.py.tpl").st_mtime:
-            replace_in_file("maya/AbcShape/mtoa/AbcShapeHelper.py.tpl", AbcShapeHelper, "<<NodeName>>", AbcShapeName)
-
          prjs.append({"name": "%sAbcShapeMtoa" % nameprefix,
                       "type": "dynamicmodule",
                       "alias": "alembic-mtoa",
@@ -520,8 +508,7 @@ if withMaya:
                       "ext": mtoa.ExtensionExt(),
                       "defs": defs,
                       "srcs": glob.glob("maya/AbcShape/mtoa/*.cpp"),
-                      "install": {"maya/plug-ins/%s/mtoa-%s" % (maya.Version(nice=True), mtoa.Version(compat=True)): [AbcShapeMtoaAE],
-                                  "maya/python": [AbcShapeHelper]},
+                      "install": {"maya/plug-ins/%s/mtoa-%s" % (maya.Version(nice=True), mtoa.Version(compat=True)): [AbcShapeMtoaAE]},
                       "custom": [RequireAlembicHelper(static=link_static), mtoa.Require, arnold.Require, maya.Require]})
 
 excons.AddHelpTargets({"alembic-static": "Alembic static library",
@@ -534,7 +521,7 @@ excons.AddHelpTargets({"alembic-static": "Alembic static library",
                        "alembic-arnold": "Arnold procedural",
                        "alembic-mtoa": "MtoA translator for alembic AbcShape",
                        "alembic-vray": "V-Ray procedural",
-                       "eco": "Arnold procedural ecosystem package"})
+                       "eco": "Alembic ecosystem package"})
 
 excons.AddHelpOptions(alembic="""ALEMBIC OPTIONS
   alembic-hdf5-support=0|1  : Build with HDF5 support.                   [0]
@@ -590,6 +577,6 @@ if "eco" in COMMAND_LINE_TARGETS:
             ecotgts["mtoa"] = targets[tgtname] + [AbcShapeMtoaAE]
             outdirs["mtoa"] = ecop + "/maya/plug-ins/%s/mtoa-%s" % (maya.Version(nice=True), mtoa.Version(compat=True))
 
-   excons.EcosystemDist(env, "alembic.env", outdirs, targets=ecotgts, name="alembic", version="1.7.1")
+   excons.EcosystemDist(env, "alembic.env", outdirs, targets=ecotgts, name="alembic", version=".".join(map(str, version_tpl)))
 
 
