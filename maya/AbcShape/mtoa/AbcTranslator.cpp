@@ -969,7 +969,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
       plug = FindMayaPlug("aiNurbsSampleRate");
       if (!plug.isNull())
       {
-         AiNodeSetInt(proc, "nurbs_sample_rate", plug.asInt());
+         AiNodeSetUInt(proc, "nurbs_sample_rate", plug.asUInt());
       }
 
       plug = FindMayaPlug("aiWidthScale");
@@ -1155,7 +1155,7 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
       if (!plug.isNull() && HasParameter(entry, "nurbs_sample_rate", proc, "constant INT"))
       {
          MGlobal::displayWarning("[AbcShapeMtoa] Override 'nurbs_sample_rate' from MtoA specific parameter 'aiSampleRate'");
-         AiNodeSetInt(proc, "nurbs_sample_rate", plug.asInt());
+         AiNodeSetUInt(proc, "nurbs_sample_rate", plug.asInt());
       }
 
       plug = FindMayaPlug("aiCurveWidth");

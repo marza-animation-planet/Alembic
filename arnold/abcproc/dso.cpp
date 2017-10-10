@@ -1056,7 +1056,7 @@ void Dso::transferShapeParams(AtNode *dst)
 
 void Dso::transferInstanceParams(AtNode *dst)
 {
-   AiNodeSetInt(dst, Strings::id, AiNodeGetInt(mProcNode, Strings::id));
+   AiNodeSetUInt(dst, Strings::id, AiNodeGetUInt(mProcNode, Strings::id));
    AiNodeSetBool(dst, Strings::receive_shadows, AiNodeGetBool(mProcNode, Strings::receive_shadows));
    AiNodeSetBool(dst, Strings::self_shadows, AiNodeGetBool(mProcNode, Strings::self_shadows));
    AiNodeSetBool(dst, Strings::invert_normals, AiNodeGetBool(mProcNode, Strings::invert_normals));
