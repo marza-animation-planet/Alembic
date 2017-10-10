@@ -269,11 +269,21 @@ static AlembicGeometrySource::GeomInfo* BuildMeshPlugins(AlembicGeometrySource *
             std::cout << "[AlembicLoader] BuildMeshPlugins: Check for reference mesh" << std::endl;
          }
 
-         // bool varyingTopoplogy = (node.typedObject().getSchema().getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
+         bool createRef = false;
 
+         if (params->referenceSource == AlembicLoaderParams::RS_frame)
+         {
+            bool varyingTopoplogy = (node.typedObject().getSchema().getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
+            createRef = !varyingTopoplogy;
+         }
+         else
+         {
+            createRef = CheckReferencePositions(node);
+         }
          // AlembicNode *refNode = (CheckReferencePositions(node) ? &node : (varyingTopoplogy ? 0 : src->referenceScene()->find(node.path())));
 
          // if (refNode)
+         if (createRef)
          {
             // AlembicMesh *refMesh = dynamic_cast<AlembicMesh*>(refNode);
             // AlembicSubD *refSubd = (refMesh ? 0 : dynamic_cast<AlembicSubD*>(refNode));
