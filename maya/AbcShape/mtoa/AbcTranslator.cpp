@@ -969,7 +969,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
       plug = FindMayaPlug("aiNurbsSampleRate");
       if (!plug.isNull())
       {
-         AiNodeSetUInt(proc, "nurbs_sample_rate", plug.asUInt());
+         AiNodeSetUInt(proc, "nurbs_sample_rate", (unsigned int)plug.asInt());
       }
 
       plug = FindMayaPlug("aiWidthScale");
