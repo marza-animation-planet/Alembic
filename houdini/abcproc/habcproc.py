@@ -723,3 +723,35 @@ def autobumpVisibility(node):
     except:
         return 1
 
+
+def getDisplacementShader(node):
+    if node:
+        cat = node.type().category().name()
+        if cat == "Object":
+            p = node.parm("shop_materialpath")
+            if p is None:
+                return ""
+            else:
+                np = hou.node(p.eval())
+                if np is None:
+                    return ""
+                else:
+                    node = np
+                    cat = node.type().category().name()
+        if cat != "Shop":
+            return ""
+        matl = filter(lambda x: x.type().name() == "arnold_material", node.allSubChildren())
+        for mat in matl:
+            iidx = mat.inputIndex("displacement")
+            if iidx < 0:
+                continue
+            conns = mat.inputConnectors()[iidx]
+            for conn in conns:
+                inode = conn.inputNode()
+                if inode is not None:
+                    return inode.path()
+    return ""
+
+
+def updateDisplacementShader(node):
+    node.parm("ar_user_disp_map").set(getDisplacementShader(node))
