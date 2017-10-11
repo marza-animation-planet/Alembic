@@ -248,7 +248,6 @@ def countShapes(node):
     return count
 
 
-# In the TRUE sense of the word
 def isSingleShape(node):
     filename = node.parm("ar_filename").evalAsString()
     objectpath = node.parm("ar_objectpath").evalAsString()
@@ -282,13 +281,6 @@ def isSingleShape(node):
             pass
 
     return False
-
-
-# NOT SURE THIS ONE IS NEEDED ANYMORE
-def hasMotionSamples(node):
-    samples = node.parm("ar_samples")
-    ignore_mb = (node.parm("ar_ignore_deform_blur").evalAsInt() and node.parm("ar_ignore_transform_blur").evalAsInt())
-    return (True if (not ignore_mb and samples.evalAsInt() > 0) else False)
 
 
 def computeFrame(node, frame=None, ignoreCycle=False):
@@ -386,12 +378,6 @@ def createArnoldAbc(path=None, mode='multiProc', objectPath='/', frameRange=(Non
 
     node.parm('ar_start_frame').set(startF)
     node.parm('ar_end_frame').set(endF)
-
-    #if mode != 'multiProc' and mode != 'singleShape':
-    #    mode = 'multiProc'
-    #node.parm('abc_mode').set(mode)
-    #node.parm('ar_objectpath').set('/' if mode == 'multiProc' else objectPath)
-
     node.parm('ar_objectpath').set(objectPath)
     node.parm('ar_offset').set(offset)
 
@@ -717,3 +703,23 @@ def syncUserAttributes(srcNode, dstNode, verbose=False, includeFolders=[], inclu
         dstNode.removeSpareParmTuple(parm.tuple())
 
     return True
+
+
+def autobumpVisibility(node):
+    try:
+        import arnold
+        rv = 0
+        for n, m in [("camera", arnold.AI_RAY_CAMERA), \
+                     ("shadow", arnold.AI_RAY_SHADOW), \
+                     ("diffuse_reflect", arnold.AI_RAY_DIFFUSE_REFLECT), \
+                     ("specular_reflect", arnold.AI_RAY_SPECULAR_REFLECT), \
+                     ("diffuse_transmit", arnold.AI_RAY_DIFFUSE_TRANSMIT), \
+                     ("specular_transmit", arnold.AI_RAY_SPECULAR_TRANSMIT), \
+                     ("volume", arnold.AI_RAY_VOLUME)]:
+            p = node.parm("ar_autobump_visibility_" + n)
+            if p is not None and p.eval():
+                rv = rv | m
+        return rv
+    except:
+        return 1
+
