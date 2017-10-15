@@ -15,11 +15,12 @@ from excons.tools import arnold
 from excons.tools import mtoa
 from excons.tools import maya
 from excons.tools import vray
+from excons.tools import houdini
 
 
 excons.InitGlobals()
 
-version_tpl = (1, 7, 3)
+version_tpl = (1, 7, 4)
 version_str = ".".join(map(str, version_tpl))
 
 use_boost = True
@@ -39,14 +40,31 @@ arnoldInc, arnoldLib = excons.GetDirs("arnold", libdirname=("lib" if sys.platfor
 withArnold = (arnoldInc and arnoldLib)
 withMaya = (excons.GetArgument("with-maya", default=None) is not None)
 withVray = (excons.GetArgument("with-vray", default=None) is not None)
+withHoudini = (excons.GetArgument("with-houdini", default=None) is not None)
+
+if withArnold:
+   A, M, m, p = arnold.Version(asString=False)
+   if A != 5:
+      withArnold = None
+   elif M == 0 and m < 1:
+      withArnold = None
+   if not withArnold:
+      print("Arnold 5 above 5.0.1.0 required")
 
 if withMaya:
    maya.SetupMscver()
 
 if withVray:
-  vrayVer = vray.Version(asString=False, nice=True)
+   vrayVer = vray.Version(asString=False, nice=True)
 else:
-  vrayVer = (0, 0, 0)
+   vrayVer = (0, 0, 0)
+
+if withHoudini:
+   houVer = houdini.Version(asString=False, full=False)
+   if houVer < 15.5:
+      print("Houdini %s is not supported" % houVer)
+      withHoudini = None
+
 
 env = excons.MakeBaseEnv()
 
@@ -78,7 +96,7 @@ else:
 
 # static or shared?
 def RequireAlembic(static=True, withPython=False, withGL=False, linkCore=True, linkGL=True):
-   
+
    def _RequireFunc(env):
       if sys.platform == "darwin":
          env.Append(CPPFLAGS=" ".join([" -Wno-unused-parameter",
@@ -88,91 +106,91 @@ def RequireAlembic(static=True, withPython=False, withGL=False, linkCore=True, l
       elif sys.platform == "win32":
          env.Append(CCFLAGS=" /bigobj")
          env.Append(CPPDEFINES=["NOMINMAX"])
-         
+
          mscmaj = int(excons.mscver.split(".")[0])
-         
+
          # Work around the 2GB file limit with Visual Studio 10.0
          #   https://connect.microsoft.com/VisualStudio/feedback/details/627639/std-fstream-use-32-bit-int-as-pos-type-even-on-x64-platform
          #   https://groups.google.com/forum/#!topic/alembic-discussion/5ElRJkXhi9M
          if mscmaj == 10:
             env.Prepend(CPPPATH=["lib/vc10fix"])
-         
+
          if mscmaj < 10:
             excons.WarnOnce("You should use at least Visual C 10.0 if you expect reading alembic file above 2GB without crash (use mscver= flag)", tool="alembic")
-      
+
       else:
          env.Append(CPPFLAGS=" ".join([" -Wno-unused-local-typedefs",
                                        "-Wno-unused-parameter",
                                        "-Wno-unused-but-set-variable",
                                        "-Wno-unused-variable",
                                        "-Wno-ignored-qualifiers"]))
-      
+
       defs = []
       incdirs = ["lib"]
       libdir = excons.OutputBaseDirectory() + "/lib"
       libprefix = ("lib" if (sys.platform != "win32" or static) else "")
       libext = (".lib" if sys.platform == "win32" else (".a" if static else excons.SharedLibraryLinkExt()))
       libs = []
-      
+
       if sys.platform == "win32":
          defs.extend(["PLATFORM_WINDOWS", "PLATFORM=WINDOWS"])
          if not static:
             defs.append("ALEMBIC_DLL")
             if withGL:
                defs.append("ABC_OPENGL_DLL")
-      
+
       elif sys.platform == "darwin":
          defs.extend(["PLATFORM_DARWIN", "PLATFORM=DARWIN"])
          libs.append("m")
-      
+
       else:
          defs.extend(["PLATFORM_LINUX", "PLATFORM=LINUX"])
          libs.extend(["dl", "rt", "m"])
-      
+
       env.Append(CPPDEFINES=defs)
-      
+
       env.Append(CPPPATH=incdirs)
-      
+
       env.Append(LIBPATH=[libdir])
-      
+
       if withGL and linkGL:
          excons.Link(env, libdir + "/" + libprefix + "AlembicAbcOpenGL" + libext, static=static, force=True, silent=True)
-      
+
       if linkCore:
          excons.Link(env, libdir + "/" + libprefix + "Alembic" + libext, static=static, force=True, silent=True)
-      
+
       reqs = []
-      
+
       if withGL:
          if sys.platform != "darwin":
            reqs.append(glew.Require)
          reqs.append(glut.Require)
          reqs.append(gl.Require)
-      
+
       if withPython:
          reqs.append(RequirePyIlmBase)
          if use_hdf5:
             reqs.append(hdf5.Require(hl=True, verbose=True))
-         
+
       else:
          reqs.append(RequireIlmBase)
          reqs.append(boost.Require())
          if use_hdf5:
             reqs.append(hdf5.Require(hl=True, verbose=True))
-      
+
       for req in reqs:
          req(env)
-      
+
       if libs:
          env.Append(LIBS=libs)
-   
-   
+
+
    return _RequireFunc
 
 
 def RequireRegex(env):
    global regexSrcDir
-   
+
    if sys.platform == "win32":
       env.Append(CPPDEFINES=["REGEX_STATIC"])
       env.Append(CPPPATH=[regexSrcDir])
@@ -180,18 +198,18 @@ def RequireRegex(env):
 
 def RequireAlembicHelper(static=True, withPython=False, withGL=False):
    def _RequireFunc(env):
-      
+
       RequireRegex(env)
-      
+
       env.Append(CPPPATH=["lib/SceneHelper"])
-      
+
       env.Append(LIBS=["SceneHelper"])
-      
+
       requireAlembic = RequireAlembic(static=static, withPython=withPython, withGL=withGL)
-      
+
       requireAlembic(env)
-   
-   
+
+
    return _RequireFunc
 
 
@@ -211,7 +229,7 @@ opts = {"PROJECT_VERSION_MAJOR": str(version_tpl[0]),
         "PROJECT_VERSION_MINOR": str(version_tpl[1]),
         "PROJECT_VERSION_PATCH": str(version_tpl[2]),
         "ALEMBIC_WITH_HDF5": ("" if use_hdf5 else "//") + "#define ALEMBIC_WITH_HDF5",
-        "ALEMBIC_LIB_USES_BOOST": ("" if use_boost else "//") + "#define ALEMBIC_LIB_USES_BOOST", 
+        "ALEMBIC_LIB_USES_BOOST": ("" if use_boost else "//") + "#define ALEMBIC_LIB_USES_BOOST",
         "ALEMBIC_LIB_USES_TR1": ("" if use_tr1 else "//") + "#define ALEMBIC_LIB_USES_TR1"}
 
 GenerateConfig = excons.config.AddGenerator(env, "abccfg", opts, pattern="\$\{([^}]+)\}|#cmakedefine\s+([^\s]+)")
@@ -225,7 +243,7 @@ for sl in sublibs:
    lib_headers += env.Install("%s/%s" % (out_headers_dir, sl), excons.glob("lib/Alembic/%s/*.h" % sl))
    lib_sources[sl] = excons.glob("lib/Alembic/%s/*.cpp" % sl)
 
-lib_headers += env.Install("%s/AbcOpenGL" % out_headers_dir, glob.glob("abcview/lib/AbcOpenGL/*.h"))
+lib_headers += env.Install("%s/AbcOpenGL" % out_headers_dir, excons.glob("abcview/lib/AbcOpenGL/*.h"))
 
 # Base libraries
 
@@ -282,7 +300,7 @@ prjs.extend([{"name": ("alembicmodule" if sys.platform != "win32" else "alembic"
               "bldprefix": "python-%s" % python.Version(),
               "defs": pydefs + ["alembicmodule_EXPORTS"],
               "incdirs": ["python/PyAlembic"],
-              "srcs": glob.glob("python/PyAlembic/*.cpp"),
+              "srcs": excons.glob("python/PyAlembic/*.cpp"),
               "custom": [RequireAlembic(static=link_static, withPython=True)],
               "install": {"%s/%s" % (python.ModulePrefix(), python.Version()): ["cask/cask.py"]}
              },
@@ -296,7 +314,7 @@ prjs.extend([{"name": ("alembicmodule" if sys.platform != "win32" else "alembic"
               "bldprefix": "python-%s" % python.Version(),
               "defs": pydefs + ["alembicglmodule_EXPORTS"],
               "incdirs": ["abcview/python/PyAbcOpenGL"],
-              "srcs": glob.glob("abcview/python/PyAbcOpenGL/*.cpp"),
+              "srcs": excons.glob("abcview/python/PyAbcOpenGL/*.cpp"),
               "custom": [RequireAlembic(static=link_static, withPython=True, withGL=True)]}])
 
 # Command line tools
@@ -317,29 +335,29 @@ for progname in prog_names:
    prjs.append({"name": progname.lower(),
                 "type": "program",
                 "alias": "alembic-tools",
-                "srcs": prog_srcs.get(progname, glob.glob("bin/%s/*.cpp" % progname)),
+                "srcs": prog_srcs.get(progname, excons.glob("bin/%s/*.cpp" % progname)),
                 "custom": [RequireAlembic(static=link_static)]})
 
 # Requires Qt
 # prjs.append({"name": "abcview",
 #              "type": "program",
 #              "alias": "alembic-tools",
-#              "srcs": glob.glob("abcview/bin/AbcView/*.cpp"),
+#              "srcs": excons.glob("abcview/bin/AbcView/*.cpp"),
 #              "custom": [RequireAlembic(static=link_static, withGL=True)]})
 
 # Helper library and test
 prjs.extend([{"name": "SceneHelper",
               "type": "staticlib",
               "desc": "Alembic scene handling utility library",
-              "srcs": glob.glob("lib/SceneHelper/*.cpp") + regexSrc,
+              "srcs": excons.glob("lib/SceneHelper/*.cpp") + regexSrc,
               "custom": [RequireAlembicHelper(static=link_static)],
-              "install": {"include/SceneHelper": glob.glob("lib/SceneHelper/*.h") + regexInc}
+              "install": {"include/SceneHelper": excons.glob("lib/SceneHelper/*.h") + regexInc}
              },
              {"name": "SceneHelperTest",
               "type": "program",
               "desc": "SceneHelper library test program",
               "incdirs": ["examples/bin/SceneHelper"],
-              "srcs": glob.glob("examples/bin/SceneHelper/*.cpp"),
+              "srcs": excons.glob("examples/bin/SceneHelper/*.cpp"),
               "custom": [RequireAlembicHelper(static=link_static)]}])
 
 # DCC tools
@@ -349,12 +367,6 @@ if nameprefix:
    defs.append("NAME_PREFIX=\"\\\"%s\\\"\"" % nameprefix)
 
 if withArnold:
-   A, M, m, p = arnold.Version(asString=False)
-   #if A < 4 or (A == 4 and (M < 2 or (M == 2 and m < 3))):
-   if A < 5 or (A == 5 and M == 0 and m < 1):
-      print("Arnold procedural requires arnold 5.0.1.0 or above.")
-      sys.exit(1)
-
    prjs.append({"name": "%sAlembicArnoldProcedural" % nameprefix,
                 "type": "dynamicmodule",
                 "desc": "Original arnold alembic procedural",
@@ -364,9 +376,9 @@ if withArnold:
                 "bldprefix": "arnold-%s" % arnold.Version(),
                 "defs": defs,
                 "incdirs": ["arnold/Procedural"],
-                "srcs": glob.glob("arnold/Procedural/*.cpp") + regexSrc,
+                "srcs": excons.glob("arnold/Procedural/*.cpp") + regexSrc,
                 "custom": [arnold.Require, RequireRegex, RequireAlembic(static=link_static)]})
-   
+
    prjs.append({"name": "abcproc",
                 "type": "dynamicmodule",
                 "alias": "alembic-arnold",
@@ -376,7 +388,7 @@ if withArnold:
                 "rpaths": ["../../lib"],
                 "bldprefix": "arnold-%s" % arnold.Version(),
                 "incdirs": ["arnold/abcproc"],
-                "srcs": glob.glob("arnold/abcproc/*.cpp") + glob.glob("arnold/abcproc/visitors/*.cpp"),
+                "srcs": excons.glob("arnold/abcproc/*.cpp") + excons.glob("arnold/abcproc/visitors/*.cpp"),
                 "custom": [arnold.Require, RequireAlembicHelper(static=link_static)]})
 
 if withVray:
@@ -389,7 +401,7 @@ if withVray:
                 "rpaths": ["../lib"],
                 "bldprefix": "vray-%s" % vray.Version(),
                 "incdirs": ["vray"],
-                "srcs": glob.glob("vray/*.cpp"),
+                "srcs": excons.glob("vray/*.cpp"),
                 "custom": [vray.Require, RequireAlembicHelper(static=link_static)]})
 
 if withMaya:
@@ -400,7 +412,7 @@ if withMaya:
          fdst.write(line.replace(srcStr, dstStr))
       fdst.close()
       fsrc.close()
-   
+
    AbcShapeName = "%sAbcShape" % nameprefix
    AbcShapeMel = "maya/AbcShape/AE%sTemplate.mel" % AbcShapeName
    AbcMatEditPy = "maya/AbcShape/%sAbcMaterialEditor.py" % nameprefix
@@ -408,31 +420,31 @@ if withMaya:
    AbcShapeMtoa = "arnold/abcproc/mtoa_%s.py" % AbcShapeName
    if withVray:
       AbcShapePy = "maya/AbcShape/%sabcshape4vray.py" % nameprefix.lower()
-   
+
    impver = excons.GetArgument("maya-abcimport-version", None)
    expver = excons.GetArgument("maya-abcexport-version", None)
    trsver = excons.GetArgument("maya-abctranslator-version", None)
    shpver = excons.GetArgument("maya-abcshape-version", None)
-   
+
    if not os.path.exists(AbcShapeMel) or os.stat(AbcShapeMel).st_mtime < os.stat("maya/AbcShape/AETemplate.mel.tpl").st_mtime:
       replace_in_file("maya/AbcShape/AETemplate.mel.tpl", AbcShapeMel, "<<NodeName>>", AbcShapeName)
-   
+
    if not os.path.exists(AbcShapeMtoa) or os.stat(AbcShapeMtoa).st_mtime < os.stat("arnold/abcproc/mtoa.py.tpl").st_mtime:
       replace_in_file("arnold/abcproc/mtoa.py.tpl", AbcShapeMtoa, "<<NodeName>>", AbcShapeName)
-   
+
    if not os.path.exists(AbcMatEditMel) or os.stat(AbcMatEditMel).st_mtime < os.stat("maya/AbcShape/AbcMaterialEditor.mel.tpl").st_mtime:
       replace_in_file("maya/AbcShape/AbcMaterialEditor.mel.tpl", AbcMatEditMel, "<<Prefix>>", nameprefix)
-   
+
    if not os.path.exists(AbcMatEditPy) or os.stat(AbcMatEditPy).st_mtime < os.stat("maya/AbcShape/AbcMaterialEditor.py.tpl").st_mtime:
       replace_in_file("maya/AbcShape/AbcMaterialEditor.py.tpl", AbcMatEditPy, "<<NodeName>>", AbcShapeName)
-   
+
    if withVray:
       if not os.path.exists(AbcShapePy) or os.stat(AbcShapePy).st_mtime < os.stat("maya/AbcShape/abcshape4vray.py.tpl").st_mtime:
          replace_in_file("maya/AbcShape/abcshape4vray.py.tpl", AbcShapePy, "<<NodeName>>", AbcShapeName)
-    
+
    # AbcImport / AbcExport do not use SceneHelper but need regex library
    # it doesn't hurt to link SceneHelper
-   
+
    prjs.extend([{"name": "%sAbcImport" % nameprefix,
                  "alias": "alembic-maya",
                  "type": "dynamicmodule",
@@ -443,7 +455,7 @@ if withMaya:
                  "bldprefix": "maya-%s" % maya.Version(),
                  "defs": defs + (["ABCIMPORT_VERSION=\"\\\"%s\\\"\"" % impver] if impver else []),
                  "incdirs": ["maya/AbcImport"],
-                 "srcs": glob.glob("maya/AbcImport/*.cpp") + regexSrc,
+                 "srcs": excons.glob("maya/AbcImport/*.cpp") + regexSrc,
                  "custom": [RequireRegex, RequireAlembic(static=link_static), maya.Require, maya.Plugin]
                 },
                 {"name": "%sAbcExport" % nameprefix,
@@ -456,7 +468,7 @@ if withMaya:
                  "bldprefix": "maya-%s" % maya.Version(),
                  "defs": defs + (["ABCEXPORT_VERSION=\"\\\"%s\\\"\"" % expver] if expver else []),
                  "incdirs": ["maya/AbcExport"],
-                 "srcs": glob.glob("maya/AbcExport/*.cpp"),
+                 "srcs": excons.glob("maya/AbcExport/*.cpp"),
                  "custom": [RequireAlembic(static=link_static), maya.Require, maya.Plugin]
                 },
                 {"name": "%sAbcShape" % nameprefix,
@@ -470,9 +482,9 @@ if withMaya:
                  "defs": defs + (["ABCSHAPE_VERSION=\"\\\"%s\\\"\"" % shpver] if shpver else []) +
                                 (["ABCSHAPE_VRAY_SUPPORT"] if withVray else []),
                  "incdirs": ["maya/AbcShape"],
-                 "srcs": glob.glob("maya/AbcShape/*.cpp"),
+                 "srcs": excons.glob("maya/AbcShape/*.cpp"),
                  "custom": ([vray.Require] if withVray else []) + [RequireAlembicHelper(static=link_static), maya.Require, gl.Require, maya.Plugin],
-                 "install": {"maya/scripts": glob.glob("maya/AbcShape/*.mel"),
+                 "install": {"maya/scripts": excons.glob("maya/AbcShape/*.mel"),
                              "maya/python": [AbcShapeMtoa, AbcMatEditPy] + ([AbcShapePy] if withVray else [])}
                 },
                 {"name": "%sAbcFileTranslator" % nameprefix,
@@ -485,19 +497,19 @@ if withMaya:
                  "bldprefix": "maya-%s" % maya.Version(),
                  "defs": defs + (["ABCFILETRANSLATOR_VERSION=\"\\\"%s\\\"\"" % trsver] if trsver else []),
                  "incdirs": ["maya/AbcFileTranslator"],
-                 "srcs": glob.glob("maya/AbcFileTranslator/*.cpp"),
+                 "srcs": excons.glob("maya/AbcFileTranslator/*.cpp"),
                  "custom": [RequireAlembic(static=link_static), maya.Require, maya.Plugin],
-                 "install": {"maya/scripts": glob.glob("maya/AbcFileTranslator/*.mel")}}])
+                 "install": {"maya/scripts": excons.glob("maya/AbcFileTranslator/*.mel")}}])
 
    if withArnold:
       A, M, m = mtoa.Version(asString=False)
       # So far MtoA 2.>=0 supported only
       if A >= 2:
          AbcShapeMtoaAE = "maya/AbcShape/mtoa/%sMtoa.py" % AbcShapeName
-         
+
          if not os.path.exists(AbcShapeMtoaAE) or os.stat(AbcShapeMtoaAE).st_mtime < os.stat("maya/AbcShape/mtoa/AbcShapeMtoa.py.tpl").st_mtime:
             replace_in_file("maya/AbcShape/mtoa/AbcShapeMtoa.py.tpl", AbcShapeMtoaAE, "<<NodeName>>", AbcShapeName)
-         
+
          prjs.append({"name": "%sAbcShapeMtoa" % nameprefix,
                       "type": "dynamicmodule",
                       "alias": "alembic-mtoa",
@@ -507,9 +519,18 @@ if withMaya:
                       "bldprefix": "maya-%s/mtoa-%s" % (maya.Version(), mtoa.Version()),
                       "ext": mtoa.ExtensionExt(),
                       "defs": defs,
-                      "srcs": glob.glob("maya/AbcShape/mtoa/*.cpp"),
+                      "srcs": excons.glob("maya/AbcShape/mtoa/*.cpp"),
                       "install": {"maya/plug-ins/%s/mtoa-%s" % (maya.Version(nice=True), mtoa.Version(compat=True)): [AbcShapeMtoaAE]},
                       "custom": [RequireAlembicHelper(static=link_static), mtoa.Require, arnold.Require, maya.Require]})
+
+if withHoudini and withArnold:
+   # HtoA
+   prjs.append({"name": "alembic-htoa",
+                "type": "install",
+                "install": {"houdini/otls/%s" % houVer: excons.glob("houdini/abcproc/*.otl"),
+                            "houdini/python": excons.glob("houdini/abcproc/*.py")}})
+
+
 
 excons.AddHelpTargets({"alembic-static": "Alembic static library",
                        "alembic-shared": "Alembic shared library",
@@ -520,6 +541,7 @@ excons.AddHelpTargets({"alembic-static": "Alembic static library",
                        "alembic-maya": "All alembic maya plugins",
                        "alembic-arnold": "Arnold procedural",
                        "alembic-mtoa": "MtoA translator for alembic AbcShape",
+                       "alembic-htoa": "HtoA OTL for Arnold alembic procedural",
                        "alembic-vray": "V-Ray procedural",
                        "eco": "Alembic ecosystem package"})
 
@@ -542,6 +564,8 @@ Export("RequireAlembicHelper")
 deftargets = ["alembic-libs", "alembic-tools", "alembic-python"]
 if withArnold:
    deftargets.append("alembic-arnold")
+   if withHoudini:
+      deftargets.append("alembic-htoa")
 if withVray:
    deftargets.append("alembic-vray")
 if withMaya:
@@ -552,7 +576,7 @@ Default(deftargets)
 
 if "eco" in COMMAND_LINE_TARGETS:
    outbd = excons.OutputBaseDirectory()
-   ecop = "/" + excons.EcosystemPlatform() 
+   ecop = "/" + excons.EcosystemPlatform()
 
    ecotgts = {"tools": targets["alembic-tools"],
               "python": targets["alembic-python"] + ["cask/cask.py"]}
@@ -563,6 +587,13 @@ if "eco" in COMMAND_LINE_TARGETS:
    if withArnold:
       ecotgts["arnold"] = targets["abcproc"]
       outdirs["arnold"] = ecop + "/arnold/%s" % arnold.Version(compat=True)
+
+      if withHoudini:
+         from pprint import pprint as pp
+         ecotgts["htoa-otls"] = excons.glob("houdini/abcproc/*.otl")
+         outdirs["htoa-otls"] = ecop + "/houdini/otls/%s" % houdini.Version(asString=False, full=False)
+         ecotgts["htoa-scripts"] = excons.glob("houdini/abcproc/*.py")
+         outdirs["htoa-scripts"] = ecop + "/houdini/python"
 
    if withMaya:
       ecotgts["maya-scripts"] = [outbd + "/maya/python", outbd + "/maya/scripts"],
