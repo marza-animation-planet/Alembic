@@ -811,7 +811,24 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
 
    if (pe)
    {
-      subd = (AiNodeGetInt(mDso->procNode(), "subdiv_type") > 0);
+      int pet = AiUserParamGetType(pe);
+      switch (pet)
+      {
+      case AI_TYPE_BYTE:
+         subd = (AiNodeGetByte(mDso->procNode(), "subdiv_type") > 0);
+         break;
+      case AI_TYPE_INT:
+         subd = (AiNodeGetInt(mDso->procNode(), "subdiv_type") > 0);
+         break;
+      case AI_TYPE_UINT:
+         subd = (AiNodeGetUInt(mDso->procNode(), "subdiv_type") > 0);
+         break;
+      case AI_TYPE_STRING:
+         subd = (strcmp(AiNodeGetStr(mDso->procNode(), "subdiv_type"), "none") != 0);
+         break;
+      default:
+         AiMsgDebug("[abcproc] Unsupported parameter type for 'subdiv_type'");
+      }
    }
 
    if (!subd)
@@ -819,7 +836,24 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
       pe = AiNodeLookUpUserParameter(mDso->procNode(), "smoothing");
       if (pe)
       {
-         smoothing = AiNodeGetBool(mDso->procNode(), "smoothing");
+         int pet = AiUserParamGetType(pe);
+         switch (pet)
+         {
+         case AI_TYPE_BOOLEAN:
+            smoothing = AiNodeGetBool(mDso->procNode(), "smoothing");
+            break;
+         case AI_TYPE_BYTE:
+            smoothing = (AiNodeGetByte(mDso->procNode(), "smoothing") != 0);
+            break;
+         case AI_TYPE_INT:
+            smoothing = (AiNodeGetInt(mDso->procNode(), "smoothing") != 0);
+            break;
+         case AI_TYPE_UINT:
+            smoothing = (AiNodeGetUInt(mDso->procNode(), "smoothing") != 0);
+            break;
+         default:
+            AiMsgDebug("[abcproc] Unsupported parameter type for 'smoothing'");
+         }
       }
    }
 
@@ -1587,7 +1621,24 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
 
    if (pe)
    {
-      subd = (AiNodeGetInt(mDso->procNode(), "subdiv_type") > 0);
+      int pet = AiUserParamGetType(pe);
+      switch (pet)
+      {
+      case AI_TYPE_BYTE:
+         subd = (AiNodeGetByte(mDso->procNode(), "subdiv_type") > 0);
+         break;
+      case AI_TYPE_INT:
+         subd = (AiNodeGetInt(mDso->procNode(), "subdiv_type") > 0);
+         break;
+      case AI_TYPE_UINT:
+         subd = (AiNodeGetUInt(mDso->procNode(), "subdiv_type") > 0);
+         break;
+      case AI_TYPE_STRING:
+         subd = (strcmp(AiNodeGetStr(mDso->procNode(), "subdiv_type"), "none") != 0);
+         break;
+      default:
+         AiMsgDebug("[abcproc] Unsupported parameter type for 'subdiv_type'");
+      }
    }
 
    if (!subd)
@@ -1595,7 +1646,24 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
       pe = AiNodeLookUpUserParameter(mDso->procNode(), "smoothing");
       if (pe)
       {
-         smoothing = AiNodeGetBool(mDso->procNode(), "smoothing");
+         int pet = AiUserParamGetType(pe);
+         switch (pet)
+         {
+         case AI_TYPE_BOOLEAN:
+            smoothing = AiNodeGetBool(mDso->procNode(), "smoothing");
+            break;
+         case AI_TYPE_BYTE:
+            smoothing = (AiNodeGetByte(mDso->procNode(), "smoothing") != 0);
+            break;
+         case AI_TYPE_INT:
+            smoothing = (AiNodeGetInt(mDso->procNode(), "smoothing") != 0);
+            break;
+         case AI_TYPE_UINT:
+            smoothing = (AiNodeGetUInt(mDso->procNode(), "smoothing") != 0);
+            break;
+         default:
+            AiMsgDebug("[abcproc] Unsupported parameter type for 'smoothing'");
+         }
       }
    }
 

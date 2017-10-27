@@ -1226,7 +1226,7 @@ void Dso::transferUserParams(AtNode *dst)
 
          if (AiNodeLookUpUserParameter(dst, pname) != 0)
          {
-            // Already declared during expansion (most probably read from gto file)
+            // Already declared during expansion (most probably read from abc file)
             doCopy = false;
          }
          else
@@ -1429,7 +1429,7 @@ void Dso::transferUserParams(AtNode *dst)
                      AtArray *a = AiNodeGetArray(dst, "vlist");
                      if (AiArrayGetNumElements(val) != AiArrayGetNumElements(a))
                      {
-                        AiMsgWarning("[gto DSO]     Point count mismatch for varying attribute");
+                        AiMsgWarning("[abcproc]     Point count mismatch for varying attribute");
                         continue;
                      }
                   }
@@ -1438,7 +1438,7 @@ void Dso::transferUserParams(AtNode *dst)
                      AtArray *a = AiNodeGetArray(dst, "points");
                      if (AiArrayGetNumElements(val) != AiArrayGetNumElements(a))
                      {
-                        AiMsgWarning("[gto DSO]     Point count mismatch for varying attribute");
+                        AiMsgWarning("[abcproc]     Point count mismatch for varying attribute");
                         continue;
                      }
                   }
@@ -1447,7 +1447,7 @@ void Dso::transferUserParams(AtNode *dst)
                      AtArray *a = AiNodeGetArray(dst, "points");
                      if (AiArrayGetNumElements(val) != AiArrayGetNumElements(a))
                      {
-                        AiMsgWarning("[gto DSO]     Point count mismatch for varying attribute");
+                        AiMsgWarning("[abcproc]     Point count mismatch for varying attribute");
                         continue;
                      }
                   }
@@ -1455,7 +1455,7 @@ void Dso::transferUserParams(AtNode *dst)
                   {
                      if (verbose())
                      {
-                        AiMsgInfo("[gto DSO]     Cannot apply varying attribute");
+                        AiMsgInfo("[abcproc]     Cannot apply varying attribute");
                      }
                      continue;
                   }
@@ -1471,7 +1471,7 @@ void Dso::transferUserParams(AtNode *dst)
                         // direcly compare size
                         if (AiArrayGetNumElements(val) != AiArrayGetNumElements(a))
                         {
-                           AiMsgWarning("[gto DSO]     Count mismatch for indexed attribute");
+                           AiMsgWarning("[abcproc]     Count mismatch for indexed attribute");
                            continue;
                         }
                      }
@@ -1481,7 +1481,7 @@ void Dso::transferUserParams(AtNode *dst)
                         AtArray *idxs = AiNodeGetArray(mProcNode, indexAttr.c_str());
                         if (!idxs || AiArrayGetNumElements(idxs) != AiArrayGetNumElements(a))
                         {
-                           AiMsgWarning("[gto DSO]     Count mismatch for indexed attribute");
+                           AiMsgWarning("[abcproc]     Count mismatch for indexed attribute");
                            continue;
                         }
                      }
@@ -1490,7 +1490,7 @@ void Dso::transferUserParams(AtNode *dst)
                   {
                      if (verbose())
                      {
-                        AiMsgInfo("[gto DSO]     Cannot apply indexed attribute");
+                        AiMsgInfo("[abcproc]     Cannot apply indexed attribute");
                      }
                   }
                   break;
