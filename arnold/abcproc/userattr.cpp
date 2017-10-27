@@ -980,9 +980,57 @@ void _NodeSet<AI_TYPE_BOOLEAN, bool>(AtNode *node, const char *name, bool *vals)
 }
 
 template <>
+void _NodeSet<AI_TYPE_BOOLEAN, uint8_t>(AtNode *node, const char *name, uint8_t *vals)
+{
+   AiNodeSetBool(node, name, (vals[0] != 0));
+}
+
+template <>
+void _NodeSet<AI_TYPE_BOOLEAN, int>(AtNode *node, const char *name, int *vals)
+{
+   AiNodeSetBool(node, name, (vals[0] != 0));
+}
+
+template <>
+void _NodeSet<AI_TYPE_BOOLEAN, unsigned int>(AtNode *node, const char *name, unsigned int *vals)
+{
+   AiNodeSetBool(node, name, (vals[0] != 0));
+}
+
+template <>
+void _NodeSet<AI_TYPE_BYTE, bool>(AtNode *node, const char *name, bool *vals)
+{
+   AiNodeSetBool(node, name, (vals[0] ? 1 : 0));
+}
+
+template <>
 void _NodeSet<AI_TYPE_BYTE, uint8_t>(AtNode *node, const char *name, uint8_t *vals)
 {
    AiNodeSetBool(node, name, vals[0]);
+}
+
+template <>
+void _NodeSet<AI_TYPE_BYTE, int>(AtNode *node, const char *name, int *vals)
+{
+   AiNodeSetBool(node, name, (uint8_t)vals[0]);
+}
+
+template <>
+void _NodeSet<AI_TYPE_BYTE, unsigned int>(AtNode *node, const char *name, unsigned int *vals)
+{
+   AiNodeSetBool(node, name, (uint8_t)vals[0]);
+}
+
+template <>
+void _NodeSet<AI_TYPE_INT, bool>(AtNode *node, const char *name, bool *vals)
+{
+   AiNodeSetInt(node, name, (vals[0] ? 1 : 0));
+}
+
+template <>
+void _NodeSet<AI_TYPE_INT, uint8_t>(AtNode *node, const char *name, uint8_t *vals)
+{
+   AiNodeSetInt(node, name, (int)vals[0]);
 }
 
 template <>
@@ -994,7 +1042,49 @@ void _NodeSet<AI_TYPE_INT, int>(AtNode *node, const char *name, int *vals)
 template <>
 void _NodeSet<AI_TYPE_INT, unsigned int>(AtNode *node, const char *name, unsigned int *vals)
 {
+   AiNodeSetInt(node, name, vals[0]);
+}
+
+template <>
+void _NodeSet<AI_TYPE_UINT, bool>(AtNode *node, const char *name, bool *vals)
+{
+   AiNodeSetUInt(node, name, (vals[0] ? 1 : 0));
+}
+
+template <>
+void _NodeSet<AI_TYPE_UINT, uint8_t>(AtNode *node, const char *name, uint8_t *vals)
+{
+   AiNodeSetUInt(node, name, (unsigned int)vals[0]);
+}
+
+template <>
+void _NodeSet<AI_TYPE_UINT, int>(AtNode *node, const char *name, int *vals)
+{
+   AiNodeSetUInt(node, name, (unsigned int)vals[0]);
+}
+
+template <>
+void _NodeSet<AI_TYPE_UINT, unsigned int>(AtNode *node, const char *name, unsigned int *vals)
+{
    AiNodeSetUInt(node, name, vals[0]);
+}
+
+template <>
+void _NodeSet<AI_TYPE_FLOAT, uint8_t>(AtNode *node, const char *name, uint8_t *vals)
+{
+   AiNodeSetFlt(node, name, (float)vals[0]);
+}
+
+template <>
+void _NodeSet<AI_TYPE_FLOAT, int>(AtNode *node, const char *name, int *vals)
+{
+   AiNodeSetFlt(node, name, (float)vals[0]);
+}
+
+template <>
+void _NodeSet<AI_TYPE_FLOAT, unsigned int>(AtNode *node, const char *name, unsigned int *vals)
+{
+   AiNodeSetFlt(node, name, (float)vals[0]);
 }
 
 template <>
@@ -1077,6 +1167,82 @@ void _ArraySet<AI_TYPE_BOOLEAN, bool>(AtArray *ary, unsigned int count, bool *va
 }
 
 template <>
+void _ArraySet<AI_TYPE_BOOLEAN, uint8_t>(AtArray *ary, unsigned int count, uint8_t *vals, unsigned int *idxs)
+{
+   if (idxs)
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetBool(ary, i, vals[idxs[i]] != 0);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetBool(ary, i, vals[i] != 0);
+      }
+   }
+}
+
+template <>
+void _ArraySet<AI_TYPE_BOOLEAN, int>(AtArray *ary, unsigned int count, int *vals, unsigned int *idxs)
+{
+   if (idxs)
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetBool(ary, i, vals[idxs[i]] != 0);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetBool(ary, i, vals[i] != 0);
+      }
+   }
+}
+
+template <>
+void _ArraySet<AI_TYPE_BOOLEAN, unsigned int>(AtArray *ary, unsigned int count, unsigned int *vals, unsigned int *idxs)
+{
+   if (idxs)
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetBool(ary, i, vals[idxs[i]] != 0);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetBool(ary, i, vals[i] != 0);
+      }
+   }
+}
+
+template <>
+void _ArraySet<AI_TYPE_BYTE, bool>(AtArray *ary, unsigned int count, bool *vals, unsigned int *idxs)
+{
+   if (idxs)
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetByte(ary, i, vals[idxs[i]] ? 1 : 0);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetByte(ary, i, vals[i] ? 1 : 0);
+      }
+   }
+}
+
+template <>
 void _ArraySet<AI_TYPE_BYTE, uint8_t>(AtArray *ary, unsigned int count, uint8_t *vals, unsigned int *idxs)
 {
    if (idxs)
@@ -1091,6 +1257,82 @@ void _ArraySet<AI_TYPE_BYTE, uint8_t>(AtArray *ary, unsigned int count, uint8_t 
       for (unsigned int i=0; i<count; ++i)
       {
          AiArraySetByte(ary, i, vals[i]);
+      }
+   }
+}
+
+template <>
+void _ArraySet<AI_TYPE_BYTE, int>(AtArray *ary, unsigned int count, int *vals, unsigned int *idxs)
+{
+   if (idxs)
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetByte(ary, i, (uint8_t)vals[idxs[i]]);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetByte(ary, i, (uint8_t)vals[i]);
+      }
+   }
+}
+
+template <>
+void _ArraySet<AI_TYPE_BYTE, unsigned int>(AtArray *ary, unsigned int count, unsigned int *vals, unsigned int *idxs)
+{
+   if (idxs)
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetByte(ary, i, (uint8_t)vals[idxs[i]]);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetByte(ary, i, (uint8_t)vals[i]);
+      }
+   }
+}
+
+template <>
+void _ArraySet<AI_TYPE_INT, bool>(AtArray *ary, unsigned int count, bool *vals, unsigned int *idxs)
+{
+   if (idxs)
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetInt(ary, i, vals[idxs[i]] ? 1 : 0);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetInt(ary, i, vals[i] ? 1 : 0);
+      }
+   }
+}
+
+template <>
+void _ArraySet<AI_TYPE_INT, uint8_t>(AtArray *ary, unsigned int count, uint8_t *vals, unsigned int *idxs)
+{
+   if (idxs)
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetInt(ary, i, (int)vals[idxs[i]]);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetInt(ary, i, (int)vals[i]);
       }
    }
 }
@@ -1115,6 +1357,82 @@ void _ArraySet<AI_TYPE_INT, int>(AtArray *ary, unsigned int count, int *vals, un
 }
 
 template <>
+void _ArraySet<AI_TYPE_INT, unsigned int>(AtArray *ary, unsigned int count, unsigned int *vals, unsigned int *idxs)
+{
+   if (idxs)
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetInt(ary, i, (int)vals[idxs[i]]);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetInt(ary, i, (int)vals[i]);
+      }
+   }
+}
+
+template <>
+void _ArraySet<AI_TYPE_UINT, bool>(AtArray *ary, unsigned int count, bool *vals, unsigned int *idxs)
+{
+   if (idxs)
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetUInt(ary, i, vals[idxs[i]] ? 1 : 0);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetUInt(ary, i, vals[i] ? 1 : 0);
+      }
+   }
+}
+
+template <>
+void _ArraySet<AI_TYPE_UINT, uint8_t>(AtArray *ary, unsigned int count, uint8_t *vals, unsigned int *idxs)
+{
+   if (idxs)
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetUInt(ary, i, (unsigned int)vals[idxs[i]]);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetUInt(ary, i, (unsigned int)vals[i]);
+      }
+   }
+}
+
+template <>
+void _ArraySet<AI_TYPE_UINT, int>(AtArray *ary, unsigned int count, int *vals, unsigned int *idxs)
+{
+   if (idxs)
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetUInt(ary, i, (unsigned int)vals[idxs[i]]);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetUInt(ary, i, (unsigned int)vals[i]);
+      }
+   }
+}
+
+template <>
 void _ArraySet<AI_TYPE_UINT, unsigned int>(AtArray *ary, unsigned int count, unsigned int *vals, unsigned int *idxs)
 {
    if (idxs)
@@ -1129,6 +1447,63 @@ void _ArraySet<AI_TYPE_UINT, unsigned int>(AtArray *ary, unsigned int count, uns
       for (unsigned int i=0; i<count; ++i)
       {
          AiArraySetUInt(ary, i, vals[i]);
+      }
+   }
+}
+
+template <>
+void _ArraySet<AI_TYPE_FLOAT, uint8_t>(AtArray *ary, unsigned int count, uint8_t *vals, unsigned int *idxs)
+{
+   if (idxs)
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetFlt(ary, i, (float)vals[idxs[i]]);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetFlt(ary, i, (float)vals[i]);
+      }
+   }
+}
+
+template <>
+void _ArraySet<AI_TYPE_FLOAT, int>(AtArray *ary, unsigned int count, int *vals, unsigned int *idxs)
+{
+   if (idxs)
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetFlt(ary, i, (float)vals[idxs[i]]);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetFlt(ary, i, (float)vals[i]);
+      }
+   }
+}
+
+template <>
+void _ArraySet<AI_TYPE_FLOAT, unsigned int>(AtArray *ary, unsigned int count, unsigned int *vals, unsigned int *idxs)
+{
+   if (idxs)
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetFlt(ary, i, (float)vals[idxs[i]]);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0; i<count; ++i)
+      {
+         AiArraySetFlt(ary, i, (float)vals[i]);
       }
    }
 }
@@ -1334,7 +1709,7 @@ void _ArraySet<AI_TYPE_STRING, const char*>(AtArray *ary, unsigned int count, co
 
 
 template <int ArnoldType, typename T>
-void _SetUserAttribute(AtNode *node, const std::string &valName, const std::string &idxName, UserAttribute &ua, unsigned int *remapIndices)
+void __SetUserAttribute(AtNode *node, const std::string &valName, const std::string &idxName, UserAttribute &ua, unsigned int *remapIndices)
 {
    T *vals = (T*) ua.data;
    
@@ -1423,11 +1798,55 @@ void _SetUserAttribute(AtNode *node, const std::string &valName, const std::stri
    }
 }
 
+template <int ArnoldType>
+void _SetUserAttribute(AtNode *node, const std::string &valName, const std::string &idxName, UserAttribute &ua, unsigned int *remapIndices)
+{
+   switch (ua.arnoldType)
+   {
+   case AI_TYPE_BOOLEAN:
+      __SetUserAttribute<ArnoldType, bool>(node, valName, idxName, ua, remapIndices);
+      break;
+   case AI_TYPE_BYTE:
+      __SetUserAttribute<ArnoldType, uint8_t>(node, valName, idxName, ua, remapIndices);
+      break;
+   case AI_TYPE_INT:
+      __SetUserAttribute<ArnoldType, int>(node, valName, idxName, ua, remapIndices);
+      break;
+   case AI_TYPE_UINT:
+      __SetUserAttribute<ArnoldType, unsigned int>(node, valName, idxName, ua, remapIndices);
+      break;
+   case AI_TYPE_FLOAT:
+      __SetUserAttribute<ArnoldType, float>(node, valName, idxName, ua, remapIndices);
+      break;
+   case AI_TYPE_VECTOR2:
+      __SetUserAttribute<ArnoldType, float>(node, valName, idxName, ua, remapIndices);
+      break;
+   case AI_TYPE_VECTOR:
+      __SetUserAttribute<ArnoldType, float>(node, valName, idxName, ua, remapIndices);
+      break;
+   case AI_TYPE_RGB:
+      __SetUserAttribute<ArnoldType, float>(node, valName, idxName, ua, remapIndices);
+      break;
+   case AI_TYPE_RGBA:
+      __SetUserAttribute<ArnoldType, float>(node, valName, idxName, ua, remapIndices);
+      break;
+   case AI_TYPE_MATRIX:
+      __SetUserAttribute<ArnoldType, float>(node, valName, idxName, ua, remapIndices);
+      break;
+   case AI_TYPE_STRING:
+      __SetUserAttribute<ArnoldType, const char*>(node, valName, idxName, ua, remapIndices);
+   default:
+      break;
+   }
+}
+
 void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigned int count, unsigned int *remapIndices)
 {
    std::string decl;
    std::string valsName = name;
    std::string idxsName = "";
+   int outArnoldType = ua.arnoldType;
+   std::string outArnoldTypeStr = ua.arnoldTypeStr;
    
    unsigned int cnt = count;
    
@@ -1438,21 +1857,26 @@ void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigne
       {
          decl += "ARRAY ";
       }
-      decl += ua.arnoldTypeStr;
+      decl += outArnoldTypeStr;
    }
    else if (ua.arnoldCategory == AI_USERDEF_UNIFORM)
    {
-      decl = "uniform " + ua.arnoldTypeStr;
+      if (valsName == "subdiv_face_iterations")
+      {
+         outArnoldType = AI_TYPE_BYTE;
+         outArnoldTypeStr = "BYTE";
+      }
+      decl = "uniform " + outArnoldTypeStr;
       cnt = ua.dataCount;
    }
    else if (ua.arnoldCategory == AI_USERDEF_VARYING)
    {
-      decl = "varying " + ua.arnoldTypeStr;
+      decl = "varying " + outArnoldTypeStr;
       cnt = ua.dataCount;
    }
    else
    {
-      decl = "indexed " + ua.arnoldTypeStr;
+      decl = "indexed " + outArnoldTypeStr;
       idxsName = valsName + "idxs";
       cnt = (ua.indices ? ua.indicesCount : ua.dataCount);
    }
@@ -1477,7 +1901,7 @@ void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigne
          bool isArray = (AiUserParamGetType(upe) == AI_TYPE_ARRAY);
          int type = (isArray ? AiUserParamGetArrayType(upe) : AiUserParamGetType(upe));
          
-         if (type != ua.arnoldType ||
+         if (type != outArnoldType ||
              AiUserParamGetCategory(upe) != ua.arnoldCategory,
              ua.isArray != isArray)
          {
@@ -1487,40 +1911,40 @@ void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigne
       }
    }
    
-   switch (ua.arnoldType)
+   switch (outArnoldType)
    {
    case AI_TYPE_BOOLEAN:
-      _SetUserAttribute<AI_TYPE_BOOLEAN, bool>(node, valsName, idxsName, ua, remapIndices);
+      _SetUserAttribute<AI_TYPE_BOOLEAN>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_BYTE:
-      _SetUserAttribute<AI_TYPE_BYTE, uint8_t>(node, valsName, idxsName, ua, remapIndices);
+      _SetUserAttribute<AI_TYPE_BYTE>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_INT:
-      _SetUserAttribute<AI_TYPE_INT, int>(node, valsName, idxsName, ua, remapIndices);
+      _SetUserAttribute<AI_TYPE_INT>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_UINT:
-      _SetUserAttribute<AI_TYPE_UINT, unsigned int>(node, valsName, idxsName, ua, remapIndices);
+      _SetUserAttribute<AI_TYPE_UINT>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_FLOAT:
-      _SetUserAttribute<AI_TYPE_FLOAT, float>(node, valsName, idxsName, ua, remapIndices);
+      _SetUserAttribute<AI_TYPE_FLOAT>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_VECTOR2:
-      _SetUserAttribute<AI_TYPE_VECTOR2, float>(node, valsName, idxsName, ua, remapIndices);
+      _SetUserAttribute<AI_TYPE_VECTOR2>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_VECTOR:
-      _SetUserAttribute<AI_TYPE_VECTOR, float>(node, valsName, idxsName, ua, remapIndices);
+      _SetUserAttribute<AI_TYPE_VECTOR>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_RGB:
-      _SetUserAttribute<AI_TYPE_RGB, float>(node, valsName, idxsName, ua, remapIndices);
+      _SetUserAttribute<AI_TYPE_RGB>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_RGBA:
-      _SetUserAttribute<AI_TYPE_RGBA, float>(node, valsName, idxsName, ua, remapIndices);
+      _SetUserAttribute<AI_TYPE_RGBA>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_MATRIX:
-      _SetUserAttribute<AI_TYPE_MATRIX, float>(node, valsName, idxsName, ua, remapIndices);
+      _SetUserAttribute<AI_TYPE_MATRIX>(node, valsName, idxsName, ua, remapIndices);
       break;
    case AI_TYPE_STRING:
-      _SetUserAttribute<AI_TYPE_STRING, const char*>(node, valsName, idxsName, ua, remapIndices);
+      _SetUserAttribute<AI_TYPE_STRING>(node, valsName, idxsName, ua, remapIndices);
    default:
       break;
    }
