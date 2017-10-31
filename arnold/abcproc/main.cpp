@@ -6,6 +6,8 @@
 
 // ---
 
+#ifndef ARNOLD4_API
+
 AI_PROCEDURAL_NODE_EXPORT_METHODS(AbcProcMtd);
 
 
@@ -75,6 +77,8 @@ node_parameters
 
    AiMetaDataSetBool(nentry, Strings::filename, Strings::filepath, true);
 }
+
+#endif
 
 procedural_init
 {
@@ -275,6 +279,20 @@ static void __attribute__((destructor)) on_dlclose(void)
 #endif // ALEMBIC_WITH_HDF5
 
 
+#ifdef ARNOLD4_API
+
+proc_loader
+{
+   vtable->Init     = ProcInit;
+   vtable->Cleanup  = ProcCleanup;
+   vtable->NumNodes = ProcNumNodes;
+   vtable->GetNode  = ProcGetNode;
+   strcpy(vtable->version, AI_VERSION);
+   return 1;
+}
+
+#else
+
 node_loader
 {
    if (i > 0)
@@ -290,3 +308,6 @@ node_loader
 
    return true;
 }
+
+#endif
+

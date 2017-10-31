@@ -44,9 +44,15 @@ withHoudini = (excons.GetArgument("with-houdini", default=None) is not None)
 
 if withArnold:
    A, M, m, p = arnold.Version(asString=False)
-   if A != 5:
-      withArnold = None
-   elif M == 0 and m < 1:
+   # MtoA >=1.4.0 supported
+   # Requires arnold >= 4.2.15.1
+   if A == 4:
+      if M != 2 or m < 15 or (m == 15 and p < 1):
+         withArnold = None
+   elif A == 5:
+      if M == 0 and m < 1:
+         withArnold = None
+   else:
       withArnold = None
    if not withArnold:
       print("Arnold 5 above 5.0.1.0 required")
@@ -504,7 +510,8 @@ if withMaya:
    if withArnold:
       A, M, m = mtoa.Version(asString=False)
       # So far MtoA 2.>=0 supported only
-      if A >= 2:
+      #if A >= 2:
+      if A >= 2 or (A == 1 and M >= 4):
          AbcShapeMtoaAE = "maya/AbcShape/mtoa/%sMtoa.py" % AbcShapeName
 
          if not os.path.exists(AbcShapeMtoaAE) or os.stat(AbcShapeMtoaAE).st_mtime < os.stat("maya/AbcShape/mtoa/AbcShapeMtoa.py.tpl").st_mtime:

@@ -54,7 +54,13 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
       std::string targetName = targetNode->formatPartialPath(mDso->namePrefix().c_str(), AlembicNode::LocalPrefix, '|');
       std::string name = mDso->uniqueName(targetName);
 
+      #ifdef ARNOLD4_API
+      AtNode *proc = AiNode("procedural", name.c_str(), mDso->procNode());
+      AiNodeSetStr(proc, "dso", "abcproc");
+      AiNodeSetBool(proc, "load_at_init", true);
+      #else
       AtNode *proc = AiNode("abcproc", name.c_str(), mDso->procNode());
+      #endif
 
       AbcProcGlobalLock::Release();
 

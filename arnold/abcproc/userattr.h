@@ -4,10 +4,10 @@
 #include <Alembic/AbcCoreAbstract/All.h>
 #include <Alembic/Abc/All.h>
 #include <Alembic/AbcGeom/All.h>
-#include <ai.h>
 #include <string>
 #include <map>
 #include <set>
+#include "compat.h"
 
 struct UserAttribute
 {

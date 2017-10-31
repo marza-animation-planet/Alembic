@@ -33,11 +33,21 @@ bool ResizeUserAttribute(UserAttribute &ua, unsigned int newSize)
    int intDef = 0;
    unsigned int uintDef = 0;
    float floatDef = 0.0f;
+#ifdef ARNOLD4_API
+   AtVector2 vec2Def = {0.0f, 0.0f};
+   AtPoint pntDef = {0.0f, 0.0f, 0.0f};
+   AtVector vecDef = {0.0f, 0.0f, 0.0f};
+   AtRGB rgbDef = {0.0f, 0.0f, 0.0f};
+   AtRGBA rgbaDef = {0.0f, 0.0f, 0.0f, 1.0f};
+   AtMatrix matrixDef;
+   AiM4Identity(matrixDef);
+#else
    AtVector2 vec2Def(0.0f, 0.0f);
    AtVector vecDef(0.0f, 0.0f, 0.0f);
    AtRGB rgbDef(0.0f, 0.0f, 0.0f);
    AtRGBA rgbaDef(0.0f, 0.0f, 0.0f, 1.0f);
    AtMatrix matrixDef = AiM4Identity();
+#endif
    const char *strDef = 0;
    
    std::set<std::string>::iterator it = ua.strings.insert("").first;
@@ -78,6 +88,12 @@ bool ResizeUserAttribute(UserAttribute &ua, unsigned int newSize)
       defaultValue = &(vecDef.x);
       podSize = sizeof(float);
       break;
+   #ifdef ARNOLD4_API
+   case AI_TYPE_POINT:
+      defaultValue = &(pntDef.x);
+      podSize = sizeof(float);
+      break;
+   #endif
    case AI_TYPE_RGB:
       defaultValue = &(rgbDef.r);
       podSize = sizeof(float);
@@ -182,6 +198,9 @@ bool CopyUserAttribute(UserAttribute &src, unsigned int srcIdx, unsigned int cou
    case AI_TYPE_FLOAT:
    case AI_TYPE_VECTOR2:
    case AI_TYPE_VECTOR:
+   #ifdef ARNOLD4_API
+   case AI_TYPE_POINT:
+   #endif
    case AI_TYPE_RGB:
    case AI_TYPE_RGBA:
    case AI_TYPE_MATRIX:
@@ -819,7 +838,7 @@ bool ReadUserAttribute(UserAttribute &ua,
          return _ReadUserAttribute<Alembic::Abc::Float32TPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
       case 2:
          ua.arnoldType = AI_TYPE_VECTOR2;
-         ua.arnoldTypeStr = "VECTOR2";
+         ua.arnoldTypeStr = VECTOR2_TYPE_STR;
          if (interp.find("point") != std::string::npos)
          {
             return _ReadUserAttribute<Alembic::Abc::P2fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
@@ -850,6 +869,10 @@ bool ReadUserAttribute(UserAttribute &ua,
             ua.arnoldTypeStr = "VECTOR";
             if (interp.find("point") != std::string::npos)
             {
+               #ifdef ARNOLD4_API
+               ua.arnoldType = AI_TYPE_POINT;
+               ua.arnoldTypeStr = "POINT";
+               #endif
                return _ReadUserAttribute<Alembic::Abc::P3fTPTraits, Alembic::Util::float32_t, float>(ua, parent, header, t, geoparam, interpolate);
             }
             else if (interp.find("normal") != std::string::npos)
@@ -896,7 +919,7 @@ bool ReadUserAttribute(UserAttribute &ua,
          return _ReadUserAttribute<Alembic::Abc::Float64TPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
       case 2:
          ua.arnoldType = AI_TYPE_VECTOR2;
-         ua.arnoldTypeStr = "VECTOR2";
+         ua.arnoldTypeStr = VECTOR2_TYPE_STR;
          if (interp.find("point") != std::string::npos)
          {
             return _ReadUserAttribute<Alembic::Abc::P2dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
@@ -921,6 +944,10 @@ bool ReadUserAttribute(UserAttribute &ua,
 
          if (interp.find("point") != std::string::npos)
          {
+            #ifdef ARNOLD4_API
+            ua.arnoldType = AI_TYPE_POINT;
+            ua.arnoldTypeStr = "POINT";
+            #endif
             return _ReadUserAttribute<Alembic::Abc::P3dTPTraits, Alembic::Util::float64_t, float>(ua, parent, header, t, geoparam, interpolate);
          }
          else if (interp.find("normal") != std::string::npos)
@@ -1098,6 +1125,14 @@ void _NodeSet<AI_TYPE_VECTOR2, float>(AtNode *node, const char *name, float *val
 {
    AiNodeSetVec2(node, name, vals[0], vals[1]);
 }
+
+#ifdef ARNOLD4_API
+template <>
+void _NodeSet<AI_TYPE_POINT, float>(AtNode *node, const char *name, float *vals)
+{
+   AiNodeSetPnt(node, name, vals[0], vals[1], vals[2]);
+}
+#endif
 
 template <>
 void _NodeSet<AI_TYPE_VECTOR, float>(AtNode *node, const char *name, float *vals)
@@ -1552,6 +1587,36 @@ void _ArraySet<AI_TYPE_VECTOR2, float>(AtArray *ary, unsigned int count, float *
    }
 }
 
+#ifdef ARNOLD4_API
+
+template <>
+void _ArraySet<AI_TYPE_POINT, float>(AtArray *ary, unsigned int count, float *vals, unsigned int *idxs)
+{
+   AtPoint pnt;
+   if (idxs)
+   {
+      for (unsigned int i=0, j=0; i<count; ++i)
+      {
+         j = idxs[i] * 3;
+         pnt.x = vals[j+0];
+         pnt.y = vals[j+1];
+         pnt.z = vals[j+2];
+         AiArraySetPnt(ary, i, pnt);
+      }
+   }
+   else
+   {
+      for (unsigned int i=0, j=0; i<count; ++i, j+=3)
+      {
+         pnt.x = vals[j+0];
+         pnt.y = vals[j+1];
+         pnt.z = vals[j+2];
+         AiArraySetPnt(ary, i, pnt);
+      }
+   }
+}
+#endif
+
 template <>
 void _ArraySet<AI_TYPE_VECTOR, float>(AtArray *ary, unsigned int count, float *vals, unsigned int *idxs)
 {
@@ -1824,6 +1889,11 @@ void _SetUserAttribute(AtNode *node, const std::string &valName, const std::stri
    case AI_TYPE_VECTOR:
       __SetUserAttribute<ArnoldType, float>(node, valName, idxName, ua, remapIndices);
       break;
+   #ifdef ARNOLD4_API
+   case AI_TYPE_POINT:
+      __SetUserAttribute<ArnoldType, float>(node, valName, idxName, ua, remapIndices);
+      break;
+   #endif
    case AI_TYPE_RGB:
       __SetUserAttribute<ArnoldType, float>(node, valName, idxName, ua, remapIndices);
       break;
@@ -1934,6 +2004,11 @@ void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigne
    case AI_TYPE_VECTOR:
       _SetUserAttribute<AI_TYPE_VECTOR>(node, valsName, idxsName, ua, remapIndices);
       break;
+   #ifdef ARNOLD4_API
+   case AI_TYPE_POINT:
+      _SetUserAttribute<AI_TYPE_POINT>(node, valsName, idxsName, ua, remapIndices);
+      break;
+   #endif
    case AI_TYPE_RGB:
       _SetUserAttribute<AI_TYPE_RGB>(node, valsName, idxsName, ua, remapIndices);
       break;
@@ -2105,6 +2180,9 @@ bool PromoteToObjectAttrib(const UserAttribute &src, UserAttribute &dst)
          }
          break;
       case AI_TYPE_VECTOR:
+      #ifdef ARNOLD4_API
+      case AI_TYPE_POINT:
+      #endif
       case AI_TYPE_RGB:
          {
             dst.data = AiMalloc(3 * sizeof(float));

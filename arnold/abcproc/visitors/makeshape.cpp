@@ -2086,10 +2086,10 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
 
    unsigned int nkeys = (vel0 ? mDso->numMotionSamples() : 1);
 
-   AtArray *points = AiArrayAllocate(info.pointCount, nkeys, AI_TYPE_VECTOR);
+   AtArray *points = AiArrayAllocate(info.pointCount, nkeys, AI_TYPE_POINT);
 
    std::map<Alembic::Util::uint64_t, size_t>::iterator idit;
-   AtVector pnt;
+   AtPoint pnt;
 
    for (unsigned int i=0, koff=0; i<nkeys; ++i, koff+=info.pointCount)
    {
@@ -2161,7 +2161,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
             }
          }
 
-         AiArraySetVec(points, koff+j, pnt);
+         AiArraySetPnt(points, koff+j, pnt);
       }
 
       std::map<Alembic::Util::uint64_t, std::pair<size_t, size_t> >::iterator it;
@@ -2195,7 +2195,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
             }
          }
 
-         AiArraySetVec(points, koff + it->second.second, pnt);
+         AiArraySetPnt(points, koff + it->second.second, pnt);
       }
    }
 
@@ -2685,7 +2685,7 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
 
    if (!points)
    {
-      points = AiArrayAllocate(allocPointCount, numMotionSteps, AI_TYPE_VECTOR);
+      points = AiArrayAllocate(allocPointCount, numMotionSteps, AI_TYPE_POINT);
    }
    else
    {
@@ -2704,7 +2704,7 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
    size_t pi = motionStep * allocPointCount;
    unsigned int po = 0;
    Alembic::Abc::V3f p0, p1;
-   AtVector pnt;
+   AtPoint pnt;
    const float *cvel = vel;
    const float *cacc = acc;
 
@@ -2856,7 +2856,7 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
             pnt.x = pt[0];
             pnt.y = pt[1];
             pnt.z = pt[2];
-            AiArraySetVec(points, pi++, pnt);
+            AiArraySetPnt(points, pi++, pnt);
 
             // if (mDso->verbose())
             // {
@@ -2872,7 +2872,7 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
             pnt.x = pt[0];
             pnt.y = pt[1];
             pnt.z = pt[2];
-            AiArraySetVec(points, pi++, pnt);
+            AiArraySetPnt(points, pi++, pnt);
 
             // if (mDso->verbose())
             // {
@@ -2888,7 +2888,7 @@ bool MakeShape::fillCurvesPositions(CurvesInfo &info,
             pnt.x = pt[0];
             pnt.y = pt[1];
             pnt.z = pt[2];
-            AiArraySetVec(points, pi++, pnt);
+            AiArraySetPnt(points, pi++, pnt);
 
             // if (mDso->verbose())
             // {
@@ -3092,8 +3092,8 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
 
          ua.dataDim = 3;
          ua.dataCount = count;
-         ua.arnoldType = AI_TYPE_VECTOR;
-         ua.arnoldTypeStr = "VECTOR";
+         ua.arnoldType = AI_TYPE_POINT;
+         ua.arnoldTypeStr = POINT_TYPE_STR;
       }
 
       // Check valid point count
@@ -3359,8 +3359,8 @@ bool MakeShape::fillReferencePositions(AlembicCurves *refCurves,
          InitUserAttribute(ua);
 
          ua.arnoldCategory = AI_USERDEF_VARYING;
-         ua.arnoldType = AI_TYPE_VECTOR;
-         ua.arnoldTypeStr = "VECTOR";
+         ua.arnoldType = AI_TYPE_POINT;
+         ua.arnoldTypeStr = POINT_TYPE_STR;
          ua.isArray = true;
          ua.dataDim = 3;
          ua.dataCount = info.pointCount;

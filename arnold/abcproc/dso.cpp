@@ -949,7 +949,7 @@ void Dso::readParams()
    std::string str;
 
    // Drive for directory mapping
-   str = AiNodeGetStr(mProcNode, Strings::rootdrive).c_str();
+   str = (const char*) AiNodeGetStr(mProcNode, Strings::rootdrive);
    if (str.length() == 1 &&
        ((str[0] >= 'a' && str[0] <= 'z') ||
         (str[0] >= 'A' && str[0] <= 'Z')))
@@ -1004,7 +1004,7 @@ void Dso::readParams()
    {
       for (unsigned int i=0; i<AiArrayGetNumElements(array); ++i)
       {
-         mCommonParams.removeAttributePrefices.insert(AiArrayGetStr(array, i).c_str());
+         mCommonParams.removeAttributePrefices.insert((const char*) AiArrayGetStr(array, i));
       }
    }
    mCommonParams.ignoreAttributes.clear();
@@ -1013,7 +1013,7 @@ void Dso::readParams()
    {
       for (unsigned int i=0; i<AiArrayGetNumElements(array); ++i)
       {
-         mCommonParams.ignoreAttributes.insert(AiArrayGetStr(array, i).c_str());
+         mCommonParams.ignoreAttributes.insert((const char*) AiArrayGetStr(array, i));
       }
    }
    mCommonParams.forceConstantAttributes.clear();
@@ -1022,7 +1022,7 @@ void Dso::readParams()
    {
       for (unsigned int i=0; i<AiArrayGetNumElements(array); ++i)
       {
-         mCommonParams.forceConstantAttributes.insert(AiArrayGetStr(array, i).c_str());
+         mCommonParams.forceConstantAttributes.insert((const char*) AiArrayGetStr(array, i));
       }
    }
    //  Others
@@ -1035,7 +1035,7 @@ void Dso::readParams()
    {
       for (unsigned int i=0; i<AiArrayGetNumElements(array); ++i)
       {
-         mSingleParams.computeTangentsForUVs.insert(AiArrayGetStr(array, i).c_str());
+         mSingleParams.computeTangentsForUVs.insert((const char*) AiArrayGetStr(array, i));
       }
    }
    mSingleParams.radiusName = AiNodeGetStr(mProcNode, Strings::radius_name).c_str();
@@ -1254,11 +1254,16 @@ void Dso::transferUserParams(AtNode *dst)
             case AI_TYPE_RGBA:
                if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " RGBA").c_str());
                break;
+            #ifdef ARNOLD4_API
+            case AI_TYPE_POINT:
+               if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " POINT").c_str());
+               break;
+            #endif
             case AI_TYPE_VECTOR:
                if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " VECTOR").c_str());
                break;
             case AI_TYPE_VECTOR2:
-               if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " VECTOR2").c_str());
+               if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " " + std::string(VECTOR2_TYPE_STR)).c_str());
                break;
             case AI_TYPE_STRING:
                if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " STRING").c_str());
@@ -1294,11 +1299,16 @@ void Dso::transferUserParams(AtNode *dst)
                case AI_TYPE_RGBA:
                   if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " ARRAY RGBA").c_str());
                   break;
+               #ifdef ARNOLD4_API
+               case AI_TYPE_POINT:
+                  if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " ARRAY POINT").c_str());
+                  break;
+               #endif
                case AI_TYPE_VECTOR:
                   if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " ARRAY VECTOR").c_str());
                   break;
                case AI_TYPE_VECTOR2:
-                  if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " ARRAY VECTOR2").c_str());
+                  if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " " + std::string(VECTOR2ARRAY_TYPE_STR)).c_str());
                   break;
                case AI_TYPE_STRING:
                   if (doDeclare) AiNodeDeclare(dst, pname, (std::string(sDeclBase[pcat]) + " ARRAY STRING").c_str());
@@ -1544,6 +1554,13 @@ void Dso::transferUserParams(AtNode *dst)
                   AiNodeSetRGBA(dst, pname, val.r, val.g, val.b, val.a);
                   break;
                }
+               #ifdef ARNOLD4_API
+               case AI_TYPE_POINT: {
+                  AtPoint val = AiNodeGetPnt(mProcNode, pname);
+                  AiNodeSetPnt(dst, pname, val.x, val.y, val.z);
+                  break;
+               }
+               #endif
                case AI_TYPE_VECTOR: {
                   AtVector val = AiNodeGetVec(mProcNode, pname);
                   AiNodeSetVec(dst, pname, val.x, val.y, val.z);
@@ -1568,7 +1585,7 @@ void Dso::transferUserParams(AtNode *dst)
                case AI_TYPE_NODE:
                   if (ptype == AI_TYPE_STRING)
                   {
-                     const char *nn = AiNodeGetStr(mProcNode, pname).c_str();
+                     const char *nn = (const char*) AiNodeGetStr(mProcNode, pname);
                      AtNode *n = AiNodeLookUpByName(nn);
                      AiNodeSetPtr(dst, pname, (void*)n);
                   }
@@ -1578,7 +1595,12 @@ void Dso::transferUserParams(AtNode *dst)
                   }
                   break;
                case AI_TYPE_MATRIX: {
+                  #ifdef ARNOLD4_API
+                  AtMatrix val;
+                  AiNodeGetMatrix(mProcNode, pname, val);
+                  #else
                   AtMatrix val = AiNodeGetMatrix(mProcNode, pname);
+                  #endif
                   AiNodeSetMatrix(dst, pname, val);
                   break;
                 }

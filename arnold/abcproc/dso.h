@@ -1,7 +1,8 @@
 #ifndef ABCPROC_DSO_H_
 #define ABCPROC_DSO_H_
 
-#include <ai.h>
+//#include <ai.h>
+#include "compat.h"
 #include <AlembicSceneCache.h>
 #include <strings.h>
 
