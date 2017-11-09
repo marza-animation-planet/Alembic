@@ -574,8 +574,33 @@ def parmsInFolder(node, folders):
         return node.parms()
     else:
         fldset = set(map(lambda x: tuple(x.split("/")), folders))
-        return filter(lambda x: x.containingFolders() in fldset, node.parms())
+        def isInFolders(p, fldset):
+            idx = -1
+            flds = p.containingFolders()
+            while flds and not flds in fldset:
+                flds = flds[:idx]
+                idx -= 1
+            return (True if flds else False)
+        return filter(lambda x: isInFolders(x, fldset), node.parms())
 
+def filterUserAttribute(p, includePrefices, overrideSuffix):
+    node = p.node()
+    name = p.name()
+    if overrideSuffix and name.endswith(overrideSuffix) and node.parm(name.replace(overrideSuffix, "")) is not None:
+        # Skip toggle attributes
+        return False
+    if len(includePrefices) == 0:
+        return True
+    else:
+        for includePrefix in includePrefices:
+            if name.startswith(includePrefix):
+                # Check for override toggle
+                ovrp = node.parm(name + overrideSuffix)
+                if ovrp is None or ovrp.eval():
+                    return True
+                else:
+                    return False
+        return False
 
 def syncUserAttributes(srcNode, dstNode, verbose=False, includeFolders=[], includePrefices=["ar_user_"], ignorePrefices=["ar_"], targetFolder="Procedural", stripPrefix=True, overrideSuffix="_override", ignoreNames=[]):
     if verbose:
@@ -589,41 +614,40 @@ def syncUserAttributes(srcNode, dstNode, verbose=False, includeFolders=[], inclu
     dstParms = parmsInFolder(dstNode, targetFolder)
     dstNames = set(map(lambda x: x.name(), dstParms))
 
-    def includeFilter(p):
-        node = p.node()
-        name = p.name()
-        if name.endswith(overrideSuffix) and node.parm(name.replace(overrideSuffix, "")) is not None:
-            # Skip toggle attributes
-            return False
-        if len(includePrefices) == 0:
-            return True
-        else:
-            for includePrefix in includePrefices:
-                if name.startswith(includePrefix):
-                    # Check for override toggle
-                    ovrp = node.parm(name + overrideSuffix)
-                    if ovrp is None or ovrp.eval():
-                        return True
-                    else:
-                        return False
-            return False
-
-    srcParms = filter(includeFilter, parmsInFolder(srcNode, includeFolders))
+    srcParms = filter(lambda x: filterUserAttribute(x, includePrefices, overrideSuffix), parmsInFolder(srcNode, includeFolders))
     srcNames = set(map(lambda x: x.name(), srcParms))
 
     ignoreSet = set(ignoreNames + ["ar_user_options", "ar_user_options_enable", "abcproc_parms"])
+    ignoreTypes = (hou.parmTemplateType.Folder, hou.parmTemplateType.FolderSet, hou.parmTemplateType.Button, hou.parmTemplateType.Separator)
 
     relPath = dstNode.relativePathTo(srcNode)
 
+    # When strip prefix is disabled, be carefull of overlaps between ignore and include prefices
+    if not stripPrefix:
+        _ignorePrefices = []
+        for ignp in ignorePrefices:
+            remove = False
+            for incp in includePrefices:
+                if incp.startswith(ignp):
+                    remove = True
+                    break
+            if not remove:
+                _ignorePrefices.append(ignp)
+        ignorePrefices = _ignorePrefices
+
     for parm in srcParms:
+        removedPrefix = None
         name = parm.name()
         if name in ignoreSet:
+            if verbose:
+                print("Ignored: '%s'" % name)
             continue
 
         if stripPrefix:
             for prefix in includePrefices:
                 if name.startswith(prefix):
                     name = name.replace(prefix, "")
+                    removedPrefix = prefix
                     break
 
         skip = False
@@ -632,21 +656,41 @@ def syncUserAttributes(srcNode, dstNode, verbose=False, includeFolders=[], inclu
                 skip = True
                 break
         if skip:
+            if verbose:
+                print("  Skip '%s'" % name)
             continue
 
         if verbose:
             print("  " + parm.name())
 
-        isString = (parm.parmTemplate().dataType() == hou.parmData.String)
+        dontCreate = False
+
+        tpl = parm.parmTemplate()
+
+        # For multi component parms like color, vector or float[2], a single template is shared
+        if tpl.name() in ignoreSet:
+            dontCreate = True
+        else:
+            print("  Add parm '%s' template '%s' to ignore set" % (parm.name(), tpl.name()))
+            ignoreSet.add(tpl.name())
+
+        isString = (tpl.dataType() == hou.parmData.String)
 
         scr = "ch%s(\"%s/%s\")" % ("s" if isString else "", relPath, parm.name())
 
         if not name in dstNames:
-            if verbose:
-                print("    => Add new param and link")
-            newtpl = parm.parmTemplate().clone()
-            newtpl.setName(name)
-            ptg.appendToFolder(targetFolder.split("/"), newtpl)
+            if not dontCreate:
+                if verbose:
+                    print("    => Add new param and link")
+                newtpl = tpl.clone()
+                tplname = tpl.name()
+                if removedPrefix:
+                    tplname = tplname.replace(removedPrefix, "")
+                newtpl.setName(tplname)
+                ptg.appendToFolder(targetFolder.split("/"), newtpl)
+            else:
+                if verbose:
+                    print("    => Link new param")
             delayLink.append((name, scr))
             upd = True
 
@@ -655,9 +699,10 @@ def syncUserAttributes(srcNode, dstNode, verbose=False, includeFolders=[], inclu
                 print("    => Param already exists")
             dstParm = dstNode.parm(name)
             refParm = dstParm.getReferencedParm()
-            if refParm != parm:
+            # Check against both parm and its referenced parm (if any)
+            if refParm != parm and refParm != parm.getReferencedParm():
                 if verbose:
-                    print("  => Not referencing the right attribute")
+                    print("    => Not referencing the right attribute, re-link parm")
                 dstParm.setExpression(scr, hou.exprLanguage.Hscript, True)
 
     if upd:
@@ -669,13 +714,26 @@ def syncUserAttributes(srcNode, dstNode, verbose=False, includeFolders=[], inclu
         dstParms = parmsInFolder(dstNode, targetFolder)
         dstNames = set(map(lambda x: x.name(), dstParms))
 
+    if verbose:
+        print("Remove un-wanted parms from '%s'" % dstNode.path())
+
     # Remove parameters deleted from srcNode too
-    for parm in dstParms:
-        if not parm.isSpare():
-            # Cannot delete non-spare parameters
+    for pn in dstNames:
+        parm = dstNode.parm(pn)
+
+        if not parm:
             continue
 
-        if parm.name() in ignoreSet:
+        if not parm.isSpare():
+            continue
+
+        tpl = parm.parmTemplate()
+
+        if tpl.type() in ignoreTypes:
+            continue
+
+        #if parm.name() in ignoreSet:
+        if tpl.name() in ignoreSet:
             continue
 
         skip = False
@@ -698,7 +756,7 @@ def syncUserAttributes(srcNode, dstNode, verbose=False, includeFolders=[], inclu
             continue
 
         if verbose:
-            print("  => Remove attribute \"" + parm.name() + "\"")
+            print("  => Remove attribute '%s'" % pn)
 
         dstNode.removeSpareParmTuple(parm.tuple())
 
