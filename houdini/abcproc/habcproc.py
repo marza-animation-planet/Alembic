@@ -811,5 +811,8 @@ def getDisplacementShader(node):
     return ""
 
 
-def updateDisplacementShader(node):
+def updateDisplacementShader(node, sync=True):
     node.parm("ar_user_disp_map").set(getDisplacementShader(node))
+    node.parm("ar_user_disp_map_override").set(1)
+    if sync:
+        node.parm("sync_user_parms").pressButton()
