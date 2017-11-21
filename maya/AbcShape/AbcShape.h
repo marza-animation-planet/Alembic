@@ -171,12 +171,19 @@ public:
     virtual bool isBounded() const;
     virtual MBoundingBox boundingBox() const;
     
+#if MAYA_API_VERSION >= 20180000
+    virtual bool getInternalValue(const MPlug &plug,
+                                  MDataHandle &handle);
+    virtual bool setInternalValue(const MPlug &plug,
+                                  const MDataHandle &handle);
+#else
     virtual bool getInternalValueInContext(const MPlug &plug,
                                            MDataHandle &handle,
                                            MDGContext &ctx);
     virtual bool setInternalValueInContext(const MPlug &plug,
                                            const MDataHandle &handle,
                                            MDGContext &ctx);
+#endif
     virtual void copyInternalData(MPxNode *source);
     
     inline AlembicScene* scene() { return mScene; }
