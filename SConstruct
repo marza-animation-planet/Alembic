@@ -392,6 +392,9 @@ if withArnold:
                 "custom": [arnold.Require, RequireAlembicHelper(static=link_static)]})
 
 if withVray:
+   cppflags = ""
+   if sys.platform.startswith("linux"):
+      cppflags = " -Wno-write-strings -Wno-maybe-uninitialized -Wno-sign-compare"
    prjs.append({"name": "%svray_AlembicLoader" % ("lib" if sys.platform != "win32" else ""),
                 "type": "dynamicmodule",
                 "alias": "alembic-vray",
@@ -401,6 +404,7 @@ if withVray:
                 "rpaths": ["../lib"],
                 "bldprefix": "vray-%s" % vray.Version(),
                 "incdirs": ["vray"],
+                "cppflags": cppflags,
                 "srcs": excons.glob("vray/*.cpp"),
                 "custom": [vray.Require, RequireAlembicHelper(static=link_static)]})
 
