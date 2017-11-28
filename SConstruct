@@ -287,6 +287,11 @@ prjs.append({"name": "AlembicAbcOpenGL",
 
 # Python modules
 pydefs = []
+pyflags = ""
+if sys.platform != "win32":
+   pydefs.append("BOOST_PYTHON_USE_GCC_SYMBOL_VISIBILITY")
+   if sys.platform == "darwin":
+      pyflags += " -Wno-sign-compare -Wno-missing-field-initializers -Wno-unused-local-typedef"
 if excons.GetArgument("boost-python-static", excons.GetArgument("boost-static", 0, int), int) != 0:
    pydefs.append("PYALEMBIC_USE_STATIC_BOOST_PYTHON")
 
@@ -299,6 +304,7 @@ prjs.extend([{"name": ("alembicmodule" if sys.platform != "win32" else "alembic"
               "rpaths": ["../.."],
               "bldprefix": "python-%s" % python.Version(),
               "defs": pydefs + ["alembicmodule_EXPORTS"],
+              "cppflags": pyflags,
               "incdirs": ["python/PyAlembic"],
               "srcs": excons.glob("python/PyAlembic/*.cpp"),
               "custom": [RequireAlembic(static=link_static, withPython=True)],
@@ -313,6 +319,7 @@ prjs.extend([{"name": ("alembicmodule" if sys.platform != "win32" else "alembic"
               "rpaths": ["../.."],
               "bldprefix": "python-%s" % python.Version(),
               "defs": pydefs + ["alembicglmodule_EXPORTS"],
+              "cppflags": pyflags,
               "incdirs": ["abcview/python/PyAbcOpenGL"],
               "srcs": excons.glob("abcview/python/PyAbcOpenGL/*.cpp"),
               "custom": [RequireAlembic(static=link_static, withPython=True, withGL=True)]}])
