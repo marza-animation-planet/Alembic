@@ -2708,7 +2708,11 @@ void AbcShape::printSceneBounds() const
    std::cout << "[" << PREFIX_NAME("AbcShape") << "] Scene " << mScene->selfBounds().min << " - " << mScene->selfBounds().max << std::endl;
 }
 
+#if MAYA_API_VERSION >= 20180000
+bool AbcShape::getInternalValue(const MPlug &plug, MDataHandle &handle)
+#else
 bool AbcShape::getInternalValueInContext(const MPlug &plug, MDataHandle &handle, MDGContext &ctx)
+#endif
 {
    if (plug == aFilePath)
    {
@@ -2802,11 +2806,19 @@ bool AbcShape::getInternalValueInContext(const MPlug &plug, MDataHandle &handle,
    }
    else
    {
+#if MAYA_API_VERSION >= 20180000
+      return MPxSurfaceShape::getInternalValue(plug, handle);
+#else
       return MPxSurfaceShape::getInternalValueInContext(plug, handle, ctx);
+#endif
    }
 }
 
+#if MAYA_API_VERSION >= 20180000
+bool AbcShape::setInternalValue(const MPlug &plug, const MDataHandle &handle)
+#else
 bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &handle, MDGContext &ctx)
+#endif
 {
    bool sampleTimeUpdate = false;
 
@@ -2996,7 +3008,11 @@ bool AbcShape::setInternalValueInContext(const MPlug &plug, const MDataHandle &h
    }
    else
    {
+#if MAYA_API_VERSION >= 20180000
+      return MPxSurfaceShape::setInternalValue(plug, handle);
+#else
       return MPxSurfaceShape::setInternalValueInContext(plug, handle, ctx);
+#endif
    }
 
    if (sampleTimeUpdate)
