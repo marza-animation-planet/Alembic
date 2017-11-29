@@ -266,10 +266,15 @@ prjs.append({"name": "Alembic",
              "srcs": lib_sources,
              "custom": [RequireAlembic(static=False, linkCore=False)]})
 
+glflags = ""
+if sys.platform == "darwin":
+  glflags += " -Wno-deprecated-declarations"
+
 prjs.append({"name": ("libAlembicAbcOpenGL" if sys.platform == "win32" else "AlembicAbcOpenGL"),
              "type": "staticlib",
              "alias": "alembicgl-static",
              "desc": "Alembic OpenGL library",
+             "cppflags": glflags,
              "srcs": excons.glob("abcview/lib/AbcOpenGL/*.cpp"),
              "custom": [RequireAlembic(static=True, withGL=True, linkGL=False)]})
 
@@ -279,6 +284,7 @@ prjs.append({"name": "AlembicAbcOpenGL",
              "desc": "Alembic OpenGL library",
              "symvis": "hidden",
              "defs": ["ABC_OPENGL_EXPORTS"],
+             "cppflags": glflags,
              "version": "1.1.0",
              "install_name": "libAlembicAbcOpenGL.1.dylib",
              "soname": "libAlembicAbcOpenGL.so.1",
