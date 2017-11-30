@@ -238,6 +238,16 @@ GenerateConfig = excons.config.AddGenerator(env, "abccfg", opts, pattern="\$\{([
 
 configh = GenerateConfig(cfgout, cfgin)
 
+
+nowarn_flags = ""
+if sys.platform != "win32":
+   nowarn_flags += " -Wno-sign-compare"
+   if sys.platform == "darwin":
+      nowarn_flags += " -Wno-missing-field-initializers -Wno-unused-local-typedef -Wno-deprecated-declarations"
+   else:
+      nowarn_flags += " -Wno-maybe-uninitialized -Wno-strict-aliasing -Wno-write-strings"
+
+
 lib_headers = []
 lib_sources = {}
 
@@ -253,6 +263,7 @@ prjs.append({"name": ("libAlembic" if sys.platform == "win32" else "Alembic"),
              "type": "staticlib",
              "alias": "alembic-static",
              "desc": "Alembic library",
+             "cppflags": nowarn_flags,
              "srcs": lib_sources,
              "custom": [RequireAlembic(static=True, linkCore=False)]})
 
@@ -260,6 +271,7 @@ prjs.append({"name": "Alembic",
              "type": "sharedlib",
              "alias": "alembic-shared",
              "desc": "Alembic library",
+             "cppflags": nowarn_flags,
              "symvis": "hidden",
              "defs": ["ALEMBIC_EXPORTS"],
              "version": version_str,
@@ -268,15 +280,11 @@ prjs.append({"name": "Alembic",
              "srcs": lib_sources,
              "custom": [RequireAlembic(static=False, linkCore=False)]})
 
-glflags = ""
-if sys.platform == "darwin":
-  glflags += " -Wno-deprecated-declarations"
-
 prjs.append({"name": ("libAlembicAbcOpenGL" if sys.platform == "win32" else "AlembicAbcOpenGL"),
              "type": "staticlib",
              "alias": "alembicgl-static",
              "desc": "Alembic OpenGL library",
-             "cppflags": glflags,
+             "cppflags": nowarn_flags,
              "srcs": excons.glob("abcview/lib/AbcOpenGL/*.cpp"),
              "custom": [RequireAlembic(static=True, withGL=True, linkGL=False)]})
 
@@ -286,7 +294,7 @@ prjs.append({"name": "AlembicAbcOpenGL",
              "desc": "Alembic OpenGL library",
              "symvis": "hidden",
              "defs": ["ABC_OPENGL_EXPORTS"],
-             "cppflags": glflags,
+             "cppflags": nowarn_flags,
              "version": "1.1.0",
              "install_name": "libAlembicAbcOpenGL.1.dylib",
              "soname": "libAlembicAbcOpenGL.so.1",
@@ -295,11 +303,8 @@ prjs.append({"name": "AlembicAbcOpenGL",
 
 # Python modules
 pydefs = []
-pyflags = ""
 if sys.platform != "win32":
    pydefs.append("BOOST_PYTHON_USE_GCC_SYMBOL_VISIBILITY")
-   if sys.platform == "darwin":
-      pyflags += " -Wno-sign-compare -Wno-missing-field-initializers -Wno-unused-local-typedef"
 if excons.GetArgument("boost-python-static", excons.GetArgument("boost-static", 0, int), int) != 0:
    pydefs.append("PYALEMBIC_USE_STATIC_BOOST_PYTHON")
 
@@ -312,7 +317,7 @@ prjs.extend([{"name": ("alembicmodule" if sys.platform != "win32" else "alembic"
               "rpaths": ["../.."],
               "bldprefix": "python-%s" % python.Version(),
               "defs": pydefs + ["alembicmodule_EXPORTS"],
-              "cppflags": pyflags,
+              "cppflags": nowarn_flags,
               "incdirs": ["python/PyAlembic"],
               "srcs": excons.glob("python/PyAlembic/*.cpp"),
               "custom": [RequireAlembic(static=link_static, withPython=True)],
@@ -327,7 +332,7 @@ prjs.extend([{"name": ("alembicmodule" if sys.platform != "win32" else "alembic"
               "rpaths": ["../.."],
               "bldprefix": "python-%s" % python.Version(),
               "defs": pydefs + ["alembicglmodule_EXPORTS"],
-              "cppflags": pyflags,
+              "cppflags": nowarn_flags,
               "incdirs": ["abcview/python/PyAbcOpenGL"],
               "srcs": excons.glob("abcview/python/PyAbcOpenGL/*.cpp"),
               "custom": [RequireAlembic(static=link_static, withPython=True, withGL=True)]}])
@@ -407,9 +412,6 @@ if withArnold:
                 "custom": [arnold.Require, RequireAlembicHelper(static=link_static)]})
 
 if withVray:
-   cppflags = ""
-   if sys.platform.startswith("linux"):
-      cppflags = " -Wno-write-strings -Wno-maybe-uninitialized -Wno-sign-compare"
    prjs.append({"name": "%svray_AlembicLoader" % ("lib" if sys.platform != "win32" else ""),
                 "type": "dynamicmodule",
                 "alias": "alembic-vray",
@@ -419,7 +421,7 @@ if withVray:
                 "rpaths": ["../lib"],
                 "bldprefix": "vray-%s" % vray.Version(),
                 "incdirs": ["vray"],
-                "cppflags": cppflags,
+                "cppflags": nowarn_flags,
                 "srcs": excons.glob("vray/*.cpp"),
                 "custom": [vray.Require, RequireAlembicHelper(static=link_static)]})
 
