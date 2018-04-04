@@ -106,7 +106,7 @@ scene but doesn't exist in the archive, children of that node will be connected\
                     Set read mode to open/import/replace (default to import)\n\
 -ft / filterObjects \"regex1 regex2 ...\"                                   \n\
                     Selective import cache objects whose name matches with  \n\
--eft / excludeFilterObjects \"regex1 regex2 ...\"                          \n\
+-eft / excludeFilterObjects \"regex1 regex2 ...\"                           \n\
                     Selective exclude cache objects whose name matches with \n\
 the input regular expressions.                                              \n\
 -h  / help          Print this message                                      \n\
@@ -117,8 +117,8 @@ NAME_PREFIX "AbcImport -h;                                                  \n"
 NAME_PREFIX "AbcImport -d -m open \"/tmp/test.abc\";                        \n"
 NAME_PREFIX "AbcImport -ftr -ct \"/\" -crt -rm \"/tmp/test.abc\";           \n"
 NAME_PREFIX "AbcImport -ct \"root1 root2 root3 ...\" \"/tmp/test.abc\";     \n"
-NAME_PREFIX "AbcImport \"/tmp/test.abc\" \"/tmp/justUVs.abc\" \"/tmp/other.abc\" \n"
-);
+NAME_PREFIX "AbcImport \"/tmp/sparseAnimPts.abc\" \"/tmp/justUVs.abc\" \"/tmp/base.abc\" \n"
+);  // usage
 
 }
 
