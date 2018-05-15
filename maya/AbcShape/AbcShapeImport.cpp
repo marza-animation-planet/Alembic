@@ -1,6 +1,7 @@
 #include "AbcShapeImport.h"
 #include "AbcShape.h"
 #include "Keyframer.h"
+#include "Xform.h"
 #include "AlembicSceneCache.h"
 #include "AlembicSceneVisitors.h"
 #include <maya/MArgList.h>
@@ -1138,14 +1139,12 @@ AlembicNode::VisitReturn UpdateTree::enter(AlembicXform &node, AlembicNode *inst
          pIT.setBool(inheritsXforms);
          
          // Transformation matrix
-         MMatrix mmat(sample.getMatrix().x);
-         
-         MTransformationMatrix tmat(mmat);
-         xform.set(tmat);
+         ReadXform(sample, xform);
+         MTransformationMatrix tmat = xform.transformation();
          
          if (schema.isConstant())
          {
-            mKeyframer.clearTransformKeys(xformObj, mmat);
+            mKeyframer.clearTransformKeys(xformObj, tmat);
             mKeyframer.clearInheritsTransformKey(xformObj, inheritsXforms);
          }
          else if (fabs(mSpeed) > 0.0001)
@@ -1178,13 +1177,16 @@ AlembicNode::VisitReturn UpdateTree::enter(AlembicXform &node, AlembicNode *inst
                
                Alembic::AbcGeom::XformSample sample = schema.getValue(Alembic::Abc::ISampleSelector(idx));
                
-               MMatrix mmat(sample.getMatrix().x);
+               ReadXform(sample, xform);
+               MTransformationMatrix stmat = xform.transformation();
                
                mKeyframer.setCurrentTime(t);
-               mKeyframer.addTransformKey(xformObj, mmat);
+               mKeyframer.addTransformKey(xformObj, stmat);
                mKeyframer.addInheritsTransformKey(xformObj, sample.getInheritsXforms());
             }
             
+            xform.set(tmat);
+
             mKeyframer.addCurvesImportInfo(xformObj, "", mSpeed, secOffset, secStart, secEnd,
                                            (mCycleType == AbcShape::CT_reverse), mPreserveStartFrame);
          }

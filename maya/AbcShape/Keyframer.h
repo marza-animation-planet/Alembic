@@ -11,6 +11,7 @@
 #include <maya/MMatrix.h>
 #include <maya/MObjectHandle.h>
 #include <maya/MStringArray.h>
+#include <maya/MTransformationMatrix.h>
 #include <map>
 #include <set>
 #include <vector>
@@ -36,6 +37,7 @@ public:
    void setCurrentTime(double t, MTime::Unit unit=MTime::kSeconds);
    void addInheritsTransformKey(const MObject &node, bool v);
    void addTransformKey(const MObject &node, const MMatrix &m);
+   void addTransformKey(const MObject &node, const MTransformationMatrix &tm);
    void addVisibilityKey(const MObject &node, bool v);
    void addAnyKey(const MObject &node, const MString &attr, int index, double val);
    void addCurvesImportInfo(const MObject &node, const MString &attr,
@@ -52,6 +54,7 @@ public:
    
    void clearInheritsTransformKey(const MObject &node, bool v);
    void clearTransformKeys(const MObject &node, const MMatrix &m);
+   void clearTransformKeys(const MObject &node, const MTransformationMatrix &tm);
    void clearVisibilityKey(const MObject &node, bool v);
    void clearAnyKey(const MObject &node, const MString &attr, int index, double val);
    
