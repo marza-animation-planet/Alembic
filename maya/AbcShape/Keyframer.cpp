@@ -279,7 +279,7 @@ void Keyframer::addInheritsTransformKey(const MObject &node, bool v)
    entry.values.append(v);
 }
 
-void Keyframer::clearTransformKeys(const MObject &node, const MMatrix &m)
+void Keyframer::clearTransformKeys(const MObject &node, const MTransformationMatrix &tm)
 {
    MStatus stat;
 
@@ -290,7 +290,6 @@ void Keyframer::clearTransformKeys(const MObject &node, const MMatrix &m)
       return;
    }
 
-   MTransformationMatrix tm(m);
    double v[12];
    MTransformationMatrix::RotationOrder ro;
 
@@ -324,7 +323,13 @@ void Keyframer::clearTransformKeys(const MObject &node, const MMatrix &m)
    }
 }
 
-void Keyframer::addTransformKey(const MObject &node, const MMatrix &m)
+void Keyframer::clearTransformKeys(const MObject &node, const MMatrix &m)
+{
+   MTransformationMatrix tm(m);
+   clearTransformKeys(node, tm);
+}
+
+void Keyframer::addTransformKey(const MObject &node, const MTransformationMatrix &tm)
 {
    MStatus stat;
 
@@ -335,7 +340,6 @@ void Keyframer::addTransformKey(const MObject &node, const MMatrix &m)
       return;
    }
 
-   MTransformationMatrix tm(m);
    double v[12];
    MTransformationMatrix::RotationOrder ro;
 
@@ -371,6 +375,12 @@ void Keyframer::addTransformKey(const MObject &node, const MMatrix &m)
 
       ++i;
    }
+}
+
+void Keyframer::addTransformKey(const MObject &node, const MMatrix &m)
+{
+   MTransformationMatrix tm(m);
+   addTransformKey(node, tm);
 }
 
 void Keyframer::cleanupCurve(CurveEntry &e, std::vector<unsigned int> &removeKeys, double threshold)
