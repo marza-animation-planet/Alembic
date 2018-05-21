@@ -4,6 +4,7 @@ namespace Strings
 {
    AtString filename("filename");
    AtString objectpath("objectpath");
+   AtString excludepath("excludepath");
    AtString nameprefix("nameprefix");
 
    AtString frame("frame");

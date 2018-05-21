@@ -37,6 +37,7 @@ void Dso::CommonParameters::reset()
    filePath = "";
    namePrefix = "";
    objectPath = "";
+   excludePath = "";
 
    frame = 0.0;
    startFrame = std::numeric_limits<double>::max();
@@ -90,6 +91,10 @@ std::string Dso::CommonParameters::shapeKey() const
    if (objectPath.length() > 0)
    {
       oss << " op:" << objectPath;
+   }
+   if (excludePath.length() > 0)
+   {
+      oss << " ep:" << excludePath;
    }
    // Framing
    oss << " frm:" << frame;
@@ -309,7 +314,7 @@ Dso::Dso(AtNode *node)
       char id[64];
       sprintf(id, "%p", AiThreadSelf());
 
-      AlembicSceneFilter filter(mCommonParams.objectPath, "");
+      AlembicSceneFilter filter(mCommonParams.objectPath, mCommonParams.excludePath);
 
       AlembicSceneCache::SetConcurrency(size_t(AiNodeGetInt(opts, "threads")));
 
@@ -318,7 +323,7 @@ Dso::Dso(AtNode *node)
 
    if (mScene)
    {
-      // mScene->setFilter(mCommonParams.objectPath);
+      // mScene->setFilter(mCommonParams.objectPath, mCommonParams.excludePath);
 
       if (mCommonParams.startFrame > mCommonParams.endFrame)
       {
@@ -847,7 +852,7 @@ void Dso::toLower(std::string &s) const
    }
 }
 
-void Dso::setSingleParams(AtNode *node, const std::string &objectPath) const
+void Dso::setSingleParams(AtNode *node, const std::string &objectPath, const std::string &excludePath) const
 {
    if (!node)
    {
@@ -861,6 +866,7 @@ void Dso::setSingleParams(AtNode *node, const std::string &objectPath) const
    // Common parameters
    AiNodeSetStr(node, Strings::filename, mCommonParams.filePath.c_str());
    AiNodeSetStr(node, Strings::objectpath, objectPath.c_str());
+   AiNodeSetStr(node, Strings::excludepath, excludePath.c_str());
    AiNodeSetStr(node, Strings::nameprefix, mCommonParams.namePrefix.c_str());
    AiNodeSetStr(node, Strings::rootdrive, mRootDrive.c_str());
    //  Framing
@@ -964,6 +970,7 @@ void Dso::readParams()
    // Common parameters
    mCommonParams.filePath = AiNodeGetStr(mProcNode, Strings::filename).c_str();
    mCommonParams.objectPath = AiNodeGetStr(mProcNode, Strings::objectpath).c_str();
+   mCommonParams.excludePath = AiNodeGetStr(mProcNode, Strings::excludepath).c_str();
    mCommonParams.namePrefix = AiNodeGetStr(mProcNode, Strings::nameprefix).c_str();
    //  Framing
    mCommonParams.fps = AiNodeGetFlt(mProcNode, Strings::fps);
