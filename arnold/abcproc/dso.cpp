@@ -221,7 +221,7 @@ std::string Dso::SingleParameters::shapeKey() const
 
 // ---
 
-std::map<std::string, std::string> Dso::msMasterNodes;
+std::map<std::string, AtNode*> Dso::msMasterNodes;
 
 
 Dso::Dso(AtNode *node)

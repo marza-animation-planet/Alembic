@@ -308,25 +308,25 @@ public:
 
    // Instance tacking
 
-   inline void setMasterNodeName(const std::string &name)
+   inline void setMasterNode(AtNode *node)
    {
-      msMasterNodes[mShapeKey] = name;
+      msMasterNodes[mShapeKey] = node;
    }
 
-   inline const std::string& masterNodeName() const
+   inline AtNode* masterNode() const
    {
       return msMasterNodes[mShapeKey];
    }
 
-   inline bool isInstance(std::string *masterNodeName=0) const
+   inline bool isInstance(AtNode **masterNode=0) const
    {
-      std::map<std::string, std::string>::const_iterator it = msMasterNodes.find(mShapeKey);
+      std::map<std::string, AtNode*>::const_iterator it = msMasterNodes.find(mShapeKey);
 
-      if (it != msMasterNodes.end())
+      if (it != msMasterNodes.end() && it->second)
       {
-         if (masterNodeName)
+         if (masterNode)
          {
-            *masterNodeName = it->second;
+            *masterNode = it->second;
          }
          return true;
       }
@@ -471,7 +471,7 @@ private:
 
    double mGlobalFrame;
 
-   static std::map<std::string, std::string> msMasterNodes;
+   static std::map<std::string, AtNode*> msMasterNodes;
 };
 
 
