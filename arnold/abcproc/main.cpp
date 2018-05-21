@@ -14,6 +14,7 @@ node_parameters
    // Common parameters
    AiParameterStr(Strings::filename, Strings::_empty);
    AiParameterStr(Strings::objectpath, Strings::_empty);
+   AiParameterStr(Strings::excludepath, Strings::_empty);
    AiParameterStr(Strings::nameprefix, Strings::_empty);
 
    // use node's own 'motion_start' and 'motion_end' parameters

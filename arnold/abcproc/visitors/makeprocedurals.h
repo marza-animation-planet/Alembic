@@ -63,7 +63,7 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
          AiMsgInfo("[abcproc] Generate new procedural node \"%s\"", name.c_str());
       }
 
-      mDso->setSingleParams(proc, targetNode->path());
+      mDso->setSingleParams(proc, targetNode->path(), "");
 
       if (!mDso->ignoreTransforms() && mMatrixSamplesStack.size() > 0)
       {

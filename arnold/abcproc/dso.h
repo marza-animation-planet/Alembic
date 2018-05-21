@@ -52,7 +52,7 @@ public:
    ~Dso();
 
    void readParams();
-   void setSingleParams(AtNode *node, const std::string &objectPath) const;
+   void setSingleParams(AtNode *node, const std::string &objectPath, const std::string &excludePath) const;
 
    void transferUserParams(AtNode *dst);
    void transferShapeParams(AtNode *dst);
@@ -372,6 +372,7 @@ private:
       std::string filePath;
       std::string namePrefix;
       std::string objectPath;
+      std::string excludePath;
 
       double frame;
       double startFrame;

@@ -7,6 +7,7 @@ namespace Strings
 {
    extern AtString filename;
    extern AtString objectpath;
+   extern AtString excludepath;
    extern AtString nameprefix;
 
    extern AtString frame;
