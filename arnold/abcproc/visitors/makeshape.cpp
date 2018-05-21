@@ -764,13 +764,6 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
 {
    Alembic::AbcGeom::IPolyMeshSchema schema = node.typedObject().getSchema();
 
-   if (mDso->isVolume())
-   {
-      mNode = generateVolumeBox(node, instance);
-      outputInstanceNumber(node, instance);
-      return AlembicNode::ContinueVisit;
-   }
-
    MeshInfo info;
 
    info.varyingTopology = (mDso->forceVelocityBlur() || schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
@@ -1576,13 +1569,6 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
    // generate a polymesh
    Alembic::AbcGeom::ISubDSchema schema = node.typedObject().getSchema();
 
-   if (mDso->isVolume())
-   {
-      mNode = generateVolumeBox(node, instance);
-      outputInstanceNumber(node, instance);
-      return AlembicNode::ContinueVisit;
-   }
-
    MeshInfo info;
 
    info.varyingTopology = (mDso->forceVelocityBlur() || schema.getTopologyVariance() == Alembic::AbcGeom::kHeterogenousTopology);
@@ -1829,13 +1815,6 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
 AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *instance)
 {
    Alembic::AbcGeom::IPointsSchema schema = node.typedObject().getSchema();
-
-   if (mDso->isVolume())
-   {
-      mNode = generateVolumeBox(node, instance);
-      outputInstanceNumber(node, instance);
-      return AlembicNode::ContinueVisit;
-   }
 
    PointsInfo info;
    UserAttributes extraPointAttrs;
