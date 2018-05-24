@@ -17,13 +17,6 @@ global proc AE<<NodeName>>SelectFile(string $attr)
    }
 }
 
-global proc AE<<NodeName>>ToggleUseReferenceObject(string $node)
-{
-   int $useReferenceObject = `getAttr ($node+".vrayAbcUseReferenceObject")`;
-   
-   editorTemplate -dimControl $node "vrayAbcReferenceFilename" ($useReferenceObject == 0);
-}
-
 global proc AE<<NodeName>>FileNew(string $attr)
 {
    setUITemplate -pushTemplate attributeEditorTemplate;
@@ -47,33 +40,6 @@ global proc AE<<NodeName>>FileReplace(string $attr)
    connectControl -fileName AE<<NodeName>>_FilePathField $attr;
    
    button -e -c ("AE<<NodeName>>SelectFile " + $attr) AE<<NodeName>>_FilePathBtn;
-}
-
-global proc AE<<NodeName>>UseReferenceObjectNew(string $attr)
-{
-   setUITemplate -pushTemplate attributeEditorTemplate;
-   checkBoxGrp -label "" -label1 "Use Reference Object" AE<<NodeName>>_UseReferenceObjectChk;
-   setUITemplate -popTemplate;
-   
-   AE<<NodeName>>UseReferenceObjectReplace($attr);
-}
-
-global proc AE<<NodeName>>UseReferenceObjectReplace(string $attr)
-{
-   string $node, $tokens[];
-   
-   int $ntokens = `tokenize $attr "." $tokens`;
-   
-   $node = $tokens[0];
-   
-   // re-connect control to new target node attribute
-   connectControl -index 2 AE<<NodeName>>_UseReferenceObjectChk $attr;
-   
-   // update control callback
-   checkBoxGrp -e -cc ("AE<<NodeName>>ToggleUseReferenceObject " + $node) AE<<NodeName>>_UseReferenceObjectChk;
-   
-   // force update once
-   AE<<NodeName>>ToggleUseReferenceObject $node;
 }
 
 global proc AE<<NodeName>>Template(string $nodeName)
@@ -176,8 +142,9 @@ global proc AE<<NodeName>>Template(string $nodeName)
    if (`attributeQuery -node $nodeName -exists "vrayAbcVerbose"`)
    {
       editorTemplate -beginLayout "V-Ray Plugin" -collapse 0;
-      editorTemplate -callCustom AE<<NodeName>>UseReferenceObjectNew AE<<NodeName>>UseReferenceObjectReplace "vrayAbcUseReferenceObject";
-      editorTemplate -label "Reference File" -addControl "vrayAbcReferenceFilename";
+      editorTemplate -label "Ignore Reference" -addControl "vrayAbcIgnoreReference";
+      editorTemplate -label "Reference Source" -addControl "vrayAbcReferenceSource";
+      editorTemplate -label "Reference Frame" -addControl "vrayAbcReferenceFrame";
       editorTemplate -addSeparator;
       editorTemplate -beginNoOptimize;
       editorTemplate -label "Particle Type" -addControl "vrayAbcParticleType";
