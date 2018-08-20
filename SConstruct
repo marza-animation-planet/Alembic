@@ -546,7 +546,7 @@ if withHoudini and withArnold:
    # HtoA
    prjs.append({"name": "alembic-htoa",
                 "type": "install",
-                "install": {"houdini/otls/%s" % houVer: excons.glob("houdini/abcproc/*.otl"),
+                "install": {"houdini/otls/%s" % houVer: excons.glob("houdini/abcproc/*.hda"),
                             "houdini/python": excons.glob("houdini/abcproc/*.py")}})
 
 
@@ -609,7 +609,7 @@ if "eco" in COMMAND_LINE_TARGETS:
 
       if withHoudini:
          from pprint import pprint as pp
-         ecotgts["htoa-otls"] = excons.glob("houdini/abcproc/*.otl")
+         ecotgts["htoa-otls"] = excons.glob("houdini/abcproc/*.hda")
          outdirs["htoa-otls"] = ecop + "/houdini/otls/%s" % houdini.Version(asString=False, full=False)
          ecotgts["htoa-scripts"] = excons.glob("houdini/abcproc/*.py")
          outdirs["htoa-scripts"] = ecop + "/houdini/python"
