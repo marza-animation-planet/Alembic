@@ -3,21 +3,27 @@
 #include "AlembicNode.h"
 
 AlembicSceneFilter::AlembicSceneFilter()
-   : mIncludeFilter(0)
-   , mExcludeFilter(0)
+   : mIncludeFilters(0)
+   , mIncludeFilterCount(0)
+   , mExcludeFilters(0)
+   , mExcludeFilterCount(0)
 {
 }
 
 AlembicSceneFilter::AlembicSceneFilter(const std::string &incl, const std::string &excl)
-   : mIncludeFilter(0)
-   , mExcludeFilter(0)
+   : mIncludeFilters(0)
+   , mIncludeFilterCount(0)
+   , mExcludeFilters(0)
+   , mExcludeFilterCount(0)
 {
    set(incl, excl);
 }
 
 AlembicSceneFilter::AlembicSceneFilter(const AlembicSceneFilter &rhs)
-   : mIncludeFilter(0)
-   , mExcludeFilter(0)
+   : mIncludeFilters(0)
+   , mIncludeFilterCount(0)
+   , mExcludeFilters(0)
+   , mExcludeFilterCount(0)
 {
    set(rhs.mIncludeFilterStr, rhs.mExcludeFilterStr);
 }
@@ -42,10 +48,15 @@ void AlembicSceneFilter::set(const std::string &incl, const std::string &excl)
    
    if (incl != mIncludeFilterStr)
    {
-      if (mIncludeFilter)
+      if (mIncludeFilters)
       {
-         regfree(mIncludeFilter);
-         mIncludeFilter = 0;
+         for (size_t i=0; i<mIncludeFilterCount; ++i)
+         {
+            regfree(&mIncludeFilters[i]);
+         }
+         delete[] mIncludeFilters;
+         mIncludeFilters = 0;
+         mIncludeFilterCount = 0;
          changed = true;
       }
       
@@ -53,25 +64,70 @@ void AlembicSceneFilter::set(const std::string &incl, const std::string &excl)
       
       if (incl.length() > 0)
       {
-         if (regcomp(&mIncludeFilter_, incl.c_str(), REG_EXTENDED|REG_NOSUB) != 0)
+         // Split string by spaces
+         std::vector<std::string> ilist;
+         size_t p0 = 0;
+         size_t p1 = incl.find_first_of(" \t", p0);
+         while (p0 != std::string::npos)
          {
-            std::cout << "[AlembicSceneFilter] Invalid expression: \"" << incl << "\"" << std::endl;
+            std::string ss = (p1 == std::string::npos ? incl.substr(p0) : incl.substr(p0, p1 - p0));
+            if (ss.length() > 0)
+            {
+               ilist.push_back(ss);
+            }
+            if (p1 != std::string::npos)
+            {
+               p0 = incl.find_first_not_of(" \t", p1);
+               p1 = (p0 != std::string::npos ? incl.find_first_of(" \t", p0) : std::string::npos);
+            }
+            else
+            {
+               p0 = p1;
+            }
          }
-         else
+
+         if (ilist.size() > 0)
          {
-            mIncludeFilterStr = incl;
-            mIncludeFilter = &mIncludeFilter_;
-            changed = true;
+            mIncludeFilters = new regex_t[ilist.size()];
+
+            for (std::vector<std::string>::iterator it=ilist.begin(); it!=ilist.end(); ++it)
+            {
+               if (regcomp(&mIncludeFilters[mIncludeFilterCount], it->c_str(), REG_EXTENDED|REG_NOSUB) != 0)
+               {
+                  std::cout << "[AlembicSceneFilter] Invalid expression: \"" << *it << "\"" << std::endl;
+               }
+               else
+               {
+                  ++mIncludeFilterCount;
+                  if (mIncludeFilterStr.length() > 0)
+                  {
+                     mIncludeFilterStr += " ";
+                  }
+                  mIncludeFilterStr += *it;
+                  changed = true;
+               }
+            }
+
+            if (mIncludeFilterCount == 0)
+            {
+               delete[] mIncludeFilters;
+               mIncludeFilters = 0;
+            }
          }
       }
    }
    
    if (excl != mExcludeFilterStr)
    {
-      if (mExcludeFilter)
+      if (mExcludeFilters)
       {
-         regfree(mExcludeFilter);
-         mExcludeFilter = 0;
+         for (size_t i=0; i<mExcludeFilterCount; ++i)
+         {
+            regfree(&mExcludeFilters[i]);
+         }
+         delete[] mExcludeFilters;
+         mExcludeFilters = 0;
+         mExcludeFilterCount = 0;
          changed = true;
       }
       
@@ -79,15 +135,55 @@ void AlembicSceneFilter::set(const std::string &incl, const std::string &excl)
       
       if (excl.length() > 0)
       {
-         if (regcomp(&mExcludeFilter_, excl.c_str(), REG_EXTENDED|REG_NOSUB) != 0)
+         // Split string by spaces
+         std::vector<std::string> elist;
+         size_t p0 = 0;
+         size_t p1 = excl.find_first_of(" \t", p0);
+         while (p0 != std::string::npos)
          {
-            std::cout << "[AlembicSceneFilter] Invalid expression: \"" << excl << "\"" << std::endl;
+            std::string ss = (p1 == std::string::npos ? excl.substr(p0) : excl.substr(p0, p1 - p0));
+            if (ss.length() > 0)
+            {
+               elist.push_back(ss);
+            }
+            if (p1 != std::string::npos)
+            {
+               p0 = excl.find_first_not_of(" \t", p1);
+               p1 = (p0 != std::string::npos ? excl.find_first_of(" \t", p0) : std::string::npos);
+            }
+            else
+            {
+               p0 = p1;
+            }
          }
-         else
+
+         if (elist.size() > 0)
          {
-            mExcludeFilterStr = excl;
-            mExcludeFilter = &mExcludeFilter_;
-            changed = true;
+            mExcludeFilters = new regex_t[elist.size()];
+
+            for (std::vector<std::string>::iterator it=elist.begin(); it!=elist.end(); ++it)
+            {
+               if (regcomp(&mExcludeFilters[mExcludeFilterCount], it->c_str(), REG_EXTENDED|REG_NOSUB) != 0)
+               {
+                  std::cout << "[AlembicSceneFilter] Invalid expression: \"" << *it << "\"" << std::endl;
+               }
+               else
+               {
+                  ++mExcludeFilterCount;
+                  if (mExcludeFilterStr.length() > 0)
+                  {
+                     mExcludeFilterStr += " ";
+                  }
+                  mExcludeFilterStr += *it;
+                  changed = true;
+               }
+            }
+
+            if (mExcludeFilterCount == 0)
+            {
+               delete[] mExcludeFilters;
+               mExcludeFilters = 0;
+            }
          }
       }
    }
@@ -100,17 +196,27 @@ void AlembicSceneFilter::set(const std::string &incl, const std::string &excl)
 
 void AlembicSceneFilter::reset()
 {
-   if (mIncludeFilter)
+   if (mIncludeFilters)
    {
-      regfree(mIncludeFilter);
-      mIncludeFilter = 0;
+      for (size_t i=0; i<mIncludeFilterCount; ++i)
+      {
+         regfree(&mIncludeFilters[i]);
+      }
+      delete[] mIncludeFilters;
+      mIncludeFilters = 0;
+      mIncludeFilterCount = 0;
       mIncludeFilterStr = "";
    }
    
-   if (mExcludeFilter)
+   if (mExcludeFilters)
    {
-      regfree(mExcludeFilter);
-      mExcludeFilter = 0;
+      for (size_t i=0; i<mExcludeFilterCount; ++i)
+      {
+         regfree(&mExcludeFilters[i]);
+      }
+      delete[] mExcludeFilters;
+      mExcludeFilters = 0;
+      mExcludeFilterCount = 0;
       mExcludeFilterStr = "";
    }
    
@@ -119,7 +225,7 @@ void AlembicSceneFilter::reset()
 
 bool AlembicSceneFilter::isSet() const
 {
-   return (mIncludeFilter || mExcludeFilter);
+   return (mIncludeFilterCount > 0 || mExcludeFilterCount > 0);
 }
 
 bool AlembicSceneFilter::keep(Alembic::Abc::IObject iObj) const
@@ -165,21 +271,63 @@ bool AlembicSceneFilter::keep(Alembic::Abc::IObject iObj) const
 
 bool AlembicSceneFilter::isIncluded(const char *path) const
 {
-   return (path && (!mIncludeFilter || regexec(mIncludeFilter, path, 0, NULL, 0) == 0));
+   if (path)
+   {
+      if (mIncludeFilterCount > 0)
+      {
+         for (size_t i=0; i<mIncludeFilterCount; ++i)
+         {
+            if (regexec(&mIncludeFilters[i], path, 0, NULL, 0) == 0)
+            {
+               return true;
+            }
+         }
+         return false;
+      }
+      else
+      {
+         return true;
+      }
+   }
+   else
+   {
+      return false;
+   }
 }
 
 bool AlembicSceneFilter::isExcluded(const char *path) const
 {
-   return (!path || (mExcludeFilter && regexec(mExcludeFilter, path, 0, NULL, 0) == 0));
+   if (path)
+   {
+      if (mExcludeFilterCount > 0)
+      {
+         for (size_t i=0; i<mExcludeFilterCount; ++i)
+         {
+            if (regexec(&mExcludeFilters[i], path, 0, NULL, 0) == 0)
+            {
+               return true;
+            }
+         }
+         return false;
+      }
+      else
+      {
+         return false;
+      }
+   }
+   else
+   {
+      return true;
+   }
 }
 
 
 bool AlembicSceneFilter::isIncluded(const AlembicNode *node) const
 {
-   return (node && (!mIncludeFilter || regexec(mIncludeFilter, node->path().c_str(), 0, NULL, 0) == 0));
+   return isIncluded(node ? node->path().c_str() : NULL);
 }
 
 bool AlembicSceneFilter::isExcluded(const AlembicNode *node) const
 {
-   return (!node || (mExcludeFilter && regexec(mExcludeFilter, node->path().c_str(), 0, NULL, 0) == 0));
+   return isExcluded(node ? node->path().c_str() : NULL);
 }
