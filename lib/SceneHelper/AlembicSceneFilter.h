@@ -4,6 +4,7 @@
 #include <Alembic/AbcGeom/All.h>
 #include <string>
 #include <map>
+#include <vector>
 #include <regex.h>
 
 class AlembicNode;
@@ -37,10 +38,10 @@ protected:
    
    std::string mIncludeFilterStr;
    std::string mExcludeFilterStr;
-   regex_t *mIncludeFilter;
-   regex_t *mExcludeFilter;
-   regex_t mIncludeFilter_;
-   regex_t mExcludeFilter_;
+   regex_t *mIncludeFilters;
+   size_t mIncludeFilterCount;
+   regex_t *mExcludeFilters;
+   size_t mExcludeFilterCount;
    mutable std::map<std::string, bool> mCache;
 };
 

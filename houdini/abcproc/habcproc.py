@@ -177,6 +177,9 @@ def setFrameRange(node):
 
 
 def pathChanged(node):
+    rfparm = node.parm("ar_read_abc_from")
+    if rfparm and rfparm.evalAsInt() == 1:
+        node.parm("ar_filename").set(getSourceAlembicPath(node))
     newpath = node.parm("ar_filename").evalAsString()
     oldpath = node.userData("abcproc_prevpath")
     if oldpath != newpath:
@@ -212,17 +215,45 @@ def listShapesInAbc(path):
     return listNodesInAbc(path, AbcShapeTypes)
 
 
-def selectObject(node, shapesOnly=False):
+def getSourceAlembicPath(node):
+    abcsrcparm = node.parm("ar_read_abc_from")
+    if abcsrcparm is None:
+        return ""
+    else:
+        if abcsrcparm.evalAsInt() == 0:
+            return ""
+        else:
+            sopnode = hou.node(node.parm("ar_source_sop").evalAsString())
+            if sopnode is None:
+                return ""
+            else:
+                try:
+                    filename = sopnode.parm("fileName").evalAsString()
+                    if not filename:
+                        print("Source alembic SOP doesn't have a 'fileName' parm")
+                        return ""
+                    elif not filename.endswith(".abc"):
+                        print("Source alembic SOP doesn't point to an alembic file (%s)" % filename)
+                        return ""
+                    else:
+                        return filename
+                except Exception, e:
+                    print("Failed to get source alembic file path (%s)" % e)
+                    return ""
+
+
+def selectObject(node, shapesOnly=False, exclusive=True, outputParm="ar_objectpath"):
     global AbcShapeTypes
 
     types = (set(["Xform"]).union(AbcShapeTypes) if not shapesOnly else AbcShapeTypes)
 
     filename = node.parm("ar_filename").evalAsString()
-    objectpath = node.parm("ar_objectpath").evalAsString()
-    picked = (() if objectpath in ("", "/") else (objectpath,))
-    selections = hou.ui.selectFromTree(listNodesInAbc(filename, types), picked=picked, exclusive=True)
+    objectpath = node.parm(outputParm).evalAsString()
+    picked = (() if objectpath in ("", "/") else tuple(objectpath.split(" ")))
+    selections = hou.ui.selectFromTree(listNodesInAbc(filename, types), picked=picked, exclusive=exclusive)
     if selections:
-        node.setParms({"ar_objectpath": selections[0]})
+        selections = " ".join(selections)
+        node.setParms({outputParm: selections})
 
 
 def countShapes(node):
