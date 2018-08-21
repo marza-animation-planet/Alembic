@@ -28,18 +28,23 @@ def r_findShapes(node):
     return r_findNodes(node, AbcShapeTypes)
 
 
-def r_countShapes(node, objectpath):
+def r_countShapes(node, objectpath, excludepaths=[]):
     global AbcShapeTypes
 
     count = 0
 
     path = node.path()
+    pathlen = len(path)
 
-    if len(path) < len(objectpath):
+    if pathlen < len(objectpath):
         if not objectpath.startswith(path):
             return 0
     elif not path.startswith(objectpath):
         return 0
+
+    for excludepath in excludepaths:
+        if pathlen >= len(excludepath) and path.startswith(excludepath):
+            return 0
 
     if node.type() in AbcShapeTypes:
         count = 1
@@ -172,8 +177,14 @@ def setFrameRange(node):
 
     if s:
         node.parm('ar_start_frame').set(s)
+        node.parm('abc_start_frame').set(s)
+    else:
+        node.parm('abc_start_frame').set(0)
     if e:
         node.parm('ar_end_frame').set(e)
+        node.parm('abc_end_frame').set(e)
+    else:
+        node.parm('abc_end_frame').set(0)
 
 
 def pathChanged(node):
@@ -249,7 +260,7 @@ def selectObject(node, shapesOnly=False, exclusive=True, outputParm="ar_objectpa
 
     filename = node.parm("ar_filename").evalAsString()
     objectpath = node.parm(outputParm).evalAsString()
-    picked = (() if objectpath in ("", "/") else tuple(objectpath.split(" ")))
+    picked = (() if objectpath in ("", "/") else tuple(filter(lambda y: len(y) > 0, map(lambda x: x.strip(), objectpath.split(" ")))))
     selections = hou.ui.selectFromTree(listNodesInAbc(filename, types), picked=picked, exclusive=exclusive)
     if selections:
         selections = " ".join(selections)
@@ -261,16 +272,17 @@ def countShapes(node):
 
     filename = node.parm("ar_filename").evalAsString()
     objectpath = node.parm("ar_objectpath").evalAsString()
+    excludepaths = filter(lambda y: len(y) > 0, map(lambda x: x.strip(), node.parm("ar_excludepath").evalAsString().split(" ")))
 
     count = 0
     npath = _normalizePath(filename)
-    key = npath + ":" + objectpath
+    key = npath + ":" + objectpath + ":" + ",".join(excludepaths)
 
     count = CountCache.get(key, -1)
     if count < 0:
         try:
             a = getArchive(npath, normalizePath=False)
-            count = r_countShapes(a.top, objectpath)
+            count = r_countShapes(a.top, objectpath, excludepaths)
             releaseArchive(npath, normalizePath=False)
         except:
             count = 0
@@ -282,6 +294,7 @@ def countShapes(node):
 def isSingleShape(node):
     filename = node.parm("ar_filename").evalAsString()
     objectpath = node.parm("ar_objectpath").evalAsString()
+    excludepaths = filter(lambda y: len(y) > 0, map(lambda x: x.strip(), node.parm("ar_excludepath").evalAsString().split(" ")))
 
     if objectpath and objectpath != "/":
         npath = _normalizePath(filename)
@@ -289,7 +302,6 @@ def isSingleShape(node):
         try:
             a = getArchive(npath, normalizePath=False)
             spl = objectpath.split("/")[1:]
-            print(spl)
 
             curnode = a.top
             nextnode = None
@@ -300,7 +312,15 @@ def isSingleShape(node):
                     curnode = None
                     break
                 else:
+                    nextpath = nextnode.path()
+                    pathlen = len(nextpath)
+                    for excludepath in excludepaths:
+                        if pathlen >= len(excludepath) and nextpath.startswith(excludepath):
+                            nextnode = None
+                            break
                     curnode = nextnode
+                    if curnode is None:
+                        break
 
             rv = (curnode is not None and curnode.type() in AbcShapeTypes)
 
@@ -408,7 +428,9 @@ def createArnoldAbc(path=None, mode='multiProc', objectPath='/', frameRange=(Non
         endF = frameRange[1]
 
     node.parm('ar_start_frame').set(startF)
+    node.parm('abc_start_frame').set(startF)
     node.parm('ar_end_frame').set(endF)
+    node.parm('abc_end_frame').set(endF)
     node.parm('ar_objectpath').set(objectPath)
     node.parm('ar_offset').set(offset)
 
