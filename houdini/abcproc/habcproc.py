@@ -50,7 +50,7 @@ def r_countShapes(node, objectpath, excludepaths=[]):
         count = 1
     else:
         for _, cnode in node.children.iteritems():
-            count += r_countShapes(cnode, objectpath)
+            count += r_countShapes(cnode, objectpath, excludepaths)
 
     return count
 
