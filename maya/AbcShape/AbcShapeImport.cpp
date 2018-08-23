@@ -2877,7 +2877,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
    MArgParser argData(syntax(), args, &status);
    
    // default interpoation type
-   MString rotInterp("quaternion");
+   MString rotInterp("quaternionSlerp");
    MStringDict nodeRotInterp;
    AbcShape::DisplayMode dm = AbcShape::DM_box;
    AbcShape::CycleType ct = AbcShape::CT_hold;
@@ -2918,7 +2918,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       MGlobal::displayInfo("-it / -ignoreTransforms           :");
       MGlobal::displayInfo("                                    Do not key transform nodes (but for locators direct parent).");
       MGlobal::displayInfo("-ri / -rotationInterpolation      : string (none|euler|quaternion|quaternionSlerp|quaternionSquad)");
-      MGlobal::displayInfo("                                    Set created rotation curves interpolation type (default to quaternion).");
+      MGlobal::displayInfo("                                    Set created rotation curves interpolation type (default to quaternionSlerp).");
       MGlobal::displayInfo("-nri / -nodeRotationInterpolation : string string (none|euler|quaternion|quaternionSlerp|quaternionSquad)");
       MGlobal::displayInfo("                                    Override rotation curves interpolation type (second value) for a specific node (first value).");
       MGlobal::displayInfo("                                    Node name is the alembic node name.");
