@@ -54,6 +54,7 @@ MSyntax AbcShapeImport::createSyntax()
    syntax.addFlag("-ct", "-cycleType", MSyntax::kString);
    syntax.addFlag("-ri", "-rotationInterpolation", MSyntax::kString);
    syntax.addFlag("-nri", "-nodeRotationInterpolation", MSyntax::kString, MSyntax::kString);
+   syntax.addFlag("-dsc", "-dontSimplifyCurves", MSyntax::kNoArg);
    syntax.addFlag("-ft", "-filterObjects", MSyntax::kString);
    syntax.addFlag("-eft", "-excludeFilterObjects", MSyntax::kString);
    syntax.addFlag("-u", "-update", MSyntax::kNoArg);
@@ -216,7 +217,7 @@ public:
 
    const MDagPath& getDag(const std::string &path) const;
    
-   void keyTransforms(const MString &defaultRotationInterpolation, const MStringDict &nodeRotationInterpolation, bool deleteExistingCurves=false);
+   void keyTransforms(const MString &defaultRotationInterpolation, const MStringDict &nodeRotationInterpolation, bool deleteExistingCurves=false, bool simplifyCurves=true);
    void keyVisibility(Alembic::AbcGeom::IObject iobj, MFnDependencyNode &fn);
    
 private:
@@ -2799,7 +2800,8 @@ void UpdateTree::leave(AlembicNode &, AlembicNode *)
 
 void UpdateTree::keyTransforms(const MString &defaultRotationInterpolation,
                                const MStringDict &nodeRotationInterpolation,
-                               bool deleteExistingCurves)
+                               bool deleteExistingCurves,
+                               bool simplifyCurves)
 {
    MFnAnimCurve::InfinityType inf = MFnAnimCurve::kConstant;
    
@@ -2816,7 +2818,7 @@ void UpdateTree::keyTransforms(const MString &defaultRotationInterpolation,
       break;
    }
    
-   mKeyframer.createCurves(inf, inf, deleteExistingCurves);
+   mKeyframer.createCurves(inf, inf, deleteExistingCurves, simplifyCurves);
    mKeyframer.setRotationCurvesInterpolation(defaultRotationInterpolation, nodeRotationInterpolation);
 }
 
@@ -2889,6 +2891,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
    bool setCycle = false;
    bool setPreserveStart = false;
    bool setInterp = false;
+   bool simplifyCurves = true;
    
    argData.isFlagSet("preserveStartFrame");
    
@@ -2919,6 +2922,8 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       MGlobal::displayInfo("-nri / -nodeRotationInterpolation : string string (none|euler|quaternion|quaternionSlerp|quaternionSquad)");
       MGlobal::displayInfo("                                    Override rotation curves interpolation type (second value) for a specific node (first value).");
       MGlobal::displayInfo("                                    Node name is the alembic node name.");
+      MGlobal::displayInfo("-dsc / -dontSimplifyCurves        : By default, created animation curves are simplified by removing keys surrounded by keys of identical values.");
+      MGlobal::displayInfo("                                    Use this flag to disable this behaviour.");
       MGlobal::displayInfo("-ftr / -fitTimeRange              :");
       MGlobal::displayInfo("                                    Change Maya time slider to fit the range of input file.");
       MGlobal::displayInfo("-sts / -setToStartFrame           :");
@@ -3298,6 +3303,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
       bool createInstances = argData.isFlagSet("createInstances");
       bool ignoreTransforms = argData.isFlagSet("ignoreTransforms");
       bool update = argData.isFlagSet("update");
+      bool simplifyCurves = !argData.isFlagSet("dontSimplifyCurves");
       
       if (ignoreTransforms && createInstances)
       {
@@ -3560,7 +3566,7 @@ MStatus AbcShapeImport::doIt(const MArgList& args)
                UpdateTree visitor(abcPath, dm, ignoreTransforms, createInstances, speed, offset, preserveStartFrame, ct, createMissing);
                scene->visit(AlembicNode::VisitDepthFirst, visitor);
                
-               visitor.keyTransforms(rotInterp, nodeRotInterp);
+               visitor.keyTransforms(rotInterp, nodeRotInterp, false, simplifyCurves);
                
                if (parentDag.isValid())
                {

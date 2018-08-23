@@ -646,7 +646,9 @@ void Keyframer::addCurvesImportInfo(const MObject &node,
 
 void Keyframer::createCurves(MFnAnimCurve::InfinityType preInf,
                              MFnAnimCurve::InfinityType postInf,
-                             bool deleteExistingCurves)
+                             bool deleteExistingCurves,
+                             bool simplifyCurves,
+                             double simplifyCurveThreshold)
 {
    MStatus stat;
    std::vector<unsigned int> tempIndices;
@@ -658,7 +660,10 @@ void Keyframer::createCurves(MFnAnimCurve::InfinityType preInf,
    {
       CurveEntry &entry = it->second;
       
-      cleanupCurve(entry, tempIndices, threshold);
+      if (simplifyCurves)
+      {
+         cleanupCurve(entry, tempIndices, simplifyCurveThreshold);
+      }
     
       // Also check for curves to delete
       // In any other case, times.length() == values.length()

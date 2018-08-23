@@ -47,7 +47,9 @@ public:
                             bool preserveStart);
    void createCurves(MFnAnimCurve::InfinityType preInf = MFnAnimCurve::kConstant,
                      MFnAnimCurve::InfinityType postInf = MFnAnimCurve::kConstant,
-                     bool deleteExistingCurves=false);
+                     bool deleteExistingCurves=false,
+                     bool simplifyCurves=true,
+                     double simplifyCurveThreshold=0.000001);
    void setRotationCurvesInterpolation(const MString &interpType, const MStringDict &nodeInterpType);
    void fixCurvesTangents(MFnAnimCurve::AnimCurveType type);
    void fixCurvesTangents();
