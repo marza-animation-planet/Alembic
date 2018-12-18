@@ -740,9 +740,13 @@ MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & i
                        (*inFloorPos)[pId].y,
                        (*inFloorPos)[pId].z);
             
-            MVector v0((*inFloorVel)[pId].x,
-                       (*inFloorVel)[pId].y,
-                       (*inFloorVel)[pId].z);
+            MVector v0(0.0, 0.0, 0.0);
+            if (inFloorVel)
+            {
+                v0.x = (*inFloorVel)[pId].x;
+                v0.y = (*inFloorVel)[pId].y;
+                v0.z = (*inFloorVel)[pId].z;
+            }
             
             outId[pId] = (*inFloorId)[pId];
             
@@ -759,9 +763,13 @@ MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & i
                            (*inCeilPos)[idit->second].y,
                            (*inCeilPos)[idit->second].z);
                 
-                MVector v1((*inCeilVel)[idit->second].x,
-                           (*inCeilVel)[idit->second].y,
-                           (*inCeilVel)[idit->second].z);
+                MVector v1(0.0, 0.0, 0.0);
+                if (inCeilVel)
+                {
+                   v1.x = (*inCeilVel)[idit->second].x;
+                   v1.y = (*inCeilVel)[idit->second].y;
+                   v1.z = (*inCeilVel)[idit->second].z;
+                }
                 
                 outPos[pId] = (1.0 - blend) * p0 + blend * p1;
                 outVel[pId] = (1.0 - blend) * v0 + blend * v1;
@@ -778,9 +786,16 @@ MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & i
                                   (*inFloorPos)[pId].y,
                                   (*inFloorPos)[pId].z);
             
-            outVel[pId] = MVector((*inFloorVel)[pId].x,
-                                  (*inFloorVel)[pId].y,
-                                  (*inFloorVel)[pId].z);
+            if (inFloorVel)
+            {
+                outVel[pId] = MVector((*inFloorVel)[pId].x,
+                                      (*inFloorVel)[pId].y,
+                                      (*inFloorVel)[pId].z);
+            }
+            else
+            {
+                outVel[pId] = MVector(0.0, 0.0, 0.0);
+            }
             
             outId[pId] = (*inFloorId)[pId];
         }
@@ -846,9 +861,16 @@ MStatus create(double iFrame, const Alembic::AbcGeom::IPoints & iNode,
                           (*posPtr)[pId].y,
                           (*posPtr)[pId].z);
             
-            vArray.append(MVector((*velPtr)[pId].x,
-                                  (*velPtr)[pId].y,
-                                  (*velPtr)[pId].z));
+            if (velPtr)
+            {
+               vArray.append(MVector((*velPtr)[pId].x,
+                                     (*velPtr)[pId].y,
+                                     (*velPtr)[pId].z));
+            }
+            else
+            {
+               vArray.append(MVector(0.0, 0.0, 0.0));
+            }
             
             iArray.append((*idPtr)[pId]);
         }
