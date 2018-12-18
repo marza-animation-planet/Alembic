@@ -34,8 +34,8 @@
 //
 //-*****************************************************************************
 
-#ifndef _AlembicExport_MayaPointPrimitiveWriter_h_
-#define _AlembicExport_MayaPointPrimitiveWriter_h_
+#ifndef AlembicExport_MayaPointPrimitiveWriter_h
+#define AlembicExport_MayaPointPrimitiveWriter_h
 
 #include "Foundation.h"
 #include "AttributesWriter.h"
@@ -66,4 +66,4 @@ class MayaPointPrimitiveWriter
     Alembic::AbcGeom::OPointsSchema mSchema;
 };
 
-#endif  // _AlembicExport_MayaPointPrimitiveWriter_h_
+#endif  // AlembicExport_MayaPointPrimitiveWriter_h

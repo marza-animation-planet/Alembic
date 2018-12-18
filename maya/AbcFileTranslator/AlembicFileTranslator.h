@@ -52,41 +52,41 @@ public:
 
     AlembicFileTranslator() : MPxFileTranslator() {}
 
-    virtual ~AlembicFileTranslator() {}
+    ~AlembicFileTranslator() override {}
 
     MStatus reader (const MFileObject& file,
                     const MString& optionsString,
-                    MPxFileTranslator::FileAccessMode mode);
+                    MPxFileTranslator::FileAccessMode mode) override;
 
     MStatus writer (const MFileObject& file,
                     const MString& optionsString,
-                    MPxFileTranslator::FileAccessMode mode);
+                    MPxFileTranslator::FileAccessMode mode) override;
 
     MFileKind identifyFile(const MFileObject& filename,
                            const char* buffer,
-                           short size) const;
+                           short size) const override;
 
-    bool haveReadMethod() const
+    bool haveReadMethod() const override
     {
         return true;
     }
 
-    bool haveWriteMethod() const
+    bool haveWriteMethod() const override
     {
         return true;
     }
 
-    bool haveNamespaceSupport() const
+    bool haveNamespaceSupport() const override
     {
         return true;
     }
 
-    MString defaultExtension() const
+    MString defaultExtension() const override
     {
         return "abc";
     }
 
-    MString filter() const
+    MString filter() const override
     {
         return "*.abc";
     }

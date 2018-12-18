@@ -76,7 +76,7 @@ namespace
     // the new swap position could get messed up
     void clearPt(MFnMesh & ioMesh)
     {
-        MPlug ptPlug = ioMesh.findPlug("pt");
+        MPlug ptPlug = ioMesh.findPlug("pt", true);
         unsigned int numElements = ptPlug.numElements();
         if (ptPlug.isArray() && (numElements > 0))
         {
@@ -1440,7 +1440,7 @@ void disconnectMesh(MObject & iMeshObject,
 
     // disconnect old connection from AlembicNode or some other nodes
     // to inMesh if one such connection exist
-    MPlug dstPlug = fnMesh.findPlug("inMesh");
+    MPlug dstPlug = fnMesh.findPlug("inMesh", true);
     disconnectAllPlugsTo(dstPlug);
 
     disconnectProps(fnMesh, iSampledPropList, iFirstProp);
@@ -1524,7 +1524,6 @@ MObject createPoly(double iFrame, bool iReadNormals, PolyMeshAndFriends & iNode,
         remapIndices, mayaVertexIndices, abcVertexIndices,
         true);
 
-
     // if ( !schema.getNormalsParam().valid() )
     // {
     //     MFnNumericAttribute attr;
@@ -1533,7 +1532,7 @@ MObject createPoly(double iFrame, bool iReadNormals, PolyMeshAndFriends & iNode,
     //     MFnNumericData::kBoolean, true);
     //     attr.setKeyable(true);
     //     attr.setHidden(false);
-    //     fnMesh.addAttribute(attrObj, MFnDependencyNode::kLocalDynamicAttr);
+    //     fnMesh.addAttribute(attrObj);
     // }
 
     return obj;
@@ -1584,7 +1583,7 @@ MObject createSubD(double iFrame, SubDAndFriends & iNode, MObject & iParent)
         MFnNumericData::kBoolean, 1);
     numAttr.setKeyable(true);
     numAttr.setHidden(false);
-    fnMesh.addAttribute(attrObj, MFnDependencyNode::kLocalDynamicAttr);
+    fnMesh.addAttribute(attrObj);
 
     if (samp.getInterpolateBoundary() > 0)
     {
@@ -1594,7 +1593,7 @@ MObject createSubD(double iFrame, SubDAndFriends & iNode, MObject & iParent)
 
         numAttr.setKeyable(true);
         numAttr.setHidden(false);
-        fnMesh.addAttribute(attrObj,  MFnDependencyNode::kLocalDynamicAttr);
+        fnMesh.addAttribute(attrObj);
     }
 
     if (samp.getFaceVaryingInterpolateBoundary() > 0)
@@ -1605,7 +1604,7 @@ MObject createSubD(double iFrame, SubDAndFriends & iNode, MObject & iParent)
 
         numAttr.setKeyable(true);
         numAttr.setHidden(false);
-        fnMesh.addAttribute(attrObj,  MFnDependencyNode::kLocalDynamicAttr);
+        fnMesh.addAttribute(attrObj);
     }
 
     if (samp.getFaceVaryingPropagateCorners() > 0)
@@ -1616,7 +1615,7 @@ MObject createSubD(double iFrame, SubDAndFriends & iNode, MObject & iParent)
 
         numAttr.setKeyable(true);
         numAttr.setHidden(false);
-        fnMesh.addAttribute(attrObj,  MFnDependencyNode::kLocalDynamicAttr);
+        fnMesh.addAttribute(attrObj);
     }
 
     fillCreasesCornersAndHoles(fnMesh, iNode, samp);
