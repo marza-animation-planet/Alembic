@@ -38,6 +38,8 @@
 #include "MayaUtility.h"
 #include <maya/MMatrix.h>
 #include <maya/MPoint.h>
+#include <Alembic/AbcGeom/GeometryScope.h>
+
 
 MayaPointPrimitiveWriter::MayaPointPrimitiveWriter(
     double iFrame, MDagPath & iDag, Alembic::AbcGeom::OObject & iParent,
@@ -79,6 +81,7 @@ MayaPointPrimitiveWriter::MayaPointPrimitiveWriter(
 
 void MayaPointPrimitiveWriter::write(double iFrame)
 {
+    MStatus status;
     std::vector<float> position;
     std::vector<float> velocity;
     std::vector< Alembic::Util::uint64_t > particleIds;
@@ -123,7 +126,7 @@ void MayaPointPrimitiveWriter::write(double iFrame)
         position.push_back(static_cast<float>(pt.z));
     }
     samp.setPositions(
-        Alembic::Abc::V3fArraySample((const Imath::V3f *) &position.front(),
+        Alembic::Abc::P3fArraySample((const Imath::V3f *) &position.front(),
             position.size() / 3) );
 
     // get particle velocity
@@ -154,17 +157,36 @@ void MayaPointPrimitiveWriter::write(double iFrame)
         Alembic::Abc::UInt64ArraySample(&(particleIds.front()),
             particleIds.size()) );
 
-    // assume radius is width
+    // assume radius is width / 2
     MDoubleArray radiusArray;
-    particle.radius(radiusArray);
-
-    for (unsigned int i = 0; i < size; i++)
+    MPlug radius = particle.findPlug("radiusPP", true, &status);
+    Alembic::AbcGeom::GeometryScope widthScope = Alembic::AbcGeom::kUnknownScope;
+    if (status == MS::kSuccess)
     {
-        float radius = static_cast<float>(radiusArray[i]);
-        width.push_back(radius);
+        // RadiusPP exists, get all particles value
+        widthScope = Alembic::AbcGeom::kVaryingScope;
+        particle.radius(radiusArray);
+        for (unsigned int i = 0; i < size; i++)
+        {
+            float radius = static_cast<float>(radiusArray[i]);
+            width.push_back(radius * 2.0);
+        }
+    }
+    else
+    {
+        // Get the value of the radius attribute
+        widthScope = Alembic::AbcGeom::kUniformScope;
+        width.push_back(particle.findPlug("radius").asDouble() * 2.0);
     }
 
-    // ignoring width and the velocity vectors for now
+    if (!width.empty())
+    {
+        Alembic::AbcGeom::OFloatGeomParam::Sample widthSamp;
+        widthSamp.setVals(width);
+        widthSamp.setScope(widthScope);
+        samp.setWidths(widthSamp);
+    }
+
     mSchema.set(samp);
 }
 

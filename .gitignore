@@ -43,3 +43,6 @@ arnold/abcproc/abcproc.env.tmp
 /.sconf_temp/
 /*.dblite
 /excons.cache
+
+# Build Folder
+BUILD

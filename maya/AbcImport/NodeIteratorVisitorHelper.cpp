@@ -2983,6 +2983,7 @@ MString connectAttr(ArgData & iArgData)
     MPlug srcPlug, dstPlug;
 
     MObject alembicNodeObj = modifier.createNode(PREFIX_NAME("AlembicNode"), &status);
+    modifier.doIt();
     MFnDependencyNode alembicNodeFn(alembicNodeObj, &status);
 
     AlembicNode *alembicNodePtr =

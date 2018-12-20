@@ -2195,12 +2195,15 @@ AttributesWriter::AttributesWriter(
     for (i = 0; i < attrCount; i++)
     {
         MObject attr = iNode.attribute(i);
+
         MFnAttribute mfnAttr(attr);
         MPlug plug = iNode.findPlug(attr, true);
 
         // if it is not readable, then bail without any more checking
         if (!mfnAttr.isReadable() || plug.isNull())
+        {
             continue;
+        }
 
         MString propName = plug.partialName(0, 0, 0, 0, 0, 1);
 
@@ -2208,7 +2211,9 @@ AttributesWriter::AttributesWriter(
 
         // Ignore 'hasReferenceObject', 'Pref' and 'Nref' if already exported from reference object
         if (ignoreNames.find(propStr) != ignoreNames.end())
+        {
             continue;
+        }
 
         // we handle visibility in a special way
         if (propStr == "visibility")
@@ -2221,14 +2226,26 @@ AttributesWriter::AttributesWriter(
             continue;
         }
 
+        // particles 'radiusPP' gets special treatment as alembic point schema has a .widths
+        if (particles && propStr == "radiusPP")
+        {
+            continue;
+        }
+
         bool userAttr = false;
         if (!matchFilterOrAttribs(plug, iArgs, userAttr))
+        {
             continue;
+        }
 
         if (userAttr && !iUserProps.valid())
+        {
             continue;
+        }
         if (!userAttr && !iArbGeom.valid())
+        {
             continue;
+        }
 
         int sampType = util::getSampledType(plug);
 
@@ -2580,6 +2597,12 @@ bool AttributesWriter::hasAnyAttr(const MFnDependencyNode & iNode,
     unsigned int i;
 
     std::vector< PlugAndObjArray > staticPlugObjArrayVec;
+
+    if (iNode.hasObj(MFn::kParticle))
+    {
+        // Particles always have extra attributes
+        return true;
+    }
 
     bool userAttr;
     for (i = 0; i < attrCount; i++)
