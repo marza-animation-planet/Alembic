@@ -4,12 +4,15 @@
 #include <maya/MGlobal.h>
 #include <maya/MFnPlugin.h>
 
+#ifndef GPUCACHEIMPORT_VERSION
+#  define GPUCACHEIMPORT_VERSION "1.0"
+#endif
 
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
    MString commandName = "gpuCacheImport";
    
-   MFnPlugin plugin(obj, commandName, "1.0", "Any");
+   MFnPlugin plugin(obj, commandName, GPUCACHEIMPORT_VERSION, "Any");
 
    AlembicSceneCache::SetConcurrency(size_t(MThreadUtils::getNumThreads()));
 
