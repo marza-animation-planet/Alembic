@@ -10,17 +10,16 @@
 
 PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 {
-   MString commandName = "gpuCacheImport";
-   
-   MFnPlugin plugin(obj, commandName, GPUCACHEIMPORT_VERSION, "Any");
+   MFnPlugin plugin(obj, "gpuCacheImport", GPUCACHEIMPORT_VERSION, "Any");
+   MStatus status;
 
    AlembicSceneCache::SetConcurrency(size_t(MThreadUtils::getNumThreads()));
 
-   status = plugin.registerCommand(commandName, GpuCacheImport::create, GpuCacheImport::createSyntax);
+   status = plugin.registerCommand("gpuCacheImport", GpuCacheImport::create, GpuCacheImport::createSyntax);
    
    if (status != MS::kSuccess)
    {
-      status.perror("Failed to register command '" + commandName + "'");
+      status.perror("Failed to register command 'gpuCacheImport'");
       return status;
    }
 
@@ -32,15 +31,13 @@ PLUGIN_EXPORT MStatus initializePlugin(MObject obj)
 PLUGIN_EXPORT MStatus uninitializePlugin(MObject obj)
 {
    MFnPlugin plugin(obj);
-   
    MStatus status;
-   MString commandName = "gpuCacheImport";
    
-   status = plugin.deregisterCommand(commandName);
+   status = plugin.deregisterCommand("gpuCacheImport");
    
    if (status != MS::kSuccess)
    {
-      status.perror("Failed to deregister command '" + commandName + "'");
+      status.perror("Failed to deregister command 'gpuCacheImport'");
       return status;
    }
 

@@ -36,6 +36,44 @@
 #include <maya/MPlugArray.h>
 #include <maya/MDagPathArray.h>
 
+
+void AssignDefaultShader(MObject &obj)
+{
+   static MObject sDefaultShader = MObject::kNullObj;
+
+   if (sDefaultShader.isNull())
+   {
+      MSelectionList sl;
+
+      sl.add("initialShadingGroup");
+
+      sl.getDependNode(0, sDefaultShader);
+   }
+
+   if (!obj.isNull() && !sDefaultShader.isNull())
+   {
+      MFnDependencyNode fn(sDefaultShader);
+
+      MPlug dst = fn.findPlug("dagSetMembers");
+
+      fn.setObject(obj);
+
+      MPlug src = fn.findPlug("instObjGroups");
+
+      MDGModifier dgMod;
+      MIntArray indices;
+
+      dst.getExistingArrayAttributeIndices(indices);
+
+      unsigned int dstIdx = (indices.length() > 0 ? indices[indices.length()-1] + 1 : 0);
+
+      dgMod.connect(src.elementByLogicalIndex(0), dst.elementByLogicalIndex(dstIdx));
+      dgMod.doIt();
+   }
+}
+
+// ---
+
 MSyntax GpuCacheImport::createSyntax()
 {
    MSyntax syntax;
@@ -55,14 +93,12 @@ MSyntax GpuCacheImport::createSyntax()
    syntax.addFlag("-crt", "-createIfNotFound", MSyntax::kNoArg);
    syntax.addFlag("-rm", "-removeIfNoUpdate", MSyntax::kNoArg);
    syntax.addFlag("-h", "-help", MSyntax::kNoArg);
-   syntax.addFlag("-ugc", "-useGpuCache", MSyntax::kNoArg);
    
    syntax.makeFlagMultiUse("-nri");
    
    syntax.addArg(MSyntax::kString);
    
    syntax.enableQuery(false);
-   syntax.enableEdit(true);
    
    return syntax;
 }
@@ -307,6 +343,10 @@ private:
    Keyframer mKeyframer;
    std::set<std::string> mProcessed;
    bool mCreateNodes;
+   double mSpeed;
+   double mOffset;
+   bool mPreserveStartFrame;
+   CycleType mCycleType;
 };
 
 UpdateTree::UpdateTree(const std::string &abcPath,
@@ -317,6 +357,10 @@ UpdateTree::UpdateTree(const std::string &abcPath,
    , mIgnoreTransforms(ignoreTransforms)
    , mCreateInstances(createInstances)
    , mCreateNodes(createNodes)
+   , mSpeed(1.0)
+   , mOffset(0.0)
+   , mPreserveStartFrame(false)
+   , mCycleType(CT_hold)
 {
 }
 
@@ -475,9 +519,9 @@ bool UpdateTree::createDag(const char *dagType, AlembicNode *node, bool force)
          entry.dagPath = dagPath;
          entry.typeName = dagType;
          
-         if (dagType == "gpuCache")
+         if (!strcmp(dagType, "gpuCache"))
          {
-            AbcShape::AssignDefaultShader(obj);
+            AssignDefaultShader(obj);
          }
          
          return true;
@@ -541,7 +585,6 @@ AlembicNode::VisitReturn UpdateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
    
    if (typeMatch)
    {
-      // Set AbcShape (the order in which attributes are set is though as to have the lowest possible update cost)
       MPlug plug;
       
       plug = dagNode.findPlug("cacheFileName");
@@ -635,7 +678,7 @@ void UpdateTree::getTransformSamples(AlembicXform *node, RetimeSampleSet &sample
       rs.otime = ts->getSampleTime(idx);
       rs.ntime = rs.otime;
       
-      if (mCycleType == AbcShape::CT_reverse)
+      if (mCycleType == CT_reverse)
       {
          rs.ntime = secEnd - (rs.ntime - secStart);
       }
@@ -773,7 +816,7 @@ void UpdateTree::keyVisibility(Alembic::AbcGeom::IObject iobj, MFnDependencyNode
                   Alembic::AbcCoreAbstract::index_t idx = i;
                   
                   double t = ts->getSampleTime(idx);
-                  if (mCycleType == AbcShape::CT_reverse)
+                  if (mCycleType == CT_reverse)
                   {
                      t = secEnd - (t - secStart);
                   }
@@ -786,7 +829,7 @@ void UpdateTree::keyVisibility(Alembic::AbcGeom::IObject iobj, MFnDependencyNode
                }
                
                mKeyframer.addCurvesImportInfo(mobj, "visibility", mSpeed, secOffset, secStart, secEnd,
-                                              (mCycleType == AbcShape::CT_reverse), mPreserveStartFrame);
+                                              (mCycleType == CT_reverse), mPreserveStartFrame);
             }
          }
          else if (Alembic::Abc::IBoolProperty::matches(*header))
@@ -825,7 +868,7 @@ void UpdateTree::keyVisibility(Alembic::AbcGeom::IObject iobj, MFnDependencyNode
                   Alembic::AbcCoreAbstract::index_t idx = i;
                   
                   double t = ts->getSampleTime(idx);
-                  if (mCycleType == AbcShape::CT_reverse)
+                  if (mCycleType == CT_reverse)
                   {
                      t = secEnd - (t - secStart);
                   }
@@ -838,7 +881,7 @@ void UpdateTree::keyVisibility(Alembic::AbcGeom::IObject iobj, MFnDependencyNode
                }
                
                mKeyframer.addCurvesImportInfo(mobj, "visibility", mSpeed, secOffset, secStart, secEnd,
-                                              (mCycleType == AbcShape::CT_reverse), mPreserveStartFrame);
+                                              (mCycleType == CT_reverse), mPreserveStartFrame);
             }
          }
       }
@@ -925,7 +968,7 @@ AlembicNode::VisitReturn UpdateTree::enter(AlembicXform &node, AlembicNode *inst
                double secOffset = MTime(mOffset, MTime::uiUnit()).as(MTime::kSeconds);
                
                mKeyframer.addCurvesImportInfo(xformObj, "", mSpeed, secOffset, secStart, secEnd,
-                                              (mCycleType == AbcShape::CT_reverse), mPreserveStartFrame);
+                                              (mCycleType == CT_reverse), mPreserveStartFrame);
             }
             else if (samples.size() == 1)
             {
@@ -991,7 +1034,7 @@ AlembicNode::VisitReturn UpdateTree::enter(AlembicXform &node, AlembicNode *inst
             Alembic::AbcCoreAbstract::index_t idx = i;
             
             double t = ts->getSampleTime(idx);
-            if (mCycleType == AbcShape::CT_reverse)
+            if (mCycleType == CT_reverse)
             {
                t = secEnd - (t - secStart);
             }
@@ -1009,7 +1052,7 @@ AlembicNode::VisitReturn UpdateTree::enter(AlembicXform &node, AlembicNode *inst
             mKeyframer.addAnyKey(locObj, "localScaleZ", 0, posscl[5]);
          }
          
-         bool rev = (mCycleType == AbcShape::CT_reverse);
+         bool rev = (mCycleType == CT_reverse);
          
          mKeyframer.addCurvesImportInfo(locObj, "localPositionX", mSpeed, secOffset, secStart, secEnd, rev, mPreserveStartFrame);
          mKeyframer.addCurvesImportInfo(locObj, "localPositionY", mSpeed, secOffset, secStart, secEnd, rev, mPreserveStartFrame);
@@ -1087,7 +1130,7 @@ AlembicNode::VisitReturn UpdateTree::enter(AlembicXform &node, AlembicNode *inst
                Alembic::AbcCoreAbstract::index_t idx = i;
                
                double t = ts->getSampleTime(idx);
-               if (mCycleType == AbcShape::CT_reverse)
+               if (mCycleType == CT_reverse)
                {
                   t = secEnd - (t - secStart);
                }
@@ -1106,7 +1149,7 @@ AlembicNode::VisitReturn UpdateTree::enter(AlembicXform &node, AlembicNode *inst
             xform.set(tmat);
 
             mKeyframer.addCurvesImportInfo(xformObj, "", mSpeed, secOffset, secStart, secEnd,
-                                           (mCycleType == AbcShape::CT_reverse), mPreserveStartFrame);
+                                           (mCycleType == CT_reverse), mPreserveStartFrame);
          }
       }
       else
@@ -1513,7 +1556,7 @@ void UpdateTree::keyAttribute(Property prop, MPlug &plug)
       double secStart = ts->getSampleTime(0);
       double secEnd = ts->getSampleTime(numSamples-1);
       double secOffset = MTime(mOffset, MTime::uiUnit()).as(MTime::kSeconds);
-      bool reverse = (mCycleType == AbcShape::CT_reverse);
+      bool reverse = (mCycleType == CT_reverse);
       
       double offset = secOffset;
       if (mPreserveStartFrame)
@@ -2726,10 +2769,10 @@ void UpdateTree::keyTransforms(const MString &defaultRotationInterpolation,
    
    switch (mCycleType)
    {
-   case AbcShape::CT_loop:
+   case CT_loop:
       inf = MFnAnimCurve::kCycle;
       break;
-   case AbcShape::CT_bounce:
+   case CT_bounce:
       inf = MFnAnimCurve::kOscillate;
    default:
       break;
@@ -2793,24 +2836,10 @@ MStatus GpuCacheImport::doIt(const MArgList& args)
    
    MArgParser argData(syntax(), args, &status);
    
-   // default interpoation type
+   // default interpolation type
    MString rotInterp("quaternionSlerp");
    MStringDict nodeRotInterp;
-   AbcShape::DisplayMode dm = AbcShape::DM_box;
-   AbcShape::CycleType ct = AbcShape::CT_hold;
-   double speed = 1.0;
-   double offset = 0.0;
-   bool preserveStartFrame = false;
-   
-   bool setSpeed = false;
-   bool setOffset = false;
-   bool setMode = false;
-   bool setCycle = false;
-   bool setPreserveStart = false;
    bool setInterp = false;
-   bool simplifyCurves = true;
-   
-   argData.isFlagSet("preserveStartFrame");
    
    if (argData.isFlagSet("help"))
    {
@@ -2820,16 +2849,6 @@ MStatus GpuCacheImport::doIt(const MArgList& args)
       MGlobal::displayInfo("                                    Reparent the whole hierarchy under a node in the current Maya scene.");
       MGlobal::displayInfo("-n / -namespace                   : string");
       MGlobal::displayInfo("                                    Namespace to add nodes to (default to current namespace).");
-      MGlobal::displayInfo("-m / -mode                        : string (box|boxes|points|geometry)");
-      MGlobal::displayInfo("                                    " + MString(PREFIX_NAME("AbcShape")) + " nodes display mode (default to box).");
-      MGlobal::displayInfo("-s / -speed                       : double");
-      MGlobal::displayInfo("                                    " + MString(PREFIX_NAME("AbcShape")) + " nodes speed (default to 1.0).");
-      MGlobal::displayInfo("-o / -offset                      : double");
-      MGlobal::displayInfo("                                    " + MString(PREFIX_NAME("AbcShape")) + " nodes offset in frames (default to 0.0).");
-      MGlobal::displayInfo("-psf / -preserveStartFrame        : bool");
-      MGlobal::displayInfo("                                    Preserve range start frame when using speed.");
-      MGlobal::displayInfo("-ct / -cycleType                  : string (hold|loop|reverse|bounce)");
-      MGlobal::displayInfo("                                    " + MString(PREFIX_NAME("AbcShape")) + " nodes cycle type (default to hold).");
       MGlobal::displayInfo("-ci / -createInstances            :");
       MGlobal::displayInfo("                                    Create maya instances.");
       MGlobal::displayInfo("-it / -ignoreTransforms           :");
@@ -2860,136 +2879,9 @@ MStatus GpuCacheImport::doIt(const MArgList& args)
       MGlobal::displayInfo("-rm / -removeIfNoUpdate           :");
       MGlobal::displayInfo("                                    Remove nodes in maya tree that are not present in alembic file.");
       MGlobal::displayInfo("                                    Used only when -update flag is set.");
-      MGlobal::displayInfo("-ugc / -useGpuCache               : Use gpuCache instead of " + MString(PREFIX_NAME("AbcShape")) + ".");
-      MGlobal::displayInfo("                                    Note that the following shape related options won't have any effect:");
-      MGlobal::displayInfo("                                      -mode, -speed, -offset, -preserveStartFrame, -cycleType, -ignoreTransforms");
       MGlobal::displayInfo("-h / -help                        :");
       MGlobal::displayInfo("                                    Display this help.");
       MGlobal::displayInfo("");
-      MGlobal::displayInfo("Command also work in edit mode:");
-      MGlobal::displayInfo("  -mode, -speed, -offset, -preserveStartFrame, -cycleType, -rotationInterpolation, -nodeRotationInterpolation flags are supported.");
-      MGlobal::displayInfo("  Acts on all " + MString(PREFIX_NAME("AbcShape")) + " in selected node trees.");
-   }
-   
-   if (argData.isFlagSet("preserveStartFrame"))
-   {
-      status = argData.getFlagArgument("preserveStartFrame", 0, preserveStartFrame);
-      
-      if (status != MS::kSuccess)
-      {
-         MGlobal::displayWarning("Invalid preserveStartFrame flag argument");
-         preserveStartFrame = false;
-      }
-      else
-      {
-         setPreserveStart = true;
-      }
-   }
-   
-   if (argData.isFlagSet("speed"))
-   {
-      status = argData.getFlagArgument("speed", 0, speed);
-      
-      if (status != MS::kSuccess)
-      {
-         MGlobal::displayWarning("Invalid speed flag argument");
-         speed = 1.0;
-      }
-      else
-      {
-         setSpeed = true;
-      }
-   }
-   
-   if (argData.isFlagSet("offset"))
-   {
-      status = argData.getFlagArgument("offset", 0, offset);
-      
-      if (status != MS::kSuccess)
-      {
-         MGlobal::displayWarning("Invalid offset flag argument");
-         offset = 0.0;
-      }
-      else
-      {
-         setOffset = true;
-      }
-   }
-   
-   if (argData.isFlagSet("mode"))
-   {
-      MString val;
-      status = argData.getFlagArgument("mode", 0, val);
-      
-      if (status == MS::kSuccess)
-      {
-         if (val == "box")
-         {
-            dm = AbcShape::DM_box;
-            setMode = true;
-         }
-         else if (val == "boxes")
-         {
-            dm = AbcShape::DM_boxes;
-            setMode = true;
-         }
-         else if (val == "points")
-         {
-            dm = AbcShape::DM_points;
-            setMode = true;
-         }
-         else if (val == "geometry")
-         {
-            dm = AbcShape::DM_geometry;
-            setMode = true;
-         }
-         else
-         {
-            MGlobal::displayWarning(val + " is not a valid mode");
-         }
-      }
-      else
-      {
-         MGlobal::displayWarning("Invalid mode flag argument");
-      }
-   }
-   
-   if (argData.isFlagSet("cycleType"))
-   {
-      MString val;
-      status = argData.getFlagArgument("cycleType", 0, val);
-      
-      if (status == MS::kSuccess)
-      {
-         if (val == "hold")
-         {
-            ct = AbcShape::CT_hold;
-            setCycle = true;
-         }
-         else if (val == "loop")
-         {
-            ct = AbcShape::CT_loop;
-            setCycle = true;
-         }
-         else if (val == "reverse")
-         {
-            ct = AbcShape::CT_reverse;
-            setCycle = true;
-         }
-         else if (val == "bounce")
-         {
-            ct = AbcShape::CT_bounce;
-            setCycle = true;
-         }
-         else
-         {
-            MGlobal::displayWarning(val + " is not a valid cycleType value");
-         }
-      }
-      else
-      {
-         MGlobal::displayWarning("Invalid cycleTyle flag argument");
-      }
    }
    
    if (argData.isFlagSet("rotationInterpolation"))
@@ -3058,510 +2950,357 @@ MStatus GpuCacheImport::doIt(const MArgList& args)
       nodeRotInterp[nodeName] = interpType;
    }
    
-   if (argData.isEdit())
+   MString filename("");
+   MString ns("");
+   MString includeFilter("");
+   MString excludeFilter("");
+   MString curNs = MNamespace::currentNamespace();
+   MDagPath parentDag;
+   bool createMissing = false;
+   bool deleteMissing = false;
+   
+   bool fitTimeRange = argData.isFlagSet("fitTimeRange");
+   bool setToStartFrame = argData.isFlagSet("setToStartFrame");
+   bool createInstances = argData.isFlagSet("createInstances");
+   bool ignoreTransforms = argData.isFlagSet("ignoreTransforms");
+   bool update = argData.isFlagSet("update");
+   bool simplifyCurves = !argData.isFlagSet("dontSimplifyCurves");
+   
+   if (ignoreTransforms && createInstances)
    {
-      MSelectionList oldSel;
-      MSelectionList newSel;
-      MSelectionList tmpSel;
-      
-      MGlobal::getActiveSelectionList(oldSel);
-      
-      MGlobal::executeCommand("select -hi");
-      MGlobal::getActiveSelectionList(newSel);
-      
-      MDagPath path;
-      MFnDagNode node;
-      
-      // Keep a list of processed curves
-      bool processCurves = (setSpeed || setOffset || setCycle || setPreserveStart || setInterp || nodeRotInterp.size() > 0);
-      
-      Keyframer keyframer;
-      MStringArray connectedCurves;
-      
-      double secOffset = MTime(offset, MTime::uiUnit()).as(MTime::kSeconds);
-      
-      keyframer.beginRetime();
-      
-      for (unsigned int i=0; i<newSel.length(); ++i)
-      {
-         if (newSel.getDagPath(i, path) != MS::kSuccess)
-         {
-            continue;
-         }
-         
-         if (node.setObject(path) != MS::kSuccess)
-         {
-            continue;
-         }
-         
-         if (node.typeName() == PREFIX_NAME("AbcShape"))
-         {
-            if (setSpeed)
-            {
-               node.findPlug("speed").setDouble(speed);
-            }
-            if (setOffset)
-            {
-               node.findPlug("offset").setDouble(offset);
-            }
-            if (setMode)
-            {
-               node.findPlug("displayMode").setShort(short(dm));
-            }
-            if (setCycle)
-            {
-               node.findPlug("cycleType").setShort(short(ct));
-            }
-            if (setPreserveStart)
-            {
-               node.findPlug("preserveStartFrame").setBool(preserveStartFrame);
-            }
-         }
-         
-         if (processCurves)
-         {
-            MObject curveObj;
-            
-            connectedCurves.clear();
-            MGlobal::executeCommand("listConnections -type animCurve -s 1 -d 0 \"" + path.fullPathName() + "\"", connectedCurves);
-            
-            MFnAnimCurve::InfinityType inf = MFnAnimCurve::kConstant;
-            bool reverse = false;
-            
-            if (setCycle)
-            {
-               switch (ct)
-               {
-               case AbcShape::CT_loop:
-                  inf = MFnAnimCurve::kCycle;
-                  break;
-               case AbcShape::CT_bounce:
-                  inf = MFnAnimCurve::kOscillate;
-                  break;
-               case AbcShape::CT_reverse:
-                  reverse = true;
-               default:
-                  break;
-               }
-            }
-            
-            bool setNodeInterp = setInterp;
-            MString nodeInterp = rotInterp;
-            
-            // Get target node name without parent or namespaces
-            MString nodeName = path.partialPathName();
-            int r = nodeName.rindexW(':');
-            if (r == -1)
-            {
-               r = nodeName.rindexW('|');
-            }
-            if (r != -1)
-            {
-               nodeName = nodeName.substringW(r + 1, nodeName.numChars() - 1);
-            }
-            
-            // Check for node specific interpolation override
-            MStringDict::const_iterator it = nodeRotInterp.find(nodeName);
-            if (it != nodeRotInterp.end())
-            {
-               nodeInterp = it->second;
-               setNodeInterp = true;
-            }
-            
-            for (unsigned int j=0; j<connectedCurves.length(); ++j)
-            {
-               tmpSel.clear();
-               if (tmpSel.add(connectedCurves[j]) != MS::kSuccess)
-               {
-                  continue;
-               }
-               
-               if (tmpSel.getDependNode(0, curveObj) != MS::kSuccess)
-               {
-                  continue;
-               }
-               
-               MFnAnimCurve curve(curveObj, &status);
-               if (status != MS::kSuccess)
-               {
-                  continue;
-               }
-               
-               keyframer.retimeCurve(curve,
-                                     (setSpeed ? &speed : 0),
-                                     (setOffset ? &secOffset : 0),
-                                     (setCycle ? &reverse : 0),
-                                     (setPreserveStart ? &preserveStartFrame : 0));
-               
-               keyframer.adjustCurve(curve,
-                                     (setNodeInterp ? &nodeInterp : 0),
-                                     (setCycle ? &inf : 0),
-                                     (setCycle ? &inf : 0));
-            }
-         }
-      }
-      
-      keyframer.endRetime();
-      
-      MGlobal::setActiveSelectionList(oldSel);
-      
-      status = MS::kSuccess;
+      MGlobal::displayWarning("'createInstances' and 'ignoreTransforms' options are incompatible");
    }
-   else
+   
+   if (!update && argData.isFlagSet("reparent"))
    {
-      MString filename("");
-      MString ns("");
-      MString includeFilter("");
-      MString excludeFilter("");
-      MString curNs = MNamespace::currentNamespace();
-      MDagPath parentDag;
-      bool createMissing = false;
-      bool deleteMissing = false;
+      MSelectionList sl;
       
-      bool fitTimeRange = argData.isFlagSet("fitTimeRange");
-      bool setToStartFrame = argData.isFlagSet("setToStartFrame");
-      bool createInstances = argData.isFlagSet("createInstances");
-      bool ignoreTransforms = argData.isFlagSet("ignoreTransforms");
-      bool update = argData.isFlagSet("update");
-      bool simplifyCurves = !argData.isFlagSet("dontSimplifyCurves");
-      bool useGpuCache = argData.isFlagSet("useGpuCache");
-      
-      if (ignoreTransforms && createInstances)
-      {
-         MGlobal::displayWarning("'createInstances' and 'ignoreTransforms' options are incompatible");
-      }
-      
-      if (!update && argData.isFlagSet("reparent"))
-      {
-         MSelectionList sl;
-         
-         MString val;
-         MDagPath dag;
-         status = argData.getFlagArgument("reparent", 0, val);
-         
-         if (status == MS::kSuccess)
-         {
-            if (sl.add(val) == MS::kSuccess && sl.getDagPath(0, dag) == MS::kSuccess)
-            {
-               parentDag = dag;
-            }
-            else
-            {
-               MGlobal::displayWarning(val + " is not a valid dag path");
-            }
-         }
-         else
-         {
-            MGlobal::displayWarning("Invalid reparent flag argument");
-         }
-      }
-      
-      if (!update && argData.isFlagSet("namespace"))
-      {
-         MString val;
-         status = argData.getFlagArgument("namespace", 0, val);
-         
-         if (status == MS::kSuccess)
-         {
-            if ((!MNamespace::namespaceExists(val) &&
-                  MNamespace::addNamespace(val) != MS::kSuccess) ||
-                MNamespace::setCurrentNamespace(val) != MS::kSuccess)
-            {
-               MGlobal::displayWarning(val + " is not a valid namespace");
-            }
-            else
-            {
-               ns = val;
-            }
-         }
-         else
-         {
-            MGlobal::displayWarning("Invalid namespace flag argument");
-         }   
-      }
-      
-      if (!update && argData.isFlagSet("filterObjects"))
-      {
-         MString val;
-         status = argData.getFlagArgument("filterObjects", 0, val);
-         
-         if (status == MS::kSuccess)
-         {
-            includeFilter = val;
-         }
-         else
-         {
-            MGlobal::displayWarning("Invalid filterObjects flag argument");
-         }
-      }
-      
-      if (!update && argData.isFlagSet("excludeFilterObjects"))
-      {
-         MString val;
-         status = argData.getFlagArgument("excludeFilterObjects", 0, val);
-         
-         if (status == MS::kSuccess)
-         {
-            excludeFilter = val;
-         }
-         else
-         {
-            MGlobal::displayWarning("Invalid excludeFilterObjects flag argument");
-         }
-      }
-      
-      if (update)
-      {
-         createMissing = argData.isFlagSet("createIfNotFound");
-         deleteMissing = argData.isFlagSet("removeIfNoUpdate");
-      }
-      else
-      {
-         createMissing = true;
-      }
-      
-      status = argData.getCommandArgument(0, filename);
-      MStringArray result;
+      MString val;
+      MDagPath dag;
+      status = argData.getFlagArgument("reparent", 0, val);
       
       if (status == MS::kSuccess)
       {
-         MFileObject file;
-         file.setRawFullName(filename);
-         
-         if (!file.exists())
+         if (sl.add(val) == MS::kSuccess && sl.getDagPath(0, dag) == MS::kSuccess)
          {
-            MGlobal::displayError("Invalid file path: " + filename);
-            status = MS::kFailure;
+            parentDag = dag;
          }
          else
          {
-            std::string abcPath = file.resolvedFullName().asChar();
-            
-            AlembicSceneFilter filter(includeFilter.asChar(), excludeFilter.asChar());
-            
-            AlembicScene *scene = AlembicSceneCache::Ref(abcPath, filter);
-            if (scene)
+            MGlobal::displayWarning(val + " is not a valid dag path");
+         }
+      }
+      else
+      {
+         MGlobal::displayWarning("Invalid reparent flag argument");
+      }
+   }
+   
+   if (!update && argData.isFlagSet("namespace"))
+   {
+      MString val;
+      status = argData.getFlagArgument("namespace", 0, val);
+      
+      if (status == MS::kSuccess)
+      {
+         if ((!MNamespace::namespaceExists(val) &&
+               MNamespace::addNamespace(val) != MS::kSuccess) ||
+             MNamespace::setCurrentNamespace(val) != MS::kSuccess)
+         {
+            MGlobal::displayWarning(val + " is not a valid namespace");
+         }
+         else
+         {
+            ns = val;
+         }
+      }
+      else
+      {
+         MGlobal::displayWarning("Invalid namespace flag argument");
+      }   
+   }
+   
+   if (!update && argData.isFlagSet("filterObjects"))
+   {
+      MString val;
+      status = argData.getFlagArgument("filterObjects", 0, val);
+      
+      if (status == MS::kSuccess)
+      {
+         includeFilter = val;
+      }
+      else
+      {
+         MGlobal::displayWarning("Invalid filterObjects flag argument");
+      }
+   }
+   
+   if (!update && argData.isFlagSet("excludeFilterObjects"))
+   {
+      MString val;
+      status = argData.getFlagArgument("excludeFilterObjects", 0, val);
+      
+      if (status == MS::kSuccess)
+      {
+         excludeFilter = val;
+      }
+      else
+      {
+         MGlobal::displayWarning("Invalid excludeFilterObjects flag argument");
+      }
+   }
+   
+   if (update)
+   {
+      createMissing = argData.isFlagSet("createIfNotFound");
+      deleteMissing = argData.isFlagSet("removeIfNoUpdate");
+   }
+   else
+   {
+      createMissing = true;
+   }
+   
+   status = argData.getCommandArgument(0, filename);
+   MStringArray result;
+   
+   if (status == MS::kSuccess)
+   {
+      MFileObject file;
+      file.setRawFullName(filename);
+      
+      if (!file.exists())
+      {
+         MGlobal::displayError("Invalid file path: " + filename);
+         status = MS::kFailure;
+      }
+      else
+      {
+         std::string abcPath = file.resolvedFullName().asChar();
+         
+         AlembicSceneFilter filter(includeFilter.asChar(), excludeFilter.asChar());
+         
+         AlembicScene *scene = AlembicSceneCache::Ref(abcPath, filter);
+         if (scene)
+         {
+            if (update)
             {
-               if (update)
+               MSelectionList oldSel;
+               MSelectionList newSel;
+               MDagPath path;
+               MFnDagNode node;
+               
+               MGlobal::getActiveSelectionList(oldSel);
+               
+               // Check if the selected nodes are valid nodes in the alembic file
+               
+               if (oldSel.length() == 0)
                {
-                  MSelectionList oldSel;
-                  MSelectionList newSel;
-                  MDagPath path;
-                  MFnDagNode node;
-                  
-                  MGlobal::getActiveSelectionList(oldSel);
-                  
-                  // Check if the selected nodes are valid nodes in the alembic file
-                  
-                  if (oldSel.length() == 0)
+                  MGlobal::displayError("No selection to update.");
+                  if (!AlembicSceneCache::Unref(scene))
                   {
-                     MGlobal::displayError("No selection to update.");
-                     if (!AlembicSceneCache::Unref(scene))
-                     {
-                        delete scene;
-                     }
-                     return MS::kFailure;
+                     delete scene;
+                  }
+                  return MS::kFailure;
+               }
+               
+               for (unsigned int i=0; i<oldSel.length(); ++i)
+               {
+                  if (oldSel.getDagPath(i, path) != MS::kSuccess)
+                  {
+                     continue;
                   }
                   
-                  for (unsigned int i=0; i<oldSel.length(); ++i)
+                  if (node.setObject(path) != MS::kSuccess)
                   {
-                     if (oldSel.getDagPath(i, path) != MS::kSuccess)
+                     continue;
+                  }
+                  
+                  // Check namespace consistency
+                  std::string tmp = node.name().asChar();
+                  size_t p0 = tmp.rfind(':');
+                  
+                  if (i == 0)
+                  {
+                     if (p0 != std::string::npos)
                      {
-                        continue;
+                        ns = tmp.substr(0, p0).c_str();
                      }
-                     
-                     if (node.setObject(path) != MS::kSuccess)
+                  }
+                  else
+                  {
+                     if ((p0 != std::string::npos && ns != tmp.substr(0, p0).c_str()) ||
+                         (p0 == std::string::npos && ns != ""))
                      {
-                        continue;
-                     }
-                     
-                     // Check namespace consistency
-                     std::string tmp = node.name().asChar();
-                     size_t p0 = tmp.rfind(':');
-                     
-                     if (i == 0)
-                     {
-                        if (p0 != std::string::npos)
-                        {
-                           ns = tmp.substr(0, p0).c_str();
-                        }
-                     }
-                     else
-                     {
-                        if ((p0 != std::string::npos && ns != tmp.substr(0, p0).c_str()) ||
-                            (p0 == std::string::npos && ns != ""))
-                        {
-                           MGlobal::displayError("All roots must exists in the same namespace.");
-                           if (!AlembicSceneCache::Unref(scene))
-                           {
-                              delete scene;
-                           }
-                           return MS::kFailure;
-                        }
-                     }
-                     
-                     // Get alembic node path
-                     std::string nodePath = DagToAbcPath(path);
-                     
-                     if (!scene->find(nodePath))
-                     {
-                        MGlobal::displayError("'" + MString(nodePath.c_str()) + "' node cannot be found in the provided alembic.");
+                        MGlobal::displayError("All roots must exists in the same namespace.");
                         if (!AlembicSceneCache::Unref(scene))
                         {
                            delete scene;
                         }
                         return MS::kFailure;
                      }
-                     else
-                     {
-                        // Update filter expression
-                        if (includeFilter.length() > 0)
-                        {
-                           includeFilter += "|";
-                        }
-                        includeFilter += nodePath.c_str();
-                     }
                   }
                   
-                  // Delete nodes in selection that cannot be found in the alembic file
-                  if (deleteMissing)
-                  {
-                     MGlobal::executeCommand("select -hi");
-                     MGlobal::getActiveSelectionList(newSel);
-                     
-                     MDagModifier dgmod;
-                     MDagPathArray paths;
-                     
-                     for (unsigned int i=0; i<newSel.length(); ++i)
-                     {
-                        if (newSel.getDagPath(i, path) != MS::kSuccess)
-                        {
-                           continue;
-                        }
-                        
-                        paths.append(path);
-                     }
-
-                     MGlobal::setActiveSelectionList(oldSel);
-
-                     for (unsigned int i=0; i<paths.length(); ++i)
-                     {
-                        path = paths[i];
-                        
-                        if (node.setObject(path) != MS::kSuccess)
-                        {
-                           continue;
-                        }
-                        
-                        std::string nodePath = DagToAbcPath(path);
-                        
-                        if (nodePath.length() > 0 && !scene->find(nodePath))
-                        {
-                           MGlobal::displayInfo("[gpuCacheImport] Deleting DAG \"" + path.fullPathName() + "\"");
-                           
-                           MObject nodeObj = node.object();
-                           
-                           dgmod.deleteNode(nodeObj);
-                           dgmod.doIt();
-                        }
-                     }
-                  }
+                  // Get alembic node path
+                  std::string nodePath = DagToAbcPath(path);
                   
-                  // Create a new filtered scene to only visit selected nodes
-                  AlembicSceneFilter rootFilter(includeFilter.asChar(), "");
-                  AlembicScene *filteredScene = AlembicSceneCache::Ref(abcPath, rootFilter);
-                  if (!AlembicSceneCache::Unref(scene))
+                  if (!scene->find(nodePath))
                   {
-                     delete scene;
-                  }
-                  if (!filteredScene)
-                  {
+                     MGlobal::displayError("'" + MString(nodePath.c_str()) + "' node cannot be found in the provided alembic.");
+                     if (!AlembicSceneCache::Unref(scene))
+                     {
+                        delete scene;
+                     }
                      return MS::kFailure;
                   }
-                  scene = filteredScene;
-                  
-                  // Set namespace for nodes to be created
-                  MNamespace::setCurrentNamespace(ns);
-               }
-               
-               UpdateTree visitor(abcPath, dm, ignoreTransforms, createInstances, speed, offset, preserveStartFrame, ct, createMissing, useGpuCache);
-               scene->visit(AlembicNode::VisitDepthFirst, visitor);
-               
-               visitor.keyTransforms(rotInterp, nodeRotInterp, false, simplifyCurves);
-               
-               if (parentDag.isValid())
-               {
-                  MFnDagNode parentNode(parentDag);
-                  
-                  for (size_t i=0; i<scene->childCount(); ++i)
+                  else
                   {
-                     MDagPath rootDag = visitor.getDag(scene->child(i)->path());
-                     if (rootDag.isValid())
+                     // Update filter expression
+                     if (includeFilter.length() > 0)
                      {
-                        MObject rootObj = rootDag.node();
-                        parentNode.addChild(rootObj);
-                        
-                        result.append(rootDag.fullPathName());
+                        includeFilter += "|";
                      }
+                     includeFilter += nodePath.c_str();
                   }
                }
                
-               if (fitTimeRange || setToStartFrame)
+               // Delete nodes in selection that cannot be found in the alembic file
+               if (deleteMissing)
                {
-                  double start, end;
+                  MGlobal::executeCommand("select -hi");
+                  MGlobal::getActiveSelectionList(newSel);
                   
-                  GetFrameRange visitor(false, false, false);
-                  scene->visit(AlembicNode::VisitDepthFirst, visitor);
+                  MDagModifier dgmod;
+                  MDagPathArray paths;
                   
-                  if (visitor.getFrameRange(start, end))
+                  for (unsigned int i=0; i<newSel.length(); ++i)
                   {
-                     MTime startFrame(start, MTime::kSeconds);
-                     MTime endFrame(end, MTime::kSeconds);
+                     if (newSel.getDagPath(i, path) != MS::kSuccess)
+                     {
+                        continue;
+                     }
                      
-                     if (fitTimeRange)
-                     {
-                        MAnimControl::setAnimationStartEndTime(startFrame, endFrame);
-                        MAnimControl::setMinMaxTime(startFrame, endFrame);
-                     }
-                     if (setToStartFrame)
-                     {
-                        MAnimControl::setCurrentTime(startFrame);
-                     }
+                     paths.append(path);
                   }
-               }
-               
-               if (result.length() == 0)
-               {
-                  for (size_t i=0; i<scene->childCount(); ++i)
+
+                  MGlobal::setActiveSelectionList(oldSel);
+
+                  for (unsigned int i=0; i<paths.length(); ++i)
                   {
-                     MDagPath rootDag = visitor.getDag(scene->child(i)->path());
-                     if (rootDag.isValid())
+                     path = paths[i];
+                     
+                     if (node.setObject(path) != MS::kSuccess)
                      {
-                        result.append(rootDag.fullPathName());
+                        continue;
+                     }
+                     
+                     std::string nodePath = DagToAbcPath(path);
+                     
+                     if (nodePath.length() > 0 && !scene->find(nodePath))
+                     {
+                        MGlobal::displayInfo("[gpuCacheImport] Deleting DAG \"" + path.fullPathName() + "\"");
+                        
+                        MObject nodeObj = node.object();
+                        
+                        dgmod.deleteNode(nodeObj);
+                        dgmod.doIt();
                      }
                   }
                }
                
-               if (scene && !AlembicSceneCache::Unref(scene))
+               // Create a new filtered scene to only visit selected nodes
+               AlembicSceneFilter rootFilter(includeFilter.asChar(), "");
+               AlembicScene *filteredScene = AlembicSceneCache::Ref(abcPath, rootFilter);
+               if (!AlembicSceneCache::Unref(scene))
                {
                   delete scene;
                }
+               if (!filteredScene)
+               {
+                  return MS::kFailure;
+               }
+               scene = filteredScene;
+               
+               // Set namespace for nodes to be created
+               MNamespace::setCurrentNamespace(ns);
             }
-            else
+            
+            UpdateTree visitor(abcPath, ignoreTransforms, createInstances, createMissing);
+            scene->visit(AlembicNode::VisitDepthFirst, visitor);
+            
+            visitor.keyTransforms(rotInterp, nodeRotInterp, false, simplifyCurves);
+            
+            if (parentDag.isValid())
             {
-               MGlobal::displayError("Could not read scene from file: " + filename);
-               status = MS::kFailure;
+               MFnDagNode parentNode(parentDag);
+               
+               for (size_t i=0; i<scene->childCount(); ++i)
+               {
+                  MDagPath rootDag = visitor.getDag(scene->child(i)->path());
+                  if (rootDag.isValid())
+                  {
+                     MObject rootObj = rootDag.node();
+                     parentNode.addChild(rootObj);
+                     
+                     result.append(rootDag.fullPathName());
+                  }
+               }
+            }
+            
+            if (fitTimeRange || setToStartFrame)
+            {
+               double start, end;
+               
+               GetFrameRange visitor(false, false, false);
+               scene->visit(AlembicNode::VisitDepthFirst, visitor);
+               
+               if (visitor.getFrameRange(start, end))
+               {
+                  MTime startFrame(start, MTime::kSeconds);
+                  MTime endFrame(end, MTime::kSeconds);
+                  
+                  if (fitTimeRange)
+                  {
+                     MAnimControl::setAnimationStartEndTime(startFrame, endFrame);
+                     MAnimControl::setMinMaxTime(startFrame, endFrame);
+                  }
+                  if (setToStartFrame)
+                  {
+                     MAnimControl::setCurrentTime(startFrame);
+                  }
+               }
+            }
+            
+            if (result.length() == 0)
+            {
+               for (size_t i=0; i<scene->childCount(); ++i)
+               {
+                  MDagPath rootDag = visitor.getDag(scene->child(i)->path());
+                  if (rootDag.isValid())
+                  {
+                     result.append(rootDag.fullPathName());
+                  }
+               }
+            }
+            
+            if (scene && !AlembicSceneCache::Unref(scene))
+            {
+               delete scene;
             }
          }
+         else
+         {
+            MGlobal::displayError("Could not read scene from file: " + filename);
+            status = MS::kFailure;
+         }
       }
-      
-      if (ns.length() > 0)
-      {
-         MNamespace::setCurrentNamespace(curNs);
-      }
-      
-      setResult(result);
    }
+   
+   if (ns.length() > 0)
+   {
+      MNamespace::setCurrentNamespace(curNs);
+   }
+   
+   setResult(result);
    
    return status;
 }
