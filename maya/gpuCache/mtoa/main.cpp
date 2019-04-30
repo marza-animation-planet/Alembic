@@ -1,4 +1,4 @@
-#include "AbcTranslator.h"
+#include "gpuCacheTranslator.h"
 #include "extension/Extension.h"
 
 extern "C"
@@ -10,8 +10,8 @@ DLLEXPORT void initializeExtension(CExtension& extension)
    extension.Requires("gpuCache");
    status = extension.RegisterTranslator("gpuCache",
                                          "",
-                                         CAbcTranslator::Create,
-                                         CAbcTranslator::NodeInitializer);
+                                         CGpuCacheTranslator::Create,
+                                         CGpuCacheTranslator::NodeInitializer);
 }
 
 DLLEXPORT void deinitializeExtension(CExtension& extension)
