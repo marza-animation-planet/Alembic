@@ -251,13 +251,15 @@ Dso::Dso(AtNode *node)
    readParams();
 
    AtNode *opts = AiUniverseGetOptions();
+   const AtNodeEntry *optsEntry = AiNodeGetNodeEntry(opts);
 
    // Set framerate if needed
    if (mCommonParams.fps <= 0.0)
    {
-      if (AiNodeLookUpUserParameter(opts, "fps") != 0)
+      if (AiNodeEntryLookUpParameter(optsEntry, Strings::fps) != 0 ||
+          AiNodeLookUpUserParameter(opts, Strings::fps) != 0)
       {
-         double fps = AiNodeGetFlt(opts, "fps");
+         double fps = AiNodeGetFlt(opts, Strings::fps);
          if (fps > 0.0)
          {
             mCommonParams.fps = fps;
@@ -272,7 +274,9 @@ Dso::Dso(AtNode *node)
    }
 
    // Set global frame
-   if (AiNodeLookUpUserParameter(opts, Strings::frame) != 0)
+   // 'frame' can be a builtin attribute
+   if (AiNodeEntryLookUpParameter(optsEntry, Strings::frame) != 0 ||
+       AiNodeLookUpUserParameter(opts, Strings::frame) != 0)
    {
       mGlobalFrame = AiNodeGetFlt(opts, Strings::frame);
    }
