@@ -4,6 +4,22 @@
 #include <globallock.h>
 
 
+#ifdef _WIN32
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
+inline void millisleep(unsigned long milliseconds)
+{
+   Sleep(milliseconds);
+}
+#else
+#  include <unistd.h>
+inline void millisleep(unsigned long milliseconds)
+{
+   usleep(milliseconds * 1000);
+}
+#endif
+
+
 // ---
 
 AI_PROCEDURAL_NODE_EXPORT_METHODS(AbcProcMtd);
@@ -130,10 +146,24 @@ procedural_get_node
 
          AbcProcGlobalLock::Acquire();
          bool isInstance = dso->isInstance(&master);
+         if (!isInstance)
+         {
+            // temporarily set master node to procedural to avoid concurrent expansion
+            dso->setMasterNode(dso->procNode());
+         }
+         else
+         {
+            while (AiNodeGetNodeEntry(master) == AiNodeGetNodeEntry(dso->procNode()))
+            {
+               // master is an abcproc node, it means it hasnt been expanded yet
+               // release lock and wait 10 milliseconds before re-acquiring it
+               AbcProcGlobalLock::Release();
+               millisleep(10);
+               AbcProcGlobalLock::Acquire();
+               master = dso->masterNode();
+            }
+         }
          AbcProcGlobalLock::Release();
-
-         // Keep track of procedural node name
-         const char *procName = AiNodeGetName(dso->procNode());
 
          if (!isInstance)
          {
@@ -151,53 +181,29 @@ procedural_get_node
 
                AbcProcGlobalLock::Acquire();
 
-               if (dso->isInstance(&master))
-               {
-                  std::string name = AiNodeGetName(output);
-
-                  AiMsgWarning("[abcproc] Master node '%s' created in another thread. Ignore %s node '%s'.",
-                               AiNodeGetName(master),
-                               AiNodeEntryGetName(AiNodeGetNodeEntry(output)),
-                               name.c_str());
-
-                  // reset name to avoid clashes when creating instance
-                  name += "_disabled";
-                  AiNodeSetStr(output, Strings::name, dso->uniqueName(name).c_str());
-                  AiNodeSetByte(output, Strings::visibility, 0);
-                  AiNodeSetDisabled(output, true);
-
-                  isInstance = true;
-               }
-               else
-               {
-                  dso->setMasterNode(output);
-               }
+               dso->setMasterNode(output);
 
                AbcProcGlobalLock::Release();
             }
          }
-
-         if (isInstance)
+         else
          {
             if (dso->verbose())
             {
                AiMsgInfo("[abcproc] Create a new instance of \"%s\"", AiNodeGetName(master));
             }
 
-            AbcProcGlobalLock::Acquire();
-
-            // rename source procedural node if needed
-            if (!strcmp(AiNodeGetName(dso->procNode()), procName))
             {
-               // procedural node hasn't been renamed yet
-               std::string name = "_";
-               name += procName;
-               AiNodeSetStr(dso->procNode(), Strings::name, dso->uniqueName(name).c_str());
-            }
-            // use procedural name for newly generated instance
-            output = AiNode(Strings::ginstance, procName, dso->procNode());
+#ifdef SAFE_NODE_CREATE
+               AbcProcScopeLock _lock;
+#endif
+               // rename source procedural node
+               std::string name = AiNodeGetName(dso->procNode());
+               AiNodeSetStr(dso->procNode(), Strings::name, dso->uniqueName("_" + name).c_str());
 
-            AbcProcGlobalLock::Release();
+               // use procedural name for newly generated instance
+               output = AiNode(Strings::ginstance, name.c_str(), dso->procNode());
+            }
 
             AiNodeSetBool(output, Strings::inherit_xform, false);
             AiNodeSetPtr(output, Strings::node, master);
