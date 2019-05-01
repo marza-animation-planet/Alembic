@@ -1560,6 +1560,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicMesh &node, AlembicNode *instan
    // Make sure we have the 'instance_num' attribute
 
    outputInstanceNumber(node, instance);
+   outputTransform(node, instance);
 
    return AlembicNode::ContinueVisit;
 }
@@ -1808,6 +1809,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicSubD &node, AlembicNode *instan
    // Make sure we have the 'instance_num' attribute
 
    outputInstanceNumber(node, instance);
+   outputTransform(node, instance);
 
    return AlembicNode::ContinueVisit;
 }
@@ -2485,6 +2487,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
    // Make sure we have the 'instance_num' attribute
 
    outputInstanceNumber(node, instance);
+   outputTransform(node, instance);
 
    return AlembicNode::ContinueVisit;
 }
@@ -3372,6 +3375,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
    {
       mNode = generateVolumeBox(node, instance);
       outputInstanceNumber(node, instance);
+      outputTransform(node, instance);
       return AlembicNode::ContinueVisit;
    }
 
@@ -4066,13 +4070,168 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
    SetUserAttributes(mNode, info.pointAttrs, info.pointCount);
 
    outputInstanceNumber(node, instance);
+   outputTransform(node, instance);
 
+   return AlembicNode::ContinueVisit;
+}
+
+AlembicNode::VisitReturn MakeShape::enter(AlembicXform &node, AlembicNode *instance)
+{
+   // Don't check ignoreVisibility()
+
+   if (!mDso->ignoreTransforms())
+   {
+      TimeSampleList<Alembic::AbcGeom::IXformSchema> &xformSamples = node.samples().schemaSamples;
+      
+      // Beware of the inheritsXform when computing world
+      mMatrixSamplesStack.push_back(std::deque<Alembic::Abc::M44d>());
+      
+      std::deque<Alembic::Abc::M44d> &matrices = mMatrixSamplesStack.back();
+      
+      std::deque<Alembic::Abc::M44d> *parentMatrices = 0;
+      if (mMatrixSamplesStack.size() >= 2)
+      {
+         parentMatrices = &(mMatrixSamplesStack[mMatrixSamplesStack.size()-2]);
+      }
+      
+      double renderTime = mDso->renderTime();
+      const double *sampleTimes = 0;
+      size_t sampleTimesCount = 0;
+      
+      if (mDso->ignoreTransformBlur())
+      {
+         sampleTimes = &renderTime;
+         sampleTimesCount = 1;
+      }
+      else
+      {
+         sampleTimes = &(mDso->motionSampleTimes()[0]);
+         sampleTimesCount = mDso->numMotionSamples();
+      }
+      
+      for (size_t i=0; i<sampleTimesCount; ++i)
+      {
+         double t = sampleTimes[i];
+         
+         if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Sample xform \"%s\" at t=%lf", node.path().c_str(), t);
+         }
+         
+         node.sampleBounds(t, t, (i > 0 || instance != 0));
+      }
+      
+      if (xformSamples.size() == 0)
+      {
+         // identity + inheritXforms
+         if (parentMatrices)
+         {
+            for (size_t i=0; i<parentMatrices->size(); ++i)
+            {
+               matrices.push_back(parentMatrices->at(i));
+            }
+         }
+         else
+         {
+            matrices.push_back(Alembic::Abc::M44d());
+         }
+      }
+      else if (xformSamples.size() == 1)
+      {
+         bool inheritXforms = xformSamples.begin()->data().getInheritsXforms();
+         Alembic::Abc::M44d matrix = xformSamples.begin()->data().getMatrix();
+         
+         if (inheritXforms && parentMatrices)
+         {
+            for (size_t i=0; i<parentMatrices->size(); ++i)
+            {
+               matrices.push_back(matrix * parentMatrices->at(i));
+            }
+         }
+         else
+         {
+            matrices.push_back(matrix);
+         }
+      }
+      else
+      {
+         for (size_t i=0; i<sampleTimesCount; ++i)
+         {
+            Alembic::Abc::M44d matrix;
+            bool inheritXforms = true;
+            
+            double t = sampleTimes[i];
+            
+            TimeSampleList<Alembic::AbcGeom::IXformSchema>::ConstIterator samp0, samp1;
+            double blend = 0.0;
+            
+            if (xformSamples.getSamples(t, samp0, samp1, blend))
+            {
+               if (blend > 0.0)
+               {
+                  if (samp0->data().getInheritsXforms() != samp1->data().getInheritsXforms())
+                  {
+                     AiMsgWarning("[abcproc] %s: Animated inherits transform property found, use first sample value", node.path().c_str());
+                     
+                     matrix = samp0->data().getMatrix();
+                  }
+                  else
+                  {
+                     matrix = (1.0 - blend) * samp0->data().getMatrix() + blend * samp1->data().getMatrix();
+                  }
+               }
+               else
+               {
+                  matrix = samp0->data().getMatrix();
+               }
+               
+               inheritXforms = samp0->data().getInheritsXforms();
+            }
+            
+            if (inheritXforms && parentMatrices)
+            {
+               if (i < parentMatrices->size())
+               {
+                  matrix = matrix * parentMatrices->at(i);
+               }
+               else
+               {
+                  matrix = matrix * parentMatrices->at(0);
+               }
+            }
+            
+            matrices.push_back(matrix);
+         }
+      }
+      
+      if (mDso->verbose())
+      {
+         AiMsgInfo("[abcproc] %lu xform samples for \"%s\"", matrices.size(), node.path().c_str());
+      }
+   }
+   
    return AlembicNode::ContinueVisit;
 }
 
 AlembicNode::VisitReturn MakeShape::enter(AlembicNode &, AlembicNode *)
 {
+   // Don't check ignoreInstances()
    return AlembicNode::ContinueVisit;
+}
+
+void MakeShape::leave(AlembicXform &node, AlembicNode *instance)
+{
+   if (!mDso->ignoreTransforms())
+   {
+      if (mMatrixSamplesStack.size() > 0)
+      {
+         mMatrixSamplesStack.pop_back();
+      }
+      else
+      {
+         AiMsgWarning("[abcproc] Trying to pop empty matrix stack!");
+      }
+   }
 }
 
 void MakeShape::leave(AlembicNode &, AlembicNode *)
