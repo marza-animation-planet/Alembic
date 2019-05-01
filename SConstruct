@@ -530,7 +530,7 @@ if withMaya:
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins/%s" % maya.Version(nice=True),
-                 "rpaths": ["../../../lib" if not withVray else "../../../../lib"],
+                 "rpaths": ["../../../lib"],
                  "bldprefix": "maya-%s" % maya.Version(),
                  "defs": defs + (["GPUCACHEIMPORT_VERSION=\"\\\"%s\\\"\"" % gciver] if gciver else []),
                  "incdirs": ["maya/gpuCache"],
