@@ -5,6 +5,10 @@
 #include <AlembicSceneCache.h>
 #include <strings.h>
 
+#if 0
+#  define SAFE_NODE_CREATE
+#endif
+
 enum CycleType
 {
    CT_hold = 0,

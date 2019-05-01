@@ -47,16 +47,19 @@ AlembicNode::VisitReturn MakeProcedurals::shapeEnter(AlembicNodeT<T> &node, Alem
    if (visible)
    {
       AlembicNode *targetNode = (instance ? instance : &node);
+      AtNode *proc = 0;
+      std::string name;
 
-      // Format name 'a la maya'
-      AbcProcGlobalLock::Acquire();
+      {
+#ifdef SAFE_NODE_CREATE
+         AbcProcScopeLock _lock;
+#endif
+         // Format name 'a la maya'
+         std::string targetName = targetNode->formatPartialPath(mDso->namePrefix().c_str(), AlembicNode::LocalPrefix, '|');
+         name = mDso->uniqueName(targetName);
 
-      std::string targetName = targetNode->formatPartialPath(mDso->namePrefix().c_str(), AlembicNode::LocalPrefix, '|');
-      std::string name = mDso->uniqueName(targetName);
-
-      AtNode *proc = AiNode("abcproc", name.c_str(), mDso->procNode());
-
-      AbcProcGlobalLock::Release();
+         proc = AiNode("abcproc", name.c_str(), mDso->procNode());
+      }
 
       if (mDso->verbose())
       {

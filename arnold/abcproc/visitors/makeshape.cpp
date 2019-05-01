@@ -9,7 +9,9 @@ MakeShape::MakeShape(Dso *dso)
 
 AtNode* MakeShape::createArnoldNode(const AtString &nodeType, AlembicNode &node, bool useProcName) const
 {
-   AbcProcGlobalLock::Acquire();
+#ifdef SAFE_NODE_CREATE
+   AbcProcScopeLock _lock;
+#endif
 
    std::string name;
 
@@ -25,8 +27,6 @@ AtNode* MakeShape::createArnoldNode(const AtString &nodeType, AlembicNode &node,
    }
 
    AtNode *anode = AiNode(nodeType, name.c_str(), mDso->procNode());
-
-   AbcProcGlobalLock::Release();
 
    return anode;
 }
