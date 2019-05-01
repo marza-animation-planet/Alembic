@@ -844,11 +844,11 @@ void CGpuCacheTranslator::ExportProc(AtNode *proc, unsigned int step, double ren
       AiNodeSetStr(proc, "objectpath", objpath.asChar());
       AiNodeSetFlt(proc, "fps", GetFPS());
       AiNodeSetFlt(proc, "frame", renderFrame);
-      // ignore_transforms
-      // ignore_instances
-      // ignore_visibility
-      // ignore_deform_blur
-      // ignore_transform_blur
+      AiNodeSetBool(proc, "ignore_transforms", false);
+      AiNodeSetBool(proc, "ignore_deform_blur", !deformBlur);
+      AiNodeSetBool(proc, "ignore_transform_blur", !transformBlur);
+      // ignore_instances  => Ignored for single shape calls
+      // ignore_visibility => Ignored for single shape calls 
       // cycle
       // offset
       // speed
