@@ -14,7 +14,9 @@ public:
    AlembicNode::VisitReturn enter(AlembicPoints &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicCurves &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicNode &node, AlembicNode *instance=0);
+   AlembicNode::VisitReturn enter(AlembicXform &node, AlembicNode *instance=0);
 
+   void leave(AlembicXform &node, AlembicNode *instance=0);
    void leave(AlembicNode &node, AlembicNode *instance=0);
 
    inline AtNode* node() const { return mNode; }
@@ -158,6 +160,9 @@ private:
    template <class T>
    void outputInstanceNumber(AlembicNodeT<T> &node, AlembicNode *instance);
 
+   template <class T>
+   void outputTransform(AlembicNodeT<T> &node, AlembicNode *instance);
+
    template <class MeshSchema>
    void outputMeshUVs(AlembicNodeT<Alembic::Abc::ISchemaObject<MeshSchema> > &node,
                       AtNode *mesh,
@@ -231,6 +236,7 @@ private:
 
    class Dso *mDso;
    AtNode *mNode;
+   std::deque<std::deque<Alembic::Abc::M44d> > mMatrixSamplesStack;
 };
 
 template <class Info>
@@ -310,6 +316,36 @@ void MakeShape::outputInstanceNumber(AlembicNodeT<T> &node, AlembicNode *instanc
          AiNodeDeclare(mNode, Strings::instance_num, "constant INT");
       }
       AiNodeSetInt(mNode, Strings::instance_num, int(inum));
+   }
+}
+
+template <class T>
+void MakeShape::outputTransform(AlembicNodeT<T> &node, AlembicNode *)
+{
+   if (!mDso->ignoreTransforms() && mMatrixSamplesStack.size() > 0)
+   {
+      std::deque<Alembic::Abc::M44d> &matrices = mMatrixSamplesStack.back();
+
+      if (mDso->verbose())
+      {
+         AiMsgInfo("[abcproc] %lu xform sample(s) for \"%s\"", matrices.size(), node.path().c_str());
+      }
+
+      AtArray *ary = AiArrayAllocate(1, matrices.size(), AI_TYPE_MATRIX);
+
+      for (size_t i=0; i<matrices.size(); ++i)
+      {
+         Alembic::Abc::M44d &src = matrices[i];
+
+         AtMatrix dst;
+         for (int r=0; r<4; ++r)
+            for (int c=0; c<4; ++c)
+               dst[r][c] = float(src[r][c]);
+
+         AiArraySetMtx(ary, i, dst);
+      }
+
+      AiNodeSetArray(mNode, Strings::matrix, ary);
    }
 }
 

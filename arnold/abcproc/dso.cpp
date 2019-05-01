@@ -386,7 +386,8 @@ Dso::Dso(AtNode *node)
          mNumShapes = visitor.numShapes();
          setGeneratedNodesCount(mNumShapes);
 
-         if (mNumShapes == 1 && mCommonParams.ignoreTransforms)
+         // May want to allow PM_single with ignoreTransforms off (set transform on generated shape node, procedural transform gets concatenated)
+         if (mNumShapes == 1) // && mCommonParams.ignoreTransforms)
          {
             // output a single shape in object space
             if (mCommonParams.verbose)
