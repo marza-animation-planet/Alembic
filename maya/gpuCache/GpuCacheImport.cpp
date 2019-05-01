@@ -82,8 +82,6 @@ MSyntax GpuCacheImport::createSyntax()
    syntax.addFlag("-r", "-reparent", MSyntax::kString);
    syntax.addFlag("-ftr", "-fitTimeRange", MSyntax::kNoArg);
    syntax.addFlag("-sts", "-setToStartFrame", MSyntax::kNoArg);
-   syntax.addFlag("-ci", "-createInstances", MSyntax::kNoArg);
-   syntax.addFlag("-it", "-ignoreTransforms", MSyntax::kNoArg);
    syntax.addFlag("-ri", "-rotationInterpolation", MSyntax::kString);
    syntax.addFlag("-nri", "-nodeRotationInterpolation", MSyntax::kString, MSyntax::kString);
    syntax.addFlag("-dsc", "-dontSimplifyCurves", MSyntax::kNoArg);
@@ -227,8 +225,6 @@ class UpdateTree
 public:
    
    UpdateTree(const std::string &abcPath,
-              bool ignoreTransforms,
-              bool createInstances,
               bool createNodes);
    
    AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
@@ -350,12 +346,10 @@ private:
 };
 
 UpdateTree::UpdateTree(const std::string &abcPath,
-                       bool ignoreTransforms,
-                       bool createInstances,
                        bool createNodes)
    : mAbcPath(abcPath)
-   , mIgnoreTransforms(ignoreTransforms)
-   , mCreateInstances(createInstances)
+   , mIgnoreTransforms(false)
+   , mCreateInstances(false)
    , mCreateNodes(createNodes)
    , mSpeed(1.0)
    , mOffset(0.0)
@@ -491,18 +485,61 @@ bool UpdateTree::createDag(const char *dagType, AlembicNode *node, bool force)
    {
       MDagModifier dagmod;
       MStatus status;
+      MDagPath parentDag;
       MObject parentObj = MObject::kNullObj;
       AlembicNode *parent = node->parent();
       
       if (parent)
       {
-         MDagPath parentDag = getDag(parent->path());
+         parentDag = getDag(parent->path());
          if (parentDag.isValid())
          {
             parentObj = parentDag.node();
          }
       }
-      
+
+      bool isGpuCache = !strcmp(dagType, "gpuCache");
+
+      if (isGpuCache)
+      {
+         MObject intObj = dagmod.createNode("transform", parentObj, &status);
+
+         if (status != MS::kSuccess || dagmod.doIt() != MS::kSuccess)
+         {
+            return false;
+         }
+
+         MFnDependencyNode intNode(intObj);
+         MGlobal::displayInfo("Created intermediate node: " + intNode.name());
+
+         std::string intName;
+         if (parentDag.isValid())
+         {
+            MFnDagNode parentNode(parentDag);
+            intName = parentNode.name().asChar();
+         }
+         else
+         {
+            intName = node->name();
+         }
+
+         size_t p = intName.rfind(':');
+         if (p != std::string::npos)
+         {
+            intName = intName.substr(0, p+1) + "_" + intName.substr(p+1);
+         }
+         else
+         {
+            intName = "_" + intName;
+         }
+         MGlobal::displayInfo(MString("=> Rename to ") + intName.c_str());
+         intNode.setName(intName.c_str());
+
+         intNode.findPlug("inheritsTransform").setBool(false);
+
+         parentObj = intObj;
+      }
+
       MObject obj = dagmod.createNode(dagType, parentObj, &status);
       
       if (status == MS::kSuccess && dagmod.doIt() == MS::kSuccess)
@@ -519,7 +556,7 @@ bool UpdateTree::createDag(const char *dagType, AlembicNode *node, bool force)
          entry.dagPath = dagPath;
          entry.typeName = dagType;
          
-         if (!strcmp(dagType, "gpuCache"))
+         if (isGpuCache)
          {
             AssignDefaultShader(obj);
          }
@@ -611,10 +648,11 @@ AlembicNode::VisitReturn UpdateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
          
          plug = dagNode.findPlug("visibleInRefractions");
          plug.setBool(true);
-         
-         plug = dagNode.findPlug("ignoreVisibility");
-         plug.setBool(true);
       }
+
+      // MObject xformObj = dagNode.parent(0);
+      // mKeyframer.clearTransformKeys(xformObj, MMatrix::identity);
+      // mKeyframer.clearInheritsTransformKey(xformObj, false);
    }
    
    // also key shape level visibilty
@@ -2849,10 +2887,6 @@ MStatus GpuCacheImport::doIt(const MArgList& args)
       MGlobal::displayInfo("                                    Reparent the whole hierarchy under a node in the current Maya scene.");
       MGlobal::displayInfo("-n / -namespace                   : string");
       MGlobal::displayInfo("                                    Namespace to add nodes to (default to current namespace).");
-      MGlobal::displayInfo("-ci / -createInstances            :");
-      MGlobal::displayInfo("                                    Create maya instances.");
-      MGlobal::displayInfo("-it / -ignoreTransforms           :");
-      MGlobal::displayInfo("                                    Do not key transform nodes (but for locators direct parent).");
       MGlobal::displayInfo("-ri / -rotationInterpolation      : string (none|euler|quaternion|quaternionSlerp|quaternionSquad)");
       MGlobal::displayInfo("                                    Set created rotation curves interpolation type (default to quaternionSlerp).");
       MGlobal::displayInfo("-nri / -nodeRotationInterpolation : string string (none|euler|quaternion|quaternionSlerp|quaternionSquad)");
@@ -2961,15 +2995,8 @@ MStatus GpuCacheImport::doIt(const MArgList& args)
    
    bool fitTimeRange = argData.isFlagSet("fitTimeRange");
    bool setToStartFrame = argData.isFlagSet("setToStartFrame");
-   bool createInstances = argData.isFlagSet("createInstances");
-   bool ignoreTransforms = argData.isFlagSet("ignoreTransforms");
    bool update = argData.isFlagSet("update");
    bool simplifyCurves = !argData.isFlagSet("dontSimplifyCurves");
-   
-   if (ignoreTransforms && createInstances)
-   {
-      MGlobal::displayWarning("'createInstances' and 'ignoreTransforms' options are incompatible");
-   }
    
    if (!update && argData.isFlagSet("reparent"))
    {
@@ -3224,7 +3251,7 @@ MStatus GpuCacheImport::doIt(const MArgList& args)
                MNamespace::setCurrentNamespace(ns);
             }
             
-            UpdateTree visitor(abcPath, ignoreTransforms, createInstances, createMissing);
+            UpdateTree visitor(abcPath, createMissing);
             scene->visit(AlembicNode::VisitDepthFirst, visitor);
             
             visitor.keyTransforms(rotInterp, nodeRotInterp, false, simplifyCurves);
