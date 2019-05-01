@@ -34,8 +34,8 @@
 //
 //-*****************************************************************************
 
-#ifndef _AbcExport_MayaMeshWriter_h_
-#define _AbcExport_MayaMeshWriter_h_
+#ifndef AbcExport_MayaMeshWriter_h
+#define AbcExport_MayaMeshWriter_h
 
 #include "Foundation.h"
 #include "AttributesWriter.h"
@@ -112,4 +112,4 @@ class MayaMeshWriter
     Alembic::Abc::OV2iArrayProperty mHardEdgeProp;
 };
 
-#endif  // _AbcExport_MayaMeshWriter_h_
+#endif  // AbcExport_MayaMeshWriter_h

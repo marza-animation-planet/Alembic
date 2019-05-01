@@ -535,7 +535,7 @@ MStatus AlembicNode::compute(const MPlug & plug, MDataBlock & dataBlock)
 
         //Get list of input filenames
         MFnDependencyNode depNode(thisMObject());
-        MPlug layerFilesPlug = depNode.findPlug("abc_layerFiles");
+        MPlug layerFilesPlug = depNode.findPlug("abc_layerFiles", true);
         MFnStringArrayData fnSAD( layerFilesPlug.asMObject() );
         MStringArray storedFilenames = fnSAD.array();
 
@@ -618,10 +618,10 @@ MStatus AlembicNode::compute(const MPlug & plug, MDataBlock & dataBlock)
 
 
         MFnDependencyNode dep(thisMObject());
-        MPlug allSetsPlug = dep.findPlug("allColorSets");
-        MPlug allUVsPlug = dep.findPlug("allUVSets");
-        MPlug createInstPlug = dep.findPlug("createInstances");
-        MPlug readMeshNormalsPlug = dep.findPlug("readMeshNormals");
+        MPlug allSetsPlug = dep.findPlug("allColorSets", true);
+        MPlug allUVsPlug = dep.findPlug("allUVSets", true);
+        MPlug createInstPlug = dep.findPlug("createInstances", true);
+        MPlug readMeshNormalsPlug = dep.findPlug("readMeshNormals", true);
         mReadMeshNormals = !readMeshNormalsPlug.isNull();
         
         // we don't know yet the frame range so we can't observe preserveStartFrame yet

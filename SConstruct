@@ -79,9 +79,13 @@ if not rv["require"]:
    def RequireIlmBase(env):
       RequireImath(env, static=True)
       RequireIlmThread(env, static=True)
+      if sys.platform != "win32":
+         env.Append(LIBS=["pthread"])
    def RequirePyIlmBase(env):
       RequirePyImath(env, staticpy=True, staticbase=True)
       RequireIlmThread(env, static=True)
+      if sys.platform != "win32":
+         env.Append(LIBS=["pthread"])
 else:
    pyimath_static = (excons.GetArgument("ilmbase-python-static", excons.GetArgument("ilmbase-static", 0, int), int) != 0)
    def RequireIlmBase(env):
