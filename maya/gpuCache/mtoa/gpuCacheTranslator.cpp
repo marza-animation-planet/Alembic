@@ -1,4 +1,4 @@
-#include "AbcTranslator.h"
+#include "gpuCacheTranslator.h"
 
 #include <ai_msg.h>
 #include <ai_nodes.h>
@@ -11,17 +11,18 @@
 #include <maya/MBoundingBox.h>
 #include <maya/MDGContext.h>
 #include <maya/MTypes.h>
+#include <maya/MFnDagNode.h>
 
 #if MAYA_API_VERSION >= 2018000
 #  include <maya/MDGContextGuard.h>
 #endif
 
-void* CAbcTranslator::Create()
+void* CGpuCacheTranslator::Create()
 {
-   return new CAbcTranslator();
+   return new CGpuCacheTranslator();
 }
 
-void CAbcTranslator::NodeInitializer(CAbTranslator context)
+void CGpuCacheTranslator::NodeInitializer(CAbTranslator context)
 {
    CExtensionAttrHelper helper(context.maya, "abcproc");
 
@@ -264,49 +265,49 @@ void CAbcTranslator::NodeInitializer(CAbTranslator context)
    helper.MakeInputBoolean(data);
 }
 
-CAbcTranslator::CAbcTranslator()
+CGpuCacheTranslator::CGpuCacheTranslator()
    : CShapeTranslator()
    , m_motionBlur(false)
 {
 }
 
-CAbcTranslator::~CAbcTranslator()
+CGpuCacheTranslator::~CGpuCacheTranslator()
 {
 }
 
-void CAbcTranslator::Init()
+void CGpuCacheTranslator::Init()
 {
    CShapeTranslator::Init();
    m_motionBlur = (IsMotionBlurEnabled(MTOA_MBLUR_DEFORM|MTOA_MBLUR_OBJECT) && IsLocalMotionBlurEnabled());
 }
 
-void CAbcTranslator::Export(AtNode *atNode)
+void CGpuCacheTranslator::Export(AtNode *atNode)
 {
    ExportAbc(atNode, GetMotionStep(), IsExported());
 }
 
-void CAbcTranslator::ExportMotion(AtNode *atNode)
+void CGpuCacheTranslator::ExportMotion(AtNode *atNode)
 {
    ExportAbc(atNode, GetMotionStep(), IsExported());
 }
 
-void CAbcTranslator::RequestUpdate()
+void CGpuCacheTranslator::RequestUpdate()
 {
-   SetUpdateMode(AI_RECREATE_NODE);
+   SetUpdateMode(AI_UPDATE_ONLY);
    CShapeTranslator::RequestUpdate();
 }
 
-AtNode* CAbcTranslator::CreateArnoldNodes()
+AtNode* CGpuCacheTranslator::CreateArnoldNodes()
 {
    return AddArnoldNode("abcproc");
 }
 
-bool CAbcTranslator::RequiresMotionData()
+bool CGpuCacheTranslator::RequiresMotionData()
 {
    return m_motionBlur;
 }
 
-bool CAbcTranslator::HasParameter(const AtNodeEntry *anodeEntry, const char *param, AtNode *anode, const char *decl)
+bool CGpuCacheTranslator::HasParameter(const AtNodeEntry *anodeEntry, const char *param, AtNode *anode, const char *decl)
 {
    if (AiNodeEntryLookUpParameter(anodeEntry, param) != NULL)
    {
@@ -333,45 +334,14 @@ bool CAbcTranslator::HasParameter(const AtNodeEntry *anodeEntry, const char *par
    }
 }
 
-MPlug CAbcTranslator::FindMayaObjectPlug(const MString &attrName, MStatus* ReturnStatus) const
+MPlug CGpuCacheTranslator::FindMayaObjectPlug(const MString &attrName, MStatus* ReturnStatus) const
 {
    MObject obj = GetMayaObject();
    MFnDependencyNode node(obj);
    return node.findPlug(attrName, ReturnStatus);
 }
 
-void CAbcTranslator::GetFrames(double inRenderFrame, double inSampleFrame,
-                               double &outRenderFrame, double &outSampleFrame)
-{
-   MPlug pTime = FindMayaObjectPlug("time");
-
-   MDGContext ctx0(MTime(inRenderFrame, MTime::uiUnit()));
-   MDGContext ctx1(MTime(inSampleFrame, MTime::uiUnit()));
-
-   MStatus st;
-   MTime t;
-
-   #if MAYA_API_VERSION >= 2018000
-      {
-         MDGContextGuard guard(ctx0);
-         t = pTime.asMTime(&st);
-         outRenderFrame = (st == MS::kSuccess ? t.asUnits(MTime::uiUnit()) : inRenderFrame);
-      }
-      {
-         MDGContextGuard guard(ctx1);
-         t = pTime.asMTime(&st);
-         outSampleFrame = (st == MS::kSuccess ? t.asUnits(MTime::uiUnit()) : inSampleFrame);
-      }
-   #else
-      t = pTime.asMTime(ctx0, &st);
-      outRenderFrame = (st == MS::kSuccess ? t.asUnits(MTime::uiUnit()) : inRenderFrame);
-
-      t = pTime.asMTime(ctx1, &st);
-      outSampleFrame = (st == MS::kSuccess ? t.asUnits(MTime::uiUnit()) : inSampleFrame);
-   #endif
-}
-
-double CAbcTranslator::GetFPS()
+double CGpuCacheTranslator::GetFPS()
 {
    MTime::Unit units = MTime::uiUnit();
 
@@ -468,7 +438,7 @@ double CAbcTranslator::GetFPS()
    }
 }
 
-void CAbcTranslator::ExportSubdivAttribs(AtNode *proc)
+void CGpuCacheTranslator::ExportSubdivAttribs(AtNode *proc)
 {
    static bool sInit = true;
    static const char *sAdaptiveErrorName = "subdiv_pixel_error";
@@ -556,7 +526,7 @@ void CAbcTranslator::ExportSubdivAttribs(AtNode *proc)
    }
 }
 
-void CAbcTranslator::ExportMeshAttribs(AtNode *proc)
+void CGpuCacheTranslator::ExportMeshAttribs(AtNode *proc)
 {
    const AtNodeEntry *nodeEntry = AiNodeGetNodeEntry(proc);
    MPlug plug;
@@ -584,7 +554,7 @@ void CAbcTranslator::ExportMeshAttribs(AtNode *proc)
    }
 }
 
-void CAbcTranslator::ExportVisibility(AtNode *proc)
+void CGpuCacheTranslator::ExportVisibility(AtNode *proc)
 {
    MPlug plug;
 
@@ -677,7 +647,7 @@ void CAbcTranslator::ExportVisibility(AtNode *proc)
    AiNodeSetUInt(proc, "id",  getHash(proc));
 }
 
-void CAbcTranslator::ExportShader(AtNode *proc, bool update)
+void CGpuCacheTranslator::ExportShader(AtNode *proc, bool update)
 {
    const AtNodeEntry *nodeEntry = AiNodeGetNodeEntry(proc);
    MPlug plug;
@@ -844,19 +814,27 @@ static AtArray* ToArray(const std::string &s)
    return out;
 }
 
-void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFrame, double sampleFrame)
+void CGpuCacheTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFrame, double sampleFrame)
 {
    bool transformBlur = IsMotionBlurEnabled(MTOA_MBLUR_OBJECT) && IsLocalMotionBlurEnabled();
    bool deformBlur = IsMotionBlurEnabled(MTOA_MBLUR_DEFORM) && IsLocalMotionBlurEnabled();
 
-   bool ignoreXforms = FindMayaObjectPlug("ignoreXforms").asBool();
-   bool ignoreInstances = FindMayaObjectPlug("ignoreInstances").asBool();
-   bool ignoreVisibility = FindMayaObjectPlug("ignoreVisibility").asBool();
-
    MPlug plug;
 
-   MString abcfile = FindMayaObjectPlug("filePath").asString();
-   MString objpath = FindMayaObjectPlug("objectExpression").asString();
+   MString abcfile = FindMayaObjectPlug("cacheFileName").asString();
+   MString objpath = FindMayaObjectPlug("cacheGeomPath").asString();
+
+   // replace "|" by "/" in objpath
+   std::string tmp = objpath.asChar();
+   size_t p0 = 0;
+   size_t p1 = tmp.find('|', p0);
+   while (p1 != std::string::npos)
+   {
+      tmp[p1] = '/';
+      p0 = p1;
+      p1 = tmp.find('|', p0);
+   }
+   objpath = tmp.c_str();
 
    if (!IsExportingMotion())
    {
@@ -866,18 +844,18 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
       AiNodeSetStr(proc, "objectpath", objpath.asChar());
       AiNodeSetFlt(proc, "fps", GetFPS());
       AiNodeSetFlt(proc, "frame", renderFrame);
-
-      AiNodeSetFlt(proc, "speed", FindMayaObjectPlug("speed").asFloat());
-      AiNodeSetFlt(proc, "offset", FindMayaObjectPlug("offset").asFloat());
-      AiNodeSetBool(proc, "preserve_start_frame", FindMayaObjectPlug("preserveStartFrame").asBool());
-      AiNodeSetFlt(proc, "start_frame", FindMayaObjectPlug("startFrame").asFloat());
-      AiNodeSetFlt(proc, "end_frame", FindMayaObjectPlug("endFrame").asFloat());
-      AiNodeSetInt(proc, "cycle", FindMayaObjectPlug("cycleType").asInt());
-      AiNodeSetBool(proc, "ignore_deform_blur", !deformBlur);
-      AiNodeSetBool(proc, "ignore_transform_blur", !transformBlur);
-      AiNodeSetBool(proc, "ignore_transforms", ignoreXforms);
-      AiNodeSetBool(proc, "ignore_instances", ignoreInstances);
-      AiNodeSetBool(proc, "ignore_visibility", ignoreVisibility);
+      // ignore_transforms
+      // ignore_instances
+      // ignore_visibility
+      // ignore_deform_blur
+      // ignore_transform_blur
+      // cycle
+      // offset
+      // speed
+      // preserve_start_frame
+      // start_frame
+      // end_frame
+      // excludepath
 
       plug = FindMayaPlug("aiIgnoreReference");
       if (!plug.isNull())
@@ -1047,7 +1025,7 @@ void CAbcTranslator::ExportProc(AtNode *proc, unsigned int step, double renderFr
    }
 }
 
-double CAbcTranslator::GetSampleFrame(unsigned int step)
+double CGpuCacheTranslator::GetSampleFrame(unsigned int step)
 {
    unsigned int count = 0;
    const double *frames = GetMotionFrames(count);
@@ -1061,12 +1039,10 @@ double CAbcTranslator::GetSampleFrame(unsigned int step)
    }
 }
 
-void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
+void CGpuCacheTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
 {
    double renderFrame = GetExportFrame();
    double sampleFrame = GetSampleFrame(step);
-
-   GetFrames(renderFrame, sampleFrame, renderFrame, sampleFrame);
 
    MDagPath masterDag;
    masterDag = (IsMasterInstance() ? m_dagPath : GetMasterInstance());
@@ -1127,14 +1103,14 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
       plug = FindMayaPlug("aiRenderCurve");
       if (!plug.isNull() && HasParameter(entry, "ignore_nurbs", proc, "constant BOOL"))
       {
-         MGlobal::displayWarning("[AbcShapeMtoa] Override 'ignore_nurbs' from MtoA specific parameter 'aiRenderCurve'");
+         MGlobal::displayWarning("[gpuCacheMtoa] Override 'ignore_nurbs' from MtoA specific parameter 'aiRenderCurve'");
          AiNodeSetBool(proc, "ignore_nurbs", !plug.asBool());
       }
 
       plug = FindMayaPlug("aiSampleRate");
       if (!plug.isNull() && HasParameter(entry, "nurbs_sample_rate", proc, "constant INT"))
       {
-         MGlobal::displayWarning("[AbcShapeMtoa] Override 'nurbs_sample_rate' from MtoA specific parameter 'aiSampleRate'");
+         MGlobal::displayWarning("[gpuCacheMtoa] Override 'nurbs_sample_rate' from MtoA specific parameter 'aiSampleRate'");
          AiNodeSetUInt(proc, "nurbs_sample_rate", plug.asInt());
       }
 
@@ -1142,7 +1118,7 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
       if (!plug.isNull() && HasParameter(entry, "width_min", proc, "constant FLOAT") &&
                             HasParameter(entry, "width_max", proc, "constant FLOAT"))
       {
-         MGlobal::displayWarning("[AbcShapeMtoa] Override 'width_min' and 'width_max' from MtoA specific parameter 'aiCurveWidth'");
+         MGlobal::displayWarning("[gpuCacheMtoa] Override 'width_min' and 'width_max' from MtoA specific parameter 'aiCurveWidth'");
          float width = plug.asFloat();
          AiNodeSetFlt(proc, "width_min", width);
          AiNodeSetFlt(proc, "width_max", width);
@@ -1153,21 +1129,21 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
       plug = FindMayaPlug("aiRadiusMultiplier");
       if (!plug.isNull() && HasParameter(entry, "radius_scale", proc, "constant FLOAT"))
       {
-         MGlobal::displayWarning("[AbcShapeMtoa] Override 'radius_scale' from MtoA specific parameter 'aiRadiusMultiplier'");
+         MGlobal::displayWarning("[gpuCacheMtoa] Override 'radius_scale' from MtoA specific parameter 'aiRadiusMultiplier'");
          AiNodeSetFlt(proc, "radius_scale", plug.asFloat());
       }
 
       plug = FindMayaPlug("aiMinParticleRadius");
       if (!plug.isNull() && HasParameter(entry, "radius_min", proc, "constant FLOAT"))
       {
-         MGlobal::displayWarning("[AbcShapeMtoa] Override 'radius_min' from MtoA specific parameter 'aiMinParticleRadius'");
+         MGlobal::displayWarning("[gpuCacheMtoa] Override 'radius_min' from MtoA specific parameter 'aiMinParticleRadius'");
          AiNodeSetFlt(proc, "radius_min", plug.asFloat());
       }
 
       plug = FindMayaPlug("aiMaxParticleRadius");
       if (!plug.isNull() && HasParameter(entry, "radius_max", proc, "constant FLOAT"))
       {
-         MGlobal::displayWarning("[AbcShapeMtoa] Override 'radius_max' from MtoA specific parameter 'aiMaxParticleRadius'");
+         MGlobal::displayWarning("[gpuCacheMtoa] Override 'radius_max' from MtoA specific parameter 'aiMaxParticleRadius'");
          AiNodeSetFlt(proc, "radius_max", plug.asFloat());
       }
 
@@ -1182,7 +1158,7 @@ void CAbcTranslator::ExportAbc(AtNode *proc, unsigned int step, bool update)
    {
       char numstr[16];
       sprintf(numstr, "%u", step);
-      MGlobal::displayWarning(MString("[AbcShapeMtoa] Motion step already processed: ") + numstr);
+      MGlobal::displayWarning(MString("[gpuCacheMtoa] Motion step already processed: ") + numstr);
    }
    m_exportedSteps.insert(step);
 
