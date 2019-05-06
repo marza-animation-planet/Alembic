@@ -1,0 +1,918 @@
+// ===========================================================================
+// Copyright 2016 Autodesk, Inc. All rights reserved.
+//
+// Use of this software is subject to the terms of the Autodesk license
+// agreement provided at the time of installation or download, or which
+// otherwise accompanies this software in either electronic or hard copy form.
+// ===========================================================================
+//
+//  Description:
+//      Create UI components for altGpuCache plugin
+//
+
+proc closePreferencesWindow()
+{
+	global string $gPreferenceWindow;
+	if (`window -exists $gPreferenceWindow`) {
+		string $result;
+		string $confirmMessage = (uiRes("m_altGpuCacheCreateUI.kSavePrefsOrNotMsg"));
+        string $save = `uiRes "s_TdialogStrings.rSave"`;
+        string $dontSave = `uiRes "s_TdialogStrings.rDontSave"`;
+
+		$result = `confirmDialog -title (uiRes("m_altGpuCacheCreateUI.kSaveMsg"))
+			-message $confirmMessage
+			-button $save 
+			-button $dontSave
+			-defaultButton $save
+			-cancelButton $dontSave`;
+
+		if ($result == $save) {
+			savePrefsChanges;
+		}
+		else {
+			cancelPrefsChanges;
+		}
+	}
+}
+
+global proc prefsFrameLayoutCreateAltGpuCache()
+{
+	frameLayout -labelVisible false -borderVisible false -marginWidth 10 -marginHeight 10;
+	    columnLayout -adj true prefAltGpuCacheCol;
+}
+
+global proc prefsSetOptVarToDefaultAltGpuCache()
+{
+	optionVar -iv altGpuCacheAllAuto 1;
+	
+	// Retrieve default from altGpuCache plug-in.
+	altGpuCache -e -refreshSettings;
+
+}
+
+global proc altGpuCacheManyShapesDialog(int $optimizationThreshold)
+{
+	string $okText = `uiRes s_TcommonDialogStrings.rDialogOkString`;
+	string $titleText = (uiRes("m_altGpuCacheCreateUI.kTooManyObjectsInCacheTitle"));
+	string $messageText = (uiRes("m_altGpuCacheCreateUI.kTooManyObjectsInCacheMsg"));
+	$messageText = `format -stringArg $optimizationThreshold $messageText`;
+	confirmDialog -title $titleText -message $messageText -button $okText;
+}
+
+proc altGpuCacheUncheckAllAutomatic()
+{
+    checkBoxGrp -e -value1 0 altGpuCache_allAutoCtrl;
+	optionVar -iv altGpuCacheAllAuto 0;
+}
+
+global proc altGpuCacheMaxVramAutoChanged()
+{
+    if (`checkBoxGrp -q -value1 altGpuCache_maxVramAutoCtrl`) {
+		intFieldGrp -e -enable 0 altGpuCache_maxVramCtrl;
+		optionVar -iv altGpuCacheMaxVramAuto 1;
+    }
+	else {
+		intFieldGrp -e -enable 1 altGpuCache_maxVramCtrl;
+		optionVar -iv altGpuCacheMaxVramAuto 0;
+		altGpuCacheUncheckAllAutomatic();
+	}
+}
+
+global proc altGpuCacheMaxNumOfBuffersAutoChanged()
+{
+    if (`checkBoxGrp -q -value1 altGpuCache_maxNumOfBuffersAutoCtrl`) {
+		intFieldGrp -e -enable 0 altGpuCache_maxNumOfBuffersCtrl;
+		optionVar -iv altGpuCacheMaxNumOfBuffersAuto 1;
+    }
+	else {
+		intFieldGrp -e -enable 1 altGpuCache_maxNumOfBuffersCtrl;
+		optionVar -iv altGpuCacheMaxNumOfBuffersAuto 0;
+		altGpuCacheUncheckAllAutomatic();
+	}
+}
+
+global proc altGpuCacheMinVerticesPerShapeAutoChanged()
+{
+    if (`checkBoxGrp -q -value1 altGpuCache_minVerticesPerShapeAutoCtrl`) {
+		intFieldGrp -e -enable 0 altGpuCache_minVerticesPerShapeCtrl;
+		optionVar -iv altGpuCacheMinVerticesPerShapeAuto 1;
+    }
+	else {
+		intFieldGrp -e -enable 1 altGpuCache_minVerticesPerShapeCtrl;
+		optionVar -iv altGpuCacheMinVerticesPerShapeAuto 0;
+		altGpuCacheUncheckAllAutomatic();
+	}
+}
+
+global proc altGpuCacheLowVRamOperationAutoChanged()
+{
+    if (`checkBoxGrp -q -value1 altGpuCache_lowVramOperationAutoCtrl`) {
+		radioButtonGrp -e -enable 0 altGpuCache_lowMemModeCtrl;
+		optionVar -iv altGpuCacheLowVramOperationAuto 1;
+    }
+	else {
+		radioButtonGrp -e -enable 1 altGpuCache_lowMemModeCtrl;
+		optionVar -iv altGpuCacheLowVramOperationAuto 0;
+		altGpuCacheUncheckAllAutomatic();
+	}
+}
+
+global proc altGpuCacheGlSelectionModeAutoChanged()
+{
+    if (`checkBoxGrp -q -value1 altGpuCache_glSelectionModeAutoCtrl`) {
+		radioButtonGrp -e -enable 0 altGpuCache_glSelectionModeCtrl;
+		optionVar -iv altGpuCacheGlSelectionModeAuto 1;
+    }
+	else {
+		radioButtonGrp -e -enable 1 altGpuCache_glSelectionModeCtrl;
+		optionVar -iv altGpuCacheGlSelectionModeAuto 0;
+		altGpuCacheUncheckAllAutomatic();
+	}
+}
+
+global proc altGpuCacheSelectionWireThresholdAutoChanged()
+{
+    if (`checkBoxGrp -q -value1 altGpuCache_selectionWireThresholdAutoCtrl`) {
+		radioButtonGrp -e -enable 0 altGpuCache_selectionWireThresholdCtrl;
+		optionVar -iv altGpuCacheSelectionWireThreshold 1;
+    }
+	else {
+		radioButtonGrp -e -enable 1 altGpuCache_selectionWireThresholdCtrl;
+		optionVar -iv altGpuCacheSelectionWireThreshold 0;
+		altGpuCacheUncheckAllAutomatic();
+	}
+}
+
+global proc altGpuCacheSelectionSurfaceThresholdAutoChanged()
+{
+    if (`checkBoxGrp -q -value1 altGpuCache_selectionSurfaceThresholdAutoCtrl`) {
+		intFieldGrp -e -enable 0 altGpuCache_selectionSurfaceThresholdCtrl;
+		optionVar -iv altGpuCacheSelectionSurfaceThresholdAuto 1;
+    }
+	else {
+		intFieldGrp -e -enable 1 altGpuCache_selectionSurfaceThresholdCtrl;
+		optionVar -iv altGpuCacheSelectionSurfaceThresholdAuto 0;
+		altGpuCacheUncheckAllAutomatic();
+	}
+}
+
+global proc altGpuCacheSelectionWireThresholdAutoChanged()
+{
+    if (`checkBoxGrp -q -value1 altGpuCache_selectionWireThresholdAutoCtrl`) {
+		intFieldGrp -e -enable 0 altGpuCache_selectionWireThresholdCtrl;
+		optionVar -iv altGpuCacheSelectionWireThresholdAuto 1;
+    }
+	else {
+		intFieldGrp -e -enable 1 altGpuCache_selectionWireThresholdCtrl;
+		optionVar -iv altGpuCacheSelectionWireThresholdAuto 0;
+		altGpuCacheUncheckAllAutomatic();
+	}
+}
+
+global proc altGpuCacheDisableVertexArraysAutoChanged()
+{
+    if (`checkBoxGrp -q -value1 altGpuCache_disableVertexArraysAutoCtrl`) {
+		radioButtonGrp -e -enable 0 altGpuCache_useVertexArraysCtrl;
+		optionVar -iv altGpuCacheDisableVertexArraysAuto 1;
+    }
+	else {
+		radioButtonGrp -e -enable 1 altGpuCache_useVertexArraysCtrl;
+		optionVar -iv altGpuCacheDisableVertexArraysAuto 0;
+		altGpuCacheUncheckAllAutomatic();
+	}
+}
+
+global proc altGpuCacheTwoSidedLightingAutoChanged()
+{
+    if (`checkBoxGrp -q -value1 altGpuCache_twoSidedLightingAutoCtrl`) {
+		radioButtonGrp -e -enable 0 altGpuCache_twoSidedLightingModeCtrl;
+		optionVar -iv altGpuCacheTwoSidedLightingAuto 1;
+    }
+	else {
+		radioButtonGrp -e -enable 1 altGpuCache_twoSidedLightingModeCtrl;
+		optionVar -iv altGpuCacheTwoSidedLightingAuto 0;
+		altGpuCacheUncheckAllAutomatic();
+	}
+}
+
+global proc altGpuCacheUvCoordinatesAutoChanged()
+{
+    if (`checkBoxGrp -q -value1 altGpuCache_uvCoordinatesAutoCtrl`) {
+		checkBoxGrp -e -enable 0 altGpuCache_ignoreUvCtrl;
+		optionVar -iv altGpuCacheUvCoordinatesAuto 1;
+    }
+	else {
+		checkBoxGrp -e -enable 1 altGpuCache_ignoreUvCtrl;
+		optionVar -iv altGpuCacheUvCoordinatesAuto 0;
+		altGpuCacheUncheckAllAutomatic();
+	}
+}
+
+global proc altGpuCacheBackgroundReadingAutoChanged()
+{
+    if (`checkBoxGrp -q -value1 altGpuCache_backgroundReadingAutoCtrl`) {
+		checkBoxGrp -e -enable 0 altGpuCache_backgroundReadingCtrl;
+		optionVar -iv altGpuCacheBackgroundReadingAuto 1;
+    }
+	else {
+		checkBoxGrp -e -enable 1 altGpuCache_backgroundReadingCtrl;
+		optionVar -iv altGpuCacheBackgroundReadingAuto 0;
+		altGpuCacheUncheckAllAutomatic();
+	}
+}
+
+global proc altGpuCacheBackgroundReadingRefreshAutoChanged()
+{
+    if (`checkBoxGrp -q -value1 altGpuCache_backgroundReadingRefreshAutoCtrl`) {
+		intFieldGrp -e -enable 0 altGpuCache_backgroundReadingRefreshCtrl;
+		optionVar -iv altGpuCacheBackgroundReadingRefreshAuto 1;
+    }
+	else {
+		intFieldGrp -e -enable 1 altGpuCache_backgroundReadingRefreshCtrl;
+		optionVar -iv altGpuCacheBackgroundReadingRefreshAuto 0;
+		altGpuCacheUncheckAllAutomatic();
+	}
+}
+
+proc altGpuCacheRefreshDisableStateOfValueCtrls()
+{
+	global string $gPreferenceWindow;
+	setParent $gPreferenceWindow;
+	string $parent = "prefAltGpuCacheCol";
+	
+	if (`columnLayout -q -numberOfChildren $parent` == 0) {
+		return;
+	}
+
+	altGpuCacheMaxVramAutoChanged();
+	altGpuCacheMaxNumOfBuffersAutoChanged();
+	altGpuCacheMinVerticesPerShapeAutoChanged();
+	altGpuCacheLowVRamOperationAutoChanged();
+	altGpuCacheGlSelectionModeAutoChanged();
+	altGpuCacheSelectionWireThresholdAutoChanged();
+	altGpuCacheSelectionSurfaceThresholdAutoChanged();
+	altGpuCacheSelectionWireThresholdAutoChanged();
+	altGpuCacheDisableVertexArraysAutoChanged();
+	altGpuCacheTwoSidedLightingAutoChanged();
+	altGpuCacheUvCoordinatesAutoChanged();
+    altGpuCacheBackgroundReadingAutoChanged();
+    altGpuCacheBackgroundReadingRefreshAutoChanged();
+}
+
+proc altGpuCacheRefreshAutoCtrls()
+{
+	global string $gPreferenceWindow;
+	setParent $gPreferenceWindow;
+	string $parent = "prefAltGpuCacheCol";
+	
+	if (`columnLayout -q -numberOfChildren $parent` == 0) {
+		return;
+	}
+	
+	checkBoxGrp -e -value1 `optionVar -q altGpuCacheAllAuto`						altGpuCache_allAutoCtrl;
+	checkBoxGrp -e -value1 `optionVar -q altGpuCacheMaxVramAuto`					altGpuCache_maxVramAutoCtrl;
+	checkBoxGrp -e -value1 `optionVar -q altGpuCacheMaxNumOfBuffersAuto`			altGpuCache_maxNumOfBuffersAutoCtrl;
+	checkBoxGrp -e -value1 `optionVar -q altGpuCacheMinVerticesPerShapeAuto`		altGpuCache_minVerticesPerShapeAutoCtrl;
+	checkBoxGrp -e -value1 `optionVar -q altGpuCacheLowVramOperationAuto`			altGpuCache_lowVramOperationAutoCtrl;
+	checkBoxGrp -e -value1 `optionVar -q altGpuCacheGlSelectionModeAuto`			altGpuCache_glSelectionModeAutoCtrl;
+	checkBoxGrp -e -value1 `optionVar -q altGpuCacheSelectionWireThresholdAuto`	altGpuCache_selectionWireThresholdAutoCtrl;
+	checkBoxGrp -e -value1 `optionVar -q altGpuCacheSelectionSurfaceThresholdAuto`	altGpuCache_selectionSurfaceThresholdAutoCtrl;
+	checkBoxGrp -e -value1 `optionVar -q altGpuCacheDisableVertexArraysAuto`		altGpuCache_disableVertexArraysAutoCtrl;
+	checkBoxGrp -e -value1 `optionVar -q altGpuCacheTwoSidedLightingAuto`			altGpuCache_twoSidedLightingAutoCtrl;
+	checkBoxGrp -e -value1 `optionVar -q altGpuCacheUvCoordinatesAuto`				altGpuCache_uvCoordinatesAutoCtrl;
+	checkBoxGrp -e -value1 `optionVar -q altGpuCacheBackgroundReadingAuto`			altGpuCache_backgroundReadingAutoCtrl;
+	checkBoxGrp -e -value1 `optionVar -q altGpuCacheBackgroundReadingRefreshAuto`	altGpuCache_backgroundReadingRefreshAutoCtrl;
+}
+
+global proc altGpuCacheRefreshValueCtrls()
+{
+	global string $gPreferenceWindow;
+	if (!`window -exists $gPreferenceWindow`) {
+		return;
+	}
+
+	setParent $gPreferenceWindow;
+	string $parent = "prefAltGpuCacheCol";
+	
+	if (`columnLayout -q -numberOfChildren $parent` == 0) {
+		return;
+	}
+
+	intFieldGrp -e -value1 `optionVar -q altGpuCacheMaxVram`				altGpuCache_maxVramCtrl;
+	intFieldGrp -e -value1 `optionVar -q altGpuCacheMaxNumOfBuffers`		altGpuCache_maxNumOfBuffersCtrl;
+	intFieldGrp -e -value1 `optionVar -q altGpuCacheMinVerticesPerShape`	altGpuCache_minVerticesPerShapeCtrl;
+	radioButtonGrp -e -select `optionVar -q altGpuCacheLowMemMode`			altGpuCache_lowMemModeCtrl;
+
+	radioButtonGrp  -e -select `optionVar -q altGpuCacheGlSelectionMode`		altGpuCache_glSelectionModeCtrl;
+	intFieldGrp -e -value1 `optionVar -q altGpuCacheSelectionWireThreshold`	altGpuCache_selectionWireThresholdCtrl;
+	intFieldGrp -e -value1 `optionVar -q altGpuCacheSelectionSurfaceThreshold`	altGpuCache_selectionSurfaceThresholdCtrl;
+
+	radioButtonGrp -e -select `optionVar -q altGpuCacheUseVertexArrays`		altGpuCache_useVertexArraysCtrl;
+	radioButtonGrp -e -select `optionVar -q altGpuCacheTwoSidedLightingMode`	altGpuCache_twoSidedLightingModeCtrl;
+	checkBoxGrp -e -value1 `optionVar -q altGpuCacheIgnoreUv`					altGpuCache_ignoreUvCtrl;
+	checkBoxGrp -e -value1 `optionVar -q altGpuCacheBackgroundReading`			altGpuCache_backgroundReadingCtrl;
+	intFieldGrp -e -value1 `optionVar -q altGpuCacheBackgroundReadingRefresh`	altGpuCache_backgroundReadingRefreshCtrl;
+}
+
+global proc altGpuCacheSyncSettingsWithPlugin()
+{
+	// retrieve default values from altGpuCache plug-in and set non-default values to plug-in.
+	altGpuCache -e -refreshSettings;
+
+	// value optionVar => UI
+	altGpuCacheRefreshValueCtrls();
+}
+
+global proc prefsUpdateAltGpuCache()
+{
+	// auto optionVar => UI
+	altGpuCacheRefreshAutoCtrls();
+
+	// enable/disable value controls
+	altGpuCacheRefreshDisableStateOfValueCtrls();
+
+	// sync optionVar with Plugin and show them in UI
+	altGpuCacheSyncSettingsWithPlugin();
+}
+
+global proc altGpuCacheAllAutomaticChanged()
+{
+    if (`checkBoxGrp -q -value1 altGpuCache_allAutoCtrl`) {
+		checkBoxGrp -e -value1 1 altGpuCache_maxVramAutoCtrl;
+		checkBoxGrp -e -value1 1 altGpuCache_maxNumOfBuffersAutoCtrl;
+		checkBoxGrp -e -value1 1 altGpuCache_minVerticesPerShapeAutoCtrl;
+		checkBoxGrp -e -value1 1 altGpuCache_lowVramOperationAutoCtrl;
+		checkBoxGrp -e -value1 1 altGpuCache_glSelectionModeAutoCtrl;
+		checkBoxGrp -e -value1 1 altGpuCache_selectionWireThresholdAutoCtrl;
+		checkBoxGrp -e -value1 1 altGpuCache_selectionSurfaceThresholdAutoCtrl;
+		checkBoxGrp -e -value1 1 altGpuCache_disableVertexArraysAutoCtrl;
+		checkBoxGrp -e -value1 1 altGpuCache_twoSidedLightingAutoCtrl;
+		checkBoxGrp -e -value1 1 altGpuCache_uvCoordinatesAutoCtrl;
+		checkBoxGrp -e -value1 1 altGpuCache_backgroundReadingAutoCtrl;
+		checkBoxGrp -e -value1 1 altGpuCache_backgroundReadingRefreshAutoCtrl;
+
+		altGpuCacheRefreshDisableStateOfValueCtrls();
+
+		optionVar -iv altGpuCacheAllAuto 1;
+	}
+	else {
+		optionVar -iv altGpuCacheAllAuto 0;
+	}
+}
+
+global proc altGpuCacheIntFieldsChanged()
+{
+	int $value;
+	if (`intFieldGrp -exists altGpuCache_maxVramCtrl`) {
+		$value = `intFieldGrp -q -value1 altGpuCache_maxVramCtrl`;
+		if ($value > 0) {
+			optionVar -iv altGpuCacheMaxVram $value;
+		}
+		else {
+			optionVar -iv altGpuCacheMaxVram 0;
+		}
+	}
+
+	if (`intFieldGrp -exists altGpuCache_maxNumOfBuffersCtrl`) {
+		$value = `intFieldGrp -q -value1 altGpuCache_maxNumOfBuffersCtrl`;
+		if ($value > 0) {
+			optionVar -iv altGpuCacheMaxNumOfBuffers $value;
+		}
+		else {
+			optionVar -iv altGpuCacheMaxNumOfBuffers 0;
+		}
+	}
+
+	if (`intFieldGrp -exists altGpuCache_minVerticesPerShapeCtrl`) {
+		$value = `intFieldGrp -q -value1 altGpuCache_minVerticesPerShapeCtrl`;
+		if ($value > 0) {
+			optionVar -iv altGpuCacheMinVerticesPerShape $value;
+		}
+		else {
+			optionVar -iv altGpuCacheMinVerticesPerShape 0;
+		}
+	}
+
+	if (`intFieldGrp -exists altGpuCache_selectionWireThresholdCtrl`) {
+		$value = `intFieldGrp -q -value1 altGpuCache_selectionWireThresholdCtrl`;
+		if ($value > 0) {
+			optionVar -iv altGpuCacheSelectionWireThreshold $value;
+		}
+		else {
+			optionVar -iv altGpuCacheSelectionWireThreshold 0;
+		}
+	}
+
+	if (`intFieldGrp -exists altGpuCache_selectionSurfaceThresholdCtrl`) {
+		$value = `intFieldGrp -q -value1 altGpuCache_selectionSurfaceThresholdCtrl`;
+		if ($value > 0) {
+			optionVar -iv altGpuCacheSelectionSurfaceThreshold $value;
+		}
+		else {
+			optionVar -iv altGpuCacheSelectionSurfaceThreshold 0;
+		}
+	}
+
+	if (`intFieldGrp -exists altGpuCache_backgroundReadingRefreshCtrl`) {
+		$value = `intFieldGrp -q -value1 altGpuCache_backgroundReadingRefreshCtrl`;
+		if ($value > 0) {
+			optionVar -iv altGpuCacheBackgroundReadingRefresh $value;
+		}
+		else {
+			optionVar -iv altGpuCacheBackgroundReadingRefresh 1000;
+		}
+	}
+}
+
+global proc prefsHoldCurrentStateAltGpuCache(string $mode)
+{
+	// Avoid missing value updates by assuming integer fields are all changed. 
+	altGpuCacheIntFieldsChanged;
+
+	if ($mode == "save") {
+
+		optionVar -iv "altGpuCacheAllAutoHold"							`optionVar -q altGpuCacheAllAuto`;
+		optionVar -iv "altGpuCacheMaxVramAutoHold"						`optionVar -q altGpuCacheMaxVramAuto`;
+		optionVar -iv "altGpuCacheMaxNumOfBuffersAutoHold"				`optionVar -q altGpuCacheMaxNumOfBuffersAuto`;
+		optionVar -iv "altGpuCacheMinVerticesPerShapeAutoHold"			`optionVar -q altGpuCacheMinVerticesPerShapeAuto`;
+		optionVar -iv "altGpuCacheLowVramOperationAutoHold"			`optionVar -q altGpuCacheLowVramOperationAuto`;
+		optionVar -iv "altGpuCacheGlSelectionModeAutoHold"				`optionVar -q altGpuCacheGlSelectionModeAuto`;
+		optionVar -iv "altGpuCacheSelectionWireThresholdAutoHold"		`optionVar -q altGpuCacheSelectionWireThresholdAuto`;
+		optionVar -iv "altGpuCacheSelectionSurfaceThresholdAutoHold"	`optionVar -q altGpuCacheSelectionSurfaceThresholdAuto`;
+		optionVar -iv "altGpuCacheDisableVertexArraysAutoHold"			`optionVar -q altGpuCacheDisableVertexArraysAuto`;
+		optionVar -iv "altGpuCacheTwoSidedLightingAutoHold"			`optionVar -q altGpuCacheTwoSidedLightingAuto`;
+		optionVar -iv "altGpuCacheUvCoordinatesAutoHold"				`optionVar -q altGpuCacheUvCoordinatesAuto`;
+		optionVar -iv "altGpuCacheBackgroundReadingAutoHold"			`optionVar -q altGpuCacheBackgroundReadingAuto`;
+		optionVar -iv "altGpuCacheBackgroundReadingRefreshAutoHold"	`optionVar -q altGpuCacheBackgroundReadingRefreshAuto`;
+
+		optionVar -iv "altGpuCacheMaxVramHold"				`optionVar -q altGpuCacheMaxVram`;
+		optionVar -iv "altGpuCacheMaxNumOfBuffersHold"		`optionVar -q altGpuCacheMaxNumOfBuffers`;
+		optionVar -iv "altGpuCacheMinVerticesPerShapeHold"	`optionVar -q altGpuCacheMinVerticesPerShape`;
+		optionVar -iv "altGpuCacheLowMemModelHold"			`optionVar -q altGpuCacheLowMemMode`;
+
+		optionVar -iv "altGpuCacheGlSelectionModeHold"				`optionVar -q altGpuCacheGlSelectionMode`;
+		optionVar -iv "altGpuCacheSelectionWireThresholdHold"		`optionVar -q altGpuCacheSelectionWireThreshold`;
+		optionVar -iv "altGpuCacheSelectionSurfaceThresholdHold"	`optionVar -q altGpuCacheSelectionSurfaceThreshold`;
+
+		optionVar -iv "altGpuCacheUseVertexArraysHold"			`optionVar -q altGpuCacheUseVertexArrays`;
+		optionVar -iv "altGpuCacheTwoSidedLightingModeHold"	`optionVar -q altGpuCacheTwoSidedLightingMode`;
+		optionVar -iv "altGpuCacheIgnoreUvHold"				`optionVar -q altGpuCacheIgnoreUv`;
+		optionVar -iv "altGpuCacheBackgroundReadingHold"		`optionVar -q altGpuCacheBackgroundReading`;
+		optionVar -iv "altGpuCacheBackgroundReadingRefreshHold" `optionVar -q altGpuCacheBackgroundReadingRefresh`;
+
+	} else if ($mode == "restore") {
+
+		optionVar -iv "altGpuCacheAllAuto"							`optionVar -q altGpuCacheAllAutoHold`;
+		optionVar -iv "altGpuCacheMaxVramAuto"						`optionVar -q altGpuCacheMaxVramAutoHold`;
+		optionVar -iv "altGpuCacheMaxNumOfBuffersAuto"				`optionVar -q altGpuCacheMaxNumOfBuffersAutoHold`;
+		optionVar -iv "altGpuCacheMinVerticesPerShapeAuto"			`optionVar -q altGpuCacheMinVerticesPerShapeAutoHold`;
+		optionVar -iv "altGpuCacheLowVramOperationAuto"			`optionVar -q altGpuCacheLowVramOperationAutoHold`;
+		optionVar -iv "altGpuCacheGlSelectionModeAuto"				`optionVar -q altGpuCacheGlSelectionModeAutoHold`;
+		optionVar -iv "altGpuCacheSelectionWireThresholdAuto"		`optionVar -q altGpuCacheSelectionWireThresholdAutoHold`;
+		optionVar -iv "altGpuCacheSelectionSurfaceThresholdAuto"	`optionVar -q altGpuCacheSelectionSurfaceThresholdAutoHold`;
+		optionVar -iv "altGpuCacheDisableVertexArraysAuto"			`optionVar -q altGpuCacheDisableVertexArraysAutoHold`;
+		optionVar -iv "altGpuCacheTwoSidedLightingAuto"			`optionVar -q altGpuCacheTwoSidedLightingAutoHold`;
+		optionVar -iv "altGpuCacheUvCoordinatesAuto"				`optionVar -q altGpuCacheUvCoordinatesAutoHold`;
+		optionVar -iv "altGpuCacheBackgroundReadingAuto"			`optionVar -q altGpuCacheBackgroundReadingAutoHold`;
+		optionVar -iv "altGpuCacheBackgroundReadingRefreshAuto"	`optionVar -q altGpuCacheBackgroundReadingRefreshAutoHold`;
+
+		optionVar -iv "altGpuCacheMaxVram"					`optionVar -q altGpuCacheMaxVramHold`;
+		optionVar -iv "altGpuCacheMaxNumOfBuffers"			`optionVar -q altGpuCacheMaxNumOfBuffersHold`;
+		optionVar -iv "altGpuCacheMinVerticesPerShape"		`optionVar -q altGpuCacheMinVerticesPerShapeHold`;
+		optionVar -iv "altGpuCacheLowMemMode"				`optionVar -q altGpuCacheLowMemModeHold`;
+
+		optionVar -iv "altGpuCacheGlSelectionMode"			`optionVar -q altGpuCacheGlSelectionModeHold`;
+		optionVar -iv "altGpuCacheSelectionWireThreshold"	`optionVar -q altGpuCacheSelectionWireThresholdHold`;
+		optionVar -iv "altGpuCacheSelectionSurfaceThreshold" `optionVar -q altGpuCacheSelectionSurfaceThresholdHold`;
+
+		optionVar -iv "altGpuCacheUseVertexArrays"			`optionVar -q altGpuCacheUseVertexArraysHold`;
+		optionVar -iv "altGpuCacheTwoSidedLightingMode"	`optionVar -q altGpuCacheTwoSidedLightingModeHold`;
+		optionVar -iv "altGpuCacheIgnoreUv"				`optionVar -q altGpuCacheIgnoreUvHold`;
+		optionVar -iv "altGpuCacheBackgroundReading"		`optionVar -q altGpuCacheBackgroundReadingHold`;
+		optionVar -iv "altGpuCacheBackgroundReadingRefresh" `optionVar -q altGpuCacheBackgroundReadingRefreshHold`;
+
+	} else {	// "remove"
+
+		// Remove the temporary option vars so they don't get saved out
+		optionVar -remove "altGpuCacheAllAutoHold";
+		optionVar -remove "altGpuCacheMaxVramAutoHold";
+		optionVar -remove "altGpuCacheMaxNumOfBuffersAutoHold";
+		optionVar -remove "altGpuCacheMinVerticesPerShapeAutoHold";
+		optionVar -remove "altGpuCacheLowVramOperationAutoHold";
+		optionVar -remove "altGpuCacheGlSelectionModeAutoHold";
+		optionVar -remove "altGpuCacheSelectionWireThresholdAutoHold";
+		optionVar -remove "altGpuCacheSelectionSurfaceThresholdAutoHold";
+		optionVar -remove "altGpuCacheDisableVertexArraysAutoHold";
+		optionVar -remove "altGpuCacheTwoSidedLightingAutoHold";
+		optionVar -remove "altGpuCacheUvCoordinatesAutoHold";
+		optionVar -remove "altGpuCacheBackgroundReadingAutoHold";
+		optionVar -remove "altGpuCacheBackgroundReadingRefreshAutoHold";
+
+		optionVar -remove "altGpuCacheMaxVramHold";
+		optionVar -remove "altGpuCacheMaxNumOfBuffersHold";
+		optionVar -remove "altGpuCacheMinVerticesPerShapeHold";
+		optionVar -remove "altGpuCacheLowMemModeHold";
+
+		optionVar -remove "altGpuCacheGlSelectionModeHold";
+		optionVar -remove "altGpuCacheSelectionWireThresholdHold";
+		optionVar -remove "altGpuCacheSelectionSurfaceThresholdHold";
+
+		optionVar -remove "altGpuCacheUseVertexArraysHold";
+		optionVar -remove "altGpuCacheTwoSidedLightingModeHold";
+		optionVar -remove "altGpuCacheIgnoreUvHold";
+		optionVar -remove "altGpuCacheBackgroundReadingHold";
+		optionVar -remove "altGpuCacheBackgroundReadingRefreshHold";
+
+	}
+
+	// Sync option vars to plug-in since we assume integer fields are all changed. 
+	if (`pluginInfo -q -loaded altGpuCache`) {
+		altGpuCache -e -refreshSettings;
+	}
+	altGpuCacheRefreshValueCtrls();
+}
+
+global proc prefsCreateAltGpuCache()
+{
+	global string $gPreferenceWindow;
+	setParent $gPreferenceWindow;
+	string $parent = "prefAltGpuCacheCol";
+	
+	// Check to see if this has been created already.
+	//
+	if (`columnLayout -q -numberOfChildren $parent` > 0) {
+		return;
+	}
+
+	//  Create the UI
+	//
+	setParent $parent;
+	setUITemplate -pushTemplate prefsTemplate;
+
+	string $intFieldsChangedCmd1 = "setParent " + $parent + ";altGpuCacheIntFieldsChanged;";
+	string $intFieldsChangedCmd2 = $intFieldsChangedCmd1 + "altGpuCacheRefreshValueCtrls;";
+
+	// This is used to force the width to fill the window
+	separator -style "none" -h 1;
+
+	frameLayout -label (uiRes("m_altGpuCacheCreateUI.kGpuCacheHardwareInfo")) ;
+		columnLayout -adj true;
+		textFieldGrp
+			-label (uiRes("m_altGpuCacheCreateUI.kGpuCacheManufacturer"))
+			-editable false
+			-columnAttach2 "both" "left"
+			-columnOffset2 -120 120
+			-text `altGpuCache -q -gpuManufacturer`
+			altGpuCache_manufacturerCtrl;
+		textFieldGrp
+			-label (uiRes("m_altGpuCacheCreateUI.kGpuCacheModel"))
+			-editable false
+			-columnAttach2 "both" "left"
+			-columnOffset2 -120 120
+			-text `altGpuCache -q -gpuModel`
+			altGpuCache_modelCtrl;
+		textFieldGrp
+			-label (uiRes("m_altGpuCacheCreateUI.kGpuCacheDriver"))
+			-editable false
+			-columnAttach2 "both" "left"
+			-columnOffset2 -120 120
+			-text `altGpuCache -q -gpuDriverVersion`
+			altGpuCache_driverCtrl;
+		textFieldGrp
+			-label (uiRes("m_altGpuCacheCreateUI.kGpuCacheGpuMemoryAmount"))
+			-editable false
+			-columnAttach2 "both" "left"
+			-columnOffset2 -120 120
+			-text `altGpuCache -q -gpuMemorySize`
+			altGpuCache_gpuMemoryAmountCtrl;
+	setParent $parent;
+
+	checkBoxGrp -ncb 1
+		-label "" 
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCacheAllAutomatic"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -120 120
+		-changeCommand1("setParent " + $parent + ";altGpuCacheAllAutomaticChanged;altGpuCacheSyncSettingsWithPlugin;")
+		altGpuCache_allAutoCtrl;
+	setParent $parent;
+
+	frameLayout -label (uiRes("m_altGpuCacheCreateUI.kGpuCacheVramManagement")) ;
+	checkBoxGrp -ncb 1
+		-label (uiRes("m_altGpuCacheCreateUI.kGpuCacheMaxVRAMForAllLabel"))
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCacheMaxVRAMAuto"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -120 120
+		-changeCommand1($intFieldsChangedCmd1 + "altGpuCacheMaxVramAutoChanged;altGpuCacheSyncSettingsWithPlugin;")
+		altGpuCache_maxVramAutoCtrl;
+	intFieldGrp
+		-label ""
+		-extraLabel (uiRes("m_altGpuCacheCreateUI.kGpuCacheMegaBytes"))
+		-columnWidth 1 285
+		-changeCommand($intFieldsChangedCmd2)
+		altGpuCache_maxVramCtrl;
+
+	checkBoxGrp -ncb 1
+		-label (uiRes("m_altGpuCacheCreateUI.kGpuCacheMaxNumOfBuffersLable"))
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCacheMaxNumOfBuffersAuto"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -120 120
+		-changeCommand1($intFieldsChangedCmd1 + "altGpuCacheMaxNumOfBuffersAutoChanged;altGpuCacheSyncSettingsWithPlugin;")
+		altGpuCache_maxNumOfBuffersAutoCtrl;
+	intFieldGrp
+		-label ""
+		-columnWidth 1 285
+		-changeCommand($intFieldsChangedCmd2)
+		altGpuCache_maxNumOfBuffersCtrl;
+
+	checkBoxGrp -ncb 1
+		-label (uiRes("m_altGpuCacheCreateUI.kGpuCacheMinVerticesPerShapeLabel"))
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCacheMinVerticesPerShapeAuto"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -120 120
+		-changeCommand1($intFieldsChangedCmd1 + "altGpuCacheMinVerticesPerShapeAutoChanged;altGpuCacheSyncSettingsWithPlugin;")
+		altGpuCache_minVerticesPerShapeAutoCtrl;
+	intFieldGrp
+		-label ""
+		-columnWidth 1 285
+		-changeCommand($intFieldsChangedCmd2)
+		altGpuCache_minVerticesPerShapeCtrl;
+
+	checkBoxGrp -ncb 1
+		-label (uiRes("m_altGpuCacheCreateUI.kGpuCacheLowVRAMOperationLabel"))
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCacheLowVRAMOperationAuto"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -120 120
+		-changeCommand1($intFieldsChangedCmd1 + "altGpuCacheLowVRamOperationAutoChanged;altGpuCacheSyncSettingsWithPlugin;")
+		altGpuCache_lowVramOperationAutoCtrl;
+    radioButtonGrp  -nrb 2
+		-vertical
+		-label ""
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCacheLowMemUseMem"))
+		-label2 (uiRes("m_altGpuCacheCreateUI.kGpuCacheLowMemUseTempVRAMBuffer"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -145 145
+		-changeCommand("setParent " + $parent + ";optionVar -iv altGpuCacheLowMemMode `radioButtonGrp -q -select altGpuCache_lowMemModeCtrl`")
+		altGpuCache_lowMemModeCtrl;
+	setParent $parent;
+
+	frameLayout -label (uiRes("m_altGpuCacheCreateUI.kGpuCacheGlSelectionOption")) ;
+	checkBoxGrp -ncb 1
+		-label (uiRes("m_altGpuCacheCreateUI.kGpuCachGLSelectionModeLabel"))
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCachGLSelectionModeAuto"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -120 120
+		-changeCommand1($intFieldsChangedCmd1 + "altGpuCacheGlSelectionModeAutoChanged;altGpuCacheSyncSettingsWithPlugin;")
+		altGpuCache_glSelectionModeAutoCtrl;
+    radioButtonGrp  -nrb 2
+		-vertical
+		-label ""
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCacheSelectionUseVertexArrays"))
+		-label2 (uiRes("m_altGpuCacheCreateUI.kGpuCacheSelectionUseVRAMBuffers"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -145 145
+		-changeCommand("setParent " + $parent + ";optionVar -iv altGpuCacheGlSelectionMode `radioButtonGrp -q -select altGpuCache_glSelectionModeCtrl`")
+		altGpuCache_glSelectionModeCtrl;
+	checkBoxGrp -ncb 1
+		-label (uiRes("m_altGpuCacheCreateUI.kGpuCacheSelectionWireThresholdLabel"))
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCacheSelectionWireThresholdAuto"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -120 120
+		-columnAttach3 "both" "left" "left"
+		-columnOffset3 -100 0 0
+		-changeCommand1($intFieldsChangedCmd1 + "altGpuCacheSelectionWireThresholdAutoChanged;altGpuCacheSyncSettingsWithPlugin;")
+		altGpuCache_selectionWireThresholdAutoCtrl;
+	intFieldGrp
+		-label " "
+		-extraLabel (uiRes("m_altGpuCacheCreateUI.kGpuCacheSelectionWireThresholdText"))
+		-columnWidth 1 285
+		-changeCommand($intFieldsChangedCmd2)
+		altGpuCache_selectionWireThresholdCtrl;
+	checkBoxGrp -ncb 1
+		-label (uiRes("m_altGpuCacheCreateUI.kGpuCacheSelectionSurfaceThresholdLabel"))
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCacheSelectionSurfaceThresholdAuto"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -120 120
+		-changeCommand1($intFieldsChangedCmd1 + "altGpuCacheSelectionSurfaceThresholdAutoChanged;altGpuCacheSyncSettingsWithPlugin;")
+		altGpuCache_selectionSurfaceThresholdAutoCtrl;
+	intFieldGrp
+		-label " "
+		-extraLabel (uiRes("m_altGpuCacheCreateUI.kGpuCacheSelectionSurfaceThresholdText"))
+		-columnWidth 1 285
+		-changeCommand($intFieldsChangedCmd2)
+		altGpuCache_selectionSurfaceThresholdCtrl;
+	setParent $parent;
+
+	frameLayout -label (uiRes("m_altGpuCacheCreateUI.kGpuCacheAdvancedDisplaySetting")) ;
+	checkBoxGrp -ncb 1
+		-label (uiRes("m_altGpuCacheCreateUI.kGpuCacheDisableVertexArraysLabel"))
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCacheDisableVertexArraysAuto"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -120 120
+		-changeCommand1($intFieldsChangedCmd1 + "altGpuCacheDisableVertexArraysAutoChanged;altGpuCacheSyncSettingsWithPlugin;")
+		altGpuCache_disableVertexArraysAutoCtrl;
+    radioButtonGrp  -nrb 2
+		-vertical
+		-label ""
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCacheUseVertexArrays"))
+		-label2 (uiRes("m_altGpuCacheCreateUI.kGpuCacheUseGLPrimitives"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -145 145
+		-changeCommand("setParent " + $parent + ";optionVar -iv altGpuCacheUseVertexArrays `radioButtonGrp -q -select altGpuCache_useVertexArraysCtrl`")
+		altGpuCache_useVertexArraysCtrl;
+	checkBoxGrp -ncb 1
+		-label (uiRes("m_altGpuCacheCreateUI.kGpuCacheTwoSidedLightingLabel"))
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCacheTwoSidedLightingAuto"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -120 120
+		-changeCommand1($intFieldsChangedCmd1 + "altGpuCacheTwoSidedLightingAutoChanged;altGpuCacheSyncSettingsWithPlugin;")
+		altGpuCache_twoSidedLightingAutoCtrl;
+    radioButtonGrp  -nrb 2
+		-vertical
+		-label ""
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCacheTwoSidedLightingOpenGL"))
+		-label2 (uiRes("m_altGpuCacheCreateUI.kGpuCacheTwoSidedLightingEmulation"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -145 145
+		-changeCommand("setParent " + $parent + ";optionVar -iv altGpuCacheTwoSidedLightingMode `radioButtonGrp -q -select altGpuCache_twoSidedLightingModeCtrl`")
+		altGpuCache_twoSidedLightingModeCtrl;
+	checkBoxGrp -ncb 1
+		-label (uiRes("m_altGpuCacheCreateUI.kGpuCacheUvCoordinatesLabel"))
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCacheUvCoordinatesAuto"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -120 120
+		-changeCommand1($intFieldsChangedCmd1 + "altGpuCacheUvCoordinatesAutoChanged;altGpuCacheSyncSettingsWithPlugin;")
+		altGpuCache_uvCoordinatesAutoCtrl;
+	checkBoxGrp -ncb 1
+		-label ""
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCacheIgnoreUv"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -145 145
+		-changeCommand("setParent " + $parent + ";optionVar -iv altGpuCacheIgnoreUv `checkBoxGrp -q -value1 altGpuCache_ignoreUvCtrl`")
+		altGpuCache_ignoreUvCtrl;
+	checkBoxGrp -ncb 1
+		-label (uiRes("m_altGpuCacheCreateUI.kGpuCacheBackgroundReadingLabel"))
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCacheBackgroundReadingAuto"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -120 120
+		-changeCommand1($intFieldsChangedCmd1 + "altGpuCacheBackgroundReadingAutoChanged;altGpuCacheSyncSettingsWithPlugin;")
+		altGpuCache_backgroundReadingAutoCtrl;
+	checkBoxGrp -ncb 1
+		-label ""
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCacheBackgroundReading"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -145 145
+		-changeCommand("setParent " + $parent + ";optionVar -iv altGpuCacheBackgroundReading `checkBoxGrp -q -value1 altGpuCache_backgroundReadingCtrl`")
+		altGpuCache_backgroundReadingCtrl;
+	checkBoxGrp -ncb 1
+		-label (uiRes("m_altGpuCacheCreateUI.kGpuCacheBackgroundReadingRefrsehIntervalLabel"))
+		-label1 (uiRes("m_altGpuCacheCreateUI.kGpuCacheBackgroundReadingRefreshIntervalAuto"))
+		-columnAttach2 "both" "left"
+		-columnOffset2 -120 120
+		-changeCommand1($intFieldsChangedCmd1 + "altGpuCacheBackgroundReadingRefreshAutoChanged;altGpuCacheSyncSettingsWithPlugin;")
+		altGpuCache_backgroundReadingRefreshAutoCtrl;
+	intFieldGrp
+		-label " "
+        -extraLabel (uiRes("m_altGpuCacheCreateUI.kGpuCacheBackgroundReadingRefreshIntervalUnitText"))
+        -columnWidth 1 285
+        -changeCommand($intFieldsChangedCmd2)
+		altGpuCache_backgroundReadingRefreshCtrl;
+
+	setParent $parent;
+
+	setUITemplate -popTemplate;
+
+	prefsUpdateAltGpuCache();
+}
+
+global proc altGpuCacheCreateUI()
+{
+    global string $gMainWindow;  // defined by Maya
+
+    // Load altGpuCache scripts
+    source performAltGpuCacheImport;
+    source performAltGpuCacheExport;
+
+    // Register runtime command
+    if (!`runTimeCommand -exists altGpuCacheImport`) {
+        runTimeCommand -default true
+                -annotation (uiRes("m_altGpuCacheCreateUI.kGpuCacheImportAnnot"))
+                -category "Menu items.Cache.GPU Cache (alt)"
+                -command  "performAltGpuCacheImport 0"
+                altGpuCacheImport;
+    }
+
+    if (!`runTimeCommand -exists altGpuCacheImportOptions`) {
+        runTimeCommand -default true
+                -annotation (uiRes("m_altGpuCacheCreateUI.kGpuCacheImportOptionsAnnot"))
+                -category "Menu items.Cache.GPU Cache (alt)"
+                -command  "performAltGpuCacheImport 1"
+                altGpuCacheImportOptions;
+    }
+
+    if (!`runTimeCommand -exists altGpuCacheExportAll`) {
+        runTimeCommand -default true
+                -annotation (uiRes("m_altGpuCacheCreateUI.kGpuCacheExportAllAnnot"))
+                -category "Menu items.Cache.GPU Cache (alt)"
+                -command  "performAltGpuCacheExport 0 1"
+                altGpuCacheExportAll;
+    }
+
+    if (!`runTimeCommand -exists altGpuCacheExportAllOptions`) {
+        runTimeCommand -default true
+                -annotation (uiRes("m_altGpuCacheCreateUI.kGpuCacheExportAllOptionsAnnot"))
+                -category "Menu items.Cache.GPU Cache (alt)"
+                -command  "performAltGpuCacheExport 1 1"
+                altGpuCacheExportAllOptions;
+    }
+
+    if (!`runTimeCommand -exists altGpuCacheExportSelection`) {
+        runTimeCommand -default true
+                -annotation (uiRes("m_altGpuCacheCreateUI.kGpuCacheExportSelectionAnnot"))
+                -category "Menu items.Cache.GPU Cache (alt)"
+                -command  "performAltGpuCacheExport 0 0"
+                altGpuCacheExportSelection;
+    }
+
+    if (!`runTimeCommand -exists altGpuCacheExportSelectionOptions`) {
+        runTimeCommand -default true
+                -annotation (uiRes("m_altGpuCacheCreateUI.kGpuCacheExportSelectionOptionsAnnot"))
+                -category "Menu items.Cache.GPU Cache (alt)"
+                -command  "performAltGpuCacheExport 1 0"
+                altGpuCacheExportSelectionOptions;
+    }
+
+	if (!`runTimeCommand -exists altGpuCacheRefreshAll`) {
+		runTimeCommand -default true
+				-annotation (uiRes("m_altGpuCacheCreateUI.kGpuCacheRefreshAllAnnot"))
+                -category "Menu items.Cache.GPU Cache (alt)"
+				-command "altGpuCache -refreshAll"
+				altGpuCacheRefreshAll;
+	}
+
+    // Insert GPU Cache menu
+    insertPipelineSubMenu "altGpuCacheMenu" (uiRes("m_altGpuCacheCreateUI.kGpuCache")) "buildAltGpuCacheMenu";
+
+	closePreferencesWindow();
+	addCustomPrefsTab("prefsCreateAltGpuCache",
+		"prefsFrameLayoutCreateAltGpuCache",
+		"prefsUpdateAltGpuCache",
+		"prefsHoldCurrentStateAltGpuCache",
+		"prefsSetOptVarToDefaultAltGpuCache",
+		(uiRes("m_altGpuCacheCreateUI.kGpuCachePreferences")),
+		(uiRes("m_altGpuCacheCreateUI.kGpuCacheTab")));
+}
+
+global proc buildAltGpuCacheMenu(string $parent)
+{
+    setParent -menu $parent;
+
+    if (`menu -q -numberOfItems $parent` != 0) {
+        //
+        // Menu is built already - just return
+        //
+        return;
+    }
+
+    // Create menu items
+    //
+    menuItem -label (uiRes("m_altGpuCacheCreateUI.kImport"))
+             -annotation (getRunTimeCommandAnnotation("altGpuCacheImport"))
+             -dragMenuCommand "performAltGpuCacheImport 2"
+             -command "altGpuCacheImport";
+
+    menuItem -optionBox true
+             -annotation (getRunTimeCommandAnnotation("altGpuCacheImportOptions"))
+             -command "altGpuCacheImportOptions";
+
+    menuItem -label (uiRes("m_altGpuCacheCreateUI.kExportAll"))
+             -annotation (getRunTimeCommandAnnotation("altGpuCacheExportAll"))
+             -dragMenuCommand "performAltGpuCacheExport 2 1"
+             -dragDoubleClickCommand "altGpuCacheExportAllOptions"
+             -command "altGpuCacheExportAll";
+
+    menuItem -optionBox true
+             -annotation (getRunTimeCommandAnnotation("altGpuCacheExportAllOptions"))
+             -command "altGpuCacheExportAllOptions";
+
+    menuItem -label (uiRes("m_altGpuCacheCreateUI.kExportSelection"))
+             -annotation (getRunTimeCommandAnnotation("altGpuCacheExportSelection"))
+             -dragMenuCommand "performAltGpuCacheExport 2 0"
+             -dragDoubleClickCommand "altGpuCacheExportSelectionOptions"
+             -command "altGpuCacheExportSelection";
+
+    menuItem -optionBox true
+             -annotation (getRunTimeCommandAnnotation("altGpuCacheExportSelectionOptions"))
+             -command "altGpuCacheExportSelectionOptions";
+
+	menuItem -label (uiRes("m_altGpuCacheCreateUI.kRefreshAll"))
+			 -version "2016"
+			 -annotation (getRunTimeCommandAnnotation("altGpuCacheRefreshAll"))
+			 -command "altGpuCacheRefreshAll";
+}
+
+global proc altGpuCacheDeleteUI()
+{
+	deletePipelineSubMenu "altGpuCacheMenu";
+	closePreferencesWindow();
+	deleteCustomPrefsTab("prefsCreateAltGpuCache");
+}

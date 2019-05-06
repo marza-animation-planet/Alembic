@@ -1,0 +1,14 @@
+// ===========================================================================
+// Copyright 2016 Autodesk, Inc. All rights reserved.
+//
+// Use of this software is subject to the terms of the Autodesk license
+// agreement provided at the time of installation or download, or which
+// otherwise accompanies this software in either electronic or hard copy form.
+// ===========================================================================
+displayString -replace -value "Alembic" m_AEaltGpuCacheTemplate.kAlembic;
+displayString -replace -value "All Files" m_AEaltGpuCacheTemplate.kAllFiles;
+displayString -replace -value "Assign Cache File" m_AEaltGpuCacheTemplate.kAssignCacheFile;
+displayString -replace -value "Cache File Name" m_AEaltGpuCacheTemplate.kCacheFileName;
+displayString -replace -value "GPU Cache" m_AEaltGpuCacheTemplate.kGPUCache;
+displayString -replace -value "Geometry Path" m_AEaltGpuCacheTemplate.kGeometryPath;
+displayString -replace -value "Reload the cache file" m_AEaltGpuCacheTemplate.kReload;

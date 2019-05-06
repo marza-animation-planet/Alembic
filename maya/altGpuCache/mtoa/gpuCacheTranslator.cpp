@@ -844,18 +844,91 @@ void CGpuCacheTranslator::ExportProc(AtNode *proc, unsigned int step, double ren
       AiNodeSetStr(proc, "objectpath", objpath.asChar());
       AiNodeSetFlt(proc, "fps", GetFPS());
       AiNodeSetFlt(proc, "frame", renderFrame);
-      AiNodeSetBool(proc, "ignore_transforms", false);
       AiNodeSetBool(proc, "ignore_deform_blur", !deformBlur);
       AiNodeSetBool(proc, "ignore_transform_blur", !transformBlur);
+
       // ignore_instances  => Ignored for single shape calls
-      // ignore_visibility => Ignored for single shape calls 
-      // cycle
-      // offset
-      // speed
-      // preserve_start_frame
-      // start_frame
-      // end_frame
       // excludepath
+
+      plug = FindMayaPlug("ignoreTransforms");
+      if (!plug.isNull())
+      {
+         AiNodeSetBool(proc, "ignore_transforms", plug.asBool());
+      }
+      else
+      {
+         AiNodeSetBool(proc, "ignore_transforms", false);
+      }
+
+      plug = FindMayaPlug("ignoreVisibility");
+      if (!plug.isNull())
+      {
+         AiNodeSetBool(proc, "ignore_visibility", plug.asBool());
+      }
+      else
+      {
+         AiNodeSetBool(proc, "ignore_visibility", false);
+      }
+
+      plug = FindMayaPlug("speed");
+      if (!plug.isNull())
+      {
+         AiNodeSetFlt(proc, "speed", plug.asDouble());
+      }
+      else
+      {
+         AiNodeSetFlt(proc, "speed", 1.0);
+      }
+
+      plug = FindMayaPlug("preserveStartFrame");
+      if (!plug.isNull())
+      {
+         AiNodeSetBool(proc, "preserve_start_frame", plug.asBool());
+      }
+      else
+      {
+         AiNodeSetBool(proc, "preserve_start_frame", false);
+      }
+
+      plug = FindMayaPlug("offset");
+      if (!plug.isNull())
+      {
+         AiNodeSetFlt(proc, "offset", plug.asDouble());
+      }
+      else
+      {
+         AiNodeSetFlt(proc, "offset", 0.0);
+      }
+
+      plug = FindMayaPlug("cycleType");
+      if (!plug.isNull())
+      {
+         AiNodeSetInt(proc, "cycle", plug.asShort());
+      }
+      else
+      {
+         AiNodeSetInt(proc, "cycle", 0);
+      }
+
+      plug = FindMayaPlug("startFrame");
+      if (!plug.isNull())
+      {
+         AiNodeSetFlt(proc, "start_frame", plug.asDouble());
+      }
+      else
+      {
+         AiNodeSetFlt(proc, "start_frame", 1.0);
+      }
+
+      plug = FindMayaPlug("endFrame");
+      if (!plug.isNull())
+      {
+         AiNodeSetFlt(proc, "end_frame", plug.asDouble());
+      }
+      else
+      {
+         AiNodeSetFlt(proc, "end_frame", 1.0);
+      }
 
       plug = FindMayaPlug("aiIgnoreReference");
       if (!plug.isNull())

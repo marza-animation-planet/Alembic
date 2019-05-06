@@ -1,14 +1,14 @@
-#ifndef GPUCACHE_GPUCACHEIMPORT_H_
-#define GPUCACHE_GPUCACHEIMPORT_H_
+#ifndef GPUCACHE_GPUCACHETREE_H_
+#define GPUCACHE_GPUCACHETREE_H_
 
 #include <maya/MPxCommand.h>
 
-class GpuCacheImport : public MPxCommand
+class GpuCacheTree : public MPxCommand
 {
 public:
    
-   GpuCacheImport();
-   ~GpuCacheImport();
+   GpuCacheTree();
+   ~GpuCacheTree();
 
    virtual bool hasSyntax() const;
    virtual bool isUndoable() const;

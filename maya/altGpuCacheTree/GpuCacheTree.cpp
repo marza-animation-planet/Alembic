@@ -1,4 +1,4 @@
-#include "GpuCacheImport.h"
+#include "GpuCacheTree.h"
 #include "Keyframer.h"
 #include "Xform.h"
 #include "AlembicSceneCache.h"
@@ -74,7 +74,7 @@ void AssignDefaultShader(MObject &obj)
 
 // ---
 
-MSyntax GpuCacheImport::createSyntax()
+MSyntax GpuCacheTree::createSyntax()
 {
    MSyntax syntax;
    
@@ -101,9 +101,9 @@ MSyntax GpuCacheImport::createSyntax()
    return syntax;
 }
 
-void* GpuCacheImport::create()
+void* GpuCacheTree::create()
 {
-   return new GpuCacheImport();
+   return new GpuCacheTree();
 }
 
 // ---
@@ -225,7 +225,9 @@ class UpdateTree
 public:
    
    UpdateTree(const std::string &abcPath,
-              bool createNodes);
+              bool createNodes,
+              double startTime,
+              double endTime);
    
    AlembicNode::VisitReturn enter(AlembicMesh &node, AlembicNode *instance=0);
    AlembicNode::VisitReturn enter(AlembicSubD &node, AlembicNode *instance=0);
@@ -343,10 +345,14 @@ private:
    double mOffset;
    bool mPreserveStartFrame;
    CycleType mCycleType;
+   double mStartFrame;
+   double mEndFrame;
 };
 
 UpdateTree::UpdateTree(const std::string &abcPath,
-                       bool createNodes)
+                       bool createNodes,
+                       double startTime,
+                       double endTime)
    : mAbcPath(abcPath)
    , mIgnoreTransforms(false)
    , mCreateInstances(false)
@@ -355,7 +361,11 @@ UpdateTree::UpdateTree(const std::string &abcPath,
    , mOffset(0.0)
    , mPreserveStartFrame(false)
    , mCycleType(CT_hold)
+   , mStartFrame(0.0)
+   , mEndFrame(0.0)
 {
+   mStartFrame = MTime(startTime, MTime::kSeconds).as(MTime::uiUnit());
+   mEndFrame = MTime(endTime, MTime::kSeconds).as(MTime::uiUnit());
 }
 
 bool UpdateTree::hasDag(const std::string &path) const
@@ -434,7 +444,7 @@ bool UpdateTree::checkExistingDag(AlembicNode *node, const char *dagType)
       
       if (sl.add(tmp.c_str()) == MS::kSuccess && sl.getDagPath(0, dagPath) == MS::kSuccess)
       {
-         MGlobal::displayInfo("[gpuCacheImport] Re-use existing DAG \"" + dagPath.fullPathName() + "\"");
+         MGlobal::displayInfo("[altGpuCacheTree] Re-use existing DAG \"" + dagPath.fullPathName() + "\"");
          
          MFnDagNode dagNode(dagPath);
          
@@ -498,47 +508,7 @@ bool UpdateTree::createDag(const char *dagType, AlembicNode *node, bool force)
          }
       }
 
-      bool isGpuCache = !strcmp(dagType, "gpuCache");
-
-      if (isGpuCache)
-      {
-         MObject intObj = dagmod.createNode("transform", parentObj, &status);
-
-         if (status != MS::kSuccess || dagmod.doIt() != MS::kSuccess)
-         {
-            return false;
-         }
-
-         MFnDependencyNode intNode(intObj);
-         MGlobal::displayInfo("Created intermediate node: " + intNode.name());
-
-         std::string intName;
-         if (parentDag.isValid())
-         {
-            MFnDagNode parentNode(parentDag);
-            intName = parentNode.name().asChar();
-         }
-         else
-         {
-            intName = node->name();
-         }
-
-         size_t p = intName.rfind(':');
-         if (p != std::string::npos)
-         {
-            intName = intName.substr(0, p+1) + "_" + intName.substr(p+1);
-         }
-         else
-         {
-            intName = "_" + intName;
-         }
-         MGlobal::displayInfo(MString("=> Rename to ") + intName.c_str());
-         intNode.setName(intName.c_str());
-
-         intNode.findPlug("inheritsTransform").setBool(false);
-
-         parentObj = intObj;
-      }
+      bool isGpuCache = !strcmp(dagType, "altGpuCache");
 
       MObject obj = dagmod.createNode(dagType, parentObj, &status);
       
@@ -558,6 +528,11 @@ bool UpdateTree::createDag(const char *dagType, AlembicNode *node, bool force)
          
          if (isGpuCache)
          {
+            dagNode.findPlug("ignoreTransforms").setBool(true);
+            dagNode.findPlug("ignoreVisibility").setBool(true);
+            dagNode.findPlug("preserveStartFrame").setBool(true);
+            dagNode.findPlug("startFrame").setDouble(mStartFrame);
+            dagNode.findPlug("endFrame").setDouble(mEndFrame);
             AssignDefaultShader(obj);
          }
          
@@ -606,7 +581,7 @@ AlembicNode::VisitReturn UpdateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
       }
       
       // Note: The force here is not needed as we don't check for exact type any more
-      if (!createDag("gpuCache", target, true))
+      if (!createDag("altGpuCache", target, true))
       {
          return AlembicNode::StopVisit;
       }
@@ -615,7 +590,7 @@ AlembicNode::VisitReturn UpdateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
    }
    else
    {
-      typeMatch = checkExistingDag(target, "gpuCache");
+      typeMatch = checkExistingDag(target, "altGpuCache");
    }
    
    MFnDagNode dagNode(getDag(targetPath));
@@ -1850,7 +1825,7 @@ void UpdateTree::setNumericUserProp(MFnDagNode &node, const std::string &name, A
    }
    else
    {
-      MGlobal::displayWarning("[gpuCacheImport] Numeric attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[altGpuCacheTree] Numeric attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1879,7 +1854,7 @@ void UpdateTree::setNumericArrayUserProp(MFnDagNode &node, const std::string &na
    }
    else
    {
-      MGlobal::displayWarning("[gpuCacheImport] Numeric array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[altGpuCacheTree] Numeric array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1897,7 +1872,7 @@ void UpdateTree::setPointUserProp(MFnDagNode &node, const std::string &name, Ale
    }
    else
    {
-      MGlobal::displayWarning("[gpuCacheImport] Point attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[altGpuCacheTree] Point attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1924,7 +1899,7 @@ void UpdateTree::setPointArrayUserProp(MFnDagNode &node, const std::string &name
    }
    else
    {
-      MGlobal::displayWarning("[gpuCacheImport] Point array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[altGpuCacheTree] Point array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1951,7 +1926,7 @@ void UpdateTree::setColorUserProp(MFnDagNode &node, const std::string &name, Ale
    }
    else
    {
-      MGlobal::displayWarning("[gpuCacheImport] Color attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[altGpuCacheTree] Color attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -1994,7 +1969,7 @@ void UpdateTree::setColorArrayUserProp(MFnDagNode &node, const std::string &name
    }
    else
    {
-      MGlobal::displayWarning("[gpuCacheImport] Color array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[altGpuCacheTree] Color array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -2014,7 +1989,7 @@ void UpdateTree::setMatrixUserProp(MFnDagNode &node, const std::string &name, Al
    }
    else
    {
-      MGlobal::displayWarning("[gpuCacheImport] Matrix attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[altGpuCacheTree] Matrix attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -2043,7 +2018,7 @@ void UpdateTree::setMatrixArrayUserProp(MFnDagNode &node, const std::string &nam
    }
    else
    {
-      MGlobal::displayWarning("[gpuCacheImport] Matrix array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[altGpuCacheTree] Matrix array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -2060,7 +2035,7 @@ void UpdateTree::setStringUserProp(MFnDagNode &node, const std::string &name, Al
    }
    else
    {
-      MGlobal::displayWarning("[gpuCacheImport] String attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[altGpuCacheTree] String attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -2086,7 +2061,7 @@ void UpdateTree::setStringArrayUserProp(MFnDagNode &node, const std::string &nam
    }
    else
    {
-      MGlobal::displayWarning("[gpuCacheImport] String array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
+      MGlobal::displayWarning("[altGpuCacheTree] String array attribute \"" + MString(name.c_str()) + "\" could not be created or doesn't match alembic file's description");
    }
 }
 
@@ -2145,7 +2120,7 @@ void UpdateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
          }
          else
          {
-            MGlobal::displayWarning(MString("[gpuCacheImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning(MString("[altGpuCacheTree] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -2165,7 +2140,7 @@ void UpdateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
          }
          else
          {
-            MGlobal::displayWarning(MString("[gpuCacheImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning(MString("[altGpuCacheTree] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -2185,7 +2160,7 @@ void UpdateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
          }
          else
          {
-            MGlobal::displayWarning(MString("[gpuCacheImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning(MString("[altGpuCacheTree] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -2229,7 +2204,7 @@ void UpdateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             }
             break;
          default:
-            MGlobal::displayWarning(MString("[gpuCacheImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning(MString("[altGpuCacheTree] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -2273,7 +2248,7 @@ void UpdateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             }
             break;
          default:
-            MGlobal::displayWarning(MString("[gpuCacheImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning(MString("[altGpuCacheTree] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -2317,7 +2292,7 @@ void UpdateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             }
             break;
          default:
-            MGlobal::displayWarning(MString("[gpuCacheImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning(MString("[altGpuCacheTree] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -2361,7 +2336,7 @@ void UpdateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             }
             break;
          default:
-            MGlobal::displayWarning(MString("[gpuCacheImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning(MString("[altGpuCacheTree] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -2405,7 +2380,7 @@ void UpdateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             }
             break;
          default:
-            MGlobal::displayWarning(MString("[gpuCacheImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning(MString("[altGpuCacheTree] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -2449,7 +2424,7 @@ void UpdateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             }
             break;
          default:
-            MGlobal::displayWarning(MString("[gpuCacheImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning(MString("[altGpuCacheTree] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -2553,7 +2528,7 @@ void UpdateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             }
             break;
          default:
-            MGlobal::displayWarning(MString("[gpuCacheImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning(MString("[altGpuCacheTree] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -2657,7 +2632,7 @@ void UpdateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             }
             break;
          default:
-            MGlobal::displayWarning(MString("[gpuCacheImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning(MString("[altGpuCacheTree] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -2761,7 +2736,7 @@ void UpdateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
             }
             break;
          default:
-            MGlobal::displayWarning(MString("[gpuCacheImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning(MString("[altGpuCacheTree] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
@@ -2781,12 +2756,12 @@ void UpdateTree::addUserProps(AlembicNodeT<T> &node, AlembicNode *instance)
          }
          else
          {
-            MGlobal::displayWarning(MString("[gpuCacheImport] Unsupported extent size for user property of type ") +
+            MGlobal::displayWarning(MString("[altGpuCacheTree] Unsupported extent size for user property of type ") +
                                     Alembic::Util::PODName(dataType.getPod()));
          }
          break;
       default:
-         MGlobal::displayWarning(MString("[gpuCacheImport] Unsupported user property type ") +
+         MGlobal::displayWarning(MString("[altGpuCacheTree] Unsupported user property type ") +
                                  Alembic::Util::PODName(dataType.getPod()));
       }
    }
@@ -2822,21 +2797,21 @@ void UpdateTree::keyTransforms(const MString &defaultRotationInterpolation,
 
 // ---
 
-GpuCacheImport::GpuCacheImport()
+GpuCacheTree::GpuCacheTree()
    : MPxCommand()
 {
 }
 
-GpuCacheImport::~GpuCacheImport()
+GpuCacheTree::~GpuCacheTree()
 {
 }
 
-bool GpuCacheImport::hasSyntax() const
+bool GpuCacheTree::hasSyntax() const
 {
    return true;
 }
 
-bool GpuCacheImport::isUndoable() const
+bool GpuCacheTree::isUndoable() const
 {
    return false;
 }
@@ -2868,7 +2843,7 @@ static std::string DagToAbcPath(const MDagPath &path)
    return abcPath;
 }
 
-MStatus GpuCacheImport::doIt(const MArgList& args)
+MStatus GpuCacheTree::doIt(const MArgList& args)
 {
    MStatus status;
    
@@ -2881,7 +2856,7 @@ MStatus GpuCacheImport::doIt(const MArgList& args)
    
    if (argData.isFlagSet("help"))
    {
-      MGlobal::displayInfo(MString("gpuCacheImport") + " [options] abc_file_path");
+      MGlobal::displayInfo(MString("altGpuCacheTree") + " [options] abc_file_path");
       MGlobal::displayInfo("Options:");
       MGlobal::displayInfo("-r / -reparent                    : dagpath");
       MGlobal::displayInfo("                                    Reparent the whole hierarchy under a node in the current Maya scene.");
@@ -3224,7 +3199,7 @@ MStatus GpuCacheImport::doIt(const MArgList& args)
                      
                      if (nodePath.length() > 0 && !scene->find(nodePath))
                      {
-                        MGlobal::displayInfo("[gpuCacheImport] Deleting DAG \"" + path.fullPathName() + "\"");
+                        MGlobal::displayInfo("[altGpuCacheTree] Deleting DAG \"" + path.fullPathName() + "\"");
                         
                         MObject nodeObj = node.object();
                         
@@ -3251,7 +3226,15 @@ MStatus GpuCacheImport::doIt(const MArgList& args)
                MNamespace::setCurrentNamespace(ns);
             }
             
-            UpdateTree visitor(abcPath, createMissing);
+            double startTime = 0.0;
+            double endTime = 0.0;
+            bool validRange = false;
+
+            GetFrameRange rangeVisitor(false, false, false);
+            scene->visit(AlembicNode::VisitDepthFirst, rangeVisitor);
+            validRange = rangeVisitor.getFrameRange(startTime, endTime);
+
+            UpdateTree visitor(abcPath, createMissing, startTime, endTime);
             scene->visit(AlembicNode::VisitDepthFirst, visitor);
             
             visitor.keyTransforms(rotInterp, nodeRotInterp, false, simplifyCurves);
@@ -3275,15 +3258,10 @@ MStatus GpuCacheImport::doIt(const MArgList& args)
             
             if (fitTimeRange || setToStartFrame)
             {
-               double start, end;
-               
-               GetFrameRange visitor(false, false, false);
-               scene->visit(AlembicNode::VisitDepthFirst, visitor);
-               
-               if (visitor.getFrameRange(start, end))
+               if (validRange)
                {
-                  MTime startFrame(start, MTime::kSeconds);
-                  MTime endFrame(end, MTime::kSeconds);
+                  MTime startFrame(startTime, MTime::kSeconds);
+                  MTime endFrame(endTime, MTime::kSeconds);
                   
                   if (fitTimeRange)
                   {

@@ -1,0 +1,18 @@
+// ===========================================================================
+// Copyright 2016 Autodesk, Inc. All rights reserved.
+//
+// Use of this software is subject to the terms of the Autodesk license
+// agreement provided at the time of installation or download, or which
+// otherwise accompanies this software in either electronic or hard copy form.
+// ===========================================================================
+displayString -replace -value "Alembic" m_doAltGpuCacheExportArgList.kAlembic;
+displayString -replace -value "All Files" m_doAltGpuCacheExportArgList.kAllFiles;
+displayString -replace -value "Apply to all" m_doAltGpuCacheExportArgList.kApplyToAll;
+displayString -replace -value "Confirm Overwrite" m_doAltGpuCacheExportArgList.kConfirmOverwrite;
+displayString -replace -value "^1s already exists.\nDo you want to replace it?" m_doAltGpuCacheExportArgList.kConfirmOverwriteMsg;
+displayString -replace -value "Export" m_doAltGpuCacheExportArgList.kExport2;
+displayString -replace -value "GPU Cache Export" m_doAltGpuCacheExportArgList.kGpuCacheExport;
+displayString -replace -value "altGpuCache plugin is not loaded" m_doAltGpuCacheExportArgList.kGpuCachePluginNotLoaded;
+displayString -replace -value "No" m_doAltGpuCacheExportArgList.kNo;
+displayString -replace -value "No objects to export" m_doAltGpuCacheExportArgList.kNothingToExport;
+displayString -replace -value "Yes" m_doAltGpuCacheExportArgList.kYes;

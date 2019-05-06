@@ -1,0 +1,26 @@
+// ===========================================================================
+// Copyright 2016 Autodesk, Inc. All rights reserved.
+//
+// Use of this software is subject to the terms of the Autodesk license
+// agreement provided at the time of installation or download, or which
+// otherwise accompanies this software in either electronic or hard copy form.
+// ===========================================================================
+//
+//  PLUGIN NAME:        altGpuCache
+//  FILE:               altGpuCacheInitStrings.mel
+//	Procedure Name:     altGpuCacheInitStrings
+//
+//	Description:
+//
+//      Register script resources and load localized resources 
+//      for the "altGpuCache" plugin
+//
+//	Input Value:        nodeName
+//
+//	Output Value:       None
+//
+
+global proc altGpuCacheInitStrings()
+{
+     loadPluginLanguageResources("altGpuCache", "altGpuCache.pres.mel");
+}
