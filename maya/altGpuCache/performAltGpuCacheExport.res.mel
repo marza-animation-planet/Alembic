@@ -1,0 +1,39 @@
+// ===========================================================================
+// Copyright 2016 Autodesk, Inc. All rights reserved.
+//
+// Use of this software is subject to the terms of the Autodesk license
+// agreement provided at the time of installation or download, or which
+// otherwise accompanies this software in either electronic or hard copy form.
+// ===========================================================================
+displayString -replace -value "Base File Name:" m_performAltGpuCacheExport.kBaseFileName;
+displayString -replace -value "Cache time range:" m_performAltGpuCacheExport.kCacheTimeRange;
+displayString -replace -value "Clash Options:" m_performAltGpuCacheExport.kClashOptions;
+displayString -replace -value "Current frame" m_performAltGpuCacheExport.kCurrentFrame;
+displayString -replace -value "Creates an Alembic file in a legacy format readable by any Maya version using the Alembic." m_performAltGpuCacheExport.kDataFormatHDF5Annot;
+displayString -replace -value "HDF5 - Maya 2014 Extension 1 and Legacy" m_performAltGpuCacheExport.kDataFormatHDF5Label;
+displayString -replace -value "Creates an Alembic 1.5 file usable only by Maya 2014 Extension 1 and future versions of Maya." m_performAltGpuCacheExport.kDataFormatOgawaAnnot;
+displayString -replace -value "Ogawa - Maya 2014 Extension 1" m_performAltGpuCacheExport.kDataFormatOgawaLabel;
+displayString -replace -value "Evaluate every" m_performAltGpuCacheExport.kEvaluateEvery;
+displayString -replace -value "evaluation(s)" m_performAltGpuCacheExport.kEvaluations;
+displayString -replace -value "Export" m_performAltGpuCacheExport.kExport;
+displayString -replace -value "File Format:" m_performAltGpuCacheExport.kFileFormat;
+displayString -replace -value "frame(s)" m_performAltGpuCacheExport.kFrames;
+displayString -replace -value "GPU Cache Export Options" m_performAltGpuCacheExport.kGpuCacheExportOptions;
+displayString -replace -value "Increment Filenames" m_performAltGpuCacheExport.kIncrementFilenames;
+displayString -replace -value "Node Name Suffix" m_performAltGpuCacheExport.kNodeNameSuffix;
+displayString -replace -value "Optimization Threshold:" m_performAltGpuCacheExport.kOptimizationThreshold;
+displayString -replace -value "Optimize Animations for Motion Blur:" m_performAltGpuCacheExport.kOptimizeAnimationsForMotionBlur;
+displayString -replace -value "Optimize Hierarchy:" m_performAltGpuCacheExport.kOptimizeHierarchy;
+displayString -replace -value "Render settings" m_performAltGpuCacheExport.kRenderSettings;
+displayString -replace -value "Save every" m_performAltGpuCacheExport.kSaveEvery;
+displayString -replace -value "Save Multiple Files:" m_performAltGpuCacheExport.kSaveMultipleFiles;
+displayString -replace -value "Start/End" m_performAltGpuCacheExport.kStartEnd;
+displayString -replace -value "Start/End:" m_performAltGpuCacheExport.kStartEnd2;
+displayString -replace -value "Tessellation:" m_performAltGpuCacheExport.kTessellation;
+displayString -replace -value "Time Slider" m_performAltGpuCacheExport.kTimeSlider;
+displayString -replace -value "Use Base Tessellation" m_performAltGpuCacheExport.kUseBaseTessellation;
+displayString -replace -value "Ignores the smoothing of meshes when exporting GPU caches." m_performAltGpuCacheExport.kUseBaseTessellationAnnot;
+displayString -replace -value "Use Smoothing" m_performAltGpuCacheExport.kUseSmoothing;
+displayString -replace -value "Exports the GPU cache at the displayed smoothed tessellation." m_performAltGpuCacheExport.kUseSmoothingTessellationAnnot;
+displayString -replace -value "vertices" m_performAltGpuCacheExport.kVertices;
+displayString -replace -value "Write Materials:" m_performAltGpuCacheExport.kWriteMaterials;

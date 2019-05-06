@@ -66,5 +66,5 @@ class gpuCacheTemplate(templates.ShapeTranslatorTemplate):
       self.addControl("aiVerbose", label="Verbose")
       self.endLayout()
 
-templates.registerTranslatorUI(gpuCacheTemplate, "gpuCache", "gpuCacheMtoa")
+templates.registerTranslatorUI(gpuCacheTemplate, "altGpuCache", "gpuCacheMtoa")
 

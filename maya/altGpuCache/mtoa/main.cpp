@@ -7,8 +7,8 @@ extern "C"
 DLLEXPORT void initializeExtension(CExtension& extension)
 {
    MStatus status;
-   extension.Requires("gpuCache");
-   status = extension.RegisterTranslator("gpuCache",
+   extension.Requires("altGpuCache");
+   status = extension.RegisterTranslator("altGpuCache",
                                          "",
                                          CGpuCacheTranslator::Create,
                                          CGpuCacheTranslator::NodeInitializer);

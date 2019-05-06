@@ -448,7 +448,8 @@ if withMaya:
    expver = excons.GetArgument("maya-abcexport-version", None)
    trsver = excons.GetArgument("maya-abctranslator-version", None)
    shpver = excons.GetArgument("maya-abcshape-version", None)
-   gciver = excons.GetArgument("maya-gpucacheimp-version", None)
+   agcver = excons.GetArgument("maya-altgpucache-version", None)
+   gctver = excons.GetArgument("maya-altgpucachetree-version", None)
 
    if not os.path.exists(AbcShapeMel) or os.stat(AbcShapeMel).st_mtime < os.stat("maya/AbcShape/AETemplate.mel.tpl").st_mtime:
       replace_in_file("maya/AbcShape/AETemplate.mel.tpl", AbcShapeMel, "<<NodeName>>", AbcShapeName)
@@ -524,17 +525,34 @@ if withMaya:
                  "srcs": excons.glob("maya/AbcFileTranslator/*.cpp"),
                  "custom": [RequireAlembic(static=link_static), maya.Require, maya.Plugin],
                  "install": {"maya/scripts": excons.glob("maya/AbcFileTranslator/*.mel")}},
-                {"name": "gpuCacheImport",
+                {"name": "altGpuCache",
                  "alias": "alembic-maya",
-                 "desc": "Maya alembic tree based gpuCache import",
+                 "desc": "Alternative gpuCache implementation with extra controls",
                  "type": "dynamicmodule",
                  "ext": maya.PluginExt(),
                  "prefix": "maya/plug-ins/%s" % maya.Version(nice=True),
                  "rpaths": ["../../../lib"],
                  "bldprefix": "maya-%s" % maya.Version(),
-                 "defs": defs + (["GPUCACHEIMPORT_VERSION=\"\\\"%s\\\"\"" % gciver] if gciver else []),
-                 "incdirs": ["maya/gpuCache"],
-                 "srcs": excons.glob("maya/gpuCache/*.cpp"),
+                 "defs": defs + (["ALTGPUCACHE_VERSION=\"\\\"%s\\\"\"" % agcver] if agcver else []),
+                 "incdirs": ["maya/altGpuCache"],
+                 "srcs": excons.glob("maya/altGpuCache/*.cpp"),
+                 "libs": ["tbb"],
+                 # -framework ApplicationServices -framework CoreFoundation -framework IOKit
+                 "linkflags": " -framework OpenGL -framework ApplicationServices -framework IOKit" if sys.platform == "darwin" else "",
+                 "custom": [RequireAlembicHelper(static=link_static), maya.Require, maya.Plugin],
+                 "install": {"maya/scripts": excons.glob("maya/altGpuCache/*.mel")}
+                },
+                {"name": "altGpuCacheTree",
+                 "alias": "alembic-maya",
+                 "desc": "Maya alembic tree based altGpuCache import",
+                 "type": "dynamicmodule",
+                 "ext": maya.PluginExt(),
+                 "prefix": "maya/plug-ins/%s" % maya.Version(nice=True),
+                 "rpaths": ["../../../lib"],
+                 "bldprefix": "maya-%s" % maya.Version(),
+                 "defs": defs + (["ALTGPUCACHETREE_VERSION=\"\\\"%s\\\"\"" % gctver] if gctver else []),
+                 "incdirs": ["maya/altGpuCacheTree"],
+                 "srcs": excons.glob("maya/altGpuCacheTree/*.cpp"),
                  "custom": [RequireAlembicHelper(static=link_static), maya.Require, maya.Plugin]}])
 
    if withArnold:
@@ -546,7 +564,7 @@ if withMaya:
          if not os.path.exists(AbcShapeMtoaAE) or os.stat(AbcShapeMtoaAE).st_mtime < os.stat("maya/AbcShape/mtoa/AbcShapeMtoa.py.tpl").st_mtime:
             replace_in_file("maya/AbcShape/mtoa/AbcShapeMtoa.py.tpl", AbcShapeMtoaAE, "<<NodeName>>", AbcShapeName)
 
-         GpuCacheMtoaAE = "maya/gpuCache/mtoa/gpuCacheMtoa.py"
+         GpuCacheMtoaAE = "maya/altGpuCache/mtoa/gpuCacheMtoa.py"
 
          prjs.append({"name": "%sAbcShapeMtoa" % nameprefix,
                       "type": "dynamicmodule",
@@ -569,7 +587,7 @@ if withMaya:
                       "bldprefix": "maya-%s/mtoa-%s" % (maya.Version(), mtoa.Version()),
                       "ext": mtoa.ExtensionExt(),
                       "defs": defs,
-                      "srcs": excons.glob("maya/gpuCache/mtoa/*.cpp"),
+                      "srcs": excons.glob("maya/altGpuCache/mtoa/*.cpp"),
                       "install": {"maya/plug-ins/%s/mtoa-%s" % (maya.Version(nice=True), mtoa.Version(compat=True)): [GpuCacheMtoaAE]},
                       "custom": [RequireAlembicHelper(static=link_static), mtoa.Require, arnold.Require, maya.Require]})
 
