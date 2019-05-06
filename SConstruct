@@ -536,10 +536,10 @@ if withMaya:
                  "defs": defs + (["ALTGPUCACHE_VERSION=\"\\\"%s\\\"\"" % agcver] if agcver else []),
                  "incdirs": ["maya/altGpuCache"],
                  "srcs": excons.glob("maya/altGpuCache/*.cpp"),
-                 "libs": ["tbb"],
+                 "libs": ["tbb"] + (["ole32", "oleaut32", "wbemuuid"] if sys.platform == "win32" else []),
                  # -framework ApplicationServices -framework CoreFoundation -framework IOKit
-                 "linkflags": " -framework OpenGL -framework ApplicationServices -framework IOKit" if sys.platform == "darwin" else "",
-                 "custom": [RequireAlembicHelper(static=link_static), maya.Require, maya.Plugin],
+                 "linkflags": " -framework ApplicationServices -framework IOKit" if sys.platform == "darwin" else "",
+                 "custom": [RequireAlembicHelper(static=link_static), maya.Require, maya.Plugin, gl.Require],
                  "install": {"maya/scripts": excons.glob("maya/altGpuCache/*.mel")}
                 },
                 {"name": "altGpuCacheTree",
