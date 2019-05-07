@@ -670,12 +670,13 @@ public:
         const MColor&       diffuseColor,
         bool                visibility)
     {
-        return boost::make_shared<ShapeSample>(
-            timeInSeconds,
-            numWires, numVerts,
-            wireVertIndices, triangleVertIndices,
-            positions, boundingBox, boundingBoxNTR,
-            diffuseColor, visibility);
+        // no boost::make_shared with 10 arguments
+        return boost::shared_ptr<ShapeSample>(
+            new ShapeSample(timeInSeconds,
+                numWires, numVerts,
+                wireVertIndices, triangleVertIndices,
+                positions, boundingBox, boundingBoxNTR,
+                diffuseColor, visibility));
     }
 
 	static boost::shared_ptr<ShapeSample> create(
@@ -690,12 +691,13 @@ public:
         const MColor&       diffuseColor,
         bool                visibility)
 	{
-		return boost::make_shared<ShapeSample>(
-			timeInSeconds,
-			numWires, numVerts,
-			wireVertIndices, triangleVertIndices,
-			positions, boundingBox, boundingBoxNTR,
-            diffuseColor, visibility);
+        // no boost::make_shared with 10 arguments
+		return boost::shared_ptr<ShapeSample>(
+			new ShapeSample(timeInSeconds,
+    			numWires, numVerts,
+    			wireVertIndices, triangleVertIndices,
+    			positions, boundingBox, boundingBoxNTR,
+                diffuseColor, visibility));
 	}
 
     static boost::shared_ptr<ShapeSample> createEmptySample( 
