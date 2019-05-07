@@ -5429,16 +5429,10 @@ bool SubSceneOverride::requiresUpdate(const MSubSceneContainer& container,
     bool clip = false;
     double abcTime = fShapeNode->getTime(&clip);
 
-    if (clip != fClipped) {
-        return true;
-    } else if (clip) {
+    if (clip && (clip == fClipped)) {
         // was already clipped no need to update anything
         fShapeNode->acknowledgeChanges();
         return false;
-    }
-
-    if (fShapeNode->transformsChanged() || fShapeNode->visibilityChanged() || fShapeNode->timeControlChanged()) {
-        return true;
     }
 
     // Cache the DAG paths for all instances.
@@ -5545,7 +5539,11 @@ bool SubSceneOverride::requiresUpdate(const MSubSceneContainer& container,
             fUpdateVisibilityRequired ||
             fUpdateWorldMatrixRequired ||
             fUpdateStreamsRequired ||
-            fUpdateMaterialsRequired;
+            fUpdateMaterialsRequired ||
+            clip != fClipped ||
+            fShapeNode->transformsChanged() ||
+            fShapeNode->visibilityChanged() ||
+            fShapeNode->timeControlChanged();
 }
 
 void SubSceneOverride::update(MSubSceneContainer&  container,
