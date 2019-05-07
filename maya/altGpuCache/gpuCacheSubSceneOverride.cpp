@@ -40,7 +40,6 @@
 #include <maya/MFnDagNode.h>
 #include <maya/MGlobal.h>
 #include <maya/MItDag.h>
-#include <maya/MSelectionContext.h>
 #include <maya/MSelectionList.h>
 #include <maya/MShaderManager.h>
 #include <maya/MUserData.h>
@@ -2182,7 +2181,9 @@ public:
           fEnabled(true),
           fDrawMode((MGeometry::DrawMode)0),
           fDepthPriority(MRenderItem::sDormantFilledDepthPriority),
+#if MAYA_API_VERSION > 201600
           fIsPointSnapping(false),
+#endif
           fExcludedFromPostEffects(true),
           fCastsShadows(false),
           fReceivesShadows(false)
@@ -2356,6 +2357,7 @@ public:
         }
     }
 
+#if MAYA_API_VERSION > 201600
     void setSnappingSelectionMask()
     {
         if (!fIsPointSnapping) {
@@ -2368,6 +2370,7 @@ public:
             notifyInstancingChange();
         }
     }
+#endif
 
     void setDepthPriority(unsigned int depthPriority)
     {
@@ -2504,6 +2507,7 @@ public:
         fRenderItem->castsShadows(fCastsShadows);
         fRenderItem->receivesShadows(fReceivesShadows);
         fRenderItem->setShader(fShader.get());
+#if MAYA_API_VERSION > 201600
         if (fIsPointSnapping)
         {
             MSelectionMask pointsForGravityMask(MSelectionMask::kSelectPointsForGravity);
@@ -2514,6 +2518,7 @@ public:
             MSelectionMask gpuCacheMask(ShapeNode::selectionMaskName);
             fRenderItem->setSelectionMask(gpuCacheMask);
         }
+#endif
 
         // Restore buffers.
         BuffersCache::getInstance().updateBuffers(
@@ -2610,7 +2615,9 @@ private:
     MMatrix                                 fWorldMatrix;
     MGeometry::DrawMode                     fDrawMode;
     unsigned int                            fDepthPriority;
+#if MAYA_API_VERSION > 201600
     bool                                    fIsPointSnapping;
+#endif
     bool                                    fExcludedFromPostEffects;
     bool                                    fCastsShadows;
     bool                                    fReceivesShadows;
@@ -4003,8 +4010,10 @@ public:
         // Bounding box place holder.
         updateBoundingBoxItems(subSceneOverride, container, subNodePrefix, wireColor, subNode);
 
+#if MAYA_API_VERSION > 201600
         // Snap points
         updateSnappingItems(subSceneOverride, container, subNodePrefix);
+#endif
 
         // Dormant Wireframe
         updateDormantWireItems(subSceneOverride, container, subNodePrefix, wireColor);
@@ -4027,7 +4036,9 @@ public:
 
         // Enable or disable render items.
         toggleBoundingBoxItem();
+#if MAYA_API_VERSION > 201600
         toggleSnappingItem();
+#endif
         toggleDormantWireItem();
         toggleActiveWireItem();
         toggleShadedItems();
@@ -4050,9 +4061,11 @@ public:
             }
         }
 
+#if MAYA_API_VERSION > 201600
         if (fSnappingItem) {
             fSnappingItem->setWorldMatrix(matrix);
         }
+#endif
 
         if (fDormantWireItem) {
             fDormantWireItem->setWorldMatrix(matrix);
@@ -4085,7 +4098,9 @@ public:
                      sample->positions();
         // Enable or disable render items.
         toggleBoundingBoxItem();
+#if MAYA_API_VERSION > 201600
         toggleSnappingItem();
+#endif
         toggleDormantWireItem();
         toggleActiveWireItem();
         toggleShadedItems();
@@ -4094,6 +4109,7 @@ public:
             return;
         }
 
+#if MAYA_API_VERSION > 201600
         if (fSnappingItem) {
             // The snapping item is fully sequential and does not
             // require an index buffer.
@@ -4106,6 +4122,7 @@ public:
                 bbox
             );
         }
+#endif
 
         // Update the wireframe streams.
         if (fDormantWireItem) {
@@ -4264,6 +4281,7 @@ public:
         toggleBoundingBoxItem();
     }
 
+#if MAYA_API_VERSION > 201600
     void updateSnappingItems(SubSceneOverride&   subSceneOverride,
                                 MSubSceneContainer& container,
                                 const MString&      subNodePrefix)
@@ -4306,6 +4324,7 @@ public:
             fSnappingItem->setShader(snappingShader);
         }
     }
+#endif
 
     void updateDormantWireItems(SubSceneOverride&   subSceneOverride,
                                 MSubSceneContainer& container,
@@ -4510,6 +4529,7 @@ public:
         }
     }
 
+#if MAYA_API_VERSION > 201600
     // Enable or disable snapping item.
     void toggleSnappingItem()
     {
@@ -4522,6 +4542,7 @@ public:
             }
         }
     }
+#endif
 
     // Enable or disable dormant wireframe item.
     void toggleDormantWireItem()
@@ -4573,9 +4594,11 @@ public:
             fDormantWireItem->setEnabled(false);
         }
 
+#if MAYA_API_VERSION > 201600
         if (fSnappingItem) {
             fSnappingItem->setEnabled(false);
         }
+#endif
 
         if (fBoundingBoxItem) {
             fBoundingBoxItem->setEnabled(false);
@@ -4599,10 +4622,12 @@ public:
             fDormantWireItem.reset();
         }
 
+#if MAYA_API_VERSION > 201600
         if (fSnappingItem) {
             fSnappingItem->removeFromContainer(container);
             fSnappingItem.reset();
         }
+#endif
 
         if (fBoundingBoxItem) {
             fBoundingBoxItem->removeFromContainer(container);
@@ -4621,7 +4646,9 @@ private:
     RenderItemWrapper::Ptr               fBoundingBoxItem;
     RenderItemWrapper::Ptr               fActiveWireItem;
     RenderItemWrapper::Ptr               fDormantWireItem;
+#if MAYA_API_VERSION > 201600
     RenderItemWrapper::Ptr               fSnappingItem;
+#endif
     std::vector<RenderItemWrapper::Ptr>  fShadedItems;
 
     // The following flags control the enable/disable state of render items.
@@ -5657,6 +5684,7 @@ void SubSceneOverride::update(MSubSceneContainer&  container,
     }
 }
 
+#if MAYA_API_VERSION >= 201600
 bool SubSceneOverride::getInstancedSelectionPath(const MHWRender::MRenderItem& renderItem, const MHWRender::MIntersection& intersection, MDagPath& dagPath) const
 {
 	unsigned int pathIndex = -1;
@@ -5693,12 +5721,15 @@ bool SubSceneOverride::getInstancedSelectionPath(const MHWRender::MRenderItem& r
 
 void SubSceneOverride::updateSelectionGranularity(const MDagPath& path, MHWRender::MSelectionContext& selectionContext)
 {
+#if MAYA_API_VERSION > 201600
 	// We do allow snapping, even though vertex are not selectable as components.
 	if (pointSnappingActive())
 	{
 		selectionContext.setSelectionLevel(MHWRender::MSelectionContext::kComponent);
 	}
+#endif
 }
+#endif
 
 void SubSceneOverride::dirtyEverything()
 {

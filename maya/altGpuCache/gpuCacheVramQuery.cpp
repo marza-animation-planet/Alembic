@@ -36,7 +36,13 @@
     #include <fstream>
 #endif
 
-#include <maya/MGL.h>
+#if MAYA_API_VERSION < 201600
+#   include <maya/M3dView.h>
+#   include <maya/MGLdefinitions.h>
+#   include <maya/MGLFunctionTable.h>
+#else
+#   include <maya/MGL.h>
+#endif
 
 using namespace GPUCache;
 
