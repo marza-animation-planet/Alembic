@@ -22,6 +22,9 @@
 #include <boost/date_time/microsec_time_clock.hpp>
 
 #include <maya/MDagPathArray.h>
+#if MAYA_API_VERSION >= 201600
+#   include <maya/MSelectionContext.h>
+#endif
 #include <maya/MPxSubSceneOverride.h>
 
 #include <maya/MCallbackIdArray.h>
@@ -65,8 +68,10 @@ public:
     virtual void update(MHWRender::MSubSceneContainer&  container,
                         const MHWRender::MFrameContext& frameContext);
 
-	virtual bool getInstancedSelectionPath(const MHWRender::MRenderItem& renderItem, const MHWRender::MIntersection& intersection, MDagPath& dagPath) const;
-	virtual void updateSelectionGranularity(const MDagPath& path, MHWRender::MSelectionContext& selectionContext);
+#if MAYA_API_VERSION >= 201600
+    virtual bool getInstancedSelectionPath(const MHWRender::MRenderItem& renderItem, const MHWRender::MIntersection& intersection, MDagPath& dagPath) const;
+    virtual void updateSelectionGranularity(const MDagPath& path, MHWRender::MSelectionContext& selectionContext);
+#endif
 
     // Dirty methods (called from Callbacks)
     void dirtyEverything();
