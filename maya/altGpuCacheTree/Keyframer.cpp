@@ -844,7 +844,7 @@ void Keyframer::retimeCurve(MFnAnimCurve &curve,
    if (!curve.isTimeInput() || curve.numKeys() == 0)
    {
       #ifdef _DEBUG
-      std::cout << "[" << PREFIX_NAME("AbcShape") << "] Not a time curve or no keys" << std::endl;
+      std::cout << "[altGpuCacheTree] Not a time curve or no keys" << std::endl;
       #endif
       return;
    }
@@ -860,7 +860,7 @@ void Keyframer::retimeCurve(MFnAnimCurve &curve,
    if (pStart.isNull())
    {
       #ifdef _DEBUG
-      std::cout << "[" << PREFIX_NAME("AbcShape") << "] Missing \"abcimport_start\" attribute" << std::endl;
+      std::cout << "[altGpuCacheTree] Missing \"abcimport_start\" attribute" << std::endl;
       #endif
       return;
    }
@@ -870,7 +870,7 @@ void Keyframer::retimeCurve(MFnAnimCurve &curve,
    if (pEnd.isNull())
    {
       #ifdef _DEBUG
-      std::cout << "[" << PREFIX_NAME("AbcShape") << "] Missing \"abcimport_end\" attribute" << std::endl;
+      std::cout << "[altGpuCacheTree] Missing \"abcimport_end\" attribute" << std::endl;
       #endif
       return;
    }
@@ -880,7 +880,7 @@ void Keyframer::retimeCurve(MFnAnimCurve &curve,
    if (pSpeed.isNull())
    {
       #ifdef _DEBUG
-      std::cout << "[" << PREFIX_NAME("AbcShape") << "] Missing \"abcimport_speed\" attribute" << std::endl;
+      std::cout << "[altGpuCacheTree] Missing \"abcimport_speed\" attribute" << std::endl;
       #endif
       return;
    }
@@ -890,7 +890,7 @@ void Keyframer::retimeCurve(MFnAnimCurve &curve,
    if (fabs(oldSpeed) <= 0.0001 || fabs(newSpeed) <= 0.0001)
    {
       #ifdef _DEBUG
-      std::cout << "[" << PREFIX_NAME("AbcShape") << "] Null speed found" << std::endl;
+      std::cout << "[altGpuCacheTree] Null speed found" << std::endl;
       #endif
       return;
    }
@@ -901,7 +901,7 @@ void Keyframer::retimeCurve(MFnAnimCurve &curve,
    if (pOffset.isNull())
    {
       #ifdef _DEBUG
-      std::cout << "[" << PREFIX_NAME("AbcShape") << "] Missing \"abcimport_offset\" attribute" << std::endl;
+      std::cout << "[altGpuCacheTree] Missing \"abcimport_offset\" attribute" << std::endl;
       #endif
       return;
    }
@@ -912,7 +912,7 @@ void Keyframer::retimeCurve(MFnAnimCurve &curve,
    if (pReverse.isNull())
    {
       #ifdef _DEBUG
-      std::cout << "[" << PREFIX_NAME("AbcShape") << "] Missing \"abcimport_reverse\" attribute" << std::endl;
+      std::cout << "[altGpuCacheTree] Missing \"abcimport_reverse\" attribute" << std::endl;
       #endif
       return;
    }
@@ -923,7 +923,7 @@ void Keyframer::retimeCurve(MFnAnimCurve &curve,
    if (pPreserveStart.isNull())
    {
       #ifdef _DEBUG
-      std::cout << "[" << PREFIX_NAME("AbcShape") << "] Missing \"abcimport_preservestart\" attribute" << std::endl;
+      std::cout << "[altGpuCacheTree] Missing \"abcimport_preservestart\" attribute" << std::endl;
       #endif
       return;
    }
@@ -996,7 +996,7 @@ void Keyframer::retimeCurve(MFnAnimCurve &curve,
       if (stat != MS::kSuccess)
       {
          #ifdef _DEBUG
-         std::cout << "[" << PREFIX_NAME("AbcShape") << "] Failed to add keys" << std::endl;
+         std::cout << "[altGpuCacheTree] Failed to add keys" << std::endl;
          #endif
          return;
       }
