@@ -134,7 +134,7 @@ static MStatus registerMStringResources()
 #   define ALTGPUCACHE_VERSION "1.0"
 #endif
 
-MStatus initializePlugin( MObject obj )
+PLUGIN_EXPORT MStatus initializePlugin( MObject obj )
 {
     MStatus   status;
     MFnPlugin plugin( obj, "altGpuCache", ALTGPUCACHE_VERSION, "Any");
@@ -250,7 +250,7 @@ MStatus initializePlugin( MObject obj )
     return MS::kSuccess;
 }
 
-MStatus uninitializePlugin( MObject obj )
+PLUGIN_EXPORT MStatus uninitializePlugin( MObject obj )
 {
     MStatus   status;
     MFnPlugin plugin( obj );
