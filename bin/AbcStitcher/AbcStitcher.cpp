@@ -996,6 +996,9 @@ int main( int argc, char *argv[] )
 
         Alembic::AbcCoreFactory::IFactory factory;
         factory.setPolicy(ErrorHandler::kThrowPolicy);
+        factory.setOgawaReadStrategy(Alembic::AbcCoreFactory::IFactory::kFileStreams);
+        factory.setOgawaNumStreams(1);
+        factory.setHDF5CacheHierarchy(false);
         Alembic::AbcCoreFactory::IFactory::CoreType coreType;
 
         for (int i = inStart; i < argc; ++i)
