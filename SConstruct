@@ -44,9 +44,9 @@ withHoudini = (excons.GetArgument("with-houdini", default=None) is not None)
 
 if withArnold:
    A, M, m, p = arnold.Version(asString=False)
-   if A != 5:
+   if A < 5:
       withArnold = None
-   elif M == 0 and m < 1:
+   elif A == 5 and M == 0 and m < 1:
       withArnold = None
    if not withArnold:
       print("Arnold 5 above 5.0.1.0 required")
