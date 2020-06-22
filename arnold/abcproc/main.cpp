@@ -208,9 +208,7 @@ procedural_get_node
             AiNodeSetBool(output, Strings::inherit_xform, false);
             AiNodeSetPtr(output, Strings::node, master);
 
-            // It seems that when ginstance node don't  inherit from the procedural
-            //   attributes like standard shapes
-            dso->transferInstanceParams(output);
+            dso->transferShapeParams(output);
 
             dso->transferUserParams(output);
          }

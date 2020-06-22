@@ -60,7 +60,6 @@ public:
 
    void transferUserParams(AtNode *dst);
    void transferShapeParams(AtNode *dst);
-   void transferInstanceParams(AtNode *dst);
 
 
    inline AtNode* procNode() const

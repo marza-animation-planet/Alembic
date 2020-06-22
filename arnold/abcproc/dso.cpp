@@ -1062,12 +1062,6 @@ void Dso::readParams()
 
 void Dso::transferShapeParams(AtNode *dst)
 {
-   AiNodeSetFlt(dst, Strings::motion_start, mMotionStart - mGlobalFrame);
-   AiNodeSetFlt(dst, Strings::motion_end, mMotionEnd - mGlobalFrame);
-}
-
-void Dso::transferInstanceParams(AtNode *dst)
-{
    AiNodeSetUInt(dst, Strings::id, AiNodeGetUInt(mProcNode, Strings::id));
    AiNodeSetBool(dst, Strings::receive_shadows, AiNodeGetBool(mProcNode, Strings::receive_shadows));
    AiNodeSetBool(dst, Strings::self_shadows, AiNodeGetBool(mProcNode, Strings::self_shadows));
