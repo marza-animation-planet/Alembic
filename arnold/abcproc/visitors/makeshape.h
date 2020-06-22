@@ -468,8 +468,6 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
       return 0;
    }
 
-   AtNode *mesh = createArnoldNode(Strings::polymesh, (instance ? *instance : node), true);
-
    AtVector pnt;
 
    if (meshSamples.size() == 1 && !info.varyingTopology)
@@ -975,8 +973,6 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
          smoothNormals->clear();
       }
 
-      AiNodeDestroy(mesh);
-
       if (nsides) AiArrayDestroy(nsides);
       if (vidxs) AiArrayDestroy(vidxs);
       if (vlist) AiArrayDestroy(vlist);
@@ -993,6 +989,8 @@ AtNode* MakeShape::generateBaseMesh(AlembicNodeT<Alembic::Abc::ISchemaObject<Mes
 
       return 0;
    }
+
+   AtNode *mesh = createArnoldNode(Strings::polymesh, (instance ? *instance : node), true);
 
    AiArraySetKey(nsides, 0, info.polygonVertexCount);
    AiArraySetKey(vidxs, 0, info.vertexPointIndex);
