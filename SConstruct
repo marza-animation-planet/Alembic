@@ -20,7 +20,7 @@ from excons.tools import houdini
 
 excons.InitGlobals()
 
-version_tpl = (1, 7, 10)
+version_tpl = (1, 7, 11)
 version_str = ".".join(map(str, version_tpl))
 
 use_boost = True
@@ -638,7 +638,7 @@ if withVray:
    deftargets.append("alembic-vray")
 if withMaya:
    deftargets.append("alembic-maya")
-   if withArnold:
+   if withArnold and mtoa.Version(asString=False)[0] >= 2:
       deftargets.append("alembic-mtoa")
 Default(deftargets)
 
