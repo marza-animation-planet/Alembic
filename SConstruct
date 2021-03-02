@@ -20,7 +20,7 @@ from excons.tools import houdini
 
 excons.InitGlobals()
 
-version_tpl = (1, 7, 13)
+version_tpl = (1, 7, 14)
 version_str = ".".join(map(str, version_tpl))
 
 use_boost = True
