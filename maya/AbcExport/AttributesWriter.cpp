@@ -2056,7 +2056,70 @@ void createGeomPropertyFromMFnAttr(const MObject& iAttr,
     }
 }
 
+
+bool isPerParticleAttributes( const MFnDependencyNode &iNode, MObject attrObj )
+{
+    MStatus status(MS::kSuccess);
+
+    if ( !iNode.object().hasFn(MFn::kParticle))
+    {
+        return false;
+    }
+
+    if ( !attrObj.hasFn(MFn::kTypedAttribute))
+    {
+        return false;
+    }
+
+    MFnTypedAttribute attr( attrObj );
+    MString attrName = attr.name();
+
+    if (attrName == "radiusPP")
+    {
+        // radiusPP was handled as IPointGeom Width
+        return false;
+    }
+
+    if ( attr.isHidden() ||
+         !attr.isReadable() ||
+         attr.isArray() ||
+         attr.internal() )
+    {
+        return false;
+    }
+    if ( attr.attrType() != MFnData::kDoubleArray && attr.attrType() != MFnData::kVectorArray )
+    {
+        return false;
+    }
+
+    // Perform a few name filtering to avoid useless attribute
+    // we only filter non user created attribute
+    if ( !attr.isDynamic() )
+    {
+        // manualy filter a few attributes
+        if (     attrName.substring(0, 7) == "internal" ||
+                attrName.toLowerCase().substring(attrName.length() - 5, attrName.length()) == "cache" ||
+                attrName.substring( attrName.length() - 1, attrName.length()) == "0" )
+        {
+            return false;
+        }
+
+    }
+
+    MFnParticleSystem particle( iNode.object() );
+
+    if ( particle.isPerParticleDoubleAttribute(attrName, &status) ||
+         particle.isPerParticleVectorAttribute(attrName, &status)
+    )
+    {
+        return true;
+    }
+
+
+    return false;
 }
+
+} // namespace
 
 AttributesWriter::AttributesWriter(
     Alembic::Abc::OCompoundProperty & iArbGeom,
@@ -2598,7 +2661,7 @@ bool AttributesWriter::hasAnyAttr(const MFnDependencyNode & iNode,
 
     std::vector< PlugAndObjArray > staticPlugObjArrayVec;
 
-    if (iNode.hasObj(MFn::kParticle))
+    if (iNode.object().hasFn(MFn::kParticle))
     {
         // Particles always have extra attributes
         return true;

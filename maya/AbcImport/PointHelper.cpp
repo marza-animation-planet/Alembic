@@ -48,6 +48,8 @@
 #include <maya/MFnParticleSystem.h>
 #include <maya/MDagModifier.h>
 #include <maya/MFnArrayAttrsData.h>
+#include <maya/MSelectionList.h>
+#include <maya/MFnSet.h>
 
 
 double getWeightIndexAndTime(double iFrame,
@@ -800,7 +802,8 @@ MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & i
         MDoubleArray outCount = fnAttrs.doubleArray("count", &status);
         outCount.setLength(1);
         outCount[0] = 0.0;
-        
+
+        MCHECKERROR(status);
         return status;
     }
     
@@ -821,9 +824,13 @@ MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & i
     Alembic::Abc::UInt64ArraySamplePtr inFloorId = floorSamp.getIds();
     
     MVectorArray outPos = fnAttrs.vectorArray("position", &status);
+    MCHECKERROR(status);
     MVectorArray outVel = fnAttrs.vectorArray("velocity", &status);
+    MCHECKERROR(status);
     MDoubleArray outId = fnAttrs.doubleArray("particleId", &status);
+    MCHECKERROR(status);
     MDoubleArray outCount = fnAttrs.doubleArray("count", &status);
+    MCHECKERROR(status);
     
     size_t pSize = inFloorPos->size();
     
@@ -956,12 +963,36 @@ MStatus create(double iFrame, const Alembic::AbcGeom::IPoints & iNode,
     MDagModifier dagMod;
 
     iObject = dagMod.createNode("nParticle", iParent, &status);
+    MCHECKERROR(status);
+    status = dagMod.renameNode(iObject, iNode.getName().c_str());
+    MCHECKERROR(status);
     status = dagMod.doIt();
-    fnParticle.setObject(iObject);
-    fnParticle.setName(iNode.getName().c_str());
+    MCHECKERROR(status);
 
+    // Assign default particle shader initialParticleSE to correctly display them in the viewport
+    MSelectionList sel;
+    sel.add("initialParticleSE");
+    MObject particleSG;
+    sel.getDependNode(0, particleSG);
+    MFnSet fnSG(particleSG);
+    fnSG.addMember(iObject);
+
+    fnParticle.setObject(iObject);
+
+    // Setup nucleus node (required for evaluation)
     MGlobal::executeCommand("setupNParticleConnections " + fnParticle.fullPathName());
     MGlobal::executeCommand("connectAttr time1.outTime " + fnParticle.fullPathName() + ".currentTime");
+
+    // Set attribute "isDynamic" to off, it could crash if maya tries to compute collision
+    // against another nParticleShape
+    // It is not related to alembic. It crashes also with nCached particle collision
+    // In maya Attribute Editor, the attribute is called "enable"
+    MPlug enablePlug = fnParticle.findPlug("isDynamic", true);
+    status = dagMod.newPlugValueBool(enablePlug, false);
+    MCHECKERROR(status);
+    status = dagMod.doIt();
+    MCHECKERROR(status);
+    
 
     if (pSize > 0)
     {
@@ -995,12 +1026,15 @@ MStatus create(double iFrame, const Alembic::AbcGeom::IPoints & iNode,
 
         // velocities? ids? other attributes?
         status = fnParticle.emit(pArray, vArray);
+        MCHECKERROR(status);
         fnParticle.setPerParticleAttribute("particleId", iArray, &status);
+        MCHECKERROR(status);
     }
     
     CreateAttributes(iFrame, iNode, fnParticle, pSize);
     
     status = fnParticle.saveInitialState();
+    MCHECKERROR(status);
     
     MPlug plug;
     plug = fnParticle.findPlug("isDynamic");
@@ -1012,5 +1046,6 @@ MStatus create(double iFrame, const Alembic::AbcGeom::IPoints & iNode,
     plug = fnParticle.findPlug("particleRenderType");
     plug.setValue(3);
 
+    MCHECKERROR(status);
     return status;
 }

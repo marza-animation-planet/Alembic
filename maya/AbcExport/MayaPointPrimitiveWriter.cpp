@@ -176,7 +176,7 @@ void MayaPointPrimitiveWriter::write(double iFrame)
     {
         // Get the value of the radius attribute
         widthScope = Alembic::AbcGeom::kUniformScope;
-        width.push_back(particle.findPlug("radius").asDouble() * 2.0);
+        width.push_back(particle.findPlug("radius", true).asDouble() * 2.0);
     }
 
     if (!width.empty())
