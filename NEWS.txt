@@ -1,3 +1,184 @@
+2020-10-23, Alembic 1.7.16
+Thanks to your feedback,and pull requests a couple of bug fixes and a GitHub
+enhancement.
+
+GitHub:
+
+Add a Github Action to create a python 2.7 wheel. (PR 310)
+
+AbcCoreHDF5:
+
+Specify char signedness when setting the HDF5 data type as some architectures,
+like ARM, default to unsigned. (PR 316)
+
+AbcCoreOgawa:
+
+Fuzzer issue 25695: Fix leak that can occur when reading meta data, but the file
+is maliciously cut short.  (PR 315)
+
+Fuzzer issue 26125:  Add a check and throw an excpetion for an obviously
+recursive group. (PR 321)
+
+2020-09-10, Alembic 1.7.15
+Thanks to your feedback and issues we have a few bug fixes and an enhancement.
+
+AbcCoreOgawa:
+Fuzzer issues 25166, 25175, 25185, 25204, and 25236 all test for illegal
+meta data index values which we more carefully test.
+
+Fuzzer issue 25192 turned up a leak from a malformed file causing OrData to
+throw.
+
+Tests:
+Clang was flagging an unused variable in AbcMaterial tests.
+
+CMake:
+
+Add DOCS_PATH variable which will add Doxygen as a target and cause the
+generated html directory to be installed to that location.  We remove the
+Doxygen file from the project and now use CMakes module to configure it.
+
+2020-07-22, Alembic 1.7.14
+Thanks to your feedback,issues, and pull requests we have several bug fixes and
+a few enhancements.
+
+API:
+
+Ogawa:
+
+Fix another Fuzzer issue with Ogawa::IData allocating too much memory
+because of a malicious file.  Add tests for Fuzzer issues:
+24846, 24853, 24598, 25051, and 25081. (PR296)
+
+Add support for the Haiku OS. (PR298)
+
+Murmur3:
+
+Add preprocessor define to support FreeBSD. (Issue 288)
+
+Remove Murmur3 from the LICENSE.txt since it was moved into the public domain
+a while ago, and is reflected as such in the code. (Issue 292)
+
+AbcGeom:
+
+Fix uninitialized member variable in OTypedGeomParam. (PR290)
+
+HDF:
+
+Remove some unused local functions. (Issue 293)
+
+Python bindings:
+
+Add GetArchiveStartAndEndTime. (PR291)
+
+Add optional dccFPS to the GetArchiveInfo dict. (PR294)
+
+2020-07-11, Alembic 1.7.13
+Thanks to your feedback and many issues submitted as well as a few pull requests
+we have several bug fixes.
+
+API:
+
+Ogawa:  Google generously setup AutoFuzz and it found several issues when
+reading maliciously created files.  These issues reported issues are fixed:
+253-258, 269-272, 282, 283 (PR266)
+
+Maya:
+
+AbcImport: Add support for connecting MFnData::kFloatArray.
+
+Build:
+
+Fix issue where WFObjConvert headers were being put in the wrong place when
+installed. (Issue 264)
+
+Partly address Issue 265 by making some adjustments to the Doxyfile and remove
+a very old reference to MD5Hash in the very old Houdini SOP.
+
+Partly address issues outline in PR268, use MSVC instead of Windows variable
+as they are Visual Studio specific flags and define
+-Wno-error=implicit-fallthrough for CLANG and GCC 7 and up.
+
+
+2019-10-25, Alembic 1.7.12
+Thanks to your feedback and numerous pull requests we have several enhancements
+and bug fixes.
+
+API:
+
+Use critical section instead of mutex on Windows. (PR220)
+
+ErrorHandler now uses const char * for message instead of std::string for
+efficiency gain. (PR221)
+
+Fix incompatibilities with C++17. (PR237)
+
+Add optional DCC FPS hint when calling CreateArchiveWithInfo and
+GetArchiveInfo. (PR241)
+
+Maya:
+
+AbcExport: Support writing animated facesets. (PR217)
+
+AbcExport: Support per curve width. (PR239)
+
+AbcExport: When writing sparse data like just the UVs, create an OObject
+instead of an OXform.  (PR241)
+
+Utils:
+
+WFOBJConvert: Fix bug where OBJ files with more than one shape would fail to
+properly convert UVs and Normals. (PR232)
+
+CMake:
+
+Make it easier to select the python version to build against.  (PR215)
+
+2019-5-16, Alembic 1.7.11
+Thanks to your feedback and numerous pull requests we have several enhancements
+and bug fixes.
+
+CMake:
+
+Make ILMBase detection compatible with certain older versions. (PR207)
+
+Allow Alembic to build against a custom Python installation. (PR208)
+
+OpenMayaMac.h was removed from the DevKit since Maya 2016. (Issue210)
+
+API:
+
+Fix bug in OSubD where the detection of a partial sample was incorrect.
+
+Maya:
+
+AbcExport: Fix issue where certain user properties were incorrectly being
+written as arbGeomParams.  (Issue 209) (PR211)
+
+AbcExport: Fix an issue with acyclic detection because of floating point
+inaccuracy. (PR213)
+
+2018-12-5, Alembic 1.7.10
+Thanks to your feedback and numerous pull requests we have several enhancements
+and bug fixes.
+
+API:
+
+Check to see if the OCompoundProperty already exists before trying to create
+a new one. (PR200, Issue 188)
+
+Explicitly include errno.h for compilers that don't bring it in as part of the
+other includes.  (Issue 199)
+
+Maya:
+
+Support reading and writing nParticles as I/OPoints.  (PR163)
+
+Houdini:
+
+Update the example SOP to work with Houdini 16.5, support layering,
+and take advantage of the Houdini API for faster geometry building. (PR196)
+
 2018-9-7, Alembic 1.7.9
 Thanks to your feedback and numerous pull requests we have several enhancements
 and bug fixes.

@@ -2239,6 +2239,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
          }
          else
          {
+            // The following only works with varying width... should we support uniform?
             Alembic::Abc::FloatArraySamplePtr R0 = wsamp0->data().getVals();
             Alembic::Abc::FloatArraySamplePtr R1;
 
@@ -2247,9 +2248,10 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
                AiMsgWarning("[abcproc] \"widths\" property sample time doesn't match points schema sample time (%lf and %lf respectively)",
                             samp0->time(), wsamp0->time());
             }
-            else if (R0->size() != P0->size())
+            //else if (R0->size() != P0->size() && R0->size() != 1)
+            else if (R0->size() == 0)
             {
-               AiMsgWarning("[abcproc] \"widths\" property size doesn't match render time point count");
+               AiMsgWarning("[abcproc] \"widths\" property is empty");
             }
             else
             {
@@ -2265,9 +2267,10 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
                                   samp1->time(), wsamp1->time());
                      process = false;
                   }
-                  else if (R1->size() != P1->size())
+                  //else if (R1->size() != P1->size() && R1->size() != 1)
+                  else if (R1->size() == 0)
                   {
-                     AiMsgWarning("[abcproc] \"widths\" property size doesn't match render time point count");
+                     AiMsgWarning("[abcproc] \"widths\" property is empty");
                      process = false;
                   }
                }
@@ -2275,11 +2278,16 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
                if (process)
                {
                   float *radius = (float*) AiMalloc(info.pointCount * sizeof(float));
+                  bool cstR0 = (R0->size() != P0->size());
+                  float r0 = (cstR0 ? R0->get()[0] : 0.0f);
                   float r;
 
                   if (R1)
                   {
-                     for (size_t i=0; i<R0->size(); ++i)
+                     bool cstR1 = (R1->size() != P1->size());
+                     float r1 = (cstR1 ? R1->get()[0] : 0.0f);
+
+                     for (size_t i=0; i<P0->size(); ++i)
                      {
                         Alembic::Util::uint64_t id = ID0->get()[i];
 
@@ -2287,34 +2295,34 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicPoints &node, AlembicNode *inst
 
                         if (idit != sharedids.end())
                         {
-                           r = (1 - br) * R0->get()[i] + br * R1->get()[idit->second];
+                           r = (1 - br) * (cstR0 ? r0 : R0->get()[i]) + br * (cstR1 ? r1 : R1->get()[idit->second]);
                         }
                         else
                         {
-                           r = R0->get()[i];
+                           r = (cstR0 ? r0 : R0->get()[i]);
                         }
 
-                        radius[i] = adjustRadius(r);
+                        radius[i] = adjustRadius(r * 0.5f);
                      }
 
                      std::map<Alembic::Util::uint64_t, std::pair<size_t, size_t> >::iterator idit1;
 
                      for (idit1 = idmap1.begin(); idit1 != idmap1.end(); ++idit1)
                      {
-                        r = R1->get()[idit1->second.first];
+                        r = (cstR1 ? r1 : R1->get()[idit1->second.first]);
 
-                        radius[idit1->second.second] = adjustRadius(r);
+                        radius[idit1->second.second] = adjustRadius(r * 0.5f);
                      }
                   }
                   else
                   {
-                     // asset(R0->size() == info.pointCount);
+                     // asset(R0->size() == info.pointCount || R0->size() == 1);
 
-                     for (size_t i=0; i<R0->size(); ++i)
+                     for (size_t i=0; i<P0->size(); ++i)
                      {
-                        r = R0->get()[i];
+                        r = (cstR0 ? r0 : R0->get()[i]);
 
-                        radius[i] = adjustRadius(r);
+                        radius[i] = adjustRadius(r * 0.5f);
                      }
                   }
 

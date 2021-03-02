@@ -38,13 +38,13 @@
 #include <stdexcept>
 
 
-#if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
+#if defined (__unix__) || defined (__HAIKU__) || \
+    (defined (__APPLE__) && defined (__MACH__))
 
     #include <sys/mman.h>
     #include <sys/stat.h>
     #include <fcntl.h>
     #include <unistd.h>
-
     #include <errno.h>
     #include <cstring>
 
@@ -81,6 +81,9 @@ public:
 
     virtual bool read(std::size_t iThreadId, Alembic::Util::uint64_t iPos,
                       Alembic::Util::uint64_t iSize, void* oBuf) = 0;
+
+    // not all streams have a size
+    virtual Alembic::Util::uint64_t size() {return 0xffffffffffffffff;};
 };
 
 typedef Alembic::Util::shared_ptr<IStreamReader> IStreamReaderPtr;
@@ -173,6 +176,18 @@ private:
         }
     }
 
+    static int getFileLength(FileDescriptor iFile, Alembic::Util::uint64_t & oLength)
+    {
+        struct __stat64 buf;
+
+        int err = _fstat64(iFile, &buf);
+        if (err < 0) return -1;
+        if (buf.st_size < 0) return -1;
+
+        oLength = static_cast<Alembic::Util::uint64_t>(buf.st_size);
+        return 0;
+    }
+
     static bool readFile(FileDescriptor iFid,
                   void * oBuf,
                   Alembic::Util::uint64_t iOffset,
@@ -237,6 +252,18 @@ private:
         }
     }
 
+    static int getFileLength(FileDescriptor iFile, Alembic::Util::uint64_t & oLength)
+    {
+        struct stat buf;
+
+        int err = fstat(iFile, &buf);
+        if (err < 0) return -1;
+        if (buf.st_size < 0) return -1;
+
+        oLength = static_cast<size_t>(buf.st_size);
+        return 0;
+    }
+
     static bool
     readFile(FileDescriptor iFid, void* oBuf, Alembic::Util::uint64_t iOffset,
              Alembic::Util::uint64_t iSize)
@@ -284,7 +311,11 @@ public:
         : nstreams(iNumStreams)
     {
         fid = openFile(iFileName.c_str(), O_RDONLY);
-
+        fileLen = 0;
+        if (getFileLength(fid, fileLen) < 0)
+        {
+            fileLen = 0;
+        }
         // don't check the return value here
         // IStream::init() will check isOpen
     }
@@ -304,11 +335,21 @@ public:
         return (fid > -1);
     }
 
+    Alembic::Util::uint64_t size()
+    {
+        return fileLen;
+    }
+
     bool read(std::size_t /*iTheadId*/, Alembic::Util::uint64_t iPos,
               Alembic::Util::uint64_t iSize, void* oBuf)
     {
         // Ignore the iThread. There's no need to lock.
         if (!isOpen()) return false;
+
+        if (fileLen < iSize && fileLen < iSize + iPos)
+        {
+            return false;
+        }
 
         return readFile(fid, oBuf, iPos, iSize);
     }
@@ -316,6 +357,7 @@ public:
 private:
     FileDescriptor fid;
     size_t nstreams;
+    Alembic::Util::uint64_t fileLen;
 };
 
 
@@ -515,10 +557,15 @@ public:
         return nstreams;
     }
 
+    Alembic::Util::uint64_t size()
+    {
+        return static_cast<Alembic::Util::uint64_t>(mappedRegion.len);
+    }
+
     bool read(std::size_t iStream, Alembic::Util::uint64_t iPos,
               Alembic::Util::uint64_t iSize, void* oBuf)
     {
-        if (iPos + iSize > mappedRegion.len) return false;
+        if (iSize > mappedRegion.len || iPos > mappedRegion.len || iPos + iSize > mappedRegion.len) return false;
 
         const char* p = static_cast<const char*>(mappedRegion.p) + iPos;
         std::memcpy(oBuf, p, iSize);
@@ -570,6 +617,7 @@ public:
         valid = false;
         frozen = false;
         version = 0;
+        size = 0;
     }
 
     void init(IStreamReaderPtr iReader, size_t iNumStreams)
@@ -609,16 +657,18 @@ public:
             bool filefrozen = (header[5] == char(0xff));
             Alembic::Util::uint16_t fileversion = (header[6] << 8) | header[7];
             Alembic::Util::uint64_t groupPos = *((Alembic::Util::uint64_t*) (&(header[8])));
+            Alembic::Util::uint64_t filesize = iReader->size();
 
             if (i == 0)
             {
                 firstGroupPos = groupPos;
                 frozen = filefrozen;
                 version = fileversion;
+                size = filesize;
             }
                 // all the streams have to agree, or we are invalid
             else if (firstGroupPos != groupPos || frozen != filefrozen ||
-                     version != fileversion)
+                     version != fileversion || size != filesize)
             {
                 frozen = false;
                 valid = false;
@@ -639,17 +689,10 @@ public:
     bool valid;
     bool frozen;
     Alembic::Util::uint16_t version;
+    Alembic::Util::uint64_t size;
 
     IStreamReaderPtr reader;
 };
-
-
-namespace
-{
-}  // anonymous namespace
-
-
-
 
 IStreams::IStreams(const std::string & iFileName, std::size_t iNumStreams,
                    bool iUseMMap) :
@@ -684,6 +727,11 @@ bool IStreams::isFrozen()
 Alembic::Util::uint16_t IStreams::getVersion()
 {
     return mData->version;
+}
+
+Alembic::Util::uint64_t IStreams::getSize()
+{
+    return mData->size;
 }
 
 void IStreams::read(std::size_t iThreadId, Alembic::Util::uint64_t iPos,

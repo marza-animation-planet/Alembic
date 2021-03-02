@@ -1221,7 +1221,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::IPoints& iNode)
             return MS::kFailure;
         }
 
-        MPlug dstPlug = fn.findPlug("cacheArrayData");
+        MPlug dstPlug = fn.findPlug("cacheArrayData", false);
         disconnectAllPlugsTo(dstPlug);
         
         disconnectProps(fn, mData.mPropList, firstProp);

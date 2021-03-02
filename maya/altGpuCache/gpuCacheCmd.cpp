@@ -224,9 +224,9 @@ using namespace GPUCache;
 
             MFnDependencyNode srcNode(connections[0].node());
 
-            MPlug diffusePlugR = srcNode.findPlug("defaultColorR");
-            MPlug diffusePlugG = srcNode.findPlug("defaultColorG");
-            MPlug diffusePlugB = srcNode.findPlug("defaultColorB");
+            MPlug diffusePlugR = srcNode.findPlug("defaultColorR", false);
+            MPlug diffusePlugG = srcNode.findPlug("defaultColorG", false);
+            MPlug diffusePlugB = srcNode.findPlug("defaultColorB", false);
 
             assert(!diffusePlugR.isNull());
             assert(!diffusePlugG.isNull());
@@ -289,7 +289,7 @@ using namespace GPUCache;
             MObject shaderObj;
 
             // Find the instObjGroups plug
-            MPlug instObjectGroupsParent = shape.findPlug("instObjGroups");
+            MPlug instObjectGroupsParent = shape.findPlug("instObjGroups", false);
             assert(!instObjectGroupsParent.isNull());
 
             MPlug instObjectGroups = instObjectGroupsParent.elementByLogicalIndex(
@@ -335,7 +335,7 @@ using namespace GPUCache;
                 assert(status == MS::kSuccess);
 
                 // Find surfaceShader plug
-                MPlug surfaceShaderPlug = shadingEngine.findPlug("surfaceShader");
+                MPlug surfaceShaderPlug = shadingEngine.findPlug("surfaceShader", false);
                 assert(!surfaceShaderPlug.isNull());
 
                 // outColor -> surfaceShader
@@ -358,11 +358,11 @@ using namespace GPUCache;
                     MFnLambertShader lambert(shaderObj, &status);
                     assert(status == MS::kSuccess);
 
-                    MPlug colorPlug = lambert.findPlug("color");
+                    MPlug colorPlug = lambert.findPlug("color", false);
                     assert(!colorPlug.isNull());
-                    MPlug diffusePlug = lambert.findPlug("diffuse");
+                    MPlug diffusePlug = lambert.findPlug("diffuse", false);
                     assert(!diffusePlug.isNull());
-                    MPlug transparencyPlug = lambert.findPlug("transparency");
+                    MPlug transparencyPlug = lambert.findPlug("transparency", false);
                     assert(!transparencyPlug.isNull());
 
                     if (isPlugConnectedToTexture2d(colorPlug)) {
@@ -736,46 +736,46 @@ using namespace GPUCache;
 
             MObject tessellator = modifier.createNode("nurbsTessellate");
             MFnDependencyNode tessellatorNode(tessellator);
-            modifier.connect(nurbsNode.findPlug("explicitTessellationAttributes"),
-                             tessellatorNode.findPlug("explicitTessellationAttributes"));
-            modifier.connect(nurbsNode.findPlug("curvatureTolerance"),
-                             tessellatorNode.findPlug("curvatureTolerance"));
-            modifier.connect(nurbsNode.findPlug("uDivisionsFactor"),
-                             tessellatorNode.findPlug("uDivisionsFactor"));
-            modifier.connect(nurbsNode.findPlug("vDivisionsFactor"),
-                             tessellatorNode.findPlug("vDivisionsFactor"));
-            modifier.connect(nurbsNode.findPlug("modeU"),
-                             tessellatorNode.findPlug("uType"));
-            modifier.connect(nurbsNode.findPlug("modeV"),
-                             tessellatorNode.findPlug("vType"));
-            modifier.connect(nurbsNode.findPlug("numberU"),
-                             tessellatorNode.findPlug("uNumber"));
-            modifier.connect(nurbsNode.findPlug("numberV"),
-                             tessellatorNode.findPlug("vNumber"));
-            modifier.connect(nurbsNode.findPlug("useChordHeight"),
-                             tessellatorNode.findPlug("useChordHeight"));
-            modifier.connect(nurbsNode.findPlug("useChordHeightRatio"),
-                             tessellatorNode.findPlug("useChordHeightRatio"));
-            modifier.connect(nurbsNode.findPlug("chordHeight"),
-                             tessellatorNode.findPlug("chordHeight"));
-            modifier.connect(nurbsNode.findPlug("chordHeightRatio"),
-                             tessellatorNode.findPlug("chordHeightRatio"));
-            modifier.connect(nurbsNode.findPlug("smoothEdge"),
-                             tessellatorNode.findPlug("smoothEdge"));
-            modifier.connect(nurbsNode.findPlug("smoothEdgeRatio"),
-                             tessellatorNode.findPlug("smoothEdgeRatio"));
-            modifier.connect(nurbsNode.findPlug("edgeSwap"),
-                             tessellatorNode.findPlug("edgeSwap"));
-            modifier.connect(nurbsNode.findPlug("local"),
-                             tessellatorNode.findPlug("inputSurface"));
+            modifier.connect(nurbsNode.findPlug("explicitTessellationAttributes", false),
+                             tessellatorNode.findPlug("explicitTessellationAttributes", false));
+            modifier.connect(nurbsNode.findPlug("curvatureTolerance", false),
+                             tessellatorNode.findPlug("curvatureTolerance", false));
+            modifier.connect(nurbsNode.findPlug("uDivisionsFactor", false),
+                             tessellatorNode.findPlug("uDivisionsFactor", false));
+            modifier.connect(nurbsNode.findPlug("vDivisionsFactor", false),
+                             tessellatorNode.findPlug("vDivisionsFactor", false));
+            modifier.connect(nurbsNode.findPlug("modeU", false),
+                             tessellatorNode.findPlug("uType", false));
+            modifier.connect(nurbsNode.findPlug("modeV", false),
+                             tessellatorNode.findPlug("vType", false));
+            modifier.connect(nurbsNode.findPlug("numberU", false),
+                             tessellatorNode.findPlug("uNumber", false));
+            modifier.connect(nurbsNode.findPlug("numberV", false),
+                             tessellatorNode.findPlug("vNumber", false));
+            modifier.connect(nurbsNode.findPlug("useChordHeight", false),
+                             tessellatorNode.findPlug("useChordHeight", false));
+            modifier.connect(nurbsNode.findPlug("useChordHeightRatio", false),
+                             tessellatorNode.findPlug("useChordHeightRatio", false));
+            modifier.connect(nurbsNode.findPlug("chordHeight", false),
+                             tessellatorNode.findPlug("chordHeight", false));
+            modifier.connect(nurbsNode.findPlug("chordHeightRatio", false),
+                             tessellatorNode.findPlug("chordHeightRatio", false));
+            modifier.connect(nurbsNode.findPlug("smoothEdge", false),
+                             tessellatorNode.findPlug("smoothEdge", false));
+            modifier.connect(nurbsNode.findPlug("smoothEdgeRatio", false),
+                             tessellatorNode.findPlug("smoothEdgeRatio", false));
+            modifier.connect(nurbsNode.findPlug("edgeSwap", false),
+                             tessellatorNode.findPlug("edgeSwap", false));
+            modifier.connect(nurbsNode.findPlug("local", false),
+                             tessellatorNode.findPlug("inputSurface", false));
 
             // poly type - 0 means triangles
-            modifier.newPlugValueInt(tessellatorNode.findPlug("polygonType"),0);
+            modifier.newPlugValueInt(tessellatorNode.findPlug("polygonType", false),0);
             // format - 2 means general fit
-            modifier.newPlugValueInt(tessellatorNode.findPlug("format"),2);
+            modifier.newPlugValueInt(tessellatorNode.findPlug("format", false),2);
 
             modifier.doIt();
-            tessellatorNode.findPlug("outputPolygon").getValue(mesh);
+            tessellatorNode.findPlug("outputPolygon", false).getValue(mesh);
             modifier.undoIt();
 
             return mesh;
@@ -806,9 +806,9 @@ using namespace GPUCache;
             int format = -1;
             int depth = -1;
             int sampleCount = -1;
-            MPlug formatPlug = subdNode.findPlug("format");
-            MPlug depthPlug = subdNode.findPlug("depth");
-            MPlug sampleCountPlug = subdNode.findPlug("sampleCount");
+            MPlug formatPlug = subdNode.findPlug("format", false);
+            MPlug depthPlug = subdNode.findPlug("depth", false);
+            MPlug sampleCountPlug = subdNode.findPlug("sampleCount", false);
             formatPlug.getValue(format);
             depthPlug.getValue(depth);
             sampleCountPlug.getValue(sampleCount);

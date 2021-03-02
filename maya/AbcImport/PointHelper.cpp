@@ -48,6 +48,8 @@
 #include <maya/MFnParticleSystem.h>
 #include <maya/MDagModifier.h>
 #include <maya/MFnArrayAttrsData.h>
+#include <maya/MSelectionList.h>
+#include <maya/MFnSet.h>
 
 
 double getWeightIndexAndTime(double iFrame,
@@ -264,11 +266,9 @@ template <> struct AbcToMaya<Alembic::Abc::V3d, MVector>
 };
 
 template <typename Traits, typename MayaArrayType>
-void FillValues(Alembic::Abc::ICompoundProperty geomParams, const std::string &name, double t, MayaArrayType &out,
+void FillValues(Alembic::AbcGeom::ITypedGeomParam<Traits> &prop, double t, MayaArrayType &out,
                 size_t sz0, size_t sz1=0, const Alembic::Abc::uint64_t *ids0=0, const std::map<size_t, size_t> *idmap=0)
 {
-    Alembic::AbcGeom::ITypedGeomParam<Traits> prop(geomParams, name);
-    
     Alembic::AbcCoreAbstract::index_t iprev = 0;
     Alembic::AbcCoreAbstract::index_t inext = 0;
     double tprev = 0.0;
@@ -285,9 +285,50 @@ void FillValues(Alembic::Abc::ICompoundProperty geomParams, const std::string &n
         
         if (count != sz0)
         {
-            for (size_t i=0; i<sz0; ++i)
+            if (count > 0)
             {
-                AbcToMaya<typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type, typename MayaArrayElementType<MayaArrayType>::T>::Reset(out[i]);
+                const typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type *vptr0 = samp0.getVals()->get();
+                typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type v0 = vptr0[0];
+
+                size_t n1 = samp1.getVals()->size();
+
+                if (n1 > 0 && ids0 && idmap)
+                {
+                    const typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type *vptr1 = samp1.getVals()->get();
+                    typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type v1 = vptr1[0];
+                    bool indexedV1 = (n1 == sz1);
+                    
+                    std::map<size_t, size_t>::const_iterator idit;
+                    
+                    for (size_t i=0; i<sz0; ++i)
+                    {
+                        idit = idmap->find(ids0[i]);
+                        
+                        if (idit != idmap->end())
+                        {
+                            AbcToMaya<typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type, typename MayaArrayElementType<MayaArrayType>::T>::Blend(v0, (indexedV1 ? vptr1[idit->second] : v1), blend, out[i]);
+                        }
+                        else
+                        {
+                            AbcToMaya<typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type, typename MayaArrayElementType<MayaArrayType>::T>::Set(v0, out[i]);
+                        }
+                    }
+                }
+                else
+                {
+                    for (size_t i=0; i<sz0; ++i)
+                    {
+                        AbcToMaya<typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type, typename MayaArrayElementType<MayaArrayType>::T>::Set(v0, out[i]);
+                    }
+                }
+            }
+            else
+            {
+                // what about samp1 here?
+                for (size_t i=0; i<sz0; ++i)
+                {
+                    AbcToMaya<typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type, typename MayaArrayElementType<MayaArrayType>::T>::Reset(out[i]);
+                }
             }
         }
         else
@@ -331,9 +372,21 @@ void FillValues(Alembic::Abc::ICompoundProperty geomParams, const std::string &n
         
         if (count != sz0)
         {
-            for (size_t i=0; i<sz0; ++i)
+            if (count > 0)
             {
-                AbcToMaya<typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type, typename MayaArrayElementType<MayaArrayType>::T>::Reset(out[i]);
+                const typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type *vptr = samp.getVals()->get();
+
+                for (size_t i=0; i<sz0; ++i)
+                {
+                    AbcToMaya<typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type, typename MayaArrayElementType<MayaArrayType>::T>::Set(vptr[0], out[i]);
+                }
+            }
+            else
+            {
+                for (size_t i=0; i<sz0; ++i)
+                {
+                    AbcToMaya<typename Alembic::AbcGeom::ITypedGeomParam<Traits>::value_type, typename MayaArrayElementType<MayaArrayType>::T>::Reset(out[i]);
+                }
             }
         }
         else
@@ -348,6 +401,14 @@ void FillValues(Alembic::Abc::ICompoundProperty geomParams, const std::string &n
     }
 }
 
+template <typename Traits, typename MayaArrayType>
+void FillValues(Alembic::Abc::ICompoundProperty geomParams, const std::string &name, double t, MayaArrayType &out,
+                size_t sz0, size_t sz1=0, const Alembic::Abc::uint64_t *ids0=0, const std::map<size_t, size_t> *idmap=0)
+{
+    Alembic::AbcGeom::ITypedGeomParam<Traits> prop(geomParams, name);
+    FillValues(prop, t, out, sz0, sz1, ids0, idmap);
+}
+
 void ReadAttributes(double t, const Alembic::AbcGeom::IPoints & iNode, MFnArrayAttrsData & fnAttrs,
                     size_t sz0, size_t sz1=0, const Alembic::Abc::uint64_t *ids0=0, const std::map<size_t, size_t> *idmap=0)
 {
@@ -359,16 +420,33 @@ void ReadAttributes(double t, const Alembic::AbcGeom::IPoints & iNode, MFnArrayA
     double tprev, tnext, blend;
     MStatus stat;
     
+    bool skipRadiusPP = false;
+
+    Alembic::AbcGeom::IFloatGeomParam widthProp = iNode.getSchema().getWidthsParam();
+    if (widthProp.valid())
+    {
+        MDoubleArray dArray = fnAttrs.doubleArray("radiusPP");
+        dArray.setLength(sz0);
+        FillValues(widthProp, t, dArray, sz0, sz1, ids0, idmap);
+        for (size_t i=0; i<sz0; ++i)
+        {
+            // radius = width / 2
+            dArray[i] = dArray[i] * 0.5;
+        }
+        skipRadiusPP = (widthProp.getScope() == Alembic::AbcGeom::kVaryingScope);
+    }
+    
     for (size_t i=0; i<geomParams.getNumProperties(); ++i)
     {
         const Alembic::AbcCoreAbstract::PropertyHeader &header = geomParams.getPropertyHeader(i);
         
         Alembic::AbcGeom::GeometryScope scope = Alembic::AbcGeom::GetGeometryScope(header.getMetaData());
         
-        if (scope != Alembic::AbcGeom::kVaryingScope)
-        {
-            continue;
-        }
+        // Expands non-varying attributes into varying by duplicating first value as many times as necessary
+        // if (scope != Alembic::AbcGeom::kVaryingScope)
+        // {
+        //     continue;
+        // }
         
         Alembic::AbcCoreAbstract::DataType abcType = header.getDataType();
         std::string usage = header.getMetaData().get("interpretation");
@@ -376,6 +454,19 @@ void ReadAttributes(double t, const Alembic::AbcGeom::IPoints & iNode, MFnArrayA
         
         MString attrName = header.getName().c_str();
         MFnArrayAttrsData::Type attrType;
+        
+        if (attrName == "radiusPP")
+        {
+            if (skipRadiusPP || scope != Alembic::AbcGeom::kVaryingScope)
+            {
+                MGlobal::displayWarning("Skipping 'radiusPP' geo param (already read from schema width)");
+                continue;
+            }
+            else
+            {
+                MGlobal::displayWarning("Overriding schema width param with 'radiusPP' geo param");
+            }
+        }
         
         switch (abcType.getPod())
         {
@@ -528,23 +619,52 @@ void CreateAttributes(double t, const Alembic::AbcGeom::IPoints & iNode, MFnPart
     vArray.setLength(sz);
     
     MString nodeName = fnParticle.name();
-    
+    bool skipRadiusPP = false;
+
+    Alembic::AbcGeom::IFloatGeomParam widthProp = iNode.getSchema().getWidthsParam();
+    if (widthProp.valid())
+    {
+        FillValues(widthProp, t, dArray, sz);
+        for (size_t i=0; i<sz; ++i)
+        {
+            // radius = width / 2
+            dArray[i] = dArray[i] * 0.5;
+        }
+        CreateArrayAttr(nodeName, "double", "radiusPP");
+        fnParticle.setPerParticleAttribute("radiusPP", dArray);
+        skipRadiusPP = (widthProp.getScope() == Alembic::AbcGeom::kVaryingScope);
+    }
+
     for (size_t i=0; i<geomParams.getNumProperties(); ++i)
     {
         const Alembic::AbcCoreAbstract::PropertyHeader &header = geomParams.getPropertyHeader(i);
         
         Alembic::AbcGeom::GeometryScope scope = Alembic::AbcGeom::GetGeometryScope(header.getMetaData());
         
-        if (scope != Alembic::AbcGeom::kVaryingScope)
-        {
-            continue;
-        }
+        // Expands non-varying attributes into varying by duplicating first value as many times as necessary
+        // if (scope != Alembic::AbcGeom::kVaryingScope)
+        // {
+        //     continue;
+        // }
         
         Alembic::AbcCoreAbstract::DataType abcType = header.getDataType();
         std::string usage = header.getMetaData().get("interpretation");
         unsigned int dim = abcType.getExtent();
         
         MString attrName = header.getName().c_str();
+        
+        if (attrName == "radiusPP")
+        {
+            if (skipRadiusPP || scope != Alembic::AbcGeom::kVaryingScope)
+            {
+                MGlobal::displayWarning("Skipping 'radiusPP' geo param (already read from schema width)");
+                continue;
+            }
+            else
+            {
+                MGlobal::displayWarning("Overriding schema width param with 'radiusPP' geo param");
+            }
+        }
         
         switch (abcType.getPod())
         {
@@ -682,7 +802,8 @@ MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & i
         MDoubleArray outCount = fnAttrs.doubleArray("count", &status);
         outCount.setLength(1);
         outCount[0] = 0.0;
-        
+
+        MCHECKERROR(status);
         return status;
     }
     
@@ -703,9 +824,13 @@ MStatus read(double iFrame, const Alembic::AbcGeom::IPoints & iNode, MObject & i
     Alembic::Abc::UInt64ArraySamplePtr inFloorId = floorSamp.getIds();
     
     MVectorArray outPos = fnAttrs.vectorArray("position", &status);
+    MCHECKERROR(status);
     MVectorArray outVel = fnAttrs.vectorArray("velocity", &status);
+    MCHECKERROR(status);
     MDoubleArray outId = fnAttrs.doubleArray("particleId", &status);
+    MCHECKERROR(status);
     MDoubleArray outCount = fnAttrs.doubleArray("count", &status);
+    MCHECKERROR(status);
     
     size_t pSize = inFloorPos->size();
     
@@ -838,12 +963,36 @@ MStatus create(double iFrame, const Alembic::AbcGeom::IPoints & iNode,
     MDagModifier dagMod;
 
     iObject = dagMod.createNode("nParticle", iParent, &status);
+    MCHECKERROR(status);
+    status = dagMod.renameNode(iObject, iNode.getName().c_str());
+    MCHECKERROR(status);
     status = dagMod.doIt();
-    fnParticle.setObject(iObject);
-    fnParticle.setName(iNode.getName().c_str());
+    MCHECKERROR(status);
 
+    // Assign default particle shader initialParticleSE to correctly display them in the viewport
+    MSelectionList sel;
+    sel.add("initialParticleSE");
+    MObject particleSG;
+    sel.getDependNode(0, particleSG);
+    MFnSet fnSG(particleSG);
+    fnSG.addMember(iObject);
+
+    fnParticle.setObject(iObject);
+
+    // Setup nucleus node (required for evaluation)
     MGlobal::executeCommand("setupNParticleConnections " + fnParticle.fullPathName());
     MGlobal::executeCommand("connectAttr time1.outTime " + fnParticle.fullPathName() + ".currentTime");
+
+    // Set attribute "isDynamic" to off, it could crash if maya tries to compute collision
+    // against another nParticleShape
+    // It is not related to alembic. It crashes also with nCached particle collision
+    // In maya Attribute Editor, the attribute is called "enable"
+    MPlug enablePlug = fnParticle.findPlug("isDynamic", true);
+    status = dagMod.newPlugValueBool(enablePlug, false);
+    MCHECKERROR(status);
+    status = dagMod.doIt();
+    MCHECKERROR(status);
+    
 
     if (pSize > 0)
     {
@@ -877,22 +1026,26 @@ MStatus create(double iFrame, const Alembic::AbcGeom::IPoints & iNode,
 
         // velocities? ids? other attributes?
         status = fnParticle.emit(pArray, vArray);
+        MCHECKERROR(status);
         fnParticle.setPerParticleAttribute("particleId", iArray, &status);
+        MCHECKERROR(status);
     }
     
     CreateAttributes(iFrame, iNode, fnParticle, pSize);
     
     status = fnParticle.saveInitialState();
+    MCHECKERROR(status);
     
     MPlug plug;
-    plug = fnParticle.findPlug("isDynamic");
+    plug = fnParticle.findPlug("isDynamic", false);
     plug.setValue(false);
     
-    plug = fnParticle.findPlug("playFromCache");
+    plug = fnParticle.findPlug("playFromCache", false);
     plug.setValue(true);
     
-    plug = fnParticle.findPlug("particleRenderType");
+    plug = fnParticle.findPlug("particleRenderType", false);
     plug.setValue(3);
 
+    MCHECKERROR(status);
     return status;
 }

@@ -39,21 +39,7 @@
 
 #include "Foundation.h"
 #include "AttributesWriter.h"
-#include "MayaTransformWriter.h"
-
-#include <Alembic/AbcGeom/OPolyMesh.h>
-#include <Alembic/AbcGeom/OSubD.h>
-
-// Mechanism to cache the MFnSet::getMembers results
-struct mObjectCmp
-{
-    bool operator()(const MObject& o1, const MObject& o2) const
-    {
-        return strcmp(MFnDependencyNode(o1).name().asChar(), MFnDependencyNode(o2).name().asChar()) < 0;
-    }
-};
-
-typedef std::map <MObject, MSelectionList, mObjectCmp> GetMembersMap;
+#include "MayaFaceSetWriter.h"
 
 // Writes an MFnMesh as a poly mesh OR a subd mesh
 class MayaMeshWriter
@@ -61,8 +47,7 @@ class MayaMeshWriter
   public:
 
     MayaMeshWriter(MDagPath & iDag, Alembic::Abc::OObject & iParent,
-        Alembic::Util::uint32_t iTimeIndex, const JobArgs & iArgs,
-        GetMembersMap& gmMap);
+        Alembic::Util::uint32_t iTimeIndex, const JobArgs & iArgs);
     void write();
     bool isAnimated() const;
     bool isSubD();
@@ -71,6 +56,8 @@ class MayaMeshWriter
     Alembic::Abc::OObject getObject() {return (mPolySchema ? mPolySchema.getObject() : mSubDSchema.getObject());};
     AttributesWriterPtr getAttrs() {return mAttrs;};
 
+    std::vector< MayaFaceSetWriterPtr >::iterator beginFaces() {return mFaceSets.begin();};
+    std::vector< MayaFaceSetWriterPtr >::iterator endFaces() {return mFaceSets.end();};
   private:
 
     void fillTopology(
@@ -110,6 +97,7 @@ class MayaMeshWriter
     UVParamsVec mUVparams;
 
     Alembic::Abc::OV2iArrayProperty mHardEdgeProp;
+    std::vector< MayaFaceSetWriterPtr > mFaceSets;
 };
 
 #endif  // AbcExport_MayaMeshWriter_h

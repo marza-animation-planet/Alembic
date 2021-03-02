@@ -20,10 +20,10 @@ from excons.tools import houdini
 
 excons.InitGlobals()
 
-version_tpl = (1, 7, 9)
+version_tpl = (1, 7, 16)
 version_str = ".".join(map(str, version_tpl))
 
-use_boost = True
+use_boost = (excons.GetArgument("use-c++11", 0, int) == 0)
 use_tr1 = False
 use_hdf5 = (excons.GetArgument("alembic-hdf5-support", 0, int) != 0)
 
@@ -107,6 +107,9 @@ def RequireAlembic(static=True, withPython=False, withGL=False, linkCore=True, l
                                        "-Wno-unused-value",
                                        "-Wno-unused-function",
                                        "-Wno-unused-variable"]))
+         if withPython:
+            env.Append(CPPFLAGS=" ".join([" -Wno-#pragma-messages",
+                                          "-Wno-self-assign-overloaded"]))
       elif sys.platform == "win32":
          env.Append(CCFLAGS=" /bigobj")
          env.Append(CPPDEFINES=["NOMINMAX"])
@@ -178,7 +181,8 @@ def RequireAlembic(static=True, withPython=False, withGL=False, linkCore=True, l
 
       else:
          reqs.append(RequireIlmBase)
-         reqs.append(boost.Require())
+         if use_boost:
+            reqs.append(boost.Require())
          if use_hdf5:
             reqs.append(hdf5.Require(hl=True, verbose=True))
 
@@ -469,6 +473,9 @@ if withMaya:
 
    # AbcImport / AbcExport do not use SceneHelper but need regex library
    # it doesn't hurt to link SceneHelper
+   mdefs = defs[:]
+   if sys.platform == "darwin":
+      mdefs.append("GL_SILENCE_DEPRECATION")
 
    prjs.extend([{"name": "%sAbcImport" % nameprefix,
                  "alias": "alembic-maya",
@@ -478,7 +485,7 @@ if withMaya:
                  "prefix": "maya/plug-ins/%s" % maya.Version(nice=True),
                  "rpaths": ["../../../lib"],
                  "bldprefix": "maya-%s" % maya.Version(),
-                 "defs": defs + (["ABCIMPORT_VERSION=\"\\\"%s\\\"\"" % impver] if impver else []),
+                 "defs": mdefs + (["ABCIMPORT_VERSION=\"\\\"%s\\\"\"" % impver] if impver else []),
                  "incdirs": ["maya/AbcImport"],
                  "srcs": excons.glob("maya/AbcImport/*.cpp") + regexSrc,
                  "custom": [RequireRegex, RequireAlembic(static=link_static), maya.Require, maya.Plugin]
@@ -491,7 +498,7 @@ if withMaya:
                  "prefix": "maya/plug-ins/%s" % maya.Version(nice=True),
                  "rpaths": ["../../../lib"],
                  "bldprefix": "maya-%s" % maya.Version(),
-                 "defs": defs + (["ABCEXPORT_VERSION=\"\\\"%s\\\"\"" % expver] if expver else []),
+                 "defs": mdefs + (["ABCEXPORT_VERSION=\"\\\"%s\\\"\"" % expver] if expver else []),
                  "incdirs": ["maya/AbcExport"],
                  "srcs": excons.glob("maya/AbcExport/*.cpp"),
                  "custom": [RequireAlembic(static=link_static), maya.Require, maya.Plugin]
@@ -504,8 +511,9 @@ if withMaya:
                  "prefix": "maya/plug-ins/%s" % maya.Version(nice=True) + ("/vray-%d.%d" % (vrayVer[0], vrayVer[1]) if withVray else ""),
                  "rpaths": ["../../../lib" if not withVray else "../../../../lib"],
                  "bldprefix": "maya-%s" % maya.Version() + ("/vray-%s" % vray.Version() if withVray else ""),
-                 "defs": defs + (["ABCSHAPE_VERSION=\"\\\"%s\\\"\"" % shpver] if shpver else []) +
-                                (["ABCSHAPE_VRAY_SUPPORT"] if withVray else []),
+                 "defs": mdefs + (["ABCSHAPE_VERSION=\"\\\"%s\\\"\"" % shpver] if shpver else []) +
+                                 (["ABCSHAPE_VRAY_SUPPORT"] if withVray else []),
+                 "cppflags": " -Wno-deprecated-declarations" if sys.platform == "darwin" else "",
                  "incdirs": ["maya/AbcShape"],
                  "srcs": excons.glob("maya/AbcShape/*.cpp"),
                  "custom": ([vray.Require] if withVray else []) + [RequireAlembicHelper(static=link_static), maya.Require, gl.Require, maya.Plugin],
@@ -520,7 +528,7 @@ if withMaya:
                  "prefix": "maya/plug-ins/%s" % maya.Version(nice=True),
                  "rpaths": ["../../../lib"],
                  "bldprefix": "maya-%s" % maya.Version(),
-                 "defs": defs + (["ABCFILETRANSLATOR_VERSION=\"\\\"%s\\\"\"" % trsver] if trsver else []),
+                 "defs": mdefs + (["ABCFILETRANSLATOR_VERSION=\"\\\"%s\\\"\"" % trsver] if trsver else []),
                  "incdirs": ["maya/AbcFileTranslator"],
                  "srcs": excons.glob("maya/AbcFileTranslator/*.cpp"),
                  "custom": [RequireAlembic(static=link_static), maya.Require, maya.Plugin],
@@ -533,7 +541,8 @@ if withMaya:
                  "prefix": "maya/plug-ins/%s" % maya.Version(nice=True),
                  "rpaths": ["../../../lib"],
                  "bldprefix": "maya-%s" % maya.Version(),
-                 "defs": defs + (["ALTGPUCACHE_VERSION=\"\\\"%s\\\"\"" % agcver] if agcver else []),
+                 "defs": mdefs + (["ALTGPUCACHE_VERSION=\"\\\"%s\\\"\"" % agcver] if agcver else []),
+                 "cppflags": " -Wno-ignored-qualifiers -Wno-deprecated-declarations -Wno-reorder -Wno-overloaded-virtual" if sys.platform == "darwin" else "",
                  "incdirs": ["maya/altGpuCache"],
                  "srcs": excons.glob("maya/altGpuCache/*.cpp"),
                  "libs": ["tbb"] + (["ole32", "oleaut32", "wbemuuid"] if sys.platform == "win32" else []),
@@ -550,7 +559,7 @@ if withMaya:
                  "prefix": "maya/plug-ins/%s" % maya.Version(nice=True),
                  "rpaths": ["../../../lib"],
                  "bldprefix": "maya-%s" % maya.Version(),
-                 "defs": defs + (["ALTGPUCACHETREE_VERSION=\"\\\"%s\\\"\"" % gctver] if gctver else []),
+                 "defs": mdefs + (["ALTGPUCACHETREE_VERSION=\"\\\"%s\\\"\"" % gctver] if gctver else []),
                  "incdirs": ["maya/altGpuCacheTree"],
                  "srcs": excons.glob("maya/altGpuCacheTree/*.cpp"),
                  "custom": [RequireAlembicHelper(static=link_static), maya.Require, maya.Plugin]}])
@@ -638,7 +647,7 @@ if withVray:
    deftargets.append("alembic-vray")
 if withMaya:
    deftargets.append("alembic-maya")
-   if withArnold:
+   if withArnold and mtoa.Version(asString=False)[0] >= 2:
       deftargets.append("alembic-mtoa")
 Default(deftargets)
 

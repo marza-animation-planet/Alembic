@@ -633,7 +633,7 @@ public:
       {
          indexTime0.first = 0;
          indexTime0.second = timeSampling->getSampleTime(0);
-         indexTime1 = indexTime1;
+         indexTime1 = indexTime0;
          // Force merge false for constant samples
          merge = false;
       }
