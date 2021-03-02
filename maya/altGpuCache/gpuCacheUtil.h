@@ -59,7 +59,7 @@ public:
     bool isVisible()
     {
         // Check visibility plug
-        MPlug visibilityPlug = fShape.findPlug("visibility");
+        MPlug visibilityPlug = fShape.findPlug("visibility", false);
         assert(!visibilityPlug.isNull());
 
         if (!visibilityPlug.asBool()) {
@@ -67,7 +67,7 @@ public:
         }
 
         // Check display layer
-        MPlug drawOverridePlug = fShape.findPlug("drawOverride");
+        MPlug drawOverridePlug = fShape.findPlug("drawOverride", false);
         assert(!drawOverridePlug.isNull());
 
         MPlugArray displayLayers;
@@ -79,7 +79,7 @@ public:
             if (displayLayerNode.hasFn(MFn::kDisplayLayer)) {
                 // Found a display layer
                 MFnDependencyNode displayLayer(displayLayerNode);
-                visibilityPlug = displayLayer.findPlug("visibility");
+                visibilityPlug = displayLayer.findPlug("visibility", false);
 
                 assert(!visibilityPlug.isNull());
                 if (!visibilityPlug.asBool()) {

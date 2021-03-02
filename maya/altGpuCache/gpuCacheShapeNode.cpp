@@ -60,6 +60,10 @@
 #include <maya/MVectorArray.h>
 #include <maya/MExternalContentInfoTable.h>
 #include <maya/MExternalContentLocationTable.h>
+#include <maya/MDrawInfo.h>
+#include <maya/MSelectInfo.h>
+#include <maya/MDrawRequest.h>
+#include <maya/MDrawRequestQueue.h>
 
 #include <cmath>
 #include <cassert>
@@ -286,7 +290,7 @@ using namespace GPUCache::ShapeNodePrivate;
 	{
 	public:
 		ReadBufferVisitor(double seconds, BufferCache* buffer, MMatrix xformMatrix) 
-			: fSeconds(seconds), fMyBufferCache(buffer), fthisXForm(xformMatrix) {}
+			: fMyBufferCache(buffer), fthisXForm(xformMatrix), fSeconds(seconds) {}
 
 		virtual void visit(const XformData&   xform,
 			const SubNode&     subNode)

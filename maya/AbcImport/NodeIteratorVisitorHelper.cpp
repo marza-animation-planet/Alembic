@@ -2994,8 +2994,8 @@ MString connectAttr(ArgData & iArgData)
         alembicNodePtr->setDebugMode(iArgData.mDebugOn);
         alembicNodePtr->setReadMeshNormals(iArgData.mReadMeshNormals);
         
-        alembicNodeFn.findPlug("regexIncludeFilter").setString(iArgData.mIncludeFilterString);
-        alembicNodeFn.findPlug("regexExcludeFilter").setString(iArgData.mExcludeFilterString);
+        alembicNodeFn.findPlug("regexIncludeFilter", false).setString(iArgData.mIncludeFilterString);
+        alembicNodeFn.findPlug("regexExcludeFilter", false).setString(iArgData.mExcludeFilterString);
     }
 
     if (iArgData.mRecreateColorSets)
@@ -3011,8 +3011,7 @@ MString connectAttr(ArgData & iArgData)
         MFnNumericAttribute numAttr;
         MObject attrObj = numAttr.create("allUVSets", "allUVSets",
             MFnNumericData::kBoolean);
-        alembicNodeFn.addAttribute(attrObj,
-            MFnDependencyNode::kLocalDynamicAttr);
+        alembicNodeFn.addAttribute(attrObj);
     }
     
     if (iArgData.mCreateInstances)
@@ -3020,8 +3019,7 @@ MString connectAttr(ArgData & iArgData)
         MFnNumericAttribute numAttr;
         MObject attrObj = numAttr.create("createInstances", "createInstances",
             MFnNumericData::kBoolean);
-        alembicNodeFn.addAttribute(attrObj,
-            MFnDependencyNode::kLocalDynamicAttr);
+        alembicNodeFn.addAttribute(attrObj);
     }
     
     if (iArgData.mReadMeshNormals)
@@ -3029,8 +3027,7 @@ MString connectAttr(ArgData & iArgData)
         MFnNumericAttribute numAttr;
         MObject attrObj = numAttr.create("readMeshNormals", "readMeshNormals",
             MFnNumericData::kBoolean);
-        alembicNodeFn.addAttribute(attrObj,
-            MFnDependencyNode::kLocalDynamicAttr);
+        alembicNodeFn.addAttribute(attrObj);
     }
     
     
@@ -3593,7 +3590,7 @@ static bool createReferenceMesh( MObject polyObj,
 
         int i = 0;
         
-        for (int p=0, n=0; p<numPolygons; ++p)
+        for (size_t p=0; p<numPolygons; ++p)
         {
             MIntArray polyVerts;
             
@@ -3621,8 +3618,8 @@ static bool createReferenceMesh( MObject polyObj,
         MDagModifier dagMod;
         
         // connect mesh referenceObject
-        MPlug pSrc = refFn.findPlug("message");
-        MPlug pDst = fn.findPlug("referenceObject");
+        MPlug pSrc = refFn.findPlug("message", false);
+        MPlug pDst = fn.findPlug("referenceObject", false);
         
         dagMod.connect(pSrc, pDst);
         dagMod.doIt();
@@ -3656,14 +3653,14 @@ static bool createReferenceMesh( MObject polyObj,
         MPlug plug;
         
         // set reference transform as template
-        plug = refTr.findPlug("template");
+        plug = refTr.findPlug("template", false);
         if (!plug.isNull())
         {
             plug.setBool(true);
         }
         
         // cut transform inheritance
-        plug = refTr.findPlug("inheritsTransform");
+        plug = refTr.findPlug("inheritsTransform", false);
         if (!plug.isNull())
         {
             plug.setBool(false);

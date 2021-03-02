@@ -1037,13 +1037,13 @@ MStatus create(double iFrame, const Alembic::AbcGeom::IPoints & iNode,
     MCHECKERROR(status);
     
     MPlug plug;
-    plug = fnParticle.findPlug("isDynamic");
+    plug = fnParticle.findPlug("isDynamic", false);
     plug.setValue(false);
     
-    plug = fnParticle.findPlug("playFromCache");
+    plug = fnParticle.findPlug("playFromCache", false);
     plug.setValue(true);
     
-    plug = fnParticle.findPlug("particleRenderType");
+    plug = fnParticle.findPlug("particleRenderType", false);
     plug.setValue(3);
 
     MCHECKERROR(status);

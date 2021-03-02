@@ -577,7 +577,7 @@ private:
 
     const ShapeNode* fShapeNode;
     double           fSeconds;
-    GLfloat          fWireframeColor[3];
+    MGLfloat         fWireframeColor[3];
     bool             fIsSelected;
     bool             fClip;
 };
@@ -1183,7 +1183,7 @@ void DrawOverride::UserData::draw(
         gGLFT->glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
         // Restore OGS default value
-        gGLFT->glFrontFace(GL_CCW);
+        gGLFT->glFrontFace(MGL_CCW);
 
         // Restore OGS default two-sided lighting state.
         gGLFT->glLightModeli(MGL_LIGHT_MODEL_TWO_SIDE, 1);

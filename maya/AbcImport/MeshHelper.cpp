@@ -136,7 +136,8 @@ namespace
         }
 
         // Loop edges to set 'smooth' flag
-        for (unsigned int e=0; e<ioMesh.numEdges(); ++e)
+        unsigned int nedges = (unsigned int)ioMesh.numEdges();
+        for (unsigned int e=0; e<nedges; ++e)
         {
             int2 i2;
             ioMesh.getEdgeVertices(e, i2);
