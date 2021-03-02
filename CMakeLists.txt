@@ -51,7 +51,7 @@ ENDIF()
 # Declare the project version
 SET(PROJECT_VERSION_MAJOR "1")
 SET(PROJECT_VERSION_MINOR "7")
-SET(PROJECT_VERSION_PATCH "14")
+SET(PROJECT_VERSION_PATCH "15")
 SET(PROJECT_VERSION
      ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH})
 SET(VERSION ${PROJECT_VERSION})
@@ -77,6 +77,9 @@ OPTION(ALEMBIC_LIB_USES_BOOST
     "Main Alembic library uses boost for things like shared_ptr" OFF)
 OPTION(ALEMBIC_LIB_USES_TR1
     "Main Alembic library uses std::tr1 for things like shared_ptr" OFF)
+option(DOCS_PATH
+    "Create and install the HTML based API documentation to this location (requires Doxygen)"
+    OFF)
 
 # Set static/dynamic build options
 SET(LIB_TYPE STATIC)
@@ -214,6 +217,10 @@ ENDIF()
 
 FIND_PACKAGE(Threads REQUIRED)
 
+IF (DOCS_PATH)
+    FIND_PACKAGE(Doxygen)
+ENDIF()
+
 # We only need boost if including PyAlembic, or using it in the lib
 IF (ALEMBIC_LIB_USES_BOOST OR USE_PYALEMBIC)
     INCLUDE("./cmake/AlembicBoost.cmake")
@@ -333,4 +340,5 @@ info_cfg_option(ALEMBIC_ILMBASE_LINK_STATIC)
 info_cfg_option(ALEMBIC_SHARED_LIBS)
 info_cfg_option(ALEMBIC_LIB_USES_BOOST)
 info_cfg_option(ALEMBIC_LIB_USES_TR1)
+info_cfg_option(DOCS_PATH)
 MESSAGE("${_config_msg}")
