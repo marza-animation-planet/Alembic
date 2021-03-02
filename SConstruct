@@ -23,7 +23,7 @@ excons.InitGlobals()
 version_tpl = (1, 7, 16)
 version_str = ".".join(map(str, version_tpl))
 
-use_boost = True
+use_boost = (excons.GetArgument("use-c++11", 0, int) == 0)
 use_tr1 = False
 use_hdf5 = (excons.GetArgument("alembic-hdf5-support", 0, int) != 0)
 
@@ -178,7 +178,8 @@ def RequireAlembic(static=True, withPython=False, withGL=False, linkCore=True, l
 
       else:
          reqs.append(RequireIlmBase)
-         reqs.append(boost.Require())
+         if use_boost:
+            reqs.append(boost.Require())
          if use_hdf5:
             reqs.append(hdf5.Require(hl=True, verbose=True))
 
