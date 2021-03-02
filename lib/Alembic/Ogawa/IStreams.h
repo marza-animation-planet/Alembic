@@ -33,8 +33,8 @@
 //
 //-*****************************************************************************
 
-#ifndef _Alembic_Ogawa_IStreams_h_
-#define _Alembic_Ogawa_IStreams_h_
+#ifndef Alembic_Ogawa_IStreams_h
+#define Alembic_Ogawa_IStreams_h
 
 #include <Alembic/Util/Export.h>
 #include <Alembic/Ogawa/Foundation.h>
@@ -48,13 +48,17 @@ namespace ALEMBIC_VERSION_NS {
 class ALEMBIC_EXPORT IStreams
 {
 public:
-    IStreams(const std::string & iFileName, std::size_t iNumStreams=1);
+    IStreams(const std::string & iFileName,
+             std::size_t iNumStreams=1,
+             bool iUseMMap=true);
     IStreams(const std::vector< std::istream * > & iStreams);
     ~IStreams();
 
     bool isValid();
     bool isFrozen();
     Alembic::Util::uint16_t getVersion();
+
+    Alembic::Util::uint64_t getSize();
 
     // locks on the threadId, seeks to iPos, and reads iSize bytes into oBuf
     void read(std::size_t iThreadId, Alembic::Util::uint64_t iPos,
@@ -64,8 +68,6 @@ private:
     // noncopyable
     IStreams(const IStreams &);
     const IStreams & operator=(const IStreams &);
-
-    void init();
 
     class PrivateData;
     Alembic::Util::unique_ptr< PrivateData > mData;

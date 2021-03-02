@@ -83,21 +83,37 @@ static dict GetArchiveInfoWrapper( Abc::IArchive& iArchive )
     AbcU::uint32_t libraryVersion;
     std::string whenWritten;
     std::string userDescription;
+    double dccFPS;
 
     Abc::GetArchiveInfo( iArchive,
                          appName,
                          libraryVersionString,
                          libraryVersion,
                          whenWritten,
-                         userDescription );
+                         userDescription,
+                         dccFPS );
     dict info;
     info["appName"] = appName;
     info["libraryVersionString"] = libraryVersionString;
     info["libraryVersion"] = libraryVersion;
     info["whenWritten"] = whenWritten;
     info["userDescription"] = userDescription;
+    if ( dccFPS > 0.0 )
+    {
+        info["dccFPS"] = dccFPS;
+    }
 
     return info;
+}
+
+//-*****************************************************************************
+static tuple GetArchiveStartAndEndTimeWrapper( Abc::IArchive& iArchive )
+{
+    double oStart;
+    double oEnd;
+    Abc::GetArchiveStartAndEndTime( iArchive, oStart, oEnd );
+
+    return make_tuple( oStart, oEnd );
 }
 
 //-*****************************************************************************
@@ -113,6 +129,11 @@ void register_archiveinfo()
          GetArchiveInfoWrapper,
          ( arg( "IArchive" ) ),
          "Return a dictionary that contains info of the given IArchive" );
+    def( "GetArchiveStartAndEndTime",
+         GetArchiveStartAndEndTimeWrapper,
+         ( arg( "IArchive" ) ),
+         "Return tuple of start and end time for the IArchive using only the "
+         "TimeSamplings" );
 
     def( "GetLibraryVersionShort",
          AbcA::GetLibraryVersionShort,

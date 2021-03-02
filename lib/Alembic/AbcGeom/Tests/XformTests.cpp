@@ -620,6 +620,60 @@ void sparseTest2()
 }
 
 //-*****************************************************************************
+void issue188()
+{
+    std::string name = "issue188.abc";
+
+    OArchive archive( Alembic::AbcCoreOgawa::WriteArchive(), name);
+    OXform axform( OObject( archive ),  "a" );
+
+    Alembic::AbcGeom::OXformSchema schema0, schema1;
+    schema0 = axform.getSchema();
+    schema1 = schema0;
+
+    Alembic::Abc::OCompoundProperty user0 = schema0.getUserProperties();
+    Alembic::Abc::OCompoundProperty user1 = schema1.getUserProperties();
+
+    Alembic::Abc::OBox3dProperty boxy( user0, "boxy" );
+    TESTING_ASSERT( user0.getNumProperties() == 1 );
+    TESTING_ASSERT( user1.getNumProperties() == 1 );
+}
+
+void fuzzer_issue25695(bool iUseMMap)
+{
+        Alembic::AbcCoreFactory::IFactory factory;
+
+        if ( iUseMMap )
+        {
+            factory.setOgawaReadStrategy(
+                Alembic::AbcCoreFactory::IFactory::kMemoryMappedFiles );
+        }
+        else
+        {
+            factory.setOgawaReadStrategy(
+                Alembic::AbcCoreFactory::IFactory::kFileStreams );
+        }
+
+        IArchive archive = factory.getArchive( "fuzzer_issue25695.abc" );
+        try
+        {
+            Alembic::AbcGeom::IXform xformObj( archive.getTop(), "Suzanne" );
+        }
+        catch(const std::exception& e)
+        {
+            std::string msg = "ISchemaObject::ISchemaObject( IObject )\n";
+            msg += "ERROR: EXCEPTION:\n";
+            msg += "IXformSchema::init()\n";
+            msg += "ERROR: EXCEPTION:\n";
+            msg += "ScalarPropertyReader::getSample size is not correct expected: 3 got: 9";
+            TESTING_ASSERT(msg == e.what());
+            return;
+        }
+
+        TESTING_ASSERT( 0 );
+}
+
+//-*****************************************************************************
 int main( int argc, char *argv[] )
 {
     xformOut();
@@ -628,5 +682,8 @@ int main( int argc, char *argv[] )
     xformTreeCreate();
     sparseTest();
     sparseTest2();
+    issue188();
+    fuzzer_issue25695(false);
+    fuzzer_issue25695(true);
     return 0;
 }

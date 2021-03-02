@@ -76,6 +76,14 @@ IGroup::IGroup(IStreamsPtr iStreams,
     mData->pos = iPos;
     mData->streams->read(iThreadIndex, iPos, 8, &mData->numChildren);
 
+    // make sure we don't have a maliciously bad number of children
+    if ( mData->numChildren > (mData->streams->getSize() / 8) ||
+         mData->numChildren == 0 )
+    {
+        mData->numChildren = 0;
+        return;
+    }
+
     // 0 should NOT have been written, this groups should have been the
     // special EMPTY_GROUP instead
 
@@ -119,6 +127,12 @@ IGroupPtr IGroup::getGroup(Alembic::Util::uint64_t iIndex, bool iLight,
         child.reset(new IGroup(mData->streams, mData->childVec[iIndex], iLight,
                                iThreadIndex));
     }
+
+    if (child && child->mData->pos == mData->pos)
+    {
+        throw std::runtime_error("Ogawa: Invalid recursive IGroup.");
+    }
+
     return child;
 }
 

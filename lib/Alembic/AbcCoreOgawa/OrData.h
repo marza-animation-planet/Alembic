@@ -34,8 +34,8 @@
 //
 //-*****************************************************************************
 
-#ifndef _Alembic_AbcCoreOgawa_OrData_h_
-#define _Alembic_AbcCoreOgawa_OrData_h_
+#ifndef Alembic_AbcCoreOgawa_OrData_h
+#define Alembic_AbcCoreOgawa_OrData_h
 
 #include <Alembic/AbcCoreOgawa/Foundation.h>
 
@@ -94,7 +94,7 @@ private:
     typedef std::map<std::string, size_t> ChildrenMap;
 
     // The children
-    Child * m_children;
+    Alembic::Util::unique_ptr< Child[] > m_children;
     ChildrenMap m_childrenMap;
 
     // Our "top" property.
