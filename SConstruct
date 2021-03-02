@@ -107,6 +107,9 @@ def RequireAlembic(static=True, withPython=False, withGL=False, linkCore=True, l
                                        "-Wno-unused-value",
                                        "-Wno-unused-function",
                                        "-Wno-unused-variable"]))
+         if withPython:
+            env.Append(CPPFLAGS=" ".join([" -Wno-#pragma-messages",
+                                          "-Wno-self-assign-overloaded"]))
       elif sys.platform == "win32":
          env.Append(CCFLAGS=" /bigobj")
          env.Append(CPPDEFINES=["NOMINMAX"])
