@@ -75,8 +75,6 @@
 #endif
 
 #include <Alembic/AbcCoreFactory/IFactory.h>
-#include <Alembic/AbcCoreHDF5/ReadWrite.h>
-#include <Alembic/AbcCoreOgawa/ReadWrite.h>
 #include <Alembic/AbcGeom/Visibility.h>
 
 MObject AlembicNode::mTimeAttr;
@@ -330,6 +328,7 @@ MStatus AlembicNode::initialize()
     status = gAttr.addDataAccept(MFnData::kString);
     status = gAttr.addDataAccept(MFnData::kIntArray);
     status = gAttr.addDataAccept(MFnData::kDoubleArray);
+    status = gAttr.addDataAccept(MFnData::kFloatArray);
     status = gAttr.addDataAccept(MFnData::kVectorArray);
     status = gAttr.addDataAccept(MFnData::kPointArray);
 
