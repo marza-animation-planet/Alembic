@@ -136,7 +136,7 @@ public:
 
 protected:
 
-    template<class T> friend void boost::checked_delete(T * x) noexcept;
+    template<class T> friend void boost::checked_delete(T * x) ALTGPU_NOEXCEPT;
 
     // Prohibited and not implemented.
     ShapeData(const ShapeData&);
@@ -206,7 +206,7 @@ public:
 
 private:
     
-    template<class T> friend void boost::checked_delete(T * x) noexcept;
+    template<class T> friend void boost::checked_delete(T * x) ALTGPU_NOEXCEPT;
 
     // Prohibited and not implemented.
     XformData(const XformData&);
@@ -324,7 +324,7 @@ public:
 
 private:
 
-    template<class T> friend void boost::checked_delete(T * x) noexcept;
+    template<class T> friend void boost::checked_delete(T * x) ALTGPU_NOEXCEPT;
 
     /*----- data members -----*/
     

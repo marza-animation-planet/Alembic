@@ -266,7 +266,7 @@ public:
     CacheFileEntry( const MString& fileName );
 
 private:
-	template<class T> friend void boost::checked_delete(T * x) noexcept;
+	template<class T> friend void boost::checked_delete(T * x) ALTGPU_NOEXCEPT;
 
 	// Private constructors to force usage of the create method.
 	CacheFileEntry();

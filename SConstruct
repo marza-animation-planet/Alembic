@@ -550,7 +550,7 @@ if withMaya:
                  "srcs": excons.glob("maya/altGpuCache/*.cpp"),
                  "libs": ["tbb"] + (["ole32", "oleaut32", "wbemuuid"] if sys.platform == "win32" else []),
                  "linkflags": " -framework ApplicationServices -framework IOKit" if sys.platform == "darwin" else "",
-                 "custom": [RequireAlembicHelper(static=link_static), maya.Require, maya.Plugin, gl.Require],
+                 "custom": [RequireAlembicHelper(static=link_static), maya.Require, maya.Plugin, boost.Require(), gl.Require],
                  "install": {"maya/scripts": excons.glob("maya/altGpuCache/*.mel")}
                 },
                 {"name": "altGpuCacheTree",

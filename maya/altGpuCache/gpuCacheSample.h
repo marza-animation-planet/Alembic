@@ -30,12 +30,19 @@
 #include <boost/make_shared.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/enable_shared_from_this.hpp>
+#include <boost/checked_delete.hpp>
 
 #include <Alembic/Util/Digest.h>
 
 #include <tbb/mutex.h>
 
 #include <vector>
+
+#ifdef _MSC_VER
+#   define ALTGPU_NOEXCEPT
+#else
+#   define ALTGPU_NOEXCEPT noexcept
+#endif
 
 #include "gpuCacheConfig.h"
 #include "gpuCacheMakeSharedHelper.h"
