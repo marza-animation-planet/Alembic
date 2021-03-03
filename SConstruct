@@ -477,7 +477,8 @@ if withMaya:
    if sys.platform == "darwin":
       mdefs.append("GL_SILENCE_DEPRECATION")
 
-   prjs.extend([{"name": "%sAbcImport" % nameprefix,
+   prjs.extend([
+                {"name": "%sAbcImport" % nameprefix,
                  "alias": "alembic-maya",
                  "type": "dynamicmodule",
                  "desc": "Maya alembic import plugin",
@@ -513,7 +514,7 @@ if withMaya:
                  "bldprefix": "maya-%s" % maya.Version() + ("/vray-%s" % vray.Version() if withVray else ""),
                  "defs": mdefs + (["ABCSHAPE_VERSION=\"\\\"%s\\\"\"" % shpver] if shpver else []) +
                                  (["ABCSHAPE_VRAY_SUPPORT"] if withVray else []),
-                 "cppflags": " -Wno-deprecated-declarations" if sys.platform == "darwin" else "",
+                 "cppflags": " -Wno-deprecated-declarations" if sys.platform != "win32" else "",
                  "incdirs": ["maya/AbcShape"],
                  "srcs": excons.glob("maya/AbcShape/*.cpp"),
                  "custom": ([vray.Require] if withVray else []) + [RequireAlembicHelper(static=link_static), maya.Require, gl.Require, maya.Plugin],
@@ -532,7 +533,8 @@ if withMaya:
                  "incdirs": ["maya/AbcFileTranslator"],
                  "srcs": excons.glob("maya/AbcFileTranslator/*.cpp"),
                  "custom": [RequireAlembic(static=link_static), maya.Require, maya.Plugin],
-                 "install": {"maya/scripts": excons.glob("maya/AbcFileTranslator/*.mel")}},
+                 "install": {"maya/scripts": excons.glob("maya/AbcFileTranslator/*.mel")}
+                },
                 {"name": "altGpuCache",
                  "alias": "alembic-maya",
                  "desc": "Alternative gpuCache implementation with extra controls",
@@ -542,11 +544,11 @@ if withMaya:
                  "rpaths": ["../../../lib"],
                  "bldprefix": "maya-%s" % maya.Version(),
                  "defs": mdefs + (["ALTGPUCACHE_VERSION=\"\\\"%s\\\"\"" % agcver] if agcver else []),
-                 "cppflags": " -Wno-ignored-qualifiers -Wno-deprecated-declarations -Wno-reorder -Wno-overloaded-virtual" if sys.platform == "darwin" else "",
+                 "cppflags": (" -Wno-deprecated-declarations" if sys.platform != "win32" else "") +
+                             (" -Wno-reorder -Wno-ignored-qualifiers -Wno-overloaded-virtual" if sys.platform == "darwin" else ""),
                  "incdirs": ["maya/altGpuCache"],
                  "srcs": excons.glob("maya/altGpuCache/*.cpp"),
                  "libs": ["tbb"] + (["ole32", "oleaut32", "wbemuuid"] if sys.platform == "win32" else []),
-                 # -framework ApplicationServices -framework CoreFoundation -framework IOKit
                  "linkflags": " -framework ApplicationServices -framework IOKit" if sys.platform == "darwin" else "",
                  "custom": [RequireAlembicHelper(static=link_static), maya.Require, maya.Plugin, gl.Require],
                  "install": {"maya/scripts": excons.glob("maya/altGpuCache/*.mel")}
@@ -562,7 +564,9 @@ if withMaya:
                  "defs": mdefs + (["ALTGPUCACHETREE_VERSION=\"\\\"%s\\\"\"" % gctver] if gctver else []),
                  "incdirs": ["maya/altGpuCacheTree"],
                  "srcs": excons.glob("maya/altGpuCacheTree/*.cpp"),
-                 "custom": [RequireAlembicHelper(static=link_static), maya.Require, maya.Plugin]}])
+                 "custom": [RequireAlembicHelper(static=link_static), maya.Require, maya.Plugin]
+                }
+               ])
 
    if withArnold:
       A, M, m = mtoa.Version(asString=False)

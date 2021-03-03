@@ -54,11 +54,11 @@ void AssignDefaultShader(MObject &obj)
    {
       MFnDependencyNode fn(sDefaultShader);
 
-      MPlug dst = fn.findPlug("dagSetMembers");
+      MPlug dst = fn.findPlug("dagSetMembers", false);
 
       fn.setObject(obj);
 
-      MPlug src = fn.findPlug("instObjGroups");
+      MPlug src = fn.findPlug("instObjGroups", false);
 
       MDGModifier dgMod;
       MIntArray indices;
@@ -610,35 +610,35 @@ AlembicNode::VisitReturn UpdateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
    {
       MPlug plug;
       
-      plug = dagNode.findPlug("ignoreTransforms");
+      plug = dagNode.findPlug("ignoreTransforms", false);
       plug.setBool(!mIgnoreTransforms);
       // Should I disable 'inheritsTransform' on parent too?
       
-      // plug = dagNode.findPlug("ignoreInstances");
+      // plug = dagNode.findPlug("ignoreInstances", false);
       // plug.setBool(mCreateInstances);
 
-      plug = dagNode.findPlug("startFrame");
+      plug = dagNode.findPlug("startFrame", false);
       plug.setDouble(mStartFrame);
 
-      plug = dagNode.findPlug("endFrame");
+      plug = dagNode.findPlug("endFrame", false);
       plug.setDouble(mEndFrame);
 
-      plug = dagNode.findPlug("cycleType");
+      plug = dagNode.findPlug("cycleType", false);
       plug.setShort(short(mCycleType));
       
-      plug = dagNode.findPlug("speed");
+      plug = dagNode.findPlug("speed", false);
       plug.setDouble(mSpeed);
       
-      plug = dagNode.findPlug("offset");
+      plug = dagNode.findPlug("offset", false);
       plug.setDouble(mOffset);
       
-      plug = dagNode.findPlug("preserveStartFrame");
+      plug = dagNode.findPlug("preserveStartFrame", false);
       plug.setBool(mPreserveStartFrame);
 
-      plug = dagNode.findPlug("cacheFileName");
+      plug = dagNode.findPlug("cacheFileName", false);
       plug.setString(mAbcPath.c_str());
 
-      plug = dagNode.findPlug("cacheGeomPath");
+      plug = dagNode.findPlug("cacheGeomPath", false);
       // replace "/" by "|" in targetPath
       std::string tmp = targetPath;
       size_t p0 = 0;
@@ -654,13 +654,13 @@ AlembicNode::VisitReturn UpdateTree::enterShape(AlembicNodeT<T> &node, AlembicNo
       if (!exists)
       {
          // Only set those on newly created nodes
-         plug = dagNode.findPlug("visibleInReflections");
+         plug = dagNode.findPlug("visibleInReflections", false);
          plug.setBool(true);
          
-         plug = dagNode.findPlug("visibleInRefractions");
+         plug = dagNode.findPlug("visibleInRefractions", false);
          plug.setBool(true);
          
-         plug = dagNode.findPlug("ignoreVisibility");
+         plug = dagNode.findPlug("ignoreVisibility", false);
          plug.setBool(true);
       }
    }
@@ -830,7 +830,7 @@ void UpdateTree::keyVisibility(Alembic::AbcGeom::IObject iobj, MFnDependencyNode
          
          if (Alembic::Abc::ICharProperty::matches(*header))
          {
-            MPlug pVis = fn.findPlug("visibility");
+            MPlug pVis = fn.findPlug("visibility", false);
             
             Alembic::Abc::ICharProperty prop(props, "visible");
             Alembic::Util::int8_t v = 1;
@@ -882,7 +882,7 @@ void UpdateTree::keyVisibility(Alembic::AbcGeom::IObject iobj, MFnDependencyNode
          }
          else if (Alembic::Abc::IBoolProperty::matches(*header))
          {
-            MPlug pVis = fn.findPlug("visibility");
+            MPlug pVis = fn.findPlug("visibility", false);
             
             Alembic::Abc::IBoolProperty prop(props, "visible");
             Alembic::Util::bool_t v = true;
@@ -1037,12 +1037,12 @@ AlembicNode::VisitReturn UpdateTree::enter(AlembicXform &node, AlembicNode *inst
          }
       }
       
-      MPlug pPx = locNode.findPlug("localPositionX");
-      MPlug pPy = locNode.findPlug("localPositionY");
-      MPlug pPz = locNode.findPlug("localPositionZ");
-      MPlug pSx = locNode.findPlug("localScaleX");
-      MPlug pSy = locNode.findPlug("localScaleY");
-      MPlug pSz = locNode.findPlug("localScaleZ");
+      MPlug pPx = locNode.findPlug("localPositionX", false);
+      MPlug pPy = locNode.findPlug("localPositionY", false);
+      MPlug pPz = locNode.findPlug("localPositionZ", false);
+      MPlug pSx = locNode.findPlug("localScaleX", false);
+      MPlug pSy = locNode.findPlug("localScaleY", false);
+      MPlug pSz = locNode.findPlug("localScaleZ", false);
       
       pPx.setDouble(posscl[0]);
       pPy.setDouble(posscl[1]);
@@ -1142,7 +1142,7 @@ AlembicNode::VisitReturn UpdateTree::enter(AlembicXform &node, AlembicNode *inst
          Alembic::AbcGeom::XformSample sample = schema.getValue();
          
          // Inherit flag
-         MPlug pIT = xform.findPlug("inheritsTransform");
+         MPlug pIT = xform.findPlug("inheritsTransform", false);
          
          bool inheritsXforms = sample.getInheritsXforms();
          pIT.setBool(inheritsXforms);
@@ -1294,7 +1294,7 @@ bool UpdateTree::createPointAttribute(MFnDagNode &node, const std::string &name,
    
    if (node.addAttribute(attr) == MS::kSuccess)
    {
-      plug = node.findPlug(aname);
+      plug = node.findPlug(aname, false);
       return (!plug.isNull());
    }
    else
@@ -1361,7 +1361,7 @@ bool UpdateTree::createColorAttribute(MFnDagNode &node, const std::string &name,
    
    if (node.addAttribute(attr) == MS::kSuccess)
    {
-      plug = node.findPlug(aname);
+      plug = node.findPlug(aname, false);
       return (!plug.isNull());
    }
    else
@@ -1384,7 +1384,7 @@ bool UpdateTree::createNumericAttribute(MFnDagNode &node, const std::string &nam
    
    if (node.addAttribute(attr) == MS::kSuccess)
    {
-      plug = node.findPlug(aname);
+      plug = node.findPlug(aname, false);
       return (!plug.isNull());
    }
    else
@@ -1407,7 +1407,7 @@ bool UpdateTree::createMatrixAttribute(MFnDagNode &node, const std::string &name
    
    if (node.addAttribute(attr) == MS::kSuccess)
    {
-      plug = node.findPlug(aname);
+      plug = node.findPlug(aname, false);
       return (!plug.isNull());
    }
    else
@@ -1433,7 +1433,7 @@ bool UpdateTree::createStringAttribute(MFnDagNode &node, const std::string &name
    
    if (node.addAttribute(attr) == MS::kSuccess)
    {
-      plug = node.findPlug(aname);
+      plug = node.findPlug(aname, false);
       return (!plug.isNull());
    }
    else
@@ -1849,7 +1849,7 @@ void UpdateTree::setNumericUserProp(MFnDagNode &node, const std::string &name, A
 {
    MFnNumericData::Type type = (MFnNumericData::Type) NumericType<TT, D>::Value;
    
-   MPlug plug = node.findPlug(name.c_str());
+   MPlug plug = node.findPlug(name.c_str(), false);
    
    bool process = (plug.isNull() ? createNumericAttribute(node, name, type, false, plug)
                                  : checkNumericAttribute(plug, type, false));
@@ -1869,7 +1869,7 @@ void UpdateTree::setNumericArrayUserProp(MFnDagNode &node, const std::string &na
 {
    MFnNumericData::Type type = (MFnNumericData::Type) NumericType<TT, D>::Value;
    
-   MPlug plug = node.findPlug(name.c_str());
+   MPlug plug = node.findPlug(name.c_str(), false);
    
    bool array = !prop.isScalarLike();
    
@@ -1896,7 +1896,7 @@ void UpdateTree::setNumericArrayUserProp(MFnDagNode &node, const std::string &na
 template <typename T, int D>
 void UpdateTree::setPointUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
 {
-   MPlug plug = node.findPlug(name.c_str());
+   MPlug plug = node.findPlug(name.c_str(), false);
    
    bool process = (plug.isNull() ? createPointAttribute(node, name, false, plug)
                                  : checkPointAttribute(plug, false));
@@ -1914,7 +1914,7 @@ void UpdateTree::setPointUserProp(MFnDagNode &node, const std::string &name, Ale
 template <typename T, int D>
 void UpdateTree::setPointArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
 {
-   MPlug plug = node.findPlug(name.c_str());
+   MPlug plug = node.findPlug(name.c_str(), false);
    
    bool array = !prop.isScalarLike();
    
@@ -1941,7 +1941,7 @@ void UpdateTree::setPointArrayUserProp(MFnDagNode &node, const std::string &name
 template <typename T, int D>
 void UpdateTree::setColorUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
 {
-   MPlug plug = node.findPlug(name.c_str());
+   MPlug plug = node.findPlug(name.c_str(), false);
    
    bool alpha = (D == 4);
    
@@ -1968,7 +1968,7 @@ void UpdateTree::setColorUserProp(MFnDagNode &node, const std::string &name, Ale
 template <typename T, int D>
 void UpdateTree::setColorArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
 {
-   MPlug plug = node.findPlug(name.c_str());
+   MPlug plug = node.findPlug(name.c_str(), false);
    
    bool array = !prop.isScalarLike();
    
@@ -2013,7 +2013,7 @@ void UpdateTree::setMatrixUserProp(MFnDagNode &node, const std::string &name, Al
 {
    MFnMatrixAttribute::Type type = (MFnMatrixAttribute::Type) MatrixType<T>::Value;
    
-   MPlug plug = node.findPlug(name.c_str());
+   MPlug plug = node.findPlug(name.c_str(), false);
    
    bool process = (plug.isNull() ? createMatrixAttribute(node, name, type, false, plug)
                                  : checkMatrixAttribute(plug, false));
@@ -2033,7 +2033,7 @@ void UpdateTree::setMatrixArrayUserProp(MFnDagNode &node, const std::string &nam
 {
    MFnMatrixAttribute::Type type = (MFnMatrixAttribute::Type) MatrixType<T>::Value;
    
-   MPlug plug = node.findPlug(name.c_str());
+   MPlug plug = node.findPlug(name.c_str(), false);
    
    bool array = !prop.isScalarLike();
    
@@ -2059,7 +2059,7 @@ void UpdateTree::setMatrixArrayUserProp(MFnDagNode &node, const std::string &nam
 
 void UpdateTree::setStringUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IScalarProperty prop)
 {
-   MPlug plug = node.findPlug(name.c_str());
+   MPlug plug = node.findPlug(name.c_str(), false);
    
    bool process = (plug.isNull() ? createStringAttribute(node, name, false, plug)
                                  : checkStringAttribute(plug, false));
@@ -2076,7 +2076,7 @@ void UpdateTree::setStringUserProp(MFnDagNode &node, const std::string &name, Al
 
 void UpdateTree::setStringArrayUserProp(MFnDagNode &node, const std::string &name, Alembic::Abc::IArrayProperty prop)
 {
-   MPlug plug = node.findPlug(name.c_str());
+   MPlug plug = node.findPlug(name.c_str(), false);
    
    bool array = !prop.isScalarLike();
    
@@ -3145,19 +3145,19 @@ MStatus GpuCacheTree::doIt(const MArgList& args)
          {
             if (setSpeed)
             {
-               node.findPlug("speed").setDouble(speed);
+               node.findPlug("speed", false).setDouble(speed);
             }
             if (setOffset)
             {
-               node.findPlug("offset").setDouble(offset);
+               node.findPlug("offset", false).setDouble(offset);
             }
             if (setCycle)
             {
-               node.findPlug("cycleType").setShort(short(ct));
+               node.findPlug("cycleType", false).setShort(short(ct));
             }
             if (setPreserveStart)
             {
-               node.findPlug("preserveStartFrame").setBool(preserveStartFrame);
+               node.findPlug("preserveStartFrame", false).setBool(preserveStartFrame);
             }
          }
          

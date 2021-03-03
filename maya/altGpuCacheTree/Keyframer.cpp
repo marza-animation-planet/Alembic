@@ -82,7 +82,7 @@ Keyframer::CurveEntry& Keyframer::getOrCreateEntry(const MFnDependencyNode &dnod
    {
       std::pair<MString, CurveEntry> entry;
 
-      MPlug plug = dnode.findPlug(attrName);
+      MPlug plug = dnode.findPlug(attrName, false);
       if (!plug.isKeyable())
       {
          plug.setKeyable(true);
@@ -127,7 +127,7 @@ void Keyframer::clearAnyKey(const MObject &node,
    MString realName = attrName;
 
    // if plug a compound, get indexth child
-   MPlug plug = dnode.findPlug(attrName);
+   MPlug plug = dnode.findPlug(attrName, false);
 
    if (plug.isCompound())
    {
@@ -167,7 +167,7 @@ void Keyframer::addAnyKey(const MObject &node,
    MString realName = attrName;
 
    // if plug a compound, get indexth child
-   MPlug plug = dnode.findPlug(attrName);
+   MPlug plug = dnode.findPlug(attrName, false);
 
    if (plug.isCompound())
    {
@@ -455,7 +455,7 @@ void Keyframer::setRotationCurvesInterpolation(const MString &type, const MStrin
       CurveEntry &entry = it->second;
 
       MFnDependencyNode node(entry.obj);
-      MPlug plug = node.findPlug(entry.attr);
+      MPlug plug = node.findPlug(entry.attr, false);
       
       MFnAnimCurve curve(plug, &stat);
 
@@ -533,7 +533,7 @@ void Keyframer::fixCurvesTangents()
       CurveEntry &entry = it->second;
 
       MFnDependencyNode node(entry.obj);
-      MPlug plug = node.findPlug(entry.attr);
+      MPlug plug = node.findPlug(entry.attr, false);
 
       MFnAnimCurve curve(plug, &stat);
 
@@ -564,7 +564,7 @@ void Keyframer::fixCurvesTangents(MFnAnimCurve::AnimCurveType type)
       CurveEntry &entry = it->second;
 
       MFnDependencyNode node(entry.obj);
-      MPlug plug = node.findPlug(entry.attr);
+      MPlug plug = node.findPlug(entry.attr, false);
 
       MFnAnimCurve curve(plug, &stat);
 
@@ -807,12 +807,12 @@ void Keyframer::createCurves(MFnAnimCurve::InfinityType preInf,
                nAttr.setHidden(true);
                curve.addAttribute(preserveStartAttr);
                
-               curve.findPlug("abcimport_speed").setDouble(entry.speed);
-               curve.findPlug("abcimport_offset").setDouble(entry.offset);
-               curve.findPlug("abcimport_start").setDouble(entry.start);
-               curve.findPlug("abcimport_end").setDouble(entry.end);
-               curve.findPlug("abcimport_reverse").setBool(entry.reverse);
-               curve.findPlug("abcimport_preservestart").setBool(entry.preserveStart);
+               curve.findPlug("abcimport_speed", false).setDouble(entry.speed);
+               curve.findPlug("abcimport_offset", false).setDouble(entry.offset);
+               curve.findPlug("abcimport_start", false).setDouble(entry.start);
+               curve.findPlug("abcimport_end", false).setDouble(entry.end);
+               curve.findPlug("abcimport_reverse", false).setBool(entry.reverse);
+               curve.findPlug("abcimport_preservestart", false).setBool(entry.preserveStart);
             }
          }
       }
@@ -856,7 +856,7 @@ void Keyframer::retimeCurve(MFnAnimCurve &curve,
    }
    
    // Retrieve import state
-   MPlug pStart = curve.findPlug("abcimport_start");
+   MPlug pStart = curve.findPlug("abcimport_start", false);
    if (pStart.isNull())
    {
       #ifdef _DEBUG
@@ -866,7 +866,7 @@ void Keyframer::retimeCurve(MFnAnimCurve &curve,
    }
    double start = pStart.asDouble();
    
-   MPlug pEnd = curve.findPlug("abcimport_end");
+   MPlug pEnd = curve.findPlug("abcimport_end", false);
    if (pEnd.isNull())
    {
       #ifdef _DEBUG
@@ -876,7 +876,7 @@ void Keyframer::retimeCurve(MFnAnimCurve &curve,
    }
    double end = pEnd.asDouble();
    
-   MPlug pSpeed = curve.findPlug("abcimport_speed");
+   MPlug pSpeed = curve.findPlug("abcimport_speed", false);
    if (pSpeed.isNull())
    {
       #ifdef _DEBUG
@@ -897,7 +897,7 @@ void Keyframer::retimeCurve(MFnAnimCurve &curve,
    double oldSpeedInv = 1.0 / oldSpeed;
    double newSpeedInv = 1.0 / newSpeed;
    
-   MPlug pOffset = curve.findPlug("abcimport_offset");
+   MPlug pOffset = curve.findPlug("abcimport_offset", false);
    if (pOffset.isNull())
    {
       #ifdef _DEBUG
@@ -908,7 +908,7 @@ void Keyframer::retimeCurve(MFnAnimCurve &curve,
    double oldOffset = pOffset.asDouble();
    double newOffset = (offset ? *offset : oldOffset);
    
-   MPlug pReverse = curve.findPlug("abcimport_reverse");
+   MPlug pReverse = curve.findPlug("abcimport_reverse", false);
    if (pReverse.isNull())
    {
       #ifdef _DEBUG
@@ -919,7 +919,7 @@ void Keyframer::retimeCurve(MFnAnimCurve &curve,
    bool oldReverse = pReverse.asBool();
    bool newReverse = (reverse ? *reverse : oldReverse);
    
-   MPlug pPreserveStart = curve.findPlug("abcimport_preservestart");
+   MPlug pPreserveStart = curve.findPlug("abcimport_preservestart", false);
    if (pPreserveStart.isNull())
    {
       #ifdef _DEBUG

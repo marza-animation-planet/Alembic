@@ -1902,7 +1902,7 @@ void SetUserAttribute(AtNode *node, const char *name, UserAttribute &ua, unsigne
          int type = (isArray ? AiUserParamGetArrayType(upe) : AiUserParamGetType(upe));
          
          if (type != outArnoldType ||
-             AiUserParamGetCategory(upe) != ua.arnoldCategory,
+             AiUserParamGetCategory(upe) != ua.arnoldCategory ||
              ua.isArray != isArray)
          {
             // Attribute spec mismatch

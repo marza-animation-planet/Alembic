@@ -56,11 +56,18 @@
 #include <maya/MMutexLock.h>
 #include <map>
 #include <string>
+#if MAYA_API_VERSION > 202000
+#   include <mutex>
+#endif
 
 
 namespace
 {
+#if MAYA_API_VERSION > 202000
+    static std::mutex gsAbcVertexIndicesLock;
+#else
     static MMutexLock gsAbcVertexIndicesLock;
+#endif
     static std::map<std::string, MIntArray> gsAbcVertexIndices;
 
     // utility to determine if a string is in the string array
