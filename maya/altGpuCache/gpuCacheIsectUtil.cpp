@@ -274,6 +274,9 @@ namespace GPUCache {
 		double boundsMin[3]={minPoint[0],minPoint[1],minPoint[2]};
 		double boundsMax[3]={maxPoint[0],maxPoint[1],maxPoint[2]};
 
+		isectParams[0] = 0.0;
+		isectParams[1] = 0.0;
+
 		//	for each side of the voxel grid (+X, -X, +Y, -Y, +Z, -Z), we will
 		//	intersect the ray with that side's plane, then check the intersection
 		//	point to see if it lies within 

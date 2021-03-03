@@ -581,7 +581,11 @@ static void clearPostRenderCallbacks()
 
 static void uiDeleted(void* clientData)
 {
+#if MAYA_API_VERSION >= 202000
+    uintptr_t idx = reinterpret_cast<uintptr_t>(clientData);
+#else
     MUintPtrSz idx = reinterpret_cast<MUintPtrSz>(clientData);
+#endif
 
     MMessage::removeCallback(s3dViewPostRenderCallbackIds[idx]);
     s3dViewPostRenderCallbackIds[idx] = MCallbackId();

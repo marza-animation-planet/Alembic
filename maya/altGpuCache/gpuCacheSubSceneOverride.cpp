@@ -5384,7 +5384,8 @@ SubSceneOverride::SubSceneOverride(const MObject& object)
     fReceiveShadowsPlug = dagNode.findPlug("receiveShadows", false);
 
     // Register callbacks
-    MDagPath dagPath = MDagPath::getAPathTo(object);  // any path
+    MDagPath dagPath;
+    MDagPath::getAPathTo(object, dagPath);  // any path
     fInstanceAddedCallback = MDagMessage::addInstanceAddedDagPathCallback(
         dagPath, InstanceChangedCallback, this);
     fInstanceRemovedCallback = MDagMessage::addInstanceRemovedDagPathCallback(

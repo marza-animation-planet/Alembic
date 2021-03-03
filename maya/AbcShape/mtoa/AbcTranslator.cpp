@@ -337,7 +337,7 @@ MPlug CAbcTranslator::FindMayaObjectPlug(const MString &attrName, MStatus* Retur
 {
    MObject obj = GetMayaObject();
    MFnDependencyNode node(obj);
-   return node.findPlug(attrName, ReturnStatus);
+   return node.findPlug(attrName, false, ReturnStatus);
 }
 
 void CAbcTranslator::GetFrames(double inRenderFrame, double inSampleFrame,
@@ -754,7 +754,7 @@ void CAbcTranslator::ExportShader(AtNode *proc, bool update)
    {
       MPlugArray shaderConns;
 
-      MPlug shaderPlug = masterShadingEngine.findPlug("displacementShader");
+      MPlug shaderPlug = masterShadingEngine.findPlug("displacementShader", false);
 
       shaderPlug.connectedTo(shaderConns, true, false);
 
@@ -762,14 +762,14 @@ void CAbcTranslator::ExportShader(AtNode *proc, bool update)
       {
          MFnDependencyNode dispNode(shaderConns[0].node());
 
-         plug = dispNode.findPlug("aiDisplacementPadding");
+         plug = dispNode.findPlug("aiDisplacementPadding", false);
          if (!plug.isNull())
          {
             outputDispPadding = true;
             dispPadding = AiMax(dispPadding, plug.asFloat());
          }
 
-         plug = dispNode.findPlug("aiDisplacementAutoBump");
+         plug = dispNode.findPlug("aiDisplacementAutoBump", false);
          if (!plug.isNull())
          {
             outputDispAutobump = true;

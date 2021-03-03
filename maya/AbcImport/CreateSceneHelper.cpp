@@ -1140,7 +1140,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::ICurves & iNode)
 
         if (!fncurve.object().isNull())
         {
-            MPlug dstPlug = fncurve.findPlug("create", true);
+            MPlug dstPlug = fncurve.findPlug("create", false);
             disconnectAllPlugsTo(dstPlug);
             disconnectProps(fncurve, mData.mPropList, firstProp);
             addToPropList(firstProp, curvesObj);
@@ -1585,7 +1585,7 @@ MStatus CreateSceneVisitor::operator()(Alembic::AbcGeom::INuPatch& iNode)
             return status;
         }
 
-        MPlug dstPlug = fn.findPlug("create", true);
+        MPlug dstPlug = fn.findPlug("create", false);
         disconnectAllPlugsTo(dstPlug);
         disconnectProps(fn, mData.mPropList, firstProp);
         addToPropList(firstProp, nurbsObj);

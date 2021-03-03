@@ -200,7 +200,11 @@ public:
    {
       MStatus status;
 
+#if MAYA_API_VERSION >= 201400
+      unsigned int nlights = std::min<unsigned int>(GL_MAX_LIGHTS, context.numberOfActiveLights(MHWRender::MDrawContext::kFilteredToLightLimit, &status));
+#else
       unsigned int nlights = std::min<unsigned int>(GL_MAX_LIGHTS, context.numberOfActiveLights(&status));
+#endif
       if (status != MStatus::kSuccess)
       {
          return false;
@@ -251,7 +255,7 @@ public:
             
 #if MAYA_API_VERSION >= 201400
             MFloatPointArray positions;
-            status = context.getLightInformation(i, positions, direction, intensity, color, hasDirection, hasPosition);
+            status = context.getLightInformation(i, positions, direction, intensity, color, hasDirection, hasPosition, MHWRender::MDrawContext::kFilteredToLightLimit);
             if (positions.length() > 0)
             {
                // only ever use first provided position for area light

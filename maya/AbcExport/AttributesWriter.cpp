@@ -2153,7 +2153,7 @@ AttributesWriter::AttributesWriter(
     // Add reference object if any
     if (iArgs.writeReferenceMesh)
     {
-        MPlug pReferenceObject = iNode.findPlug("referenceObject");
+        MPlug pReferenceObject = iNode.findPlug("referenceObject", false);
         if (!pReferenceObject.isNull())
         {
             MPlugArray pSrcs;
@@ -2694,7 +2694,7 @@ bool AttributesWriter::hasReferenceObject(const MFnDependencyNode & iNode,
 {
     if (iArgs.writeReferenceMesh)
     {
-        MPlug pReferenceObject = iNode.findPlug("referenceObject");
+        MPlug pReferenceObject = iNode.findPlug("referenceObject", false);
         
         if (!pReferenceObject.isNull())
         {

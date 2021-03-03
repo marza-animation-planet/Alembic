@@ -448,7 +448,7 @@ static void CurrentRendererChanged(const MString &name, MObject drg=MObject::kNu
    {
       MFnDependencyNode node(drg.isNull() ? obj : drg);
       
-      MPlug plug = node.findPlug("preMel");
+      MPlug plug = node.findPlug("preMel", false);
       
       if (!plug.isNull())
       {
@@ -462,7 +462,7 @@ static void CurrentRendererChanged(const MString &name, MObject drg=MObject::kNu
          }
       }
       
-      plug = node.findPlug("preRenderMel");
+      plug = node.findPlug("preRenderMel", false);
       
       if (!plug.isNull())
       {
@@ -485,7 +485,7 @@ static void CurrentRendererChanged(const MString &name, MObject drg=MObject::kNu
    {
       MFnDependencyNode node(vrs.isNull() ? obj : vrs);
       
-      MPlug plug = node.findPlug("postTranslatePython");
+      MPlug plug = node.findPlug("postTranslatePython", false);
       
       if (!plug.isNull())
       {
@@ -499,7 +499,7 @@ static void CurrentRendererChanged(const MString &name, MObject drg=MObject::kNu
          }
       }
       
-      plug = node.findPlug("preKeyframeMel");
+      plug = node.findPlug("preKeyframeMel", false);
       
       if (!plug.isNull())
       {
@@ -745,7 +745,7 @@ static void PluginLoaded(const MStringArray &strs, void *)
          RenderGlobalsCreated(drg, 0);
          
          MFnDependencyNode node(drg);   
-         MPlug plug = node.findPlug("currentRenderer");
+         MPlug plug = node.findPlug("currentRenderer", false);
       
          if (!plug.isNull())
          {

@@ -675,8 +675,13 @@ bool DrawOverride::UserData::setupLightingGL(
 
     // Take into account only the 8 lights supported by the basic
     // OpenGL profile.
+#if MAYA_API_VERSION >= 201400
+    const unsigned int nbLights =
+        std::min(context.numberOfActiveLights(MHWRender::MDrawContext::kFilteredToLightLimit, &status), 8u);
+#else
     const unsigned int nbLights =
         std::min(context.numberOfActiveLights(&status), 8u);
+#endif
     if (status != MStatus::kSuccess) return false;
 
     if (nbLights > 0) {
@@ -717,9 +722,15 @@ bool DrawOverride::UserData::setupLightingGL(
             MColor color;
             bool hasDirection;
             bool hasPosition;
+#if MAYA_API_VERSION >= 201400
+            status = context.getLightInformation(
+                i, positions, direction, intensity, color,
+                hasDirection, hasPosition, MHWRender::MDrawContext::kFilteredToLightLimit);
+#else
             status = context.getLightInformation(
                 i, positions, direction, intensity, color,
                 hasDirection, hasPosition);
+#endif
             if (status != MStatus::kSuccess) return false;
 
             // if (hasPosition)
@@ -835,8 +846,13 @@ void DrawOverride::UserData::unsetLightingGL(
 
     // Take into account only the 8 lights supported by the basic
     // OpenGL profile.
+#if MAYA_API_VERSION >= 201400
+    const unsigned int nbLights =
+        std::min(context.numberOfActiveLights(MHWRender::MDrawContext::kFilteredToLightLimit, &status), 8u);
+#else
     const unsigned int nbLights =
         std::min(context.numberOfActiveLights(&status), 8u);
+#endif
     if (status != MStatus::kSuccess) return;
 
     // Restore OpenGL default values for anything that we have
