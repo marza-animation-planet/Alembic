@@ -3386,9 +3386,11 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
    TimeSampleList<Alembic::AbcGeom::ICurvesSchema> &samples = node.samples().schemaSamples;
    TimeSampleList<Alembic::AbcGeom::IFloatGeomParam> Wsamples;
    TimeSampleList<Alembic::AbcGeom::IN3fGeomParam> Nsamples;
+   TimeSampleList<Alembic::AbcGeom::IV2fGeomParam> UVsamples;
    TimeSampleList<Alembic::AbcGeom::ICurvesSchema>::ConstIterator samp0, samp1;
    TimeSampleList<Alembic::AbcGeom::IFloatGeomParam>::ConstIterator Wsamp0, Wsamp1;
    TimeSampleList<Alembic::AbcGeom::IN3fGeomParam>::ConstIterator Nsamp0, Nsamp1;
+   TimeSampleList<Alembic::AbcGeom::IV2fGeomParam>::ConstIterator UVsamp0, UVsamp1;
    double a = 1.0;
    double b = 0.0;
    double t = 0.0;
@@ -3412,6 +3414,11 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
       {
          Nsamples.update(normals, t, t, false);
       }
+
+      if (uvs)
+      {
+         UVsamples.update(uvs, t, t, false);
+      }
    }
    else
    {
@@ -3434,6 +3441,11 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
          if (normals)
          {
             Nsamples.update(normals, t, t, i > 0);
+         }
+
+         if (uvs)
+         {
+            UVsamples.update(uvs, t, t, i > 0);
          }
       }
 
@@ -3950,7 +3962,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
       }
       else
       {
-         Nsamples.getSamples(mDso->renderTime(), Nsamp0, Nsamp0, b);
+         Nsamples.getSamples(mDso->renderTime(), Nsamp0, Nsamp1, b);
 
          N0 = Nsamp0->data().getVals();
 
@@ -3995,6 +4007,134 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
 
    // Process uvs
 
+   AtArray *aiuvs = 0;
+
+   if (UVsamples.size() > 0)
+   {
+      if (mDso->verbose())
+      {
+         AiMsgInfo("[abcproc] Reading curve uv(s)...");
+      }
+
+      Alembic::Abc::V2fArraySamplePtr UV0, UV1;
+      Alembic::Abc::V2f uv0, uv1;
+      AtVector2 uv;
+
+      if (UVsamples.size() > 1 && !info.varyingTopology)
+      {
+         aiuvs = AiArrayAllocate(info.curveCount, mDso->numMotionSamples(), AI_TYPE_VECTOR2);
+
+         for (size_t i=0; i<mDso->numMotionSamples(); ++i)
+         {
+            b = 0.0;
+
+            UVsamples.getSamples(mDso->motionSampleTime(i), UVsamp0, UVsamp1, b);
+
+            UV0 = UVsamp0->data().getVals();
+
+            if (UV0->size() != 1 &&
+                UV0->size() != info.curveCount &&
+                UV0->size() != info.pointCount)
+            {
+               if (mDso->verbose())
+               {
+                  AiMsgInfo("[abcproc] Curve uvs count mismatch");
+               }
+
+               AiArrayDestroy(aiuvs);
+               aiuvs = 0;
+               break;
+            }
+
+            unsigned int UVcount = (unsigned int) UV0->size();
+            unsigned int pi = 0;
+
+            if (b > 0.0)
+            {
+               a = 1.0 - b;
+
+               UV1 = UVsamp1->data().getVals();
+
+               if (UV1->size() != UV0->size())
+               {
+                  AiArrayDestroy(aiuvs);
+                  aiuvs = 0;
+                  break;
+               }
+
+               for (unsigned int ci=0; ci<info.curveCount; ++ci)
+               {
+                  unsigned int np = AiArrayGetUInt(num_points, ci) - 2;
+                  unsigned int uvi = (UVcount == 1 ? 0 : (UVcount == info.curveCount ? ci : pi));
+
+                  uv0 = UV0->get()[uvi];
+                  uv1 = UV1->get()[uvi];
+                  uv.x = a * uv0.x + b * uv1.x;
+                  uv.y = a * uv0.y + b * uv1.y;
+                  AiArraySetVec2(aiuvs, ci, uv);
+
+                  pi += np;
+               }
+            }
+            else
+            {
+               for (unsigned int ci=0; ci<info.curveCount; ++ci)
+               {
+                  unsigned int np = AiArrayGetUInt(num_points, ci) - 2;
+                  unsigned int uvi = (UVcount == 1 ? 0 : (UVcount == info.curveCount ? ci : pi));
+
+                  uv0 = UV0->get()[uvi];
+                  uv.x = uv0.x;
+                  uv.y = uv0.y;
+                  AiArraySetVec2(aiuvs, ci, uv);
+
+                  pi += np;
+               }
+            }
+         }
+      }
+      else
+      {
+         UVsamples.getSamples(mDso->renderTime(), UVsamp0, UVsamp1, b);
+
+         UV0 = UVsamp0->data().getVals();
+
+         if (UV0->size() == 1 ||
+             UV0->size() == info.curveCount ||
+             UV0->size() == info.pointCount)
+         {
+            unsigned int UVcount = (unsigned int) UV0->size();
+
+            aiuvs = AiArrayAllocate(info.curveCount, 1, AI_TYPE_VECTOR2);
+
+            unsigned int pi = 0;
+
+            for (unsigned int ci=0; ci<info.curveCount; ++ci)
+            {
+               unsigned int np = AiArrayGetUInt(num_points, ci) - 2;
+               unsigned int uvi = (UVcount == 1 ? 0 : (UVcount == info.curveCount ? ci : pi));
+
+               uv0 = UV0->get()[uvi];
+               uv.x = uv0.x;
+               uv.y = uv0.y;
+               AiArraySetVec2(aiuvs, ci, uv);
+
+               pi += np;
+            }
+         }
+         else if (mDso->verbose())
+         {
+            AiMsgInfo("[abcproc] Curve uvs count mismatch");
+         }
+      }
+   }
+
+   if (aiuvs)
+   {
+      AiNodeSetArray(mNode, "uvs", aiuvs);
+   }
+
+   /*
    if (uvs)
    {
       if (info.pointAttrs.find("uv") != info.pointAttrs.end() ||
@@ -4035,6 +4175,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
          DestroyUserAttribute(uvsAttr);
       }
    }
+   */
 
    // Reference positions
 
