@@ -3191,10 +3191,12 @@ AlembicCacheReader::~AlembicCacheReader()
         tbb::mutex::scoped_lock alembicLock(gsAlembicMutex);
         fAbcArchive.reset();
     }
+    /* C++11 destructors default to noexcept, throw will always call terminate()
     catch (CacheReaderInterruptException& ex) {
         // pass upward
         throw ex;
     }
+    */
     catch (std::exception& ex) {
         DisplayError(kCloseFileErrorMsg, fFile.resolvedFullName(), ex.what());
     }

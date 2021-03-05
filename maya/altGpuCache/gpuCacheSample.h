@@ -38,7 +38,7 @@
 
 #include <vector>
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || !defined(__APPLE__)
 #   define ALTGPU_NOEXCEPT
 #else
 #   define ALTGPU_NOEXCEPT noexcept

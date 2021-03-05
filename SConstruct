@@ -130,7 +130,8 @@ def RequireAlembic(static=True, withPython=False, withGL=False, linkCore=True, l
                                        "-Wno-unused-parameter",
                                        "-Wno-unused-but-set-variable",
                                        "-Wno-unused-variable",
-                                       "-Wno-ignored-qualifiers"]))
+                                       "-Wno-ignored-qualifiers",
+                                       "-Wno-type-limits"]))
 
       defs = []
       incdirs = ["lib"]
@@ -251,7 +252,7 @@ if sys.platform != "win32":
    if sys.platform == "darwin":
       nowarn_flags += " -Wno-missing-field-initializers -Wno-unused-local-typedef -Wno-deprecated-declarations"
    else:
-      nowarn_flags += " -Wno-maybe-uninitialized -Wno-strict-aliasing -Wno-write-strings"
+      nowarn_flags += " -Wno-maybe-uninitialized -Wno-strict-aliasing -Wno-write-strings -Wno-type-limits"
 
 
 lib_headers = []
