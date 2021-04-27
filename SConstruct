@@ -52,7 +52,7 @@ if withArnold:
       print("Arnold 5 above 5.0.1.0 required")
 
 if withMaya:
-   maya.SetupMscver()
+   maya.SetupCompiler()
 
 if withVray:
    vrayVer = vray.Version(asString=False, nice=True)
