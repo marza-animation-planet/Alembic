@@ -77,13 +77,13 @@ if not rv["require"]:
            "ilmbase-python-staticlibs": "1"}
    excons.Call("openexr", overrides=opts, imp=["RequireImath", "RequireIlmThread", "RequirePyImath"])
    def RequireIlmBase(env):
-      RequireImath(env, static=True)
-      RequireIlmThread(env, static=True)
+      RequireImath(env, static=True) # pylint: disable=undefined-variable
+      RequireIlmThread(env, static=True) # pylint: disable=undefined-variable
       if sys.platform != "win32":
          env.Append(LIBS=["pthread"])
    def RequirePyIlmBase(env):
-      RequirePyImath(env, staticpy=True, staticbase=True)
-      RequireIlmThread(env, static=True)
+      RequirePyImath(env, staticpy=True, staticbase=True)  # pylint: disable=undefined-variable
+      RequireIlmThread(env, static=True) # pylint: disable=undefined-variable
       if sys.platform != "win32":
          env.Append(LIBS=["pthread"])
 else:
@@ -241,7 +241,7 @@ opts = {"PROJECT_VERSION_MAJOR": str(version_tpl[0]),
         "ALEMBIC_LIB_USES_BOOST": ("" if use_boost else "//") + "#define ALEMBIC_LIB_USES_BOOST",
         "ALEMBIC_LIB_USES_TR1": ("" if use_tr1 else "//") + "#define ALEMBIC_LIB_USES_TR1"}
 
-GenerateConfig = excons.config.AddGenerator(env, "abccfg", opts, pattern="\$\{([^}]+)\}|#cmakedefine\s+([^\s]+)")
+GenerateConfig = excons.config.AddGenerator(env, "abccfg", opts, pattern=r"\$\{([^}]+)\}|#cmakedefine\s+([^\s]+)")
 
 configh = GenerateConfig(cfgout, cfgin)
 
@@ -640,8 +640,8 @@ env.Depends(targets["alembic-shared"], lib_headers)
 env.Depends(targets["alembicgl-static"], lib_headers)
 env.Depends(targets["alembicgl-shared"], lib_headers)
 
-Export("RequireAlembic")
-Export("RequireAlembicHelper")
+Export("RequireAlembic") # pylint: disable=undefined-variable
+Export("RequireAlembicHelper") # pylint: disable=undefined-variable
 
 deftargets = ["alembic-libs", "alembic-tools", "alembic-python"]
 if withArnold:
@@ -654,9 +654,9 @@ if withMaya:
    deftargets.append("alembic-maya")
    if withArnold and mtoa.Version(asString=False)[0] >= 2:
       deftargets.append("alembic-mtoa")
-Default(deftargets)
+Default(deftargets) # pylint: disable=undefined-variable
 
-if "eco" in COMMAND_LINE_TARGETS:
+if "eco" in COMMAND_LINE_TARGETS: # pylint: disable=undefined-variable
    outbd = excons.OutputBaseDirectory()
    ecop = "/" + excons.EcosystemPlatform()
 
