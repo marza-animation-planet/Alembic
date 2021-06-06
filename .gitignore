@@ -46,3 +46,4 @@ arnold/abcproc/abcproc.env.tmp
 
 # Build Folder
 BUILD
+/.vscode

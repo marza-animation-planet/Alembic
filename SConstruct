@@ -241,7 +241,18 @@ opts = {"PROJECT_VERSION_MAJOR": str(version_tpl[0]),
         "ALEMBIC_LIB_USES_BOOST": ("" if use_boost else "//") + "#define ALEMBIC_LIB_USES_BOOST",
         "ALEMBIC_LIB_USES_TR1": ("" if use_tr1 else "//") + "#define ALEMBIC_LIB_USES_TR1"}
 
-GenerateConfig = excons.config.AddGenerator(env, "abccfg", opts, pattern=r"\$\{([^}]+)\}|#cmakedefine\s+([^\s]+)")
+def replace_cmakedefine(line, opts):
+   m = re.match(r"^#cmakedefine\s+([^\s]+)", line)
+   if m is not None:
+      opt = m.group(1)
+      if opts.get(opt, False):
+         return "// #define %s%s" % (opt, line.replace(m.group(0), ""))
+      else:
+         return "#define %s%s" % (opt, line.replace(m.group(0), ""))
+   else:
+      return line
+
+GenerateConfig = excons.config.AddGenerator(env, "abccfg", opts, pattern=r"\$\{([^}]+)\}", optgroup=1, replacefuncs=[replace_cmakedefine])
 
 configh = GenerateConfig(cfgout, cfgin)
 
@@ -323,6 +334,7 @@ prjs.extend([{"name": ("alembicmodule" if sys.platform != "win32" else "alembic"
               "prefix": "%s/%s" % (python.ModulePrefix(), python.Version()),
               "rpaths": ["../.."],
               "bldprefix": "python-%s" % python.Version(),
+              "vismap": (("pyalembic_%s.map" % ("mac" if sys.platform == "darwin" else "lin")) if sys.platform != "win32" else None),
               "defs": pydefs + ["alembicmodule_EXPORTS"],
               "cppflags": nowarn_flags,
               "incdirs": ["python/PyAlembic"],
@@ -338,6 +350,7 @@ prjs.extend([{"name": ("alembicmodule" if sys.platform != "win32" else "alembic"
               "prefix": "%s/%s" % (python.ModulePrefix(), python.Version()),
               "rpaths": ["../.."],
               "bldprefix": "python-%s" % python.Version(),
+              "vismap": (("pyalembicgl_%s.map" % ("mac" if sys.platform == "darwin" else "lin")) if sys.platform != "win32" else None),
               "defs": pydefs + ["alembicglmodule_EXPORTS"],
               "cppflags": nowarn_flags,
               "incdirs": ["abcview/python/PyAbcOpenGL"],
