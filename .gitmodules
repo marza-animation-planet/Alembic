@@ -1,12 +1,12 @@
 [submodule "excons"]
 	path = excons
-	url = git://github.com/gatgui/excons.git
+	url = git@github.com:marza-animation-planet/excons.git
 [submodule "openexr"]
 	path = openexr
-	url = git://github.com/gatgui/openexr.git
+	url = git@github.com:marza-animation-planet/openexr.git
 [submodule "abcview"]
 	path = abcview
-	url = git://github.com/gatgui/abcview
+	url = git@github.com:marza-animation-planet/abcview
 [submodule "cask"]
 	path = cask
-	url = git://github.com/gatgui/cask
+	url = git@github.com:marza-animation-planet/cask
