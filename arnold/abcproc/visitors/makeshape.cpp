@@ -2547,20 +2547,17 @@ bool MakeShape::initCurves(CurvesInfo &info,
    int degree = (sample.getType() == Alembic::AbcGeom::kCubic ? 3 : 1);
    bool periodic = (sample.getWrap() == Alembic::AbcGeom::kPeriodic);
 
-   if (info.degree != 1)
+   if (degree != 1)
    {
       switch (sample.getBasis())
       {
       case Alembic::AbcGeom::kNoBasis:
-         arnoldBasis = "linear";
-         degree = 1;
-         break;
-
-      case Alembic::AbcGeom::kBezierBasis:
-         arnoldBasis = "bezier";
+         AiMsgWarning("[abcproc] Cubic curve basis not specified, assuming 'catmull-rom'");
+         arnoldBasis = "catmull-rom";
          break;
 
       case Alembic::AbcGeom::kBsplineBasis:
+         // conversion
          nurbs = true;
          arnoldBasis = "catmull-rom";
          break;
@@ -2568,6 +2565,10 @@ bool MakeShape::initCurves(CurvesInfo &info,
       case Alembic::AbcGeom::kCatmullromBasis:
          arnoldBasis = "catmull-rom";
          break;
+
+      case Alembic::AbcGeom::kBezierBasis:
+         AiMsgWarning("[abcproc] Curve 'Bezier' basis not supported");
+         return false;
 
       case Alembic::AbcGeom::kPowerBasis:
          AiMsgWarning("[abcproc] Curve 'Power' basis not supported");
@@ -3737,6 +3738,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
    // min_pixel_width
    // invert_normals
 
+   unsigned int extraPoints = (info.degree == 3 ? 2 : 0);
+
    // Process radius
    AtArray *radius = 0;
 
@@ -3785,7 +3788,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
 
                for (unsigned int ci=0; ci<info.curveCount; ++ci)
                {
-                  unsigned int np = AiArrayGetUInt(num_points, ci) - 2;
+                  unsigned int np = AiArrayGetUInt(num_points, ci) - extraPoints;
 
                   for (unsigned int j=0; j<np; ++j, ++pi)
                   {
@@ -3802,7 +3805,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
             {
                for (unsigned int ci=0; ci<info.curveCount; ++ci)
                {
-                  unsigned int np = AiArrayGetUInt(num_points, ci) - 2;
+                  unsigned int np = AiArrayGetUInt(num_points, ci) - extraPoints;
 
                   for (unsigned int j=0; j<np; ++j, ++pi)
                   {
@@ -3834,7 +3837,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
 
             for (unsigned int ci=0; ci<info.curveCount; ++ci)
             {
-               unsigned int np = AiArrayGetUInt(num_points, ci) - 2;
+               unsigned int np = AiArrayGetUInt(num_points, ci) - extraPoints;
 
                for (unsigned int j=0; j<np; ++j, ++pi)
                {
@@ -3862,6 +3865,7 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
    AiNodeSetArray(mNode, "radius", radius);
 
    // Process normals (orientation)
+   // -> per point, unlike radius
 
    AtArray *orientations = 0;
 
@@ -3875,12 +3879,13 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
       Alembic::Abc::N3fArraySamplePtr N0, N1;
       Alembic::Abc::V3f n0, n1;
       AtVector nrm;
+      unsigned int Pcount = info.pointCount + extraPoints * info.curveCount;
 
       if (Nsamples.size() > 1 && !info.varyingTopology)
       {
-         orientations = AiArrayAllocate(info.pointCount, mDso->numMotionSamples(), AI_TYPE_VECTOR);
-
          unsigned int po = 0;
+
+         orientations = AiArrayAllocate(Pcount, mDso->numMotionSamples(), AI_TYPE_VECTOR);
 
          for (size_t i=0; i<mDso->numMotionSamples(); ++i)
          {
@@ -3906,7 +3911,8 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
             }
 
             unsigned int Ncount = (unsigned int) N0->size();
-            unsigned int pi = 0;
+            unsigned int spi = 0;
+            unsigned int dpi = 0;
 
             if (b > 0.0)
             {
@@ -3923,18 +3929,43 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
 
                for (unsigned int ci=0; ci<info.curveCount; ++ci)
                {
-                  unsigned int np = AiArrayGetUInt(num_points, ci) - 2;
+                  unsigned int np = AiArrayGetUInt(num_points, ci) - extraPoints;
 
-                  for (unsigned int j=0; j<np; ++j, ++pi)
+                  if (extraPoints > 0)
                   {
-                     unsigned int ni = (Ncount == 1 ? 0 : (Ncount == info.curveCount ? ci : pi));
+                     unsigned int ni = (Ncount == 1 ? 0 : (Ncount == info.curveCount ? ci : spi));
 
                      n0 = N0->get()[ni];
                      n1 = N1->get()[ni];
                      nrm.x = a * n0.x + b * n1.x;
                      nrm.y = a * n0.y + b * n1.y;
                      nrm.z = a * n0.z + b * n1.z;
-                     AiArraySetVec(orientations, po + pi, nrm);
+                     AiArraySetVec(orientations, po + dpi, nrm);
+                     ++dpi;
+                  }
+
+                  for (unsigned int j=0; j<np; ++j, ++spi, ++dpi)
+                  {
+                     unsigned int ni = (Ncount == 1 ? 0 : (Ncount == info.curveCount ? ci : spi));
+
+                     n0 = N0->get()[ni];
+                     n1 = N1->get()[ni];
+                     nrm.x = a * n0.x + b * n1.x;
+                     nrm.y = a * n0.y + b * n1.y;
+                     nrm.z = a * n0.z + b * n1.z;
+                     AiArraySetVec(orientations, po + dpi, nrm);
+                  }
+
+                  if (extraPoints > 0)
+                  {
+                     unsigned int ni = (Ncount == 1 ? 0 : (Ncount == info.curveCount ? ci : spi - 1));
+
+                     n0 = N0->get()[ni];
+                     n1 = N1->get()[ni];
+                     nrm.x = a * n0.x + b * n1.x;
+                     nrm.y = a * n0.y + b * n1.y;
+                     nrm.z = a * n0.z + b * n1.z;
+                     AiArraySetVec(orientations, po + dpi, nrm);
                   }
                }
             }
@@ -3942,22 +3973,45 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
             {
                for (unsigned int ci=0; ci<info.curveCount; ++ci)
                {
-                  unsigned int np = AiArrayGetUInt(num_points, ci) - 2;
+                  unsigned int np = AiArrayGetUInt(num_points, ci) - extraPoints;
 
-                  for (unsigned int j=0; j<np; ++j, ++pi)
+                  if (extraPoints > 0)
                   {
-                     unsigned int ni = (Ncount == 1 ? 0 : (Ncount == info.curveCount ? ci : pi));
+                     unsigned int ni = (Ncount == 1 ? 0 : (Ncount == info.curveCount ? ci : spi));
 
                      n0 = N0->get()[ni];
                      nrm.x = n0.x;
                      nrm.y = n0.y;
                      nrm.z = n0.z;
-                     AiArraySetVec(orientations, po + pi, nrm);
+                     AiArraySetVec(orientations, po + dpi, nrm);
+                     ++dpi;
+                  }
+
+                  for (unsigned int j=0; j<np; ++j, ++spi, ++dpi)
+                  {
+                     unsigned int ni = (Ncount == 1 ? 0 : (Ncount == info.curveCount ? ci : spi));
+
+                     n0 = N0->get()[ni];
+                     nrm.x = n0.x;
+                     nrm.y = n0.y;
+                     nrm.z = n0.z;
+                     AiArraySetVec(orientations, po + dpi, nrm);
+                  }
+
+                  if (extraPoints > 0)
+                  {
+                     unsigned int ni = (Ncount == 1 ? 0 : (Ncount == info.curveCount ? ci : spi-1));
+
+                     n0 = N0->get()[ni];
+                     nrm.x = n0.x;
+                     nrm.y = n0.y;
+                     nrm.z = n0.z;
+                     AiArraySetVec(orientations, po + dpi, nrm);
                   }
                }
             }
 
-            po += info.pointCount;
+            po += Pcount;
          }
       }
       else
@@ -3971,24 +4025,47 @@ AlembicNode::VisitReturn MakeShape::enter(AlembicCurves &node, AlembicNode *inst
              N0->size() == info.pointCount)
          {
             unsigned int Ncount = (unsigned int) N0->size();
+            unsigned int spi = 0;
+            unsigned int dpi = 0;
 
-            orientations = AiArrayAllocate(info.pointCount, 1, AI_TYPE_VECTOR);
-
-            unsigned int pi = 0;
+            orientations = AiArrayAllocate(Pcount, 1, AI_TYPE_VECTOR);
 
             for (unsigned int ci=0; ci<info.curveCount; ++ci)
             {
-               unsigned int np = AiArrayGetUInt(num_points, ci) - 2;
+               unsigned int np = AiArrayGetUInt(num_points, ci) - extraPoints;
 
-               for (unsigned int j=0; j<np; ++j, ++pi)
+               if (extraPoints > 0)
                {
-                  unsigned int ni = (Ncount == 1 ? 0 : (Ncount == info.curveCount ? ci : pi));
+                  unsigned int ni = (Ncount == 1 ? 0 : (Ncount == info.curveCount ? ci : spi));
 
                   n0 = N0->get()[ni];
                   nrm.x = n0.x;
                   nrm.y = n0.y;
                   nrm.z = n0.z;
-                  AiArraySetVec(orientations, pi, nrm);
+                  AiArraySetVec(orientations, dpi, nrm);
+                  ++dpi;
+               }
+
+               for (unsigned int j=0; j<np; ++j, ++dpi, ++spi)
+               {
+                  unsigned int ni = (Ncount == 1 ? 0 : (Ncount == info.curveCount ? ci : spi));
+
+                  n0 = N0->get()[ni];
+                  nrm.x = n0.x;
+                  nrm.y = n0.y;
+                  nrm.z = n0.z;
+                  AiArraySetVec(orientations, dpi, nrm);
+               }
+
+               if (extraPoints > 0)
+               {
+                  unsigned int ni = (Ncount == 1 ? 0 : (Ncount == info.curveCount ? ci : spi - 1));
+
+                  n0 = N0->get()[ni];
+                  nrm.x = n0.x;
+                  nrm.y = n0.y;
+                  nrm.z = n0.z;
+                  AiArraySetVec(orientations, dpi, nrm);
                }
             }
          }
