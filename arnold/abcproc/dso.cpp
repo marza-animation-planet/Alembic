@@ -321,6 +321,7 @@ Dso::Dso(AtNode *node)
       AlembicSceneFilter filter(mCommonParams.objectPath, mCommonParams.excludePath);
 
       AlembicSceneCache::SetConcurrency(size_t(AiNodeGetInt(opts, "threads")));
+      AlembicSceneCache::SetUseMemoryMappedFiles(false);
 
       mScene = AlembicSceneCache::Ref(mCommonParams.filePath, id, filter, true);
    }

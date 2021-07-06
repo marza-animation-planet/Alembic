@@ -5,6 +5,11 @@ void AlembicSceneCache::SetConcurrency(size_t n)
    Instance().setConcurrency(n);
 }
 
+void AlembicSceneCache::SetUseMemoryMappedFiles(bool onoff)
+{
+   Instance().setUseMemoryMappedFiles(onoff);
+}
+
 AlembicScene* AlembicSceneCache::Ref(const std::string &filepath, bool persistent)
 {
    return Instance().ref(filepath, persistent);
@@ -45,6 +50,7 @@ AlembicSceneCache& AlembicSceneCache::Instance()
 
 AlembicSceneCache::AlembicSceneCache()
    : mDefaultConcurrency(1)
+   , mUseMemoryMappedFiles(true)
 {
 }
 
@@ -75,6 +81,11 @@ void AlembicSceneCache::setConcurrency(size_t n)
    {
       mDefaultConcurrency = n;
    }
+}
+
+void AlembicSceneCache::setUseMemoryMappedFiles(bool onoff)
+{
+   mUseMemoryMappedFiles = onoff;
 }
 
 std::string AlembicSceneCache::formatPath(const std::string &filepath)
@@ -172,6 +183,16 @@ AlembicScene* AlembicSceneCache::ref(const std::string &filepath, const std::str
          
          factory.setPolicy(Alembic::Abc::ErrorHandler::kQuietNoopPolicy);
          factory.setOgawaNumStreams(mDefaultConcurrency);
+         // Memory mapped files improve read performances by arround 10 ~ 25%
+         // Still, for huge abc files, memory overhead can become a draw back
+         if (mUseMemoryMappedFiles)
+         {
+            factory.setOgawaReadStrategy(Alembic::AbcCoreFactory::IFactory::kMemoryMappedFiles);
+         }
+         else
+         {
+            factory.setOgawaReadStrategy(Alembic::AbcCoreFactory::IFactory::kFileStreams);
+         }
          Alembic::Abc::IArchive archive = factory.getArchive(path, coreType);
          
          if (archive.valid())
