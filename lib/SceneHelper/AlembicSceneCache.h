@@ -12,6 +12,7 @@ class AlembicSceneCache
 public:
    
    static void SetConcurrency(size_t n);
+   static void SetUseMemoryMappedFiles(bool onoff);
 
    static AlembicScene* Ref(const std::string &filepath, bool persistent=false);
    static AlembicScene* Ref(const std::string &filepath, const AlembicSceneFilter &filter, bool persistent=false);
@@ -28,6 +29,7 @@ private:
    ~AlembicSceneCache();
 
    void setConcurrency(size_t n);
+   void setUseMemoryMappedFiles(bool onoff);
    
    std::string formatPath(const std::string &filepath);
    
@@ -53,6 +55,7 @@ private:
    std::map<std::string, CacheEntry> mScenes;
 
    size_t mDefaultConcurrency;
+   bool mUseMemoryMappedFiles;
 };
 
 #endif
